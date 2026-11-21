@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
@@ -207,6 +208,7 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
               );
             },
           ),
+        if (PlatformFeatures.camera)
         MenuItemButton(
           leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
           // The callback awaits the camera route. Holding lock suppression
@@ -215,6 +217,7 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
           onPressed: widget.onCaptureFromCamera,
           child: Text(context.l10n.camera),
         ),
+        if (PlatformFeatures.audioRecorder)
         MenuItemButton(
           leadingIcon: Icon(Icons.mic_none_rounded, color: cs.primary),
           onPressed: () => ref

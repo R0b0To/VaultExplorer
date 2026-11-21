@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart' show PointerMoveEvent;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
@@ -36,7 +37,7 @@ class BrowserLocationIcon extends StatelessWidget {
       return Icon(Icons.sd_card_rounded, size: size, color: color);
     }
     if (container.isLocalStorage) {
-      return Icon(Icons.phone_android_rounded, size: size, color: color);
+      return Icon(PlatformFeatures.localStorageIcon, size: size, color: color);
     }
     return ContainerFormatIcon(
       format: ContainerFormat.fromWire(container.containerFormat),

@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/sync/data/config/sync_config_store.dart';
@@ -1007,66 +1008,70 @@ class _SyncRuleEditorSheetState extends ConsumerState<SyncRuleEditorSheet> {
                           value: _live,
                           onChanged: (v) => setState(() => _live = v),
                         ),
-                        SwitchListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                          title: Text(
-                            l10n.autoSyncScheduledTitle,
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            _scheduleAvailable
-                                ? l10n.autoSyncScheduledSubtitle
-                                : l10n.autoSyncScheduledSetupRequired,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                          value: _scheduledRun,
-                          onChanged: _saving ? null : _setScheduledRun,
-                        ),
-                        if (_scheduledRun)
-                          ListTile(
+                        // Scheduled runs rely on Android's WorkManager and the
+                        // automation password, neither of which exists on desktop.
+                        if (PlatformFeatures.backgroundScheduling) ...[
+                          SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
-                            leading: const Icon(Icons.schedule_rounded),
                             title: Text(
-                              l10n.autoSyncScheduledTimeTitle,
+                              l10n.autoSyncScheduledTitle,
                               style: textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: Text(
-                              l10n.autoSyncScheduledTimeSubtitle,
+                              _scheduleAvailable
+                                  ? l10n.autoSyncScheduledSubtitle
+                                  : l10n.autoSyncScheduledSetupRequired,
                               style: textTheme.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            trailing: TextButton(
-                              onPressed: _saving ? null : _pickScheduledTime,
-                              child: Text(_scheduledTime.format(context)),
-                            ),
+                            value: _scheduledRun,
+                            onChanged: _saving ? null : _setScheduledRun,
                           ),
-                        if (!_scheduleAvailable)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Padding(
-                              padding: const EdgeInsets.only(
-                                left: 16,
-                                bottom: 8,
+                          if (_scheduledRun)
+                            ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
                               ),
-                              child: TextButton(
-                                onPressed: _saving
-                                    ? null
-                                    : _openAutomationSettings,
-                                child: Text(l10n.autoSyncScheduledConfigure),
+                              leading: const Icon(Icons.schedule_rounded),
+                              title: Text(
+                                l10n.autoSyncScheduledTimeTitle,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                l10n.autoSyncScheduledTimeSubtitle,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                              trailing: TextButton(
+                                onPressed: _saving ? null : _pickScheduledTime,
+                                child: Text(_scheduledTime.format(context)),
                               ),
                             ),
-                          ),
+                          if (!_scheduleAvailable)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 16,
+                                  bottom: 8,
+                                ),
+                                child: TextButton(
+                                  onPressed: _saving
+                                      ? null
+                                      : _openAutomationSettings,
+                                  child: Text(l10n.autoSyncScheduledConfigure),
+                                ),
+                              ),
+                            ),
+                        ],
                         SwitchListTile(
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 
 enum DisguiseMode {
   vault,
@@ -27,6 +28,9 @@ class DisguiseModeApi {
   const DisguiseModeApi();
 
   Future<DisguiseMode> getMode() async {
+    // Mask Mode swaps the Android launcher identity; desktop is always the
+    // real app, whatever a restored setting says.
+    if (!PlatformFeatures.maskMode) return DisguiseMode.vault;
     try {
       final result = await _channel.invokeMethod<String>('getMode');
       return DisguiseMode.fromWire(result);

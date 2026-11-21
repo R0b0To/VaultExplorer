@@ -138,7 +138,9 @@ write, create directory, rename, delete, set mtime, copy between volumes, space 
 screen, lock. **Import** (pick files or a folder, conflict resolution skip / overwrite / keep both,
 free-space guard, progress, cancel, delete-sources-after-import) and **export** (to a folder, "save as",
 extract-to-path), with the same progress and per-item events the Android handlers push. **Image
-thumbnails and previews** (Flutter codecs, PNG output, IMAGE_TOO_LARGE guard), **open with / open link /
+thumbnails and previews** (Flutter codecs, PNG output, IMAGE_TOO_LARGE guard), **full-resolution images in the
+viewer** (`getMediaFileSize` / `readMediaFileChunk`, which the viewers use in place of `getFileSize` /
+`readFileChunk`), **video thumbnails** (see "Video thumbnails" below), **open with / open link /
 open local file** via the desktop's default handler.
 
 **Crypto primitives** (`hashPassword`, `hashPasswordSha256`, `pbkdf2`, `hmac`, `scrypt`, `argon2id`,
@@ -257,24 +259,55 @@ media viewer -> NativeVideoController -> VideoPlaybackBackend
   Without libmpv the app still runs; opening a video shows an "install libmpv" error. `pubspec.lock` was not
   regenerated.
 
+### Video thumbnails
+
+`getVideoThumbnail` / `getVideoThumbnailWithSize` take one frame out of the same libmpv the player uses (Android
+uses MediaMetadataRetriever; the engine has no video decoder of its own):
+
+```
+host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), slots, cancel on lock)
+          |- grabFrameWithMpv   (mpv_frame_grabber.dart: fresh paused Player + VideoController, first picture,
+          |                      Player.screenshot as JPEG, player disposed)
+          '- decodeVideoFrame   (video_frame_decoder.dart: scale-while-decoding to the target size, PNG out,
+                                  8x8 "is this frame blank" check)
+```
+
+- Source: the loopback media server session of the file (so nothing decrypted touches storage), or a `file:` URL
+  for local-storage items and the temp copies archive previews use. The player gets the same lock-down as
+  playback (`cache-on-disk` off and verified, sidecar loading off, protocol whitelist) plus: software decode and
+  rendering, no audio output, and a 16 MiB read-ahead cap (mpv's default would pull ~150 MiB of the vault through
+  the decryption per thumbnail).
+- Frame choice follows Android: `firstFrame` = time 0; `frameAtPercentage` = `framePosition` of the duration
+  (clamped to 5%..90%, needs a second open once the duration is known); `hybrid` (default) = time 0, and if that
+  frame is blank (`isLikelyBlankFrame`, a port of the Kotlin heuristic) the first non-blank frame at
+  `framePosition`, 25% or 45%. An explicit `timeUs` (the video editor) is used as is.
+- At most 2 players at a time; a locked vault drops its queued requests. Any failure answers `null`, which the Dart
+  side treats as "no thumbnail for this video" (placeholder icon), exactly as for an Android `FRAME_FAILED`.
+- Thumbnails are PNG (like image thumbnails), so they are larger than Android's JPEG ones in the cache.
+- The pure parts (`video_thumbnail_logic.dart`, `desktop_video_thumbnails.dart`) are covered by
+  `test/core/engine/desktop/video_thumbnail_logic_test.dart` and `desktop_video_thumbnails_test.dart`. The mpv and
+  `dart:ui` adapters have **not been run inside Flutter**: they follow `desktop_video_backend.dart` and
+  `desktop_images.dart` closely, but `Player.screenshot` and the first-frame signal of an off-screen
+  `VideoController` are the first things to check on a real Linux / Windows build.
+
 ## Not yet
 
-- Engine-channel coverage: of the 375 methods the Dart layer calls, the desktop host answers 107 and answers
-  45 Android-only ones with a harmless default; **228 still reply `null`**. Many are Android-only (camera 26,
+- Engine-channel coverage: of the 375 methods the Dart layer calls, the desktop host answers 111 and answers
+  45 Android-only ones with a harmless default; **224 still reply `null`**. Many are Android-only (camera 26,
   Media3 23, audio recorder 12, panic 11, disguise 10, automation 10, PiP 6, quick capture 7). The ones worth
   doing for desktop: repair / check / header tools (`vault_repair_api`, 11, including
   `checkFolderVault` / `repairFolderVault`), archives (`vault_archive_api`, 8 -- the libarchive engine is already
   in the build, it only needs ABI functions), PDF (8), audio editing (4), `mountContainerFolder` /
-  `createUsbContainer` / pickers in `vault_lifecycle_api`, and part of `vault_file_io_api` (36, e.g. video
-  thumbnails, `getMediaFileSize`).
+  `createUsbContainer` / pickers in `vault_lifecycle_api`, and part of `vault_file_io_api` (32, e.g.
+  `probeImageDimensions`, which the gallery only uses to lay tiles out early and treats `null` as "unknown").
 - In-place growth (new in this main): `expandVeraCryptContainer`, `expandLuksContainer`, `growVeraCryptFileSystem`,
   `growLuksFileSystem`. The engine already has `fsGrowToFit` (NTFS and ext2/3/4; FAT/exFAT report unsupported); it only needs
   ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.
 - Windows: folder vaults on a real Windows machine (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
   MinGW, and re-running the engine smoke test after the rebase.
-- Archives, video thumbnails, PDF, camera, video/audio editing -- need their
-  desktop backends (they are platform code on Android). Video **playback** is done (below); video
-  thumbnails, scrub-preview frames, picture-in-picture and background playback / media session are not.
+- Archives, PDF, camera, video/audio editing -- need their
+  desktop backends (they are platform code on Android). Video **playback** and **thumbnails** are done (below);
+  scrub-preview frames, picture-in-picture and background playback / media session are not.
 - Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification
   (the engine still rejects an illegal name when it writes it).
 - Share sheet; JPEG/WebP encoding for the image editor (PNG only for now).

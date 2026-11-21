@@ -87,6 +87,7 @@ class SettingsSearchEntry {
     this.keywords = const [],
     this.scrollTo = true,
     this.minSdk,
+    this.available,
   });
 
   /// Stable identifier, e.g. `security.master_password`. Never shown.
@@ -109,6 +110,10 @@ class SettingsSearchEntry {
 
   /// Hide the entry below this Android SDK level (the row isn't shown there).
   final int? minSdk;
+
+  /// Hide the entry when this returns false (the row isn't shown on this
+  /// platform, e.g. an Android-only feature on desktop). Null means always.
+  final bool Function()? available;
 
   ResolvedSettingsEntry resolve(AppLocalizations l10n) {
     final resolvedTitle = title(l10n);

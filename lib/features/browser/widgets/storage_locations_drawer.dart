@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -189,7 +190,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
                       selected: activeVolId == kDecoyLocalVolId,
                       selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
                       leading: Icon(
-                        Icons.phone_android_rounded,
+                        PlatformFeatures.localStorageIcon,
                         color: activeVolId == kDecoyLocalVolId ? cs.primary : cs.onSurfaceVariant,
                       ),
                       title: Text(

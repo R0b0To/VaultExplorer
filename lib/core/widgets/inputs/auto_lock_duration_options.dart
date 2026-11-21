@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/widgets/inputs/duration_picker_dialog.dart';
 import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 
@@ -75,7 +76,13 @@ List<SelectOption<int>> autoLockDurationOptions(
   final options = <SelectOption<int>>[
     if (defaultOption != null) defaultOption,
     if (immediateOption != null) immediateOption,
-    if (screenLockOnlyOption != null) screenLockOnlyOption,
+    // "Only when the screen turns off" needs a screen-off event, which desktop
+    // sessions don't have. A value already saved (e.g. imported from an
+    // Android backup) keeps its entry so the picker still has a match.
+    if (screenLockOnlyOption != null &&
+        (PlatformFeatures.lockOnScreenOff ||
+            currentMinutes == kScreenLockOnlyAutoLockDuration))
+      screenLockOnlyOption,
     zeroOption,
     for (final mins in _presetAutoLockMinutes)
       SelectOption(value: mins, label: formatAutoLockDuration(context, mins)),

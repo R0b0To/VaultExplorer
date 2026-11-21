@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart'
@@ -43,7 +44,18 @@ class DuressSettingsService {
   Future<String?> getPinHash() => _secure.read(key: _kPinHash);
   Future<String?> getPatternHash() => _secure.read(key: _kPatternHash);
 
+  // A duress credential's only effect is to trigger a panic purge, which is an
+  // Android-only feature. On desktop stored credentials (for example from a
+  // restored Android backup) are ignored, so none can match at unlock.
   Future<DuressConfig> getConfig() async {
+    if (!PlatformFeatures.panicResponder) {
+      return (
+        configured: false,
+        hasPassword: false,
+        hasPin: false,
+        hasPattern: false,
+      );
+    }
     final pwHash = await _secure.read(key: _kPasswordHash);
     final pinHash = await _secure.read(key: _kPinHash);
     final patternHash = await _secure.read(key: _kPatternHash);
@@ -72,6 +84,7 @@ class DuressSettingsService {
   }
 
   Future<bool> verifyPassword(String candidate) async {
+    if (!PlatformFeatures.panicResponder) return false;
     final hash = await _secure.read(key: _kPasswordHash);
     final salt = await _secure.read(key: _kPasswordSalt);
     if (hash == null || salt == null) return false;
@@ -98,6 +111,7 @@ class DuressSettingsService {
   }
 
   Future<bool> verifyPin(String candidate) async {
+    if (!PlatformFeatures.panicResponder) return false;
     final hash = await _secure.read(key: _kPinHash);
     if (hash == null) return false;
     return pin_lock.verifyPin(_cryptoApi, candidate, hash);
@@ -114,6 +128,7 @@ class DuressSettingsService {
   }
 
   Future<bool> verifyPattern(List<int> candidate) async {
+    if (!PlatformFeatures.panicResponder) return false;
     final hash = await _secure.read(key: _kPatternHash);
     if (hash == null) return false;
     return pattern_lock.verifyPattern(_cryptoApi, candidate, hash);

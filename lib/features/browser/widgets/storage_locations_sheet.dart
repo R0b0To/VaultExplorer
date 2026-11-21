@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
@@ -114,7 +115,7 @@ class StorageLocationsSheet extends ConsumerWidget {
 
             // 1. Primary Internal Storage
             ListTile(
-              leading: Icon(Icons.phone_android_rounded, color: cs.primary),
+              leading: Icon(PlatformFeatures.localStorageIcon, color: cs.primary),
               title: Text(
                 primaryLocalContainer.displayName,
                 style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),

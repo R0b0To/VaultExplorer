@@ -35,6 +35,7 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/emergency_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/quick_capture_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_index.dart';
@@ -336,6 +337,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                 onTap: () =>
                     setState(() => _selectedSection = _SettingsSection.security),
               ),
+              if (PlatformFeatures.storageIntegrationSettings)
               _buildHubTile(
                 icon: Icons.settings_input_composite_rounded,
                 iconColor: cs.secondary,
@@ -528,6 +530,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                       ),
                     ),
                   ),
+                  if (PlatformFeatures.storageIntegrationSettings)
                   _buildHubTile(
                     icon: Icons.settings_input_composite_rounded,
                     iconColor: cs.secondary,
@@ -1607,7 +1610,8 @@ class _SecuritySettingsScreenState
                         }
                       },
                     ),
-                    if (!state.settings.appLockScreenLockOnly)
+                    if (PlatformFeatures.lockOnScreenOff &&
+                        !state.settings.appLockScreenLockOnly)
                       SwitchListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1726,6 +1730,7 @@ class _SecuritySettingsScreenState
                         }
                       },
                     ),
+                  if (PlatformFeatures.screenshotBlocking)
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
@@ -1752,6 +1757,7 @@ class _SecuritySettingsScreenState
                           );
                     },
                   ),
+                  if (PlatformFeatures.derivedKeyCache)
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
@@ -1777,95 +1783,101 @@ class _SecuritySettingsScreenState
               ),
               const SizedBox(height: 16),
 
-              // 3a. Mask Mode
-              SectionHeader(context.l10n.sectionMaskMode),
-              SectionCard(
-                children: [
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    title: Text(
-                      context.l10n.discreteModeTitle,
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+              if (PlatformFeatures.maskMode) ...[
+                // 3a. Mask Mode
+                SectionHeader(context.l10n.sectionMaskMode),
+                SectionCard(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      title: Text(
+                        context.l10n.discreteModeTitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    subtitle: Text(
-                      state.disguiseMode == DisguiseMode.decoy
-                          ? context.l10n.discreteModeActiveSubtitle
-                          : context.l10n.discreteModeInactiveSubtitle,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
+                      subtitle: Text(
+                        state.disguiseMode == DisguiseMode.decoy
+                            ? context.l10n.discreteModeActiveSubtitle
+                            : context.l10n.discreteModeInactiveSubtitle,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
+                      value: state.disguiseMode == DisguiseMode.decoy,
+                      onChanged: _setDiscreteMode,
                     ),
-                    value: state.disguiseMode == DisguiseMode.decoy,
-                    onChanged: _setDiscreteMode,
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
 
-              // 3b. Emergency Panic & Duress
-              SectionHeader(context.l10n.emergencyPanicTitle),
-              SectionCard(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.warning_amber_rounded, color: cs.error),
-                    title: Text(
-                      context.l10n.emergencyPanicTitle,
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+              if (PlatformFeatures.panicResponder) ...[
+                // 3b. Emergency Panic & Duress
+                SectionHeader(context.l10n.emergencyPanicTitle),
+                SectionCard(
+                  children: [
+                    ListTile(
+                      leading: Icon(Icons.warning_amber_rounded, color: cs.error),
+                      title: Text(
+                        context.l10n.emergencyPanicTitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        context.l10n.emergencyPanicSubtitle,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const EmergencySettingsScreen()),
+                        ),
                       ),
                     ),
-                    subtitle: Text(
-                      context.l10n.emergencyPanicSubtitle,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const EmergencySettingsScreen()),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
 
-              // 3c. Quick Capture
-              SectionHeader(context.l10n.quickCaptureSettingsTitle),
-              SectionCard(
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.bolt_rounded, color: cs.primary),
-                    title: Text(
-                      context.l10n.quickCaptureSettingsTitle,
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+              if (PlatformFeatures.quickCapture) ...[
+                // 3c. Quick Capture
+                SectionHeader(context.l10n.quickCaptureSettingsTitle),
+                SectionCard(
+                  children: [
+                    ListTile(
+                      leading: Icon(Icons.bolt_rounded, color: cs.primary),
+                      title: Text(
+                        context.l10n.quickCaptureSettingsTitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        context.l10n.quickCaptureSettingsSubtitle,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const QuickCaptureSettingsScreen()),
+                        ),
                       ),
                     ),
-                    subtitle: Text(
-                      context.l10n.quickCaptureSettingsSubtitle,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const QuickCaptureSettingsScreen()),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
 
               // 3d. Authenticator (TOTP 2FA)
               SectionHeader(context.l10n.authenticatorSettingsTitle),
@@ -2945,6 +2957,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
                           );
                     },
                   ),
+                  if (PlatformFeatures.logcat)
                   ListTile(
                     title: Text(
                       context.l10n.logcatTitle,

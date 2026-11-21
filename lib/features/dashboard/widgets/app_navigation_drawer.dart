@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
@@ -789,7 +790,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                           alpha: 0.5,
                         ),
                         leading: Icon(
-                          Icons.phone_android_rounded,
+                          PlatformFeatures.localStorageIcon,
                           color: currentVolId == kDecoyLocalVolId
                               ? cs.primary
                               : cs.onSurfaceVariant,

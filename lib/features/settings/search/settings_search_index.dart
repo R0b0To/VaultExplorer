@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_models.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -62,6 +63,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     fallback: (l) => l.masterLockTitle,
     details: [(l) => l.lockAppOnScreenOffSubtitle],
     keywords: ['screen off', 'lock screen', 'sleep'],
+    available: () => PlatformFeatures.lockOnScreenOff,
   ),
   _e(
     'security.auto_lock_containers',
@@ -95,6 +97,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       'secure screen',
       'screenshot',
     ],
+    available: () => PlatformFeatures.screenshotBlocking,
   ),
   _e(
     'security.cache_derived_keys',
@@ -103,6 +106,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.autoLockContainersTitle,
     details: [(l) => l.cacheDerivedKeysSubtitle],
     keywords: ['key cache', 'remember keys', 'faster unlock', 'speed'],
+    available: () => PlatformFeatures.derivedKeyCache,
   ),
   _e(
     'security.discreet_mode',
@@ -114,6 +118,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       (l) => l.discreteModeInactiveSubtitle,
     ],
     keywords: ['mask', 'disguise', 'stealth', 'hide', 'discreet', 'privacy'],
+    available: () => PlatformFeatures.maskMode,
   ),
   _e(
     'security.authenticator_enable',
@@ -139,6 +144,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       'lockdown',
       'emergency',
     ],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'quick_capture.screen',
@@ -147,6 +153,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     scrollTo: false,
     details: [(l) => l.quickCaptureSettingsSubtitle],
     keywords: ['camera', 'tile', 'shortcut', 'scratchpad', 'capture', 'photo'],
+    available: () => PlatformFeatures.quickCapture,
   ),
   _e(
     'authenticator.screen',
@@ -170,6 +177,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       (l) => l.panicTierNuclearSubtitle,
     ],
     keywords: ['panic level', 'severity', 'wipe'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.quick_tile',
@@ -177,6 +185,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.panicQuickTileTitle,
     details: [(l) => l.panicQuickTileSubtitle],
     keywords: ['quick settings tile', 'shortcut', 'panic button'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.trigger_now',
@@ -184,6 +193,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.triggerPanicNowTitle,
     details: [(l) => l.triggerPanicNowSubtitle],
     keywords: ['panic now', 'wipe now', 'test panic'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.boot_trigger',
@@ -191,6 +201,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.sectionPanicBootTrigger,
     details: [(l) => l.panicBootTriggerLevelLabel],
     keywords: ['boot', 'startup', 'restart', 'reboot'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.boot_trigger_arm',
@@ -198,12 +209,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.panicBootTriggerArmTitle,
     section: (l) => l.sectionPanicBootTrigger,
     keywords: ['arm', 'reboot', 'boot'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.kit',
     SettingsDestination.emergency,
     (l) => l.sectionPanicKit,
     keywords: ['panic kit', 'responder', 'companion app'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.kit_enable',
@@ -212,6 +225,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.sectionPanicKit,
     details: [(l) => l.panicKitEnableSubtitle],
     keywords: ['panic kit', 'responder'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.kit_pairing',
@@ -221,6 +235,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     fallback: (l) => l.panicKitEnableTitle,
     details: [(l) => l.panicKitEnforcePairingSubtitle],
     keywords: ['panic kit', 'pairing', 'trusted app'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.duress',
@@ -228,6 +243,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.sectionDuressUnlock,
     details: [(l) => l.duressPasswordTitle, (l) => l.duressPatternTitle],
     keywords: ['decoy', 'fake password', 'coercion', 'duress', 'hidden'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.duress_password',
@@ -239,6 +255,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       (l) => l.duressPasswordNotConfiguredSubtitle,
     ],
     keywords: ['decoy password', 'fake password', 'coercion'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.duress_pin',
@@ -250,6 +267,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       (l) => l.duressPinNotConfiguredSubtitle,
     ],
     keywords: ['decoy pin', 'fake pin', 'coercion'],
+    available: () => PlatformFeatures.panicResponder,
   ),
   _e(
     'emergency.duress_pattern',
@@ -261,6 +279,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       (l) => l.duressPatternNotConfiguredSubtitle,
     ],
     keywords: ['decoy pattern', 'fake pattern', 'coercion'],
+    available: () => PlatformFeatures.panicResponder,
   ),
 
   // ──────────────────────────────── Quick capture ────────────────────────────
@@ -271,6 +290,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.sectionQuickCapture,
     details: [(l) => l.quickCaptureTileToggleSubtitle],
     keywords: ['quick settings tile', 'camera', 'capture'],
+    available: () => PlatformFeatures.quickCapture,
   ),
   _e(
     'quick_capture.shortcut',
@@ -279,6 +299,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.sectionQuickCapture,
     details: [(l) => l.quickCaptureAddShortcutSubtitle],
     keywords: ['home screen', 'shortcut', 'pin', 'camera', 'capture'],
+    available: () => PlatformFeatures.quickCapture,
   ),
 
   // ───────────────────────────────── Authenticator ───────────────────────────
@@ -334,6 +355,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       'speed',
       'fast',
     ],
+    available: () => PlatformFeatures.storagePermission,
   ),
   _e(
     'storage.keep_running',
@@ -347,6 +369,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       'keep alive',
       'battery',
     ],
+    available: () => PlatformFeatures.backgroundService,
   ),
   _e(
     'storage.usb_prompt',
@@ -354,6 +377,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.usbAttachPromptTitle,
     details: [(l) => l.usbAttachPromptSubtitle],
     keywords: ['usb', 'otg', 'drive', 'attach', 'plug in', 'stick'],
+    available: () => PlatformFeatures.usbHost,
   ),
   _e(
     'storage.file_provider',
@@ -367,6 +391,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
       'expose',
       'storage access framework',
     ],
+    available: () => PlatformFeatures.storageIntegrationSettings,
   ),
   _e(
     'storage.share_sheet',
@@ -374,6 +399,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.shareSheetIntegrationTitle,
     details: [(l) => l.shareSheetIntegrationSubtitle],
     keywords: ['share', 'send to', 'import', 'share target', 'share menu'],
+    available: () => PlatformFeatures.shareTarget,
   ),
   _e(
     'storage.share_import_lock',
@@ -381,6 +407,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.autoLockOnShareImportTitle,
     details: [(l) => l.autoLockOnShareImportSubtitle],
     keywords: ['share', 'import', 'lock'],
+    available: () => PlatformFeatures.shareTarget,
   ),
 
   // ───────────────────────────── Vault & file handling ───────────────────────
@@ -875,6 +902,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     ],
     // Back-gesture progress needs Android 14; the row is hidden below that.
     minSdk: 34,
+    available: () => PlatformFeatures.predictiveBack,
   ),
 
   // ─────────────────────────── Screens reached from Appearance ───────────────
@@ -924,6 +952,7 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     scrollTo: false,
     details: [(l) => l.logcatSubtitle],
     keywords: ['logs', 'logcat', 'debug', 'diagnostics', 'troubleshooting'],
+    available: () => PlatformFeatures.logcat,
   ),
 
   // ─────────────────────────────────── About ─────────────────────────────────
@@ -1015,6 +1044,7 @@ SettingsSearchEntry _e(
   List<String> keywords = const [],
   bool scrollTo = true,
   int? minSdk,
+  bool Function()? available,
 }) {
   return SettingsSearchEntry(
     id: id,
@@ -1026,6 +1056,7 @@ SettingsSearchEntry _e(
     keywords: keywords,
     scrollTo: scrollTo,
     minSdk: minSdk,
+    available: available,
   );
 }
 
@@ -1037,7 +1068,8 @@ List<ResolvedSettingsEntry> resolveSettingsSearchIndex(
 }) {
   return [
     for (final entry in kSettingsSearchEntries)
-      if (entry.minSdk == null || androidSdkInt >= entry.minSdk!)
+      if ((entry.minSdk == null || androidSdkInt >= entry.minSdk!) &&
+          (entry.available?.call() ?? true))
         entry.resolve(l10n),
   ];
 }

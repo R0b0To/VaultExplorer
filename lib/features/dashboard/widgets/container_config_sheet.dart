@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_controller.dart';
@@ -1372,6 +1373,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 ),
               ),
             ),
+            if (PlatformFeatures.automation)
             ListTile(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,

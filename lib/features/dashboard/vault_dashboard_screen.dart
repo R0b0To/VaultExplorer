@@ -27,6 +27,7 @@ import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_sheet.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_dashboard_content_view.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_app_bar.dart';
@@ -752,13 +753,15 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
 
     bool hasUsb = false;
-    try {
-      final devices = await ref
-          .read(vaultLifecycleApiProvider)
-          .listUsbDevices();
-      hasUsb = devices.isNotEmpty;
-    } catch (e) {
-      VeLog.w(_kLogTag, 'USB device enumeration failed', e);
+    if (PlatformFeatures.usbHost) {
+      try {
+        final devices = await ref
+            .read(vaultLifecycleApiProvider)
+            .listUsbDevices();
+        hasUsb = devices.isNotEmpty;
+      } catch (e) {
+        VeLog.w(_kLogTag, 'USB device enumeration failed', e);
+      }
     }
 
     if (!mounted) return;

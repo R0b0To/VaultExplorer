@@ -22,6 +22,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 import 'desktop_crypto.dart';
@@ -33,8 +34,11 @@ import 'desktop_mounts.dart';
 import 'desktop_secure_store.dart';
 import 'desktop_split_join.dart';
 import 'desktop_transfers.dart';
+import 'desktop_video_thumbnails.dart';
 import 'engine_worker_pool.dart';
+import 'mpv_frame_grabber.dart';
 import 've_native.dart';
+import 'video_frame_decoder.dart';
 
 /// What the app is told about an active session (Android keeps this in ContainerSessionRegistry).
 class _SessionMeta {
@@ -79,6 +83,20 @@ class DesktopEngineHost {
 
   /// Thumbnails / image export (Flutter codecs; see desktop_images.dart).
   late final DesktopImages _images = DesktopImages(readWhole: _readWholeVaultFile);
+
+  /// Video thumbnails: one frame out of libmpv, read through the loopback media server like playback is (see
+  /// desktop_video_thumbnails.dart). Nothing is started until the first request.
+  late final DesktopVideoThumbnails _videoThumbs = DesktopVideoThumbnails(
+    openVaultFile: (vol, path) async {
+      final size = await pool.call('fileSize', [vol, path]) as int;
+      if (size <= 0) return null; // missing, unreadable or empty: no point starting a player
+      final session = await mediaServer.open(volId: vol, filePath: path);
+      return VideoSource(url: session.url, close: session.close);
+    },
+    grab: grabFrameWithMpv,
+    decode: decodeVideoFrame,
+    log: (message) => debugPrint('[desktop-thumbnail] $message'),
+  );
 
   /// Handing files to other apps + a few host-file helpers (see desktop_external.dart).
   final DesktopExternal _external = DesktopExternal();
@@ -295,6 +313,15 @@ class DesktopEngineHost {
       case ChannelMethods.encodeImage:
         return _images.encode(args);
 
+      // ── video thumbnails ── (null on any failure: the callers treat that as "no thumbnail for this video")
+      case ChannelMethods.getVideoThumbnail:
+        return (await _videoThumbnail(args))?.bytes;
+      case ChannelMethods.getVideoThumbnailWithSize:
+        {
+          final t = await _videoThumbnail(args);
+          return t == null ? null : {'bytes': t.bytes, 'width': t.width, 'height': t.height};
+        }
+
       // ── other applications ──
       case ChannelMethods.launchUrl:
         return _external.launchUrl(args['url'] as String? ?? '');
@@ -404,11 +431,17 @@ class DesktopEngineHost {
           _throwFor(r[0] as int);
           return (r[1] as List<Object?>).cast<String>();
         }
+      // The `...Media...` pair is what the viewers use (full-resolution images, prefetch, players). On Android
+      // they run on their own executor so a long media read cannot starve browsing; the engine here is already
+      // reached through worker isolates, so they are the same calls. Leaving them unanswered made every image
+      // open with "size 0" and never get past its thumbnail.
       case ChannelMethods.getFileSize:
+      case ChannelMethods.getMediaFileSize:
         return _size(await pool.call('fileSize', [_vol(args['filePath']), args['fileName']]) as int);
       case ChannelMethods.getFolderSize:
         return _size(await pool.call('folderSize', [_vol(args['filePath']), args['dirPath']]) as int);
       case ChannelMethods.readFileChunk:
+      case ChannelMethods.readMediaFileChunk:
         {
           final r = await pool.call('read', [
             _vol(args['filePath']),
@@ -1044,6 +1077,7 @@ class DesktopEngineHost {
   // ── sessions ───────────────────────────────────────────────────────────
 
   void _forget(int vol) {
+    _videoThumbs.cancelVolume(vol);
     unawaited(_mediaServer?.closeVolume(vol));
     _mounts.forgetVolume(vol); // the engine unmounts a slot's mounts when it locks it
     final uri = _uriByVol.remove(vol);
@@ -1271,6 +1305,29 @@ class DesktopEngineHost {
 
   // ── helpers ────────────────────────────────────────────────────────────
 
+  /// Parses the arguments shared by `getVideoThumbnail` and `getVideoThumbnailWithSize` (same names Android's
+  /// handler reads) and runs the request.
+  Future<VideoThumbnail?> _videoThumbnail(Map<Object?, Object?> args) {
+    final fileName = args['fileName'] as String;
+    final isLocal = args['isLocalStorage'] == true;
+    final timeUs = (args['timeUs'] as num?)?.toInt();
+    return _videoThumbs.thumbnail(
+      VideoThumbnailRequest(
+        // A vault file belongs to a mounted volume (NOT_MOUNTED otherwise, as for every other call). A local one
+        // is a path on this machine: absolute already (archive previews), or relative to the folder that was added.
+        volId: isLocal ? null : _vol(args['filePath']),
+        path: !isLocal
+            ? fileName
+            : (p.isAbsolute(fileName) ? fileName : p.join(args['filePath'] as String, fileName)),
+        isLocalFile: isLocal,
+        targetSize: (args['targetSize'] as num?)?.toInt() ?? 180,
+        strategy: ThumbnailGenerationStrategy.fromJson(args['strategy'] as String?),
+        framePosition: (args['framePosition'] as num?)?.toDouble() ?? 0.12,
+        explicitTimeUs: timeUs != null && timeUs >= 0 ? timeUs : null,
+      ),
+    );
+  }
+
   int _vol(Object? uri) {
     final vol = _volByUri[uri];
     if (vol == null) {
@@ -1341,6 +1398,7 @@ class DesktopEngineHost {
 
   Future<void> dispose() async {
     _pump?.cancel();
+    _videoThumbs.dispose();
     await _mediaServer?.closeAll();
     for (final vol in _uriByVol.keys.toList()) {
       await pool.call('lock', [vol]);

@@ -104,7 +104,7 @@ For repeat builds from PowerShell, run `scripts/build_windows.ps1 -Run`. It prep
 `.dart_tool/package_config.json` is missing, rebuilds `vaultexplorer_engine.dll` with the MSYS2 UCRT64 toolchain,
 builds the Flutter Windows app, copies the DLL next to the runner, and optionally starts it. Add `-PubGet` to
 force a package refresh, `-Configuration Release` for a release build, or `-Msys2Root <path>` when MSYS2 is not
-installed at `C:\msys64`. The script stops if the app is open, so close it before rebuilding. It checks for the
+installed under `C:\Tools\msys64`, `C:\msys64` or `C:\msys2`. The script checks whether the runner or DLL is locked and stops with a message; close the app before rebuilding. It checks for the
 MSYS2 UCRT64 CMake, Ninja, GCC and G++ tools but does not install them; see the package command above.
 
 What the Windows port changed, and why (all behind the desktop/Windows switches, so Android is unchanged):

@@ -81,6 +81,14 @@ std::wstring widen(const std::string& s) {
     return w;
 }
 
+std::string narrow(const std::wstring& w) {
+    if (w.empty()) return std::string();
+    const int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()), nullptr, 0, nullptr, nullptr);
+    std::string s(static_cast<size_t>(n), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()), &s[0], n, nullptr, nullptr);
+    return s;
+}
+
 void loadModule() {
     std::wstring dir;
     HKEY key = nullptr;
@@ -104,21 +112,34 @@ void loadModule() {
 #else
     const wchar_t* dll = L"bin\\winfsp-x64.dll";
 #endif
-    gModule = LoadLibraryExW((dir + dll).c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    const std::wstring dllPath = dir + dll;
+    gModule = LoadLibraryExW(dllPath.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
     if (!gModule) {
-        gLoadError = "WinFsp is not installed (get it from https://winfsp.dev, install the Core component)";
+        const DWORD err = GetLastError();
+        if (GetFileAttributesW(dllPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            gLoadError = "WinFsp is not installed (looked for " + narrow(dllPath) +
+                         "; get it from https://winfsp.dev, install the Core component)";
+        } else {
+            // present but refused to load (a missing dependency also reports ERROR_MOD_NOT_FOUND)
+            gLoadError = "could not load " + narrow(dllPath) + " (Windows error " + std::to_string(err) + ")";
+        }
         return;
     }
     static const char* required[] = {"fsp_fuse3_new", "fsp_fuse3_mount", "fsp_fuse3_unmount", "fsp_fuse3_destroy",
                                      "fsp_fuse3_exit", "fsp_fuse3_loop", "fsp_fuse3_get_context",
                                      "fsp_fuse_opt_add_arg", "fsp_fuse_opt_free_args"};
+    std::string missing;
     for (const char* name : required) {
         if (!GetProcAddress(gModule, name)) {
-            gLoadError = "the installed WinFsp is too old (FUSE 3 API missing); please update it";
-            FreeLibrary(gModule);
-            gModule = nullptr;
-            return;
+            if (!missing.empty()) missing += ", ";
+            missing += name;
         }
+    }
+    if (!missing.empty()) {
+        gLoadError = "the WinFsp at " + narrow(dllPath) + " is missing: " + missing +
+                     " (the FUSE 3 API needs a recent WinFsp; please update it)";
+        FreeLibrary(gModule);
+        gModule = nullptr;
     }
 }
 

@@ -3,7 +3,7 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include "block_io.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
@@ -28,7 +28,7 @@
 #undef max
 #include <algorithm>
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 
 // Reduced to 256 sectors (128 KB) to guarantee zero endpoint stalls on Android USB bulk transfers
 static constexpr uint64_t CREATE_FILL_BATCH = 256;

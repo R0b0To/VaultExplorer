@@ -6,8 +6,8 @@
 #include <openssl/sha.h>
 #include "io/host_file.h"
 #ifdef __ANDROID__
-#include <android/log.h>
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Composite", __VA_ARGS__)
+#include "platform/engine_log.h"
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_Composite", __VA_ARGS__)
 #else
 #define LOGI(...) do {} while(0)
 #endif

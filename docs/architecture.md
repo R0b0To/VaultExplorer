@@ -108,6 +108,23 @@ attached. Everything else -- listing, per-chunk I/O, streams, `ContainerEngine`'
 dispatch, `ContainerSessionRegistry`'s locks -- still runs in Kotlin and moves over
 operation by operation.
 
+**Engine / host boundary** (`cpp/platform/`). The portable engine (`session/`, `io/`,
+`filesystems/`, `containers/`, `crypto/`, `foldervault/`, `volman/`, `xfer/` and the rest of the
+directories listed in `scripts/check_engine_portable.py`) must build without a JVM or the NDK, so a
+desktop front-end can link it. Two small headers are all it needs from its host. `engine_hooks.h`
+declares the callbacks the engine makes -- unlock / copy / import / export / split-join progress,
+cancellation polling, lock yielding, raw USB sector I/O -- with no JNI type in them; on Android
+`jni/jni_callbacks.cpp` defines them by calling into Kotlin, while `engine_hooks_default.cpp` is the
+do-nothing set for a host with no use for them (never compiled into the Android library). `engine_log.h`
+turns the engine's `LOGI(...)`-style macros into the *same* `__android_log_print` call on Android, and
+into a sink the host installs with `engineLogSetSink()` (a no-op until it does) everywhere else.
+`jni/jni_callbacks.h` now only holds the JVM globals; the two helpers that throw Kotlin exceptions
+(`throwNotUnlocked`, `throwReadOnly`) moved from `session/session_guard.cpp` to
+`jni/session_guard_jni.cpp`. `scripts/check_engine_portable.py` (also a CTest entry) fails if any file
+in a portable directory includes `<jni.h>`, an `<android/...>` header or a bridge header. Not yet done
+for a desktop build: the engine's volume I/O is POSIX file-descriptor based (`volume_state.h` includes
+`<unistd.h>`), so Windows needs a shim or a port there.
+
 **Transfer helpers** (`cpp/xfer/`). A third platform-neutral library for byte-level work that
 needs no policy: content hashing (MD5 / SHA-1 / SHA-256 / SHA-512, several in one pass, on the
 mbedtls the folder-vault core already links) and splitting / joining files into numbered parts
@@ -1350,7 +1367,8 @@ than take this summary on faith:
   behind the manager with copies between every pair of formats) and
   `volman_block_test` (the block-device adapter on the real `volumes[]` table over a fake
   filesystem layer, beside real vaults; registered only where `<openssl/aes.h>` exists),
-  `xfer_test` (hash known-answer vectors, part naming and sequence resolution, split / join on
+  `engine_log_test` and `engine_hooks_default_test` (the logging shim and the default hooks,
+  built with no JNI or Android header), `xfer_test` (hash known-answer vectors, part naming and sequence resolution, split / join on
   in-memory streams and on real files), `prims_test` (HMAC / PBKDF2 / AES-GCM / AES-CBC against
   independently generated vectors, input contracts, tamper detection),
   `composite_block_device_test`, `sector_batching_test`, `fs_scan_test`,

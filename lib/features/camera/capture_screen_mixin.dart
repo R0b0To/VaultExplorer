@@ -54,6 +54,22 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   /// Live outline from the native document detector.
   void onDocumentQuadEvent(Map<String, dynamic> event) {}
 
+  // Panorama / photo-sphere capture is optional too; screens that offer it
+  // override these.
+  /// Whether the mode toggle includes "panorama".
+  bool get supportsPanorama => false;
+  /// True while panorama mode is on (the shutter then starts / ends a sweep).
+  bool get capturePanoramaActive => false;
+  /// True from the first shutter press of a sweep until its result is in.
+  bool get capturePanoramaRunning => false;
+  Future<void> setPanoramaMode(bool enable) async {}
+  /// First press starts the sweep, the next one finishes it.
+  Future<void> takePanoramaShutter() async {}
+
+  /// Width of the slot the mode toggle takes beside the shutter.
+  double get modeToggleSlotWidth =>
+      (supportsDocumentScan || supportsPanorama) ? 94 : 48;
+
   /// A part of a segmented video recording has been closed natively and is
   /// waiting to be picked up. Only the screen that records segmented video
   /// overrides this.
@@ -547,6 +563,11 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
       return;
     }
 
+    if (capturePanoramaActive) {
+      takePanoramaShutter();
+      return;
+    }
+
     if (captureControls.isVideoMode) {
       if (captureIsRecording) {
         stopVideoRecording();
@@ -626,9 +647,12 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
           mainAxisSize: MainAxisSize.min,
           children: [
             modeButton(
-              selected: !captureControls.isVideoMode && !captureIsScanMode,
+              selected: !captureControls.isVideoMode &&
+                  !captureIsScanMode &&
+                  !capturePanoramaActive,
               icon: Icons.photo_camera_rounded,
               onTap: () async {
+                if (capturePanoramaActive) await setPanoramaMode(false);
                 if (captureIsScanMode) {
                   await setDocumentScanMode(false);
                 } else {
@@ -641,18 +665,33 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
               selected: captureControls.isVideoMode,
               icon: Icons.videocam_rounded,
               onTap: () async {
+                if (capturePanoramaActive) await setPanoramaMode(false);
                 if (captureIsScanMode) await setDocumentScanMode(false);
                 await setVideoMode(true);
               },
             ),
           ],
         ),
-        if (supportsDocumentScan) ...[
+        if (supportsDocumentScan || supportsPanorama) ...[
           const SizedBox(width: 10),
-          modeButton(
-            selected: captureIsScanMode,
-            icon: Icons.document_scanner_rounded,
-            onTap: () => setDocumentScanMode(true),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (supportsDocumentScan)
+                modeButton(
+                  selected: captureIsScanMode,
+                  icon: Icons.document_scanner_rounded,
+                  onTap: () => setDocumentScanMode(true),
+                ),
+              if (supportsDocumentScan && supportsPanorama)
+                const SizedBox(height: 10),
+              if (supportsPanorama)
+                modeButton(
+                  selected: capturePanoramaActive,
+                  icon: Icons.panorama_photosphere,
+                  onTap: () => setPanoramaMode(!capturePanoramaActive),
+                ),
+            ],
           ),
         ],
       ],
@@ -660,7 +699,8 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   }
 
   Future<void> flipCamera() async {
-    if (captureIsRecording ||
+    if (capturePanoramaActive ||
+        captureIsRecording ||
         isEncrypting ||
         captureIsCountingDown ||
         isStartingVideo ||
@@ -698,7 +738,8 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   /// already open is only a zoom change (the logical camera switches lens by
   /// itself); a standalone camera id reopens the session on that camera.
   Future<void> selectLensStop(NativeCameraLens stop) async {
-    if (captureIsRecording ||
+    if (capturePanoramaActive ||
+        captureIsRecording ||
         isEncrypting ||
         captureIsCountingDown ||
         isStartingVideo) {
@@ -724,6 +765,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   }
 
   Future<void> takePhoto() async {
+    if (capturePanoramaActive) return takePanoramaShutter();
     if (captureIsScanMode) return takeScanPage();
     if (!cameraController.isInitialized || isEncrypting || isTakingPhoto) return;
     isTakingPhoto = true;
@@ -1029,12 +1071,12 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOut,
-                      width: captureControls.isVideoMode && captureIsRecording ? 30 : 60,
-                      height: captureControls.isVideoMode && captureIsRecording ? 30 : 60,
+                      width: (captureControls.isVideoMode && captureIsRecording) || capturePanoramaRunning ? 30 : 60,
+                      height: (captureControls.isVideoMode && captureIsRecording) || capturePanoramaRunning ? 30 : 60,
                       decoration: BoxDecoration(
-                        color: captureControls.isVideoMode ? Colors.red : Colors.white,
+                        color: captureControls.isVideoMode || capturePanoramaRunning ? Colors.red : Colors.white,
                         borderRadius: BorderRadius.circular(
-                          captureControls.isVideoMode && captureIsRecording ? 8 : 30,
+                          (captureControls.isVideoMode && captureIsRecording) || capturePanoramaRunning ? 8 : 30,
                         ),
                       ),
                     ),
@@ -1044,7 +1086,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
                   // Same width the mode toggle's slot had, so the shutter
                   // does not move when the recording starts.
                   SizedBox(
-                    width: supportsDocumentScan ? 94 : 48,
+                    width: modeToggleSlotWidth,
                     child: captureSnapshotAvailable
                         ? Center(
                             child: buildRecordingSideButton(
@@ -1061,7 +1103,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
                 else if (!captureIsCountingDown)
                   buildModeToggle()
                 else
-                  SizedBox(width: supportsDocumentScan ? 94 : 48),
+                  SizedBox(width: modeToggleSlotWidth),
               ],
             ),
           ],

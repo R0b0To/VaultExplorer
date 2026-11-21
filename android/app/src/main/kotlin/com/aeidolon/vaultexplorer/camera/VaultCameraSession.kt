@@ -8,6 +8,7 @@ import android.graphics.Matrix
 import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
+import android.graphics.YuvImage
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
@@ -43,6 +44,7 @@ import javax.crypto.SecretKey
 import kotlin.math.abs
 import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.panorama.PanoramaPoseTracker
 
 private const val TAG = "VaultCameraSession"
 
@@ -100,6 +102,21 @@ class VaultCameraSession(
     // Scan mode flavour: false = QR codes, true = live document-edge detection.
     @Volatile private var isDocumentScan = false
     private var wasDocumentFound = false
+
+    // Fast YUV streaming mode for smooth, zero-stutter panorama capture.
+    private var isPanoramaMode = false
+    private var panoramaAwbLocked = false
+    private var pendingPanoramaGrab = false
+    private var panoramaGrabMinStartNs = 0L
+    private var panoramaGrabTimeout: Runnable? = null
+    private var pendingSessionReadyCallback: (() -> Unit)? = null
+
+    // 16-entry ring pairing Camera2 SENSOR_TIMESTAMP -> elapsedRealtimeNanos + exposure info.
+    private val frameTimeTs = LongArray(16)
+    private val frameStartNs = LongArray(16)
+    private val frameExpNs = LongArray(16)
+    private val frameSkewNs = LongArray(16)
+    private var frameTimeIdx = 0
 
     private external fun nativeScanQrCode(
         yBytes: ByteArray,
@@ -181,6 +198,7 @@ class VaultCameraSession(
         val triggerPrecapture: Boolean,
         val retried: Boolean,
         val captureOrientationDegrees: Int,
+        val forPanorama: Boolean = false,
     ) {
         var phase = if (useTorch) StillPhase.WAIT_TORCH else StillPhase.WAIT_PRECAPTURE
         var triggerFrame = -1L
@@ -188,6 +206,10 @@ class VaultCameraSession(
         var torchLitAt = 0L
         var convergedFrames = 0
         var postDone = false
+        var captureStartTimeNs = 0L
+        var captureEndTimeNs = 0L
+        var captureExposureNs = 0L
+        var captureRollingSkewNs = 0L
         var timeout: Runnable? = null
         var watchdog: Runnable? = null
     }
@@ -242,6 +264,7 @@ class VaultCameraSession(
     private var pendingPhotoCallback: ((Boolean, String?) -> Unit)? = null
     private var pendingPhotoWriter: ChunkSink? = null
     private var pendingPhotoBytesCallback: ((Boolean, ByteArray?, ByteArray?, String?) -> Unit)? = null
+    private var pendingPanoramaCallback: ((Boolean, ByteArray?, Int?, FloatArray?, Float?, String?) -> Unit)? = null
     private var pendingPhotoAspectRatio: Float? = null
     private var pendingPhotoOrientationDegrees: Int? = null
     private var pendingRecordStart: ((Boolean, String?) -> Unit)? = null
@@ -303,9 +326,148 @@ class VaultCameraSession(
         }
     }
 
+    private fun recordRepeatingStart(sensorTs: Long, startNs: Long) {
+        val slot = frameTimeIdx
+        frameTimeIdx = (frameTimeIdx + 1) and 15
+        frameTimeTs[slot] = sensorTs
+        frameStartNs[slot] = startNs
+        frameExpNs[slot] = 0L
+        frameSkewNs[slot] = 0L
+    }
+
+    private fun updateRepeatingTiming(sensorTs: Long, expNs: Long, skewNs: Long) {
+        for (i in 0 until 16) {
+            if (frameTimeTs[i] == sensorTs) {
+                frameExpNs[i] = expNs
+                frameSkewNs[i] = skewNs
+                return
+            }
+        }
+    }
+
+    private fun lookupRepeatingTiming(sensorTs: Long): Triple<Long, Long, Long>? {
+        for (i in 0 until 16) {
+            if (frameTimeTs[i] == sensorTs) {
+                return Triple(frameStartNs[i], frameExpNs[i], frameSkewNs[i])
+            }
+        }
+        return null
+    }
+
+    private fun yuv420ToNv21(image: Image): ByteArray {
+        val w = image.width
+        val h = image.height
+        val cw = (w + 1) / 2
+        val ch = (h + 1) / 2
+        val nv21 = ByteArray(w * h + 2 * cw * ch)
+
+        val yPlane = image.planes[0]
+        val yBuf = yPlane.buffer
+        val yBytes = ByteArray(yBuf.remaining())
+        yBuf.get(yBytes)
+        val yRowStride = yPlane.rowStride
+        val yPixStride = yPlane.pixelStride
+        if (yPixStride == 1 && yRowStride == w) {
+            System.arraycopy(yBytes, 0, nv21, 0, minOf(w * h, yBytes.size))
+        } else {
+            var dst = 0
+            for (row in 0 until h) {
+                val base = row * yRowStride
+                for (col in 0 until w) {
+                    val idx = base + col * yPixStride
+                    nv21[dst++] = if (idx < yBytes.size) yBytes[idx] else 0
+                }
+            }
+        }
+
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
+        val uBuf = uPlane.buffer
+        val vBuf = vPlane.buffer
+        val uBytes = ByteArray(uBuf.remaining())
+        val vBytes = ByteArray(vBuf.remaining())
+        uBuf.get(uBytes)
+        vBuf.get(vBytes)
+        val uRowStride = uPlane.rowStride
+        val vRowStride = vPlane.rowStride
+        val uPixStride = uPlane.pixelStride
+        val vPixStride = vPlane.pixelStride
+
+        var uvDst = w * h
+        for (row in 0 until ch) {
+            val uBase = row * uRowStride
+            val vBase = row * vRowStride
+            for (col in 0 until cw) {
+                val vIdx = vBase + col * vPixStride
+                val uIdx = uBase + col * uPixStride
+                nv21[uvDst++] = if (vIdx < vBytes.size) vBytes[vIdx] else 0
+                nv21[uvDst++] = if (uIdx < uBytes.size) uBytes[uIdx] else 0
+            }
+        }
+        return nv21
+    }
+
     private fun onAnalysisFrameAvailable(reader: ImageReader) {
         val image = try { reader.acquireLatestImage() } catch (_: Exception) { null } ?: return
         try {
+            if (isPanoramaMode) {
+                val cb = pendingPanoramaCallback
+                if (!pendingPanoramaGrab || cb == null) return
+                val nowNs = SystemClock.elapsedRealtimeNanos()
+                val timing = lookupRepeatingTiming(image.timestamp)
+                val startNs = timing?.first ?: (nowNs - 16_000_000L)
+                // Ignore stale frames queued before the request was issued.
+                if (startNs + 20_000_000L < panoramaGrabMinStartNs) return
+
+                pendingPanoramaGrab = false
+                pendingPanoramaCallback = null
+                panoramaGrabTimeout?.let { bgHandler.removeCallbacks(it) }
+                panoramaGrabTimeout = null
+                val orientationArg = pendingPhotoOrientationDegrees
+                pendingPhotoOrientationDegrees = null
+                pendingPhotoAspectRatio = null
+
+                val expNs = (timing?.second ?: 0L).coerceIn(0L, 200_000_000L)
+                val skewNs = (timing?.third ?: 0L).coerceIn(0L, 60_000_000L)
+                val midNs = if (expNs > 0L) {
+                    (startNs + expNs / 2L + skewNs / 2L).coerceAtMost(nowNs)
+                } else {
+                    startNs.coerceAtMost(nowNs)
+                }
+                val blurEndNs = if (expNs > 0L) {
+                    (startNs + expNs.coerceAtLeast(5_000_000L)).coerceAtMost(nowNs)
+                } else {
+                    nowNs
+                }
+                val poseStart = PanoramaPoseTracker.poseAt(startNs)
+                val poseEnd = PanoramaPoseTracker.poseAt(blurEndNs)
+                val poseMid = PanoramaPoseTracker.poseAt(midNs)
+                val motionRad = if (poseStart != null && poseEnd != null) {
+                    PanoramaPoseTracker.poseAngle(poseStart, poseEnd)
+                } else {
+                    null
+                }
+
+                val jpegBytes = try {
+                    val nv21 = yuv420ToNv21(image)
+                    val out = ByteArrayOutputStream()
+                    YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
+                        .compressToJpeg(Rect(0, 0, image.width, image.height), 92, out)
+                    out.toByteArray()
+                } catch (e: Throwable) {
+                    VeLog.w(TAG, e) { "panorama YUV encode failed" }
+                    null
+                }
+
+                if (jpegBytes == null) {
+                    cb.invoke(false, null, null, null, null, "encode failed")
+                } else {
+                    val rot = computeCaptureOrientation(orientationArg ?: lastOrientationDegrees)
+                    cb.invoke(true, jpegBytes, rot, poseMid, motionRad, null)
+                }
+                return
+            }
+
             if (!isScanMode || isScanningFrame || nativeAnalysisUnavailable) return
             val now = System.currentTimeMillis()
             val documentScan = isDocumentScan
@@ -400,7 +562,10 @@ class VaultCameraSession(
             pendingQuality = videoQuality
             pendingPhotoResolution = photoResolution
             pendingOpenResult = callback
-            torchForFlash = false
+          torchForFlash = false
+            isPanoramaMode = false
+            panoramaAwbLocked = false
+            pendingPanoramaGrab = false
             snapshotUnsupported = false
             recordingHasSnapshot = false
             openAttempts = 0
@@ -456,7 +621,16 @@ class VaultCameraSession(
         captureSession = null
         videoRecorder?.releaseEncoder()
         videoRecorder = null
-        isRecording = false
+         isRecording = false
+        isPanoramaMode = false
+        panoramaAwbLocked = false
+        pendingPanoramaGrab = false
+        panoramaGrabTimeout?.let { bgHandler.removeCallbacks(it) }
+        panoramaGrabTimeout = null
+        pendingSessionReadyCallback?.let { cb ->
+            pendingSessionReadyCallback = null
+            cb()
+        }
         recordingHasSnapshot = false
         recordingChunkWriter = null
         pendingRecordStart?.invoke(false, "camera closed")
@@ -511,7 +685,16 @@ class VaultCameraSession(
         try { videoRecorder?.releaseEncoder() } catch (_: Exception) {}
         captureSession = null
         videoRecorder = null
-        isRecording = false
+         isRecording = false
+        isPanoramaMode = false
+        panoramaAwbLocked = false
+        pendingPanoramaGrab = false
+        panoramaGrabTimeout?.let { bgHandler.removeCallbacks(it) }
+        panoramaGrabTimeout = null
+        pendingSessionReadyCallback?.let { cb ->
+            pendingSessionReadyCallback = null
+            cb()
+        }
         recordingHasSnapshot = false
         recordingChunkWriter = null
         torchForFlash = false
@@ -628,20 +811,36 @@ class VaultCameraSession(
             snapshotReader = snapshot
         }
 
-        analysisReader?.close()
+       currentPreviewWidth = previewSize.width
+        currentPreviewHeight = previewSize.height
+
+        recreateAnalysisReaderLocked(chars)
+    }
+
+    private fun recreateAnalysisReaderLocked(chars: CameraCharacteristics) {
+        val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: return
+        val photoAspect = photoSize.width.toFloat() / photoSize.height.toFloat()
         val yuvSizes = map.getOutputSizes(ImageFormat.YUV_420_888)?.toList().orEmpty()
-        // Same aspect as the photo/preview, so a quad detected here maps 1:1 onto the
-        // preview (a different aspect would be a differently cropped field of view).
+        // Same aspect as the photo/preview, so quads/panorama frames match 1:1.
         val matchingYuv = yuvSizes
             .filter { abs((it.width.toFloat() / it.height.toFloat()) - photoAspect) < 0.05f }
             .ifEmpty { yuvSizes }
-        val scanSize = chooseSize(matchingYuv, 720, capAt1080p = true)
-        val aReader = ImageReader.newInstance(scanSize.width, scanSize.height, ImageFormat.YUV_420_888, 2)
+        val picked = if (isPanoramaMode) {
+            val maxPreviewLong = maxOf(currentPreviewWidth, currentPreviewHeight).coerceAtLeast(720)
+            val maxPreviewArea = currentPreviewWidth.toLong() * currentPreviewHeight.toLong()
+            val bounded = matchingYuv.filter {
+                it.width > 0 && it.height > 0 &&
+                    maxOf(it.width, it.height) <= maxPreviewLong &&
+                    it.width.toLong() * it.height.toLong() <= maxPreviewArea
+            }.ifEmpty { matchingYuv }
+            chooseSize(bounded, minOf(1440, maxPreviewLong), capAt1080p = true)
+        } else {
+            chooseSize(matchingYuv, 720, capAt1080p = true)
+        }
+        analysisReader?.close()
+        val aReader = ImageReader.newInstance(picked.width, picked.height, ImageFormat.YUV_420_888, 3)
         aReader.setOnImageAvailableListener({ r -> onAnalysisFrameAvailable(r) }, bgHandler)
         analysisReader = aReader
-
-        currentPreviewWidth = previewSize.width
-        currentPreviewHeight = previewSize.height
     }
 
     /**
@@ -760,7 +959,11 @@ class VaultCameraSession(
         return true
     }
 
-    private fun onSessionReady() {
+     private fun onSessionReady() {
+        pendingSessionReadyCallback?.let { cb ->
+            pendingSessionReadyCallback = null
+            cb()
+        }
         pendingOpenResult?.let { cb ->
             pendingOpenResult = null
             cb(true, null)
@@ -783,7 +986,11 @@ class VaultCameraSession(
         }
     }
 
-    private fun onSessionFailed(reason: String) {
+  private fun onSessionFailed(reason: String) {
+        pendingSessionReadyCallback?.let { cb ->
+            pendingSessionReadyCallback = null
+            cb()
+        }
         val openCb = pendingOpenResult
         if (openCb != null) {
             pendingOpenResult = null
@@ -803,7 +1010,16 @@ class VaultCameraSession(
     }
 
     private fun abortRecordingAndRestorePreview() {
-        isRecording = false
+         isRecording = false
+        isPanoramaMode = false
+        panoramaAwbLocked = false
+        pendingPanoramaGrab = false
+        panoramaGrabTimeout?.let { bgHandler.removeCallbacks(it) }
+        panoramaGrabTimeout = null
+        pendingSessionReadyCallback?.let { cb ->
+            pendingSessionReadyCallback = null
+            cb()
+        }
         recordingHasSnapshot = false
         recordingChunkWriter = null
         videoRecorder?.releaseEncoder()
@@ -824,12 +1040,31 @@ class VaultCameraSession(
      * Watches every preview frame. CameraX bases the "does AUTO flash fire" decision and the
      * wait-for-AE-to-settle logic on these results; without them a flash photo is taken blind.
      */
-    private val repeatingCallback = object : CameraCaptureSession.CaptureCallback() {
+     private val repeatingCallback = object : CameraCaptureSession.CaptureCallback() {
+        override fun onCaptureStarted(
+            session: CameraCaptureSession,
+            request: CaptureRequest,
+            timestamp: Long,
+            frameNumber: Long,
+        ) {
+            if (isPanoramaMode) {
+                recordRepeatingStart(timestamp, SystemClock.elapsedRealtimeNanos())
+            }
+        }
+
         override fun onCaptureCompleted(
             session: CameraCaptureSession,
             request: CaptureRequest,
             result: TotalCaptureResult,
         ) {
+            if (isPanoramaMode) {
+                val ts = result.get(CaptureResult.SENSOR_TIMESTAMP)
+                if (ts != null) {
+                    val exp = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L
+                    val skew = result.get(CaptureResult.SENSOR_ROLLING_SHUTTER_SKEW) ?: 0L
+                    updateRepeatingTiming(ts, exp, skew)
+                }
+            }
             lastAeState = result.get(CaptureResult.CONTROL_AE_STATE)
             lastAfState = result.get(CaptureResult.CONTROL_AF_STATE)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -846,7 +1081,7 @@ class VaultCameraSession(
         val builder = device.createCaptureRequest(template)
         previewSurface?.let { builder.addTarget(it) }
         if (isRecording) videoRecorder?.inputSurface?.let { builder.addTarget(it) }
-        if (isScanMode) analysisReader?.surface?.let { builder.addTarget(it) }
+        if (isScanMode || isPanoramaMode) analysisReader?.surface?.let { builder.addTarget(it) }
         applyControls(builder)
         return builder
     }
@@ -970,10 +1205,44 @@ class VaultCameraSession(
         }
     }
 
-    private fun applyWhiteBalance(builder: CaptureRequest.Builder) {
+     private fun applyWhiteBalance(builder: CaptureRequest.Builder) {
         val mode = if (availableAwbModes.isEmpty() || awbMode in availableAwbModes) awbMode
         else CaptureRequest.CONTROL_AWB_MODE_AUTO
         builder.set(CaptureRequest.CONTROL_AWB_MODE, mode)
+        if (panoramaAwbLocked) {
+            builder.set(CaptureRequest.CONTROL_AWB_LOCK, true)
+        }
+    }
+
+    fun setPanoramaMode(enabled: Boolean, callback: (() -> Unit)? = null) {
+        runOnCameraThread {
+            if (isPanoramaMode == enabled) {
+                callback?.invoke()
+                return@runOnCameraThread
+            }
+            isPanoramaMode = enabled
+            panoramaAwbLocked = false
+            pendingPanoramaGrab = false
+            panoramaGrabTimeout?.let { bgHandler.removeCallbacks(it) }
+            panoramaGrabTimeout = null
+            val chars = characteristics
+            if (chars == null || cameraDevice == null) {
+                callback?.invoke()
+                return@runOnCameraThread
+            }
+            recreateAnalysisReaderLocked(chars)
+            pendingSessionReadyCallback?.invoke()
+            pendingSessionReadyCallback = callback
+            createSessionLocked()
+        }
+    }
+
+    fun setPanoramaCaptureActive(active: Boolean) {
+        runOnCameraThread {
+            if (panoramaAwbLocked == active) return@runOnCameraThread
+            panoramaAwbLocked = active
+            updateRepeatingRequest()
+        }
     }
 
     // CameraX CameraMetadata.getSupportedAeMode/AfMode: never put a mode on a request that the
@@ -1095,6 +1364,24 @@ class VaultCameraSession(
         }
     }
 
+    /**
+     * tan(half the field of view) along the *long* edge of the photo at the
+     * current zoom, or null when the lens data is missing. The short edge
+     * follows from the image's aspect ratio. Used to place panorama frames.
+     */
+     fun fieldOfViewHalfTangent(): Double? {
+        val chars = characteristics ?: return null
+        val targetSize = if (isPanoramaMode && analysisReader != null) {
+            Size(analysisReader!!.width, analysisReader!!.height)
+        } else {
+            photoSize
+        }
+        val photoLong = maxOf(targetSize.width, targetSize.height).toDouble()
+        val photoShort = minOf(targetSize.width, targetSize.height).toDouble().coerceAtLeast(1.0)
+        val half = halfFovTangentOf(chars, photoLong / photoShort) ?: return null
+        return half / currentZoom.coerceAtLeast(0.1f)
+    }
+
     private fun computeCaptureOrientation(rotationDegrees: Int = lastOrientationDegrees): Int {
         val chars = characteristics ?: return 0
         val sensorOrientation = chars.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
@@ -1131,7 +1418,7 @@ class VaultCameraSession(
             jpegReader
         }
 
-    fun capturePhoto(
+     fun capturePhoto(
         aspectRatio: Float? = null,
         orientationDegrees: Int? = null,
         callback: (Boolean, ByteArray?, ByteArray?, String?) -> Unit,
@@ -1142,6 +1429,46 @@ class VaultCameraSession(
             pendingPhotoAspectRatio = aspectRatio
             pendingPhotoOrientationDegrees = orientationDegrees
             startStill(retried = false)
+        }
+    }
+
+    fun capturePanoramaPhoto(
+        orientationDegrees: Int? = null,
+        callback: (Boolean, ByteArray?, Int?, FloatArray?, Float?, String?) -> Unit,
+    ) {
+        runOnCameraThread {
+            if (cameraDevice == null || captureSession == null) {
+                callback(false, null, null, null, null, "camera not ready")
+                return@runOnCameraThread
+            }
+            if (pendingPanoramaGrab || stillFlow != null) {
+                callback(false, null, null, null, null, "capture already in progress")
+                return@runOnCameraThread
+            }
+            if (isPanoramaMode && analysisReader != null) {
+                pendingPanoramaCallback = callback
+                pendingPhotoAspectRatio = null
+                pendingPhotoOrientationDegrees = orientationDegrees
+                pendingPanoramaGrab = true
+                panoramaGrabMinStartNs = SystemClock.elapsedRealtimeNanos()
+                panoramaGrabTimeout?.let { bgHandler.removeCallbacks(it) }
+                panoramaGrabTimeout = Runnable {
+                    if (pendingPanoramaGrab) {
+                        pendingPanoramaGrab = false
+                        pendingPanoramaCallback = null
+                        pendingPhotoOrientationDegrees = null
+                        callback(false, null, null, null, null, "panorama frame timed out")
+                    }
+                }.also { bgHandler.postDelayed(it, 1_500L) }
+                return@runOnCameraThread
+            }
+            if (!stillPreconditionsOk { callback(false, null, null, null, null, it) }) {
+                return@runOnCameraThread
+            }
+            pendingPanoramaCallback = callback
+            pendingPhotoAspectRatio = null
+            pendingPhotoOrientationDegrees = orientationDegrees
+            startStill(retried = false, forPanorama = true)
         }
     }
 
@@ -1186,13 +1513,13 @@ class VaultCameraSession(
         return true // unknown -> be safe, like CameraX
     }
 
-    private fun startStill(retried: Boolean) {
+      private fun startStill(retried: Boolean, forPanorama: Boolean = false) {
         val chars = characteristics
         if (cameraDevice == null || captureSession == null || stillReader() == null || chars == null) {
             failPendingPhoto("camera not ready")
             return
         }
-        val flashRequired = isFlashRequiredForStill()
+        val flashRequired = if (forPanorama) false else isFlashRequiredForStill()
         val useTorch = flashRequired &&
             (forceTorchAsFlash || CameraFlashQuirks.shouldUseTorchAsFlash(chars, isUltraWideActive()))
         val triggerPrecapture = when {
@@ -1201,9 +1528,6 @@ class VaultCameraSession(
             forceTorchAsFlash -> false
             else -> CameraFlashQuirks.torchAsFlashAllowsAePrecapture()
         }
-        // Freeze orientation at capture start. Sensor updates can arrive while
-        // flash metering is running; the JPEG must keep the orientation chosen
-        // by the caller for the preview frame.
         val captureRotation = pendingPhotoOrientationDegrees ?: lastOrientationDegrees
         val flow = StillFlow(
             flashRequired,
@@ -1211,6 +1535,7 @@ class VaultCameraSession(
             triggerPrecapture,
             retried,
             computeCaptureOrientation(captureRotation),
+            forPanorama = forPanorama,
         )
         stillFlow = flow
         VeLog.d(TAG) { "still: flashRequired=$flashRequired torch=$useTorch precapture=$triggerPrecapture retried=$retried" }
@@ -1376,16 +1701,36 @@ class VaultCameraSession(
             } else {
                 CameraDevice.TEMPLATE_STILL_CAPTURE
             }
-            val builder = device.createCaptureRequest(template)
+           val builder = device.createCaptureRequest(template)
             builder.addTarget(reader.surface)
             applyControls(builder)
+            if (flow.forPanorama) {
+                builder.set(CaptureRequest.CONTROL_AE_MODE, supportedAeMode(CaptureRequest.CONTROL_AE_MODE_ON))
+                if (isFlashSupported) builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+            }
             builder.set(CaptureRequest.JPEG_ORIENTATION, flow.captureOrientationDegrees)
             session.capture(builder.build(), object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureStarted(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    timestamp: Long,
+                    frameNumber: Long,
+                ) {
+                    if (flow.forPanorama && flow.captureStartTimeNs == 0L) {
+                        flow.captureStartTimeNs = SystemClock.elapsedRealtimeNanos()
+                    }
+                }
+
                 override fun onCaptureCompleted(
                     session: CameraCaptureSession,
                     request: CaptureRequest,
                     result: TotalCaptureResult,
                 ) {
+                    if (flow.forPanorama) {
+                        flow.captureEndTimeNs = SystemClock.elapsedRealtimeNanos()
+                        flow.captureExposureNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L
+                        flow.captureRollingSkewNs = result.get(CaptureResult.SENSOR_ROLLING_SHUTTER_SKEW) ?: 0L
+                    }
                     // Exposure is done: torch off / precapture cancel. The JPEG follows via the reader.
                     postStillCapture(flow)
                 }
@@ -1451,7 +1796,16 @@ class VaultCameraSession(
         if (flow != null) failPendingPhoto(reason)
     }
 
-    private fun failPendingPhoto(reason: String) {
+  private fun failPendingPhoto(reason: String) {
+        pendingPanoramaGrab = false
+        panoramaGrabTimeout?.let { bgHandler.removeCallbacks(it) }
+        panoramaGrabTimeout = null
+        pendingPanoramaCallback?.let {
+            pendingPanoramaCallback = null
+            pendingPhotoAspectRatio = null
+            pendingPhotoOrientationDegrees = null
+            it(false, null, null, null, null, reason)
+        }
         pendingPhotoBytesCallback?.let {
             pendingPhotoBytesCallback = null
             pendingPhotoAspectRatio = null
@@ -1518,6 +1872,40 @@ class VaultCameraSession(
                 // Release the session *before* handing the photo out: the callback may
                 // immediately ask for the next one.
                 finishStill(flow)
+            }
+
+            val panoCb = pendingPanoramaCallback
+            if (panoCb != null && !pendingPanoramaGrab) {
+                pendingPanoramaCallback = null
+                pendingPhotoAspectRatio = null
+                pendingPhotoOrientationDegrees = null
+                var poseMid: FloatArray? = null
+                var motionRad: Float? = null
+                if (flow != null && flow.captureStartTimeNs > 0L) {
+                    val startNs = flow.captureStartTimeNs
+                    val endNs = flow.captureEndTimeNs.takeIf { it > startNs }
+                        ?: SystemClock.elapsedRealtimeNanos()
+                    val expNs = flow.captureExposureNs.coerceIn(0L, 500_000_000L)
+                    val skewNs = flow.captureRollingSkewNs.coerceIn(0L, 100_000_000L)
+                    val midNs = if (expNs > 0L) {
+                        (startNs + expNs / 2L + skewNs / 2L).coerceIn(startNs, endNs)
+                    } else {
+                        (startNs + endNs) / 2L
+                    }
+                    val blurEndNs = if (expNs > 0L) {
+                        (startNs + expNs.coerceAtLeast(5_000_000L)).coerceAtMost(endNs)
+                    } else {
+                        endNs
+                    }
+                    val poseStart = PanoramaPoseTracker.poseAt(startNs)
+                    val poseEnd = PanoramaPoseTracker.poseAt(blurEndNs)
+                    poseMid = PanoramaPoseTracker.poseAt(midNs)
+                    if (poseStart != null && poseEnd != null) {
+                        motionRad = PanoramaPoseTracker.poseAngle(poseStart, poseEnd)
+                    }
+                }
+                panoCb.invoke(true, bytes, null, poseMid, motionRad, null)
+                return
             }
 
             val bytesCb = pendingPhotoBytesCallback

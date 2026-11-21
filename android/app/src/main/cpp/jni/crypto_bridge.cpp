@@ -18,7 +18,7 @@
 #include "crypto/cipher_shim.h"
 #include "crypto/single_file_crypto.h"
 #include "session_prepare.h"
-#include "session_guard.h"
+#include "session_guard_jni.h"
 #include "volume_state.h"
 #include "jni_bridge_common.h"
 #include "jni_callbacks.h"

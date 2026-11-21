@@ -4056,6 +4056,61 @@ class AppLocalizationsKo extends AppLocalizations {
   String get unknownErrorFallback => '알 수 없는 오류';
 
   @override
+  String get panoramaModeWide => '와이드';
+
+  @override
+  String get panoramaStitching => '이미지 합치는 중…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return '촬영: $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor => '모션 센서를 기다리는 중…';
+
+  @override
+  String get panoramaStartSphereHint => '셔터를 누른 다음 각 점을 향해 주세요';
+
+  @override
+  String get panoramaStartWideHint => '셔터를 누른 다음 부드럽게 움직여 주세요';
+
+  @override
+  String get panoramaHoldStillHint => '움직이지 마세요…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint => '세로 방향을 맞춰 주세요';
+
+  @override
+  String get panoramaKeepLevelHint => '휴대전화를 수평으로 유지하세요';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint => '점을 향해 주세요 (촬영할 때는 움직이지 마세요)';
+
+  @override
+  String get panoramaSlowDownHint => '천천히 움직이세요';
+
+  @override
+  String get panoramaAimAtDotHint => '점을 향해 주세요';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return '선을 따라 움직이고 끝나면 $done을 누르세요';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError => '이 기기에는 파노라마 촬영용 모션 센서가 없습니다';
+
+  @override
+  String get panoramaRearCameraRequiredError => '파노라마에는 후면 카메라가 필요합니다';
+
+  @override
+  String get panoramaNotEnoughPhotosError => '사진이 부족합니다. 조금 더 움직여 주세요.';
+
+  @override
+  String get panoramaStitchFailedError => '파노라마를 합칠 수 없습니다';
+
+  @override
   String get cameraPermissionsRequiredMessage =>
       '카메라를 사용하려면 카메라 및 마이크 권한이 필요합니다.';
 

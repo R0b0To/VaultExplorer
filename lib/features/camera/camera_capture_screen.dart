@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/features/browser/viewer/panorama/device_orientation_sensor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
@@ -25,6 +26,9 @@ import 'scan/document_quad_overlay.dart';
 import 'scan/document_scan_api.dart';
 import 'scan/document_scan_editor_screen.dart';
 import 'scan/scan_geometry.dart';
+import 'panorama/panorama_capture_controller.dart';
+import 'panorama/panorama_capture_overlay.dart';
+import 'panorama/panorama_channel.dart';
 import 'vault_camera_controller.dart';
 
 /// What [CameraCaptureScreen] pops with after a successful save.
@@ -115,6 +119,169 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   /// Runs part collection one at a time, so the event nudges and the final
   /// stop never overlap and parts are always numbered in order.
   Future<void> _segmentChain = Future<void>.value();
+
+  // --- Panorama / photo sphere --------------------------------------------
+  PanoramaCaptureController? _pano;
+  bool _panoActive = false;
+
+  @override
+  bool get supportsPanorama => true;
+
+  @override
+  bool get capturePanoramaActive => _panoActive;
+
+  @override
+  bool get capturePanoramaRunning {
+    final phase = _pano?.phase;
+    return phase == PanoramaPhase.capturing || phase == PanoramaPhase.stitching;
+  }
+
+  @override
+  Future<void> setPanoramaMode(bool enable) async {
+    if (enable == _panoActive ||
+        captureIsRecording ||
+        isEncrypting ||
+        captureIsCountingDown ||
+        isStartingVideo) {
+      return;
+    }
+    if (!enable) {
+      await _leavePanorama();
+      return;
+    }
+    if (!await DeviceOrientationSensor.isAvailable()) {
+      if (mounted) showErrorToast(context.l10n.panoramaNoMotionSensorError);
+      return;
+    }
+    if (captureActiveFacing == 'front') {
+      if (mounted) showErrorToast(context.l10n.panoramaRearCameraRequiredError);
+      return;
+    }
+    if (_isScanMode) await setDocumentScanMode(false);
+    if (captureControls.isVideoMode) {
+      await setVideoMode(false);
+      if (captureControls.isVideoMode) return;
+    }
+    // Frames are placed using the lens' field of view, so shoot at 1x.
+    if ((captureCurrentZoom - 1.0).abs() > 0.01) {
+      final zoom = 1.0.clamp(captureMinZoom, captureMaxZoom).toDouble();
+      captureSessionController.setZoom(zoom);
+      await applyZoomLogged(cameraController, zoom, logTag: captureLogTag);
+    }
+    await cameraController.setPanoramaMode(true);
+    if (!mounted) return;
+    final tanHalfLong = await cameraController.getFieldOfView();
+    final rotation = await computePreviewRotationDegrees();
+    final photoAspect = _parsePhotoAspectRatio();
+    final controller = PanoramaCaptureController(
+      capture: _capturePanoramaFrame,
+      onFeedback: HapticFeedback.lightImpact,
+      onResult: _onPanoramaResult,
+      onCapturingChanged: (capturing) {
+        unawaited(cameraController.setPanoramaCaptureActive(capturing));
+      },
+    );
+    await controller.open(
+      fovHalfTangentLong: tanHalfLong,
+      rotationDegrees: rotation,
+      photoAspectRatio: photoAspect,
+    );
+    if (!mounted) {
+      controller.dispose();
+      unawaited(cameraController.setPanoramaMode(false));
+      return;
+    }
+    setState(() {
+      _pano = controller;
+      _panoActive = true;
+    });
+  }
+
+  double _parsePhotoAspectRatio() {
+    final res = captureSession.currentPhotoResolution;
+    if (res != null) {
+      final parts = res.toLowerCase().split('x');
+      if (parts.length == 2) {
+        final w = int.tryParse(parts[0].trim());
+        final h = int.tryParse(parts[1].trim());
+        if (w != null && h != null && w > 0 && h > 0) {
+          return w > h ? w / h : h / w;
+        }
+      }
+    }
+    return 4 / 3;
+  }
+
+  Future<void> _leavePanorama() async {
+    final controller = _pano;
+    if (mounted) {
+      setState(() {
+        _pano = null;
+        _panoActive = false;
+      });
+    }
+    unawaited(cameraController.setPanoramaCaptureActive(false));
+    if (controller != null) {
+      await controller.close();
+      controller.dispose();
+    }
+    await cameraController.setPanoramaMode(false);
+  }
+
+  @override
+  Future<void> takePanoramaShutter() async {
+    final controller = _pano;
+    if (controller == null) return;
+    switch (controller.phase) {
+      case PanoramaPhase.ready:
+        controller.start();
+      case PanoramaPhase.capturing:
+        await controller.finish();
+      case PanoramaPhase.stitching:
+        break;
+    }
+  }
+
+  Future<PanoramaShotCaptureResult> _capturePanoramaFrame(int _) async {
+    if (!cameraController.isInitialized) {
+      return (ok: false, pose: null, motionRad: null);
+    }
+    final degrees = await computePreviewRotationDegrees();
+    final result = await cameraController.capturePanoramaPhoto(
+      orientationDegrees: degrees,
+    );
+    return (
+      ok: result.success,
+      pose: result.pose,
+      motionRad: result.motionRad,
+    );
+  }
+
+  void _onPanoramaResult(PanoramaResult result) {
+    if (!mounted) return;
+    if (!result.success) {
+      showErrorToast(
+        result.error == 'too few frames'
+            ? context.l10n.panoramaNotEnoughPhotosError
+            : context.l10n.panoramaStitchFailedError,
+      );
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    final isFirstMedia = capturedMedia.isEmpty;
+    setState(() {
+      capturedMedia.add(
+        CapturedMediaItem.photo(
+          photoBytes: result.bytes!,
+          thumbnailBytes: result.thumbnail!,
+        ),
+      );
+      if (isFirstMedia && captureOpensReviewOnFirstMedia) {
+        enterReviewing();
+      }
+    });
+    scrollToEndOfTray();
+  }
 
   // --- Document scanning --------------------------------------------------
   final _scanApi = const DocumentScanApi();
@@ -248,6 +415,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _liveQuad.dispose();
     sensorSubscription?.cancel();
     cameraEventSubscription?.cancel();
+    final panoController = _pano;
+    if (panoController != null) {
+      unawaited(cameraController.setPanoramaCaptureActive(false));
+      unawaited(cameraController.setPanoramaMode(false));
+      unawaited(panoController.close());
+      panoController.dispose();
+    }
     unawaited(cameraController.dispose());
 
     if (captureIsRecording) {
@@ -318,6 +492,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       await initCamera(
         cameraId: selectedCameraId.isNotEmpty ? selectedCameraId : null,
       );
+      if (mounted && _panoActive && cameraController.isInitialized) {
+        await cameraController.setPanoramaMode(true);
+      }
     }
   }
 
@@ -375,7 +552,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   }
 
   void _onTapToFocus(TapDownDetails details, BoxConstraints constraints) async {
-    if (!cameraController.isInitialized) return;
+    if (!cameraController.isInitialized || (_panoActive && capturePanoramaRunning)) {
+      return;
+    }
 
     final natural = cameraDisplayPointToNatural(
       details.localPosition.dx / constraints.maxWidth,
@@ -435,6 +614,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         isStartingVideo) {
       return;
     }
+    if (enable && _panoActive) await setPanoramaMode(false);
     if (enable && captureControls.isVideoMode) {
       await setVideoMode(false);
       if (captureControls.isVideoMode) return;
@@ -1257,6 +1437,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                   return GestureDetector(
                     onScaleStart: (_) => baseZoom = captureCurrentZoom,
                     onScaleUpdate: (d) async {
+                      if (_panoActive) return;
                       double target = (baseZoom * d.scale).clamp(
                         captureMinZoom,
                         captureMaxZoom,
@@ -1278,9 +1459,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                               previewHeight: cameraController.previewHeight,
                               sensorOrientation: cameraController.sensorOrientation,
                               displayRotation: captureDisplayRotation,
-                              frameAspectRatio: cameraPreviewFrameAspectRatio(
-                                isLandscape: isLandscapeFrame,
-                              ),
+                              frameAspectRatio: _panoActive
+                                  ? (isLandscapeFrame
+                                      ? _parsePhotoAspectRatio()
+                                      : 1 / _parsePhotoAspectRatio())
+                                  : cameraPreviewFrameAspectRatio(
+                                      isLandscape: isLandscapeFrame,
+                                    ),
                               showShutterFlash: captureShowShutterFlash,
                             ),
                     ),
@@ -1311,6 +1496,23 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               },
             ),
 
+            if (_panoActive && _pano != null)
+              Positioned.fill(
+                child: Builder(
+                  builder: (context) {
+                    // The upright frame swaps its edges when the screen turns.
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _pano?.updateRotation((captureDisplayRotation % 4) * 90);
+                    });
+                    return PanoramaCaptureOverlay(
+                      controller: _pano!,
+                      onCancel: () => unawaited(_pano!.cancel()),
+                      onFinish: () => unawaited(_pano!.finish()),
+                    );
+                  },
+                ),
+              ),
+
             if (_isScanMode && isInitialized)
               Positioned(
                 top: MediaQuery.paddingOf(context).top + 72,
@@ -1324,6 +1526,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               left: 0,
               right: 0,
               child: CameraTopControlsBar(
+                isPanoramaMode: _panoActive,
                 isVideoMode: captureControls.isVideoMode,
                 isRecording: captureIsRecording,
                 isPaused: captureIsPaused,

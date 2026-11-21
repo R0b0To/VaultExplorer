@@ -1,12 +1,12 @@
 #include "block_io.h"
 #include <unistd.h>
 #include <cerrno>
-#include <android/log.h>
-#include "jni_callbacks.h"
+#include "platform/engine_log.h"
+#include "platform/engine_hooks.h"
 #include "volume_state.h"
 #include "containers/composite_block_device.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 
 bool physicalRead(int volumeId, uint64_t byteOffset, unsigned char* buffer,
                   size_t byteCount) {

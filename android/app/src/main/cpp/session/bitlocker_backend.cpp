@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include <android/log.h>
+#include "platform/engine_log.h"
 
 // Dislocker headers (C API, extern "C" already inside)
 extern "C" {
@@ -21,14 +21,14 @@ extern "C" {
 #include <dislocker/vmk_export.h>
 }
 
-#include "jni_callbacks.h"   // usbReadSectors/usbWriteSectors, reportUnlockProgress
+#include "platform/engine_hooks.h"   // usbReadSectors/usbWriteSectors, reportUnlockProgress
 #include "container_format.h"
 #include "volume_state.h"
 #include "session_prepare.h"
 #include "vhdx_image.h"
 #include "vhd_image.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_BDE", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_BDE", __VA_ARGS__)
 
 namespace {
 

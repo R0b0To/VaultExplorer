@@ -1070,6 +1070,11 @@ static int countLowercaseBlockPaths(const std::string& root) {
     return n;
 }
 
+static bool isSameDirInode(const std::string& a, const std::string& b) {
+    struct stat sa, sb;
+    return ::stat(a.c_str(), &sa) == 0 && ::stat(b.c_str(), &sb) == 0 && sa.st_ino == sb.st_ino && sa.st_dev == sb.st_dev;
+}
+
 static void lowercaseAllBlocks(const std::string& root) {
     std::vector<std::string> files;
     walkFiles(root, [&](const std::string& p, off_t) { if (p.find("cryfs.config") == std::string::npos) files.push_back(p); });
@@ -1084,6 +1089,22 @@ static void lowercaseAllBlocks(const std::string& root) {
     closedir(d);
     for (auto& s : shards) {
         std::string l = s; for (auto& c : l) c = (char)tolower(c);
+        if (l == s) continue;
+        struct stat lst;
+        if (::stat((root + "/" + l).c_str(), &lst) == 0 && lstat((root + "/" + s).c_str(), &lst) == 0 &&
+            !isSameDirInode(root + "/" + s, root + "/" + l)) {
+            // Case-sensitive storage with both "ABC" and "abc" present (a lazy per-block repair creates the uppercase
+            // folder next to a lowercase one that still holds other blocks): rename() onto a non-empty directory
+            // fails with ENOTEMPTY and would strand the blocks in "<l>.tmp", so merge the files instead.
+            DIR* sd = opendir((root + "/" + s).c_str());
+            std::vector<std::string> moved;
+            while (auto* e = readdir(sd)) { std::string n = e->d_name; if (n != "." && n != "..") moved.push_back(n); }
+            closedir(sd);
+            for (auto& n : moved) ::rename((root + "/" + s + "/" + n).c_str(), (root + "/" + l + "/" + n).c_str());
+            ::rmdir((root + "/" + s).c_str());
+            continue;
+        }
+        // Same directory (case-insensitive storage) or no lowercase twin: two steps via a temporary name.
         ::rename((root + "/" + s).c_str(), (root + "/" + l + ".tmp").c_str());
         ::rename((root + "/" + l + ".tmp").c_str(), (root + "/" + l).c_str());
     }

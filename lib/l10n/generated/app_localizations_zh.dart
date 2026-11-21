@@ -4000,6 +4000,61 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unknownErrorFallback => '未知错误';
 
   @override
+  String get panoramaModeWide => '宽幅';
+
+  @override
+  String get panoramaStitching => '正在拼接…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return '照片数：$count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor => '正在等待动作传感器…';
+
+  @override
+  String get panoramaStartSphereHint => '点击快门，然后依次对准每个圆点';
+
+  @override
+  String get panoramaStartWideHint => '点击快门，然后平稳地移动设备';
+
+  @override
+  String get panoramaHoldStillHint => '请保持静止…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint => '保持垂直对齐';
+
+  @override
+  String get panoramaKeepLevelHint => '保持手机水平';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint => '对准圆点（拍摄时请保持静止）';
+
+  @override
+  String get panoramaSlowDownHint => '移动慢一些';
+
+  @override
+  String get panoramaAimAtDotHint => '对准圆点';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return '沿着线移动 — 完成后点击“$done”';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError => '此设备没有用于全景拍摄的动作传感器';
+
+  @override
+  String get panoramaRearCameraRequiredError => '全景拍摄需要使用后置摄像头';
+
+  @override
+  String get panoramaNotEnoughPhotosError => '照片数量不足。请再移动一会儿。';
+
+  @override
+  String get panoramaStitchFailedError => '无法拼接全景照片';
+
+  @override
   String get cameraPermissionsRequiredMessage => '使用相机需要相机和麦克风权限。';
 
   @override

@@ -1,7 +1,7 @@
 #include "ntfs_backend.h"
 #include "dir_entry_wire.h"
-#include <android/log.h>
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#include "platform/engine_log.h"
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 #include <algorithm>
 #include <atomic>
 #include <cerrno>

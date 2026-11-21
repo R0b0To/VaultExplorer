@@ -404,6 +404,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private var pendingOpenMediaPlayer = false
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
     private var viewerOrientationPlugin: com.aeidolon.vaultexplorer.viewer.ViewerOrientationPlugin? = null
+    private var panoramaPlugin: com.aeidolon.vaultexplorer.panorama.PanoramaPlugin? = null
     private var vaultAudioCapturePlugin: com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin? = null
     private var quickCaptureScratchpadPlugin: com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin? = null
     private val privacyCurtain = PrivacyCurtain(this)
@@ -648,6 +649,8 @@ open class MainActivity : FlutterFragmentActivity() {
         vaultCameraPlugin = null
         viewerOrientationPlugin?.dispose()
         viewerOrientationPlugin = null
+        panoramaPlugin?.dispose()
+        panoramaPlugin = null
         vaultAudioCapturePlugin?.dispose()
         vaultAudioCapturePlugin = null
         // Any recording those plugins owned has just ended. Dart can no longer
@@ -776,6 +779,7 @@ open class MainActivity : FlutterFragmentActivity() {
         nativePlayerManager.setTextureRegistry(flutterEngine.renderer)
         vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
         viewerOrientationPlugin = com.aeidolon.vaultexplorer.viewer.ViewerOrientationPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
+        panoramaPlugin = com.aeidolon.vaultexplorer.panorama.PanoramaPlugin(flutterEngine.dartExecutor.binaryMessenger)
         vaultAudioCapturePlugin = com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin(this, flutterEngine.dartExecutor.binaryMessenger)
         quickCaptureScratchpadPlugin = com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
 

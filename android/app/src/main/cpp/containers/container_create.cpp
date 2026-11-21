@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include "mbedtls/platform_util.h"
 #include "container_format.h"
 #include "container_utils.h"
@@ -38,7 +38,7 @@
 #undef max
 #include "ff.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);

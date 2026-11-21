@@ -6,7 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <mutex>
-#include "jni_callbacks.h"
+#include "platform/engine_hooks.h"
 
 // Two-Stream Write-Combining Cache for USB Mass Storage:
 // - Coalesces data clusters into uninterrupted 128 KB bursts.

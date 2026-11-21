@@ -5490,6 +5490,84 @@
   "@unknownErrorFallback": {
     "description": "Generic fallback text used when no specific error detail is available"
   },
+  "panoramaModeWide": "Wide",
+  "@panoramaModeWide": {
+    "description": "Label for the wide panorama capture mode"
+  },
+  "panoramaStitching": "Stitching…",
+  "@panoramaStitching": {
+    "description": "Progress label while panorama photos are being stitched"
+  },
+  "panoramaShotCount": "Shots: {count}",
+  "@panoramaShotCount": {
+    "description": "Count label for photos captured in a wide panorama",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "panoramaWaitingForMotionSensor": "Waiting for the motion sensor…",
+  "@panoramaWaitingForMotionSensor": {
+    "description": "Hint shown while waiting for motion sensor data"
+  },
+  "panoramaStartSphereHint": "Tap the shutter, then aim at each dot",
+  "@panoramaStartSphereHint": {
+    "description": "Starting instruction for photo-sphere capture"
+  },
+  "panoramaStartWideHint": "Tap the shutter, then sweep smoothly",
+  "@panoramaStartWideHint": {
+    "description": "Starting instruction for wide panorama capture"
+  },
+  "panoramaHoldStillHint": "Hold still…",
+  "@panoramaHoldStillHint": {
+    "description": "Capture guidance asking the user to hold still"
+  },
+  "panoramaKeepVerticallyAlignedHint": "Keep aligned vertically",
+  "@panoramaKeepVerticallyAlignedHint": {
+    "description": "Capture guidance to keep the phone vertically aligned"
+  },
+  "panoramaKeepLevelHint": "Keep the phone level",
+  "@panoramaKeepLevelHint": {
+    "description": "Capture guidance to keep the phone level"
+  },
+  "panoramaAimAtDotOrHoldStillHint": "Aim at a dot (or hold still to snap)",
+  "@panoramaAimAtDotOrHoldStillHint": {
+    "description": "Photo-sphere guidance to aim at a target dot or hold still"
+  },
+  "panoramaSlowDownHint": "Slow down",
+  "@panoramaSlowDownHint": {
+    "description": "Capture guidance to slow down the phone movement"
+  },
+  "panoramaAimAtDotHint": "Aim at a dot",
+  "@panoramaAimAtDotHint": {
+    "description": "Photo-sphere guidance to aim at a target dot"
+  },
+  "panoramaFollowLineHint": "Follow the line — tap {done} when finished",
+  "@panoramaFollowLineHint": {
+    "description": "Wide panorama guidance to follow the line and finish",
+    "placeholders": {
+      "done": {
+        "type": "String"
+      }
+    }
+  },
+  "panoramaNoMotionSensorError": "This device has no motion sensor for panoramas",
+  "@panoramaNoMotionSensorError": {
+    "description": "Error shown when the device has no motion sensor for panorama capture"
+  },
+  "panoramaRearCameraRequiredError": "Panoramas need the rear camera",
+  "@panoramaRearCameraRequiredError": {
+    "description": "Error shown when panorama capture requires the rear camera"
+  },
+  "panoramaNotEnoughPhotosError": "Not enough photos. Keep sweeping a little longer.",
+  "@panoramaNotEnoughPhotosError": {
+    "description": "Error shown when too few photos were captured for a panorama"
+  },
+  "panoramaStitchFailedError": "Could not stitch the panorama",
+  "@panoramaStitchFailedError": {
+    "description": "Error shown when panorama stitching fails"
+  },
   "cameraPermissionsRequiredMessage": "Camera and microphone permissions are required to use the camera.",
   "@cameraPermissionsRequiredMessage": {
     "description": "Error message shown when camera/microphone permissions are denied"

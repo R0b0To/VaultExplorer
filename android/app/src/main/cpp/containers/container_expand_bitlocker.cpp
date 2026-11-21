@@ -28,7 +28,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <android/log.h>
+#include "platform/engine_log.h"
 
 #include "bl_disk_expand.h"
 #include "bl_expand.h"
@@ -39,7 +39,7 @@
 #include "virtual_block_device.h"    // ensureMounted / unmountVolume
 #include "volume_state.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_BDE_Expand", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_BDE_Expand", __VA_ARGS__)
 
 namespace {
 

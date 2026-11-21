@@ -4271,6 +4271,69 @@ class AppLocalizationsPt extends AppLocalizations {
   String get unknownErrorFallback => 'erro desconhecido';
 
   @override
+  String get panoramaModeWide => 'Amplo';
+
+  @override
+  String get panoramaStitching => 'A juntar imagens…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return 'Fotos: $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor =>
+      'A aguardar o sensor de movimento…';
+
+  @override
+  String get panoramaStartSphereHint =>
+      'Toque no obturador e aponte para cada ponto';
+
+  @override
+  String get panoramaStartWideHint =>
+      'Toque no obturador e faça um movimento suave';
+
+  @override
+  String get panoramaHoldStillHint => 'Mantenha-se imóvel…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint =>
+      'Mantenha o alinhamento vertical';
+
+  @override
+  String get panoramaKeepLevelHint => 'Mantenha o telemóvel nivelado';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint =>
+      'Aponte para um ponto (ou fique imóvel para fotografar)';
+
+  @override
+  String get panoramaSlowDownHint => 'Abrande';
+
+  @override
+  String get panoramaAimAtDotHint => 'Aponte para um ponto';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return 'Siga a linha — toque em $done para terminar';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError =>
+      'Este dispositivo não tem sensor de movimento para panoramas';
+
+  @override
+  String get panoramaRearCameraRequiredError =>
+      'Os panoramas requerem a câmara traseira';
+
+  @override
+  String get panoramaNotEnoughPhotosError =>
+      'Fotos insuficientes. Continue o movimento por mais algum tempo.';
+
+  @override
+  String get panoramaStitchFailedError => 'Não foi possível juntar o panorama';
+
+  @override
   String get cameraPermissionsRequiredMessage =>
       'As permissões de câmera e microfone são necessárias para usar a câmera.';
 

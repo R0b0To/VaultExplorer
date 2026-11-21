@@ -1,5 +1,5 @@
 #include "partition_writer.h"
-#include "jni_callbacks.h"
+#include "platform/engine_hooks.h"
 
 UsbCreateResult writeMbrPartitionTable(int volId, uint64_t startSector, uint64_t numSectors,
                                         uint64_t deviceSectorCount) {

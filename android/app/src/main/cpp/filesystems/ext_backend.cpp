@@ -2,7 +2,7 @@
 #include "dir_entry_wire.h"
 #include "crypto/os_random.h"
 #include <algorithm>
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -25,8 +25,8 @@ constexpr size_t kIoBufferSize = 2097152;
 bool extIsDirectory(ext2_filsys fs, ext2_ino_t ino);
 bool extEntryExists(ext2_filsys fs, ext2_ino_t dir, const std::string& name);
 }
-#define EXT_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
-#define EXT_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "VaultExplorer_C++", __VA_ARGS__)
+#define EXT_LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
+#define EXT_LOGE(...) ENGINE_LOG_ERROR("VaultExplorer_C++", __VA_ARGS__)
 bool extResolvePath(ext2_filsys fs, const std::string& path, ext2_ino_t* inode) {
     std::string relative = path;
     while (!relative.empty() && relative.front() == '/') relative.erase(relative.begin());

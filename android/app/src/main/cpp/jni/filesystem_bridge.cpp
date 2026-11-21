@@ -6,7 +6,7 @@
 
 #include "session_prepare.h"
 #include "container_utils.h"
-#include "session_guard.h"
+#include "session_guard_jni.h"
 #include "volume_state.h"
 #include "virtual_block_device.h"
 #include "filesystems/fs_ops.h"

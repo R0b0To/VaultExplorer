@@ -7,7 +7,7 @@
 #include "containers/composite_block_device.h"
 #include "containers/composite_map.h"
 #include "containers/container_create_composite.h"
-#include "session/session_guard.h"
+#include "session_guard_jni.h"
 #include "session/volume_state.h"
 #include "virtual_block_device.h"
 #include "filesystems/fs_ops.h"

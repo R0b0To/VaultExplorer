@@ -1,5 +1,5 @@
 #include "container_repair.h"
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include <cmath>
 #include <cstring>
 #include <sys/stat.h>
@@ -16,7 +16,7 @@
 #include "filesystems/ntfs_backend.h"
 #include "containers/vhdx_image.h"
 #include "containers/vhd_image.h"
-#include "jni/jni_callbacks.h"
+#include "platform/engine_hooks.h"
 #include "diskio.h"
 #include "ff.h"
 #include "filesystems/filesystem_paths.h"
@@ -24,7 +24,7 @@
 #include "containers/vc_header_build.h"
 #include "containers/vc_header_backup.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 
 namespace {
 bool preadFully(int fd, uint64_t offset, void* buf, size_t len) {

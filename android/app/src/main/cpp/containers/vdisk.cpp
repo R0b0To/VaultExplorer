@@ -9,13 +9,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <android/log.h>
 #include "crypto/os_random.h"
+#include "platform/engine_log.h"
 
 #include "vhd_image.h"
 #include "vhdx_image.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_VDISK", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_VDISK", __VA_ARGS__)
 
 namespace {
 

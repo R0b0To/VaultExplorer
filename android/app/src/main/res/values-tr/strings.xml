@@ -17,7 +17,6 @@
     <string name="install_unknown_apps_required">Bu uygulamanın uygulama yüklemesine izin verin, sonra APK dosyasına yeniden dokunun</string>
     <string name="mirror_push_notification_text">Değişiklikler depolamaya yükleniyor</string>
     <string name="mirror_push_notification_title">Kasa değişiklikleri kaydediliyor</string>
-    <string name="panic_tile_active_description">Acil temizleme etkin</string>
     <string name="panic_tile_label">Panik temizleme</string>
     <string name="panickit_notification_channel_description">Harici bir uygulama bağlandığında veya bağlantısı kesildiğinde gösterilir</string>
     <string name="panickit_notification_channel_name">Uygulama bağlantıları</string>

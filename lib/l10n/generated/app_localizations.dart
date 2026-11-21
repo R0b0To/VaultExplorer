@@ -214,12 +214,6 @@ abstract class AppLocalizations {
   /// **'Next match'**
   String get pdfViewerNextMatch;
 
-  /// Tooltip for closing the PDF search bar
-  ///
-  /// In en, this message translates to:
-  /// **'Close search'**
-  String get pdfViewerCloseSearch;
-
   /// Tooltip for the print action
   ///
   /// In en, this message translates to:
@@ -243,24 +237,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load PDF'**
   String get pdfViewerFailedToLoad;
-
-  /// Tooltip for the button that switches the PDF viewer into edit mode
-  ///
-  /// In en, this message translates to:
-  /// **'Edit'**
-  String get pdfViewerEditTooltip;
-
-  /// Tooltip for the button that saves and exits PDF edit mode
-  ///
-  /// In en, this message translates to:
-  /// **'Done editing'**
-  String get pdfViewerDoneEditingTooltip;
-
-  /// Snackbar message when re-encrypting an edited PDF back into the vault fails
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t save changes to this PDF'**
-  String get pdfViewerSaveFailed;
 
   /// Snackbar message when the native PDF viewer's own edit button is tapped for a document that doesn't support in-app editing (e.g. a local/SAF file, not a vault-backed one)
   ///
@@ -334,12 +310,6 @@ abstract class AppLocalizations {
   /// **'Advanced Parameters'**
   String get advancedParametersTitle;
 
-  /// Label for the optional PIM (Personal Iterations Multiplier) field
-  ///
-  /// In en, this message translates to:
-  /// **'PIM  (leave blank for default)'**
-  String get pimFieldLabel;
-
   /// Label for the cipher/encryption algorithm picker
   ///
   /// In en, this message translates to:
@@ -412,29 +382,11 @@ abstract class AppLocalizations {
   /// **'Dismiss'**
   String get dismiss;
 
-  /// Byte transfer progress, e.g. '1.2 MB / 4.0 MB (30%)'
-  ///
-  /// In en, this message translates to:
-  /// **'{transferred} / {total}  ({pct}%)'**
-  String byteProgressText(String transferred, String total, int pct);
-
-  /// Item count transfer progress, e.g. '3 / 10 (30%)'
-  ///
-  /// In en, this message translates to:
-  /// **'{done} / {total}  ({pct}%)'**
-  String countProgressText(int done, int total, int pct);
-
   /// Label shown when multiple file operations are running at once
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 transfer} other{{count} transfers}}'**
   String multiOpLabel(num count);
-
-  /// Sublabel under the multi-operation activity pill
-  ///
-  /// In en, this message translates to:
-  /// **'{summary} · tap to view all'**
-  String multiOpSublabel(String summary);
 
   /// Section header for the thumbnail resolution slider
   ///
@@ -596,12 +548,6 @@ abstract class AppLocalizations {
   /// **'This container is mounted read-only.'**
   String get readOnlyContainerWarning;
 
-  /// Snackbar/warning shown when hidden volume protection blocks a write and switches the outer volume to read-only for the rest of the session
-  ///
-  /// In en, this message translates to:
-  /// **'A write to this outer volume would have damaged the hidden volume, so it was blocked. This container has been switched to read-only for the rest of this session.'**
-  String get hiddenVolumeProtectionTriggeredWarning;
-
   /// Title for the "protect hidden volume" toggle in the unlock advanced options
   ///
   /// In en, this message translates to:
@@ -613,12 +559,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Prevent damage caused by writing to the outer volume'**
   String get protectHiddenVolumeToggleSubtitle;
-
-  /// Validation error shown when "protect hidden volume" is enabled but no hidden password/keyfiles were entered
-  ///
-  /// In en, this message translates to:
-  /// **'A hidden volume password or keyfile is required to protect it'**
-  String get protectHiddenVolumeCredentialsRequired;
 
   /// Confirmation dialog title for deleting one or more items
   ///
@@ -1118,12 +1058,6 @@ abstract class AppLocalizations {
   /// **'Remove from bookmarks'**
   String get removeFromBookmarks;
 
-  /// Tooltip for the star/bookmark toggle when the item is not currently bookmarked
-  ///
-  /// In en, this message translates to:
-  /// **'Add to bookmarks'**
-  String get addToBookmarks;
-
   /// Generic Edit action label
   ///
   /// In en, this message translates to:
@@ -1292,137 +1226,11 @@ abstract class AppLocalizations {
   /// **'Storage access needed'**
   String get archiveExplorerPermissionTitle;
 
-  /// Explanatory message shown alongside the grant-access button on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Allow access to your files to browse and extract .zip archives from Downloads.'**
-  String get archiveExplorerPermissionMessage;
-
   /// Button label to request all-files storage access from the decoy Archive Explorer screen
   ///
   /// In en, this message translates to:
   /// **'Grant Access'**
   String get archiveExplorerGrantAccess;
-
-  /// Empty state title on the decoy Archive Explorer screen when no .zip files exist in Downloads
-  ///
-  /// In en, this message translates to:
-  /// **'No archives found'**
-  String get archiveExplorerEmptyTitle;
-
-  /// Empty state message on the decoy Archive Explorer screen when no .zip files exist in Downloads
-  ///
-  /// In en, this message translates to:
-  /// **'Zip files you download will show up here.'**
-  String get archiveExplorerEmptyMessage;
-
-  /// Tooltip for the refresh button on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh'**
-  String get archiveExplorerRefreshTooltip;
-
-  /// Number of entries inside a zip archive shown on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, one{1 item} other{{count} items}}'**
-  String archiveExplorerEntryCount(int count);
-
-  /// Button label to extract every entry from a zip archive on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Extract All'**
-  String get archiveExplorerExtractAll;
-
-  /// Progress label shown while a zip archive is being extracted on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Extracting…'**
-  String get archiveExplorerExtracting;
-
-  /// Confirmation snackbar after successfully extracting a zip archive on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Extracted {count} files to Download/Extracted/{name}'**
-  String archiveExplorerExtractSuccess(int count, String name);
-
-  /// Error snackbar shown when extracting a zip archive fails on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t extract that archive.'**
-  String get archiveExplorerExtractFailed;
-
-  /// Error snackbar shown when a zip archive can't be parsed on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t open that archive.'**
-  String get archiveExplorerOpenFailed;
-
-  /// App-bar action on the decoy Archive Explorer screen to pick any .zip file via the system file picker, not just ones in Downloads
-  ///
-  /// In en, this message translates to:
-  /// **'Open archive…'**
-  String get archiveExplorerOpenArchive;
-
-  /// Error snackbar on the decoy Archive Explorer screen when a picked document can't be resolved to a real filesystem path
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t access that file directly. Try picking one from Downloads instead.'**
-  String get archiveExplorerUnresolvedPath;
-
-  /// Menu item on the decoy Archive Explorer screen to extract a zip archive to a user-chosen folder instead of the default location
-  ///
-  /// In en, this message translates to:
-  /// **'Extract to…'**
-  String get archiveExplorerExtractTo;
-
-  /// Menu item / action on the decoy Archive Explorer screen to browse a zip archive's contents without extracting it
-  ///
-  /// In en, this message translates to:
-  /// **'Preview'**
-  String get archiveExplorerPreview;
-
-  /// Transient status shown on the decoy Archive Explorer screen while the folder picker for a custom extraction destination is open
-  ///
-  /// In en, this message translates to:
-  /// **'Choosing destination…'**
-  String get archiveExplorerChoosingDestination;
-
-  /// Snackbar shown on the decoy Archive Explorer screen when the user cancels the extraction-destination folder picker
-  ///
-  /// In en, this message translates to:
-  /// **'No destination chosen.'**
-  String get archiveExplorerNoDestinationChosen;
-
-  /// Confirmation snackbar after extracting a zip archive to a user-chosen destination on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Extracted {count} files to {path}'**
-  String archiveExplorerExtractSuccessTo(int count, String path);
-
-  /// Empty state title shown when browsing into an empty folder inside an archive on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Empty folder'**
-  String get archiveBrowserEmptyTitle;
-
-  /// Empty state message shown when browsing into an empty folder inside an archive on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'This folder doesn\'t contain any files.'**
-  String get archiveBrowserEmptyMessage;
-
-  /// Breadcrumb label for the root of an archive being browsed on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Archive'**
-  String get archiveBrowserRoot;
-
-  /// Error snackbar shown when extracting a single entry for preview fails while browsing an archive on the decoy Archive Explorer screen
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t open that file.'**
-  String get archiveBrowserOpenFileFailed;
 
   /// File association label: files open in the built-in text editor
   ///
@@ -1484,12 +1292,6 @@ abstract class AppLocalizations {
   /// **'Active — tap toggle to remove'**
   String get masterPasswordActiveSubtitle;
 
-  /// Settings toggle subtitle when no master password is set
-  ///
-  /// In en, this message translates to:
-  /// **'Require a password to open the app'**
-  String get masterPasswordInactiveSubtitle;
-
   /// Label for new password input field
   ///
   /// In en, this message translates to:
@@ -1525,24 +1327,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Biometric Unlock'**
   String get biometricUnlockTitle;
-
-  /// Subtitle of the biometric unlock card
-  ///
-  /// In en, this message translates to:
-  /// **'Authenticate to securely mount the container'**
-  String get biometricUnlockSubtitle;
-
-  /// Settings row title to open the change-password form
-  ///
-  /// In en, this message translates to:
-  /// **'Change Master Password'**
-  String get changeMasterPasswordTitle;
-
-  /// Settings row subtitle
-  ///
-  /// In en, this message translates to:
-  /// **'Update master password credentials'**
-  String get changeMasterPasswordSubtitle;
 
   /// Settings toggle title
   ///
@@ -1742,47 +1526,11 @@ abstract class AppLocalizations {
   /// **'Match app colors to your wallpaper (Android 12+)'**
   String get useMaterialYouSubtitle;
 
-  /// Settings toggle title
-  ///
-  /// In en, this message translates to:
-  /// **'Pure Black (OLED)'**
-  String get pureBlackThemeTitle;
-
-  /// Settings toggle subtitle
-  ///
-  /// In en, this message translates to:
-  /// **'True black backgrounds to save battery and reduce glare on OLED screens (dark theme only)'**
-  String get pureBlackThemeSubtitle;
-
   /// Settings picker label
   ///
   /// In en, this message translates to:
   /// **'Sort Containers By'**
   String get sortContainersByLabel;
-
-  /// Settings toggle title
-  ///
-  /// In en, this message translates to:
-  /// **'Swap Card Swipe Actions'**
-  String get swapCardSwipeActionsTitle;
-
-  /// Settings toggle subtitle
-  ///
-  /// In en, this message translates to:
-  /// **'Reveal Edit on left and Remove on right when swiping cards'**
-  String get swapCardSwipeActionsSubtitle;
-
-  /// Settings toggle title
-  ///
-  /// In en, this message translates to:
-  /// **'Swipe Gesture Hint'**
-  String get swipeGestureHintTitle;
-
-  /// Settings toggle subtitle
-  ///
-  /// In en, this message translates to:
-  /// **'Show card peek animation on first container'**
-  String get swipeGestureHintSubtitle;
 
   /// Settings toggle title
   ///
@@ -1855,12 +1603,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Local Storage'**
   String get localStorageCardTitle;
-
-  /// Subtitle of the pinned dashboard card that opens real device storage
-  ///
-  /// In en, this message translates to:
-  /// **'Not encrypted — for quick transfers with vaults'**
-  String get localStorageCardSubtitle;
 
   /// Confirmation dialog title when granting All Files Access
   ///
@@ -2306,12 +2048,6 @@ abstract class AppLocalizations {
   /// **'Unlock'**
   String get unlock;
 
-  /// Button label to trigger biometric authentication
-  ///
-  /// In en, this message translates to:
-  /// **'Use Biometric'**
-  String get useBiometric;
-
   /// Instruction/error for the pattern lock setup, shown as both a hint and a validation error
   ///
   /// In en, this message translates to:
@@ -2378,24 +2114,6 @@ abstract class AppLocalizations {
   /// **'Enter Unlock PIN'**
   String get enterUnlockPinTitle;
 
-  /// Error subtitle shown after a failed PIN unlock attempt
-  ///
-  /// In en, this message translates to:
-  /// **'Wrong PIN — try again'**
-  String get wrongPinTryAgain;
-
-  /// Non-error subtitle shown above the PIN keypad on the local-file unlock sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Enter your PIN'**
-  String get enterYourPinSequence;
-
-  /// Non-error subtitle shown above the PIN keypad on the USB unlock sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Enter your PIN to mount'**
-  String get enterPinToMount;
-
   /// Shown when a container is set to PIN unlock but no PIN hash is stored
   ///
   /// In en, this message translates to:
@@ -2450,101 +2168,11 @@ abstract class AppLocalizations {
   /// **'Incorrect PIN'**
   String get incorrectPinError;
 
-  /// Snackbar confirming a recent document was removed from the decoy reader's history
-  ///
-  /// In en, this message translates to:
-  /// **'Removed \"{name}\" from list'**
-  String removedFromListSnack(String name);
-
-  /// Confirmation dialog title for clearing the decoy reader's recent documents list
-  ///
-  /// In en, this message translates to:
-  /// **'Clear Recent History?'**
-  String get clearRecentHistoryTitle;
-
-  /// Confirmation dialog body for clearing the decoy reader's recent documents list
-  ///
-  /// In en, this message translates to:
-  /// **'This will remove all recent documents from your list. The actual files on your device will not be affected.'**
-  String get clearRecentHistoryMessage;
-
-  /// Button label to confirm clearing the entire recent documents list
-  ///
-  /// In en, this message translates to:
-  /// **'Clear All'**
-  String get clearAll;
-
-  /// Snackbar confirming the recent documents list was cleared
-  ///
-  /// In en, this message translates to:
-  /// **'Recent history cleared'**
-  String get recentHistoryClearedSnack;
-
   /// Tooltip for an overflow/more-options menu button
   ///
   /// In en, this message translates to:
   /// **'More options'**
   String get moreOptionsTooltip;
-
-  /// Menu item label to clear the recent documents list
-  ///
-  /// In en, this message translates to:
-  /// **'Clear history'**
-  String get clearHistoryMenuItem;
-
-  /// Button label to open a PDF file from local storage
-  ///
-  /// In en, this message translates to:
-  /// **'Open PDF File'**
-  String get openPdfFile;
-
-  /// Empty state title on the decoy PDF reader home screen
-  ///
-  /// In en, this message translates to:
-  /// **'No documents yet'**
-  String get noDocumentsYetTitle;
-
-  /// Empty state message on the decoy PDF reader home screen
-  ///
-  /// In en, this message translates to:
-  /// **'Open a PDF from your device to start reading.'**
-  String get openPdfToStartMessage;
-
-  /// Menu item label to remove a single document from the recent list
-  ///
-  /// In en, this message translates to:
-  /// **'Remove from list'**
-  String get removeFromListMenuItem;
-
-  /// Relative time label for an event that happened less than a minute ago
-  ///
-  /// In en, this message translates to:
-  /// **'Just now'**
-  String get justNow;
-
-  /// Abbreviated relative time label, e.g. '5m ago'
-  ///
-  /// In en, this message translates to:
-  /// **'{count}m ago'**
-  String minutesAgo(int count);
-
-  /// Abbreviated relative time label, e.g. '3h ago'
-  ///
-  /// In en, this message translates to:
-  /// **'{count}h ago'**
-  String hoursAgo(int count);
-
-  /// Abbreviated relative time label, e.g. '2d ago'
-  ///
-  /// In en, this message translates to:
-  /// **'{count}d ago'**
-  String daysAgo(int count);
-
-  /// Warning snackbar when a USB container auto-locks because the drive was unplugged
-  ///
-  /// In en, this message translates to:
-  /// **'USB drive disconnected — container locked'**
-  String get usbDriveDisconnectedLocked;
 
   /// Snackbar shown when trying to unlock a container that's already open
   ///
@@ -2576,47 +2204,11 @@ abstract class AppLocalizations {
   /// **'File picker failed: {error}'**
   String filePickerFailed(String error);
 
-  /// Error when trying to unlock without having picked a container
-  ///
-  /// In en, this message translates to:
-  /// **'Select a container first'**
-  String get selectContainerFirst;
-
   /// Error when neither a password nor keyfiles were provided to unlock
   ///
   /// In en, this message translates to:
   /// **'Password or keyfiles required'**
   String get passwordOrKeyfilesRequired;
-
-  /// Title of the dialog warning about slow CryFS performance without Direct Storage Access
-  ///
-  /// In en, this message translates to:
-  /// **'Slow Performance Warning'**
-  String get slowPerformanceWarningTitle;
-
-  /// Message explaining the slow-performance tradeoff for CryFS without Direct Storage Access
-  ///
-  /// In en, this message translates to:
-  /// **'Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant \"All Files Access\" for fast speed?'**
-  String get slowPerformanceWarningMessage;
-
-  /// Button to dismiss the slow-performance warning and proceed with unlocking regardless
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock Anyway'**
-  String get unlockAnyway;
-
-  /// Fallback display name for a folder vault when none was resolved
-  ///
-  /// In en, this message translates to:
-  /// **'Vault'**
-  String get defaultVaultName;
-
-  /// Fallback display name for a container when none was resolved
-  ///
-  /// In en, this message translates to:
-  /// **'Container'**
-  String get defaultContainerName;
 
   /// Error message when folder-vault unlock fails
   ///
@@ -2629,12 +2221,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Incorrect password or invalid container'**
   String get incorrectPasswordOrInvalidContainer;
-
-  /// Fallback error text when no specific error message is available
-  ///
-  /// In en, this message translates to:
-  /// **'Unknown error'**
-  String get genericUnknownError;
 
   /// Generic progress label while decrypting
   ///
@@ -2690,18 +2276,6 @@ abstract class AppLocalizations {
   /// **'Mount Container'**
   String get mountContainerTitle;
 
-  /// Segmented control option for choosing a single-file container
-  ///
-  /// In en, this message translates to:
-  /// **'Container File'**
-  String get containerFileSegmentLabel;
-
-  /// Segmented control option for choosing a folder-based vault
-  ///
-  /// In en, this message translates to:
-  /// **'Folder Vault'**
-  String get folderVaultSegmentLabel;
-
   /// Detected container-type label combining an untranslated format/brand name with 'Container', e.g. 'LUKS Container'
   ///
   /// In en, this message translates to:
@@ -2713,12 +2287,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{format} Vault'**
   String formatVaultLabel(String format);
-
-  /// Detected container-type label combining an untranslated format/brand name with 'Drive', e.g. 'BitLocker Drive'
-  ///
-  /// In en, this message translates to:
-  /// **'{format} Drive'**
-  String formatDriveLabel(String format);
 
   /// Generic label for an unidentified encrypted container
   ///
@@ -2744,12 +2312,6 @@ abstract class AppLocalizations {
   /// **'Container Missing'**
   String get containerMissingTitle;
 
-  /// Subtitle shown alongside the container-missing title
-  ///
-  /// In en, this message translates to:
-  /// **'File path could not be resolved'**
-  String get filePathCouldNotBeResolved;
-
   /// Longer explanation shown when a saved container's file can't be found
   ///
   /// In en, this message translates to:
@@ -2768,12 +2330,6 @@ abstract class AppLocalizations {
   /// **'Locate File'**
   String get locateFileButtonLabel;
 
-  /// Subtitle under the biometric-unlock title, explaining what authenticating will do
-  ///
-  /// In en, this message translates to:
-  /// **'Authenticate to securely mount the container'**
-  String get authenticateToMountSubtitle;
-
   /// Button to switch from biometric prompt to manual password entry
   ///
   /// In en, this message translates to:
@@ -2786,47 +2342,11 @@ abstract class AppLocalizations {
   /// **'Authenticate'**
   String get authenticateButtonLabel;
 
-  /// Title of the pattern-unlock card shown on the unlock sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Draw Unlock Pattern'**
-  String get drawUnlockPatternCardTitle;
-
-  /// Message shown under the pattern title after an incorrect pattern attempt
-  ///
-  /// In en, this message translates to:
-  /// **'Wrong pattern — try again'**
-  String get wrongPatternTryAgain;
-
-  /// Message shown under the pattern title prompting the user to draw their pattern
-  ///
-  /// In en, this message translates to:
-  /// **'Connect your pattern sequence'**
-  String get connectYourPatternSequence;
-
   /// Button to switch from pattern entry to manual password entry
   ///
   /// In en, this message translates to:
   /// **'Use Password instead'**
   String get usePasswordInsteadButtonLabel;
-
-  /// Password field hint text when unlocking a folder vault
-  ///
-  /// In en, this message translates to:
-  /// **'Enter vault password'**
-  String get passwordHintFolderVault;
-
-  /// Password field hint text when unlocking a BitLocker drive
-  ///
-  /// In en, this message translates to:
-  /// **'Enter password or recovery key'**
-  String get passwordHintBitlocker;
-
-  /// Password field hint text when unlocking a regular container
-  ///
-  /// In en, this message translates to:
-  /// **'Enter container password'**
-  String get passwordHintContainer;
 
   /// Tooltip on the bookmark icon shown when the password field was prefilled from a saved credential
   ///
@@ -2839,12 +2359,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'For LUKS containers the keyfile replaces the password.'**
   String get luksKeyfileReplacesPasswordNote;
-
-  /// Subtitle explaining read-only mode for a USB drive
-  ///
-  /// In en, this message translates to:
-  /// **'Mount without allowing changes to this drive'**
-  String get readOnlyModeUsbSubtitle;
 
   /// Subtitle explaining read-only mode for a container
   ///
@@ -2893,12 +2407,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Decrypting drive…'**
   String get decryptingDriveLabel;
-
-  /// Error shown when trying to unlock a USB device that is already mounted
-  ///
-  /// In en, this message translates to:
-  /// **'This USB device is already active and mounted.'**
-  String get usbDeviceAlreadyActiveMounted;
 
   /// AppBar title when reconnecting a previously saved USB drive
   ///
@@ -2959,18 +2467,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock a file container you already have'**
   String get mountExistingContainerSubtitle;
-
-  /// Add-vault option title
-  ///
-  /// In en, this message translates to:
-  /// **'Mount split container'**
-  String get mountSplitContainerTitle;
-
-  /// Add-vault option subtitle
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock a split container directly, without joining it first'**
-  String get mountSplitContainerSubtitle;
 
   /// Title for the USB drive mount sheet
   ///
@@ -3056,12 +2552,6 @@ abstract class AppLocalizations {
   /// **'Failed to inspect PDF file size: {error}'**
   String pdfViewerFailedToInspectSize(String error);
 
-  /// Error banner title shown by the PDF rendering engine when a document fails to parse
-  ///
-  /// In en, this message translates to:
-  /// **'Error loading PDF'**
-  String get pdfViewerErrorLoadingTitle;
-
   /// Fallback text shown when the PDF viewer has no error, isn't loading, but has no document to display
   ///
   /// In en, this message translates to:
@@ -3128,12 +2618,6 @@ abstract class AppLocalizations {
   /// **'Failed to read archive: {type}'**
   String failedToReadArchive(String type);
 
-  /// Error status when tapping an archive file whose format isn't supported
-  ///
-  /// In en, this message translates to:
-  /// **'Archive format .{ext} is not yet supported'**
-  String archiveFormatNotSupported(String ext);
-
   /// Title of the dialog prompting for a password to open an encrypted archive
   ///
   /// In en, this message translates to:
@@ -3145,12 +2629,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This archive is password protected. Enter the password to view its contents.'**
   String get archivePasswordPromptMessage;
-
-  /// Status message shown after opening a solid archive (e.g. RAR or 7z) warning that per-file extraction can be slow
-  ///
-  /// In en, this message translates to:
-  /// **'This is a solid archive — opening files may be slower, especially near the end.'**
-  String get archiveSolidWarning;
 
   /// Error status when extracting a single file from an open archive fails
   ///
@@ -3362,12 +2840,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{Deleted 1 item} other{Deleted {count} items}}'**
   String deletedCount(num count);
 
-  /// Status message after a batch delete with some failures
-  ///
-  /// In en, this message translates to:
-  /// **'{deleted} deleted · {failed} failed'**
-  String deletedWithFailures(int deleted, int failed);
-
   /// Status message after exporting files to device storage
   ///
   /// In en, this message translates to:
@@ -3379,12 +2851,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export cancelled or failed'**
   String get exportCancelledOrFailed;
-
-  /// Error status when exporting files throws
-  ///
-  /// In en, this message translates to:
-  /// **'Export error: {type}'**
-  String exportError(String type);
 
   /// Confirmation dialog title after an import, asking whether to delete the source
   ///
@@ -3482,47 +2948,17 @@ abstract class AppLocalizations {
   /// **'Create Archive'**
   String get createArchiveTitle;
 
-  /// Hint text example shown in the empty archive-name field
-  ///
-  /// In en, this message translates to:
-  /// **'archive.zip'**
-  String get archiveNameHint;
-
-  /// Status message after successfully compressing a selection into an archive
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{Archived 1 file} other{Archived {count} files}}'**
-  String archivedCount(num count);
-
   /// Error status when compressing a selection into an archive throws
   ///
   /// In en, this message translates to:
   /// **'Failed to create archive: {type}'**
   String failedToArchiveGeneric(String type);
 
-  /// Hint text for the optional password field in the create-archive dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Optional password (AES-256)'**
-  String get createArchivePasswordHint;
-
-  /// Helper text shown under the disabled password field when the selected archive format doesn't support encryption
-  ///
-  /// In en, this message translates to:
-  /// **'Password protection is only available for ZIP and 7-Zip'**
-  String get createArchivePasswordUnavailableForFormat;
-
   /// Checkbox label in the create-archive dialog (7z only): also encrypt the file names inside the archive, not just their contents
   ///
   /// In en, this message translates to:
   /// **'Encrypt file names'**
   String get createArchiveEncryptFilenames;
-
-  /// Helper text under the encrypt-file-names checkbox: it needs a password, and the password is then needed even to list the contents
-  ///
-  /// In en, this message translates to:
-  /// **'Needs a password. The password is then required even to list the contents.'**
-  String get createArchiveEncryptFilenamesHint;
 
   /// Tooltip for closing the in-folder search bar
   ///
@@ -3655,12 +3091,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Format File System'**
   String get formatFileSystemLabel;
-
-  /// Section header for the main/outer volume creation form
-  ///
-  /// In en, this message translates to:
-  /// **'Standard Volume'**
-  String get standardVolumeHeader;
 
   /// Label above the VeraCrypt/LUKS1/LUKS2 format selector
   ///
@@ -3866,18 +3296,6 @@ abstract class AppLocalizations {
   /// **'GB'**
   String get unitGbShort;
 
-  /// Error when enumerating connected USB storage devices fails
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to list USB devices: {error}'**
-  String failedToListUsbDevices(String error);
-
-  /// Error when the user denies the USB device access permission prompt
-  ///
-  /// In en, this message translates to:
-  /// **'USB permission denied'**
-  String get usbPermissionDenied;
-
   /// Error when the USB drive's capacity can't be auto-detected
   ///
   /// In en, this message translates to:
@@ -3925,12 +3343,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'USB container creation failed.'**
   String get usbContainerCreationFailed;
-
-  /// Section header for the USB drive selection and outer volume form
-  ///
-  /// In en, this message translates to:
-  /// **'USB Drive & Standard Volume'**
-  String get usbStandardVolumeSectionHeader;
 
   /// Warning banner shown on the USB container creation screen
   ///
@@ -4058,24 +3470,6 @@ abstract class AppLocalizations {
   /// **'3D Flip'**
   String get playlistTransitionFlipLabel;
 
-  /// Title for the vault unlock bottom sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock Vault'**
-  String get unlockVaultTitle;
-
-  /// Title when opening an unmounted container
-  ///
-  /// In en, this message translates to:
-  /// **'Open Container'**
-  String get openContainerTitle;
-
-  /// Label for picking a container file or folder
-  ///
-  /// In en, this message translates to:
-  /// **'Select File or Folder'**
-  String get selectContainerFileOrFolder;
-
   /// Unlock option: open the volume using the backup header embedded at its end
   ///
   /// In en, this message translates to:
@@ -4094,47 +3488,17 @@ abstract class AppLocalizations {
   /// **'Keep current'**
   String get keepCurrentOption;
 
-  /// Tools row: enlarge a standard VeraCrypt volume
-  ///
-  /// In en, this message translates to:
-  /// **'Expand VeraCrypt volume'**
-  String get toolExpandVolumeTitle;
-
   /// Tools row subtitle for volume expansion
   ///
   /// In en, this message translates to:
   /// **'Make a standard volume larger, like the desktop Volume Expander'**
   String get toolExpandVolumeSubtitle;
 
-  /// Tools row: enlarge a LUKS1 or LUKS2 file container
-  ///
-  /// In en, this message translates to:
-  /// **'Expand LUKS container'**
-  String get toolExpandLuksVolumeTitle;
-
-  /// Tools row subtitle for LUKS container expansion
-  ///
-  /// In en, this message translates to:
-  /// **'Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata'**
-  String get toolExpandLuksVolumeSubtitle;
-
   /// Explains LUKS container expansion behavior and supported in-place filesystem growth
   ///
   /// In en, this message translates to:
   /// **'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.'**
   String get luksToolsExpandNote;
-
-  /// Tools row: enlarge a raw BitLocker volume file
-  ///
-  /// In en, this message translates to:
-  /// **'Expand BitLocker container'**
-  String get toolExpandBitLockerVolumeTitle;
-
-  /// Tools row subtitle for BitLocker container expansion
-  ///
-  /// In en, this message translates to:
-  /// **'Grow a BitLocker volume file or VHD/VHDX image and extend its NTFS file system'**
-  String get toolExpandBitLockerVolumeSubtitle;
 
   /// Explains BitLocker container expansion: what is supported, what is rewritten, and the backup advice
   ///
@@ -4160,12 +3524,6 @@ abstract class AppLocalizations {
   /// **'Create a hidden volume inside an existing standard volume'**
   String get toolHiddenInExistingSubtitle;
 
-  /// Button: pick the container file
-  ///
-  /// In en, this message translates to:
-  /// **'Choose container'**
-  String get vcToolsPickContainer;
-
   /// Shown before a container is picked
   ///
   /// In en, this message translates to:
@@ -4183,12 +3541,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'PIM (optional)'**
   String get vcToolsPimLabel;
-
-  /// Target size of the container after expansion, in MiB
-  ///
-  /// In en, this message translates to:
-  /// **'New container size (MiB)'**
-  String get vcToolsNewSizeLabel;
 
   /// Switch: fill the added space with encrypted data
   ///
@@ -4364,12 +3716,6 @@ abstract class AppLocalizations {
   /// **'Read-only mode'**
   String get readOnlyModeLabel;
 
-  /// Subtitle explaining read-only mode
-  ///
-  /// In en, this message translates to:
-  /// **'Prevents any write or modify operations on the vault'**
-  String get readOnlyModeSubtitle;
-
   /// No description provided for @alwaysOpenReadOnlyLabel.
   ///
   /// In en, this message translates to:
@@ -4381,24 +3727,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New sessions start read-only.'**
   String get alwaysOpenReadOnlySubtitle;
-
-  /// Label for USB device selector
-  ///
-  /// In en, this message translates to:
-  /// **'Select USB Device'**
-  String get selectUsbDeviceLabel;
-
-  /// Message when no USB devices are detected
-  ///
-  /// In en, this message translates to:
-  /// **'No compatible USB storage devices found'**
-  String get noUsbDevicesFound;
-
-  /// Title for container configuration sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Vault Configuration'**
-  String get containerConfigTitle;
 
   /// Title for the change password screen/button
   ///
@@ -4412,83 +3740,17 @@ abstract class AppLocalizations {
   /// **'Confirm New Password'**
   String get confirmNewPasswordLabel;
 
-  /// Title for in-app secure camera screen
-  ///
-  /// In en, this message translates to:
-  /// **'Vault Camera'**
-  String get cameraCaptureTitle;
-
-  /// Status text while taking a photo
-  ///
-  /// In en, this message translates to:
-  /// **'Capturing photo…'**
-  String get takingPhoto;
-
-  /// Message when camera is launched without a target vault
-  ///
-  /// In en, this message translates to:
-  /// **'No vault selected'**
-  String get noVaultSelected;
-
   /// Title of the media diagnostics dialog
   ///
   /// In en, this message translates to:
   /// **'Media Diagnostics'**
   String get mediaDiagnosticsTitle;
 
-  /// Title for advanced media viewer settings sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Viewer Settings'**
-  String get advancedViewerSettingsTitle;
-
-  /// Tooltip for the button that locks the text editor into read-only/inspection mode and disables the on-screen keyboard
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to read-only mode'**
-  String get textEditorSwitchToReadModeTooltip;
-
-  /// Tooltip for the button that unlocks the text editor for editing again
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to edit mode'**
-  String get textEditorSwitchToEditModeTooltip;
-
   /// Status bar label shown while the text editor is locked to read-only/inspection mode
   ///
   /// In en, this message translates to:
   /// **'Read-only'**
   String get textEditorReadOnlyIndicatorLabel;
-
-  /// Tooltip for the accessory key bar button that moves the caret one character left
-  ///
-  /// In en, this message translates to:
-  /// **'Move cursor left'**
-  String get textEditorMoveCursorLeftTooltip;
-
-  /// Tooltip for the accessory key bar button that moves the caret one character right
-  ///
-  /// In en, this message translates to:
-  /// **'Move cursor right'**
-  String get textEditorMoveCursorRightTooltip;
-
-  /// Tooltip for the accessory key bar button that selects the word at the caret
-  ///
-  /// In en, this message translates to:
-  /// **'Select word'**
-  String get textEditorSelectWordTooltip;
-
-  /// Tooltip for the button that turns off soft wrap, so long lines scroll horizontally instead
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to horizontal scroll'**
-  String get textEditorSwitchToHorizontalScrollTooltip;
-
-  /// Tooltip for the button that turns soft wrap back on, so long lines wrap instead of scrolling horizontally
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to soft wrap'**
-  String get textEditorSwitchToSoftWrapTooltip;
 
   /// Accessibility label for the caret scrubber strip in the text editor's accessory key bar
   ///
@@ -4640,30 +3902,6 @@ abstract class AppLocalizations {
   /// **'Go'**
   String get goToLineButton;
 
-  /// Title for unsaved changes confirm dialog in text editor
-  ///
-  /// In en, this message translates to:
-  /// **'Unsaved Changes'**
-  String get textEditorSaveConfirmTitle;
-
-  /// Message for unsaved changes confirm dialog in text editor
-  ///
-  /// In en, this message translates to:
-  /// **'Do you want to save your changes before closing?'**
-  String get textEditorSaveConfirmMessage;
-
-  /// Button label to save changes and close editor
-  ///
-  /// In en, this message translates to:
-  /// **'Save & Close'**
-  String get saveAndClose;
-
-  /// Button label to discard changes and close editor
-  ///
-  /// In en, this message translates to:
-  /// **'Discard Changes'**
-  String get discardChanges;
-
   /// Plural label for selection app bar
   ///
   /// In en, this message translates to:
@@ -4681,12 +3919,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Deselect All'**
   String get deselectAll;
-
-  /// Title for file browser sort options sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Sort Files'**
-  String get sortOptionsTitle;
 
   /// Menu option for list layout mode
   ///
@@ -4706,12 +3938,6 @@ abstract class AppLocalizations {
   /// **'Masonry View'**
   String get layoutModeMasonry;
 
-  /// Title for file operations action sheet
-  ///
-  /// In en, this message translates to:
-  /// **'File Operations'**
-  String get fileOperationsTitle;
-
   /// Title for conflict resolution sheet when copying/moving files
   ///
   /// In en, this message translates to:
@@ -4723,36 +3949,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Replace existing file'**
   String get replaceExistingFile;
-
-  /// Option to keep both files in conflict resolution
-  ///
-  /// In en, this message translates to:
-  /// **'Keep both (rename new file)'**
-  String get keepBothFiles;
-
-  /// Option to skip file in conflict resolution
-  ///
-  /// In en, this message translates to:
-  /// **'Skip this file'**
-  String get skipFile;
-
-  /// Title for dashboard empty state
-  ///
-  /// In en, this message translates to:
-  /// **'No Vaults Found'**
-  String get noVaultsFoundTitle;
-
-  /// Subtitle for dashboard empty state
-  ///
-  /// In en, this message translates to:
-  /// **'Create a new encrypted container or add an existing vault to get started.'**
-  String get noVaultsFoundSubtitle;
-
-  /// Button label to add an existing vault
-  ///
-  /// In en, this message translates to:
-  /// **'Add Existing Vault'**
-  String get addExistingVaultButton;
 
   /// Sort option for manual ordering
   ///
@@ -4844,77 +4040,11 @@ abstract class AppLocalizations {
   /// **'Unlock Container'**
   String get unlockContainerTitle;
 
-  /// Segmented button label for container-file unlock mode
-  ///
-  /// In en, this message translates to:
-  /// **'Container File'**
-  String get containerFileSegment;
-
-  /// Segmented button label for folder-vault unlock mode
-  ///
-  /// In en, this message translates to:
-  /// **'Folder Vault'**
-  String get folderVaultSegment;
-
   /// Button label to enable a feature (e.g. storage access)
   ///
   /// In en, this message translates to:
   /// **'Enable'**
   String get enableButtonLabel;
-
-  /// Short retry button label
-  ///
-  /// In en, this message translates to:
-  /// **'Retry'**
-  String get retryButtonLabelShort;
-
-  /// Button to relocate a missing container file
-  ///
-  /// In en, this message translates to:
-  /// **'Locate File'**
-  String get locateFileButton;
-
-  /// Button label to trigger biometric authentication
-  ///
-  /// In en, this message translates to:
-  /// **'Authenticate'**
-  String get authenticateButton;
-
-  /// Button to cancel an in-progress unlock operation
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel Unlock'**
-  String get cancelUnlockButton;
-
-  /// LUKS unlock progress with multiple keyslots
-  ///
-  /// In en, this message translates to:
-  /// **'Trying keyslot {attempted} of {total}…'**
-  String tryingKeyslotProgress(int attempted, int total);
-
-  /// LUKS unlock progress with a single keyslot
-  ///
-  /// In en, this message translates to:
-  /// **'Trying keyslot…'**
-  String get tryingKeyslotSingle;
-
-  /// BitLocker unlock progress with multiple credentials
-  ///
-  /// In en, this message translates to:
-  /// **'Verifying credential {attempted} of {total}…'**
-  String verifyingCredentialProgress(int attempted, int total);
-
-  /// BitLocker unlock progress with a single credential
-  ///
-  /// In en, this message translates to:
-  /// **'Verifying credential…'**
-  String get verifyingCredentialSingle;
-
-  /// VeraCrypt unlock progress showing algorithm and slot
-  ///
-  /// In en, this message translates to:
-  /// **'Trying {algo} ({slotName})…'**
-  String tryingAlgoSlot(String algo, String slotName);
 
   /// Slot name for VeraCrypt hidden volume during unlock
   ///
@@ -4928,65 +4058,11 @@ abstract class AppLocalizations {
   /// **'Standard Volume'**
   String get standardVolumeSlotName;
 
-  /// Error card subtitle when the container file cannot be found
-  ///
-  /// In en, this message translates to:
-  /// **'File path could not be resolved'**
-  String get containerMissingSubtitle;
-
-  /// Explanation text when a container is missing
-  ///
-  /// In en, this message translates to:
-  /// **'The container file may have been moved, deleted, or its host storage is currently disconnected.'**
-  String get containerMissingBody;
-
-  /// Subtitle prompting the user to draw their pattern
-  ///
-  /// In en, this message translates to:
-  /// **'Connect your pattern sequence'**
-  String get connectPatternSequence;
-
   /// Label for password text field
   ///
   /// In en, this message translates to:
   /// **'Password'**
   String get passwordLabel;
-
-  /// Hint text for folder-vault password field
-  ///
-  /// In en, this message translates to:
-  /// **'Enter vault password'**
-  String get enterVaultPasswordHint;
-
-  /// Hint text for BitLocker password field
-  ///
-  /// In en, this message translates to:
-  /// **'Enter password or recovery key'**
-  String get enterBitlockerPasswordHint;
-
-  /// Hint text for container password field
-  ///
-  /// In en, this message translates to:
-  /// **'Enter container password'**
-  String get enterContainerPasswordHint;
-
-  /// Read-only toggle subtitle specific to USB drives
-  ///
-  /// In en, this message translates to:
-  /// **'Mount without allowing changes to this drive'**
-  String get readOnlyModeUsbSubtitleDrive;
-
-  /// Toggle label to pin a USB drive on the dashboard
-  ///
-  /// In en, this message translates to:
-  /// **'Remember drive'**
-  String get rememberDriveLabel;
-
-  /// Subtitle for remember-drive toggle
-  ///
-  /// In en, this message translates to:
-  /// **'Pin drive on dashboard for quick access'**
-  String get rememberDriveSubtitle;
 
   /// Button label to unlock a folder vault
   ///
@@ -5012,89 +4088,17 @@ abstract class AppLocalizations {
   /// **'Requesting permission…'**
   String get requestingPermission;
 
-  /// Button label for USB reconnect unlock
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock & Mount'**
-  String get unlockAndMountButton;
-
   /// Button label to unlock a USB drive
   ///
   /// In en, this message translates to:
   /// **'Unlock Drive'**
   String get unlockDriveButton;
 
-  /// Error title when a saved USB device is not found
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t find \"{deviceName}\"'**
-  String couldntFindDevice(String deviceName);
-
-  /// Instruction when a saved USB device is not found
-  ///
-  /// In en, this message translates to:
-  /// **'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.'**
-  String get plugDriveBackInRetry;
-
-  /// Button to retry USB device connection
-  ///
-  /// In en, this message translates to:
-  /// **'Retry Connection'**
-  String get retryConnectionButton;
-
-  /// Button to refresh USB device list
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh Devices'**
-  String get refreshDevicesButton;
-
-  /// Empty state subtitle when no USB devices are detected
-  ///
-  /// In en, this message translates to:
-  /// **'Connect an OTG flash drive to mount'**
-  String get connectOtgDriveToMount;
-
-  /// Status label for an already-mounted USB device
-  ///
-  /// In en, this message translates to:
-  /// **'Already active'**
-  String get alreadyActive;
-
   /// Short badge label for an already-active USB device
   ///
   /// In en, this message translates to:
   /// **'Active'**
   String get active;
-
-  /// Status label for a USB device with permission granted
-  ///
-  /// In en, this message translates to:
-  /// **'Ready to unlock'**
-  String get readyToUnlock;
-
-  /// Hint text for USB partition password field
-  ///
-  /// In en, this message translates to:
-  /// **'Enter USB partition password'**
-  String get enterUsbPartitionPassword;
-
-  /// Title of the biometric auth card on USB unlock
-  ///
-  /// In en, this message translates to:
-  /// **'Biometric Authentication'**
-  String get biometricAuthenticationTitle;
-
-  /// Subtitle of the biometric auth card on USB unlock
-  ///
-  /// In en, this message translates to:
-  /// **'Authenticate to unlock and mount this USB device'**
-  String get biometricAuthUsbSubtitle;
-
-  /// Subtitle prompting the user to draw their pattern to mount USB
-  ///
-  /// In en, this message translates to:
-  /// **'Connect your pattern sequence to mount'**
-  String get connectPatternSequenceToMount;
 
   /// Menu item to select all items
   ///
@@ -5197,12 +4201,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Expose as Document Provider'**
   String get exposeAsDocumentProviderMenu;
-
-  /// Tooltip for the more-options overflow menu
-  ///
-  /// In en, this message translates to:
-  /// **'More options'**
-  String get moreOptionsTooltipShort;
 
   /// Tooltip for copy icon button
   ///
@@ -5546,12 +4544,6 @@ abstract class AppLocalizations {
   /// **'Enter Fullscreen'**
   String get enterFullscreenMenu;
 
-  /// Snackbar error when opening a file in external app fails
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to open in external app: {error}'**
-  String failedToOpenExternalApp(String error);
-
   /// Menu item for current-folder-only playlist scope
   ///
   /// In en, this message translates to:
@@ -5581,36 +4573,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Playlist Options'**
   String get playlistOptionsTooltip;
-
-  /// Tooltip when playlist is not active
-  ///
-  /// In en, this message translates to:
-  /// **'Enable Playlist'**
-  String get enablePlaylistTooltip;
-
-  /// Tooltip for the more-actions menu
-  ///
-  /// In en, this message translates to:
-  /// **'More Actions'**
-  String get moreActionsTooltip;
-
-  /// Menu item to force portrait orientation
-  ///
-  /// In en, this message translates to:
-  /// **'Force Portrait'**
-  String get forcePortraitMenu;
-
-  /// Menu item to force landscape orientation
-  ///
-  /// In en, this message translates to:
-  /// **'Force Landscape'**
-  String get forceLandscapeMenu;
-
-  /// Menu item to follow sensor orientation
-  ///
-  /// In en, this message translates to:
-  /// **'Auto-Rotate (Sensor)'**
-  String get autoRotateSensorMenu;
 
   /// Submenu title for screen orientation options
   ///
@@ -5666,101 +4628,17 @@ abstract class AppLocalizations {
   /// **'Diagnostics copied to clipboard'**
   String get diagnosticsCopiedToClipboard;
 
-  /// Title of the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Diagnostics'**
-  String get diagnosticsTitle;
-
-  /// Tooltip for copy diagnostics button
-  ///
-  /// In en, this message translates to:
-  /// **'Copy diagnostics'**
-  String get copyDiagnosticsTooltip;
-
   /// Tooltip for close button
   ///
   /// In en, this message translates to:
   /// **'Close'**
   String get closeTooltip;
 
-  /// Section header for playback stats in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Playback'**
-  String get diagnosticsPlaybackSection;
-
-  /// Section header for engine stats in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Engine'**
-  String get diagnosticsEngineSection;
-
-  /// Stat row label for playback state in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'State'**
-  String get diagnosticsStateLabel;
-
-  /// Stat row label for video resolution in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Resolution'**
-  String get diagnosticsResolutionLabel;
-
-  /// Stat row label for aspect ratio in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Aspect Ratio'**
-  String get diagnosticsAspectRatioLabel;
-
-  /// Stat row label for playback position in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Position'**
-  String get diagnosticsPositionLabel;
-
-  /// Stat row label for media duration in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Duration'**
-  String get diagnosticsDurationLabel;
-
   /// Stat row label and playback state value for an error condition in the diagnostics sheet
   ///
   /// In en, this message translates to:
   /// **'Error'**
   String get diagnosticsErrorLabel;
-
-  /// Stat row label for the playback engine name in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Player'**
-  String get diagnosticsPlayerLabel;
-
-  /// Stat row label for the decoding method in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Decoding'**
-  String get diagnosticsDecodingLabel;
-
-  /// Stat row value naming the playback engine in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'ExoPlayer (Android)'**
-  String get diagnosticsExoPlayerValue;
-
-  /// Stat row value describing the decoding method in the diagnostics sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Hardware-accelerated'**
-  String get diagnosticsHardwareAcceleratedValue;
-
-  /// Fallback stat value in the diagnostics sheet when resolution or aspect ratio is unavailable
-  ///
-  /// In en, this message translates to:
-  /// **'Unknown'**
-  String get diagnosticsUnknownValue;
 
   /// Playback state value shown in the diagnostics sheet while the player is buffering
   ///
@@ -5779,12 +4657,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paused'**
   String get diagnosticsStatePaused;
-
-  /// Fallback duration/position value in the diagnostics sheet when the time is negative or unavailable
-  ///
-  /// In en, this message translates to:
-  /// **'--:--'**
-  String get diagnosticsDurationUnavailable;
 
   /// Label for rotate 90 degrees action
   ///
@@ -5815,12 +4687,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Subtitles'**
   String get subtitlesLabel;
-
-  /// Sheet title for image settings
-  ///
-  /// In en, this message translates to:
-  /// **'Image Settings'**
-  String get imageSettingsTitle;
 
   /// Sheet title for playback/video settings
   ///
@@ -5876,12 +4742,6 @@ abstract class AppLocalizations {
   /// **'{degrees}°'**
   String rotationDegreesValue(int degrees);
 
-  /// Tooltip for settings menu button
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get settingsTooltipShort;
-
   /// Tooltip for source code link on about screen
   ///
   /// In en, this message translates to:
@@ -5906,18 +4766,6 @@ abstract class AppLocalizations {
   /// **'Reset to defaults'**
   String get resetToDefaultsTooltip;
 
-  /// AppBar title when unlocking a USB container
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock USB Container'**
-  String get usbUnlockContainerTitle;
-
-  /// AppBar title when mounting a new USB drive
-  ///
-  /// In en, this message translates to:
-  /// **'Mount USB Drive'**
-  String get usbMountContainerTitle;
-
   /// Label when slideshow auto-advance is off
   ///
   /// In en, this message translates to:
@@ -5935,24 +4783,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mute'**
   String get muteTooltip;
-
-  /// Tooltip for play once mode
-  ///
-  /// In en, this message translates to:
-  /// **'Play Once (Auto-Advance Disabled)'**
-  String get playOnceDisabledTooltip;
-
-  /// Tooltip for play and advance mode
-  ///
-  /// In en, this message translates to:
-  /// **'Play & Advance to Next'**
-  String get playAndAdvanceTooltip;
-
-  /// Tooltip for loop video mode
-  ///
-  /// In en, this message translates to:
-  /// **'Loop Current Video'**
-  String get loopCurrentVideoTooltip;
 
   /// Confirmation dialog title for clearing a vault's thumbnail cache
   ///
@@ -6055,12 +4885,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set up a pattern before saving.'**
   String get patternSetupRequiredBeforeSaving;
-
-  /// Helper text under the password field when updating saved container credentials
-  ///
-  /// In en, this message translates to:
-  /// **'Password is encrypted using Android Keystore. Leave blank if using keyfiles only.'**
-  String get passwordKeystoreEncryptedHelperText;
 
   /// Button label to change an already-configured unlock pattern
   ///
@@ -6458,18 +5282,6 @@ abstract class AppLocalizations {
   /// **'An operation is in progress. Please wait before locking.'**
   String get operationInProgressWaitMessage;
 
-  /// Tooltip for reconnecting a saved but disconnected USB drive
-  ///
-  /// In en, this message translates to:
-  /// **'Reconnect USB'**
-  String get reconnectUsbTooltip;
-
-  /// Tooltip for unlocking a container from the dashboard
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock container'**
-  String get unlockContainerTooltip;
-
   /// Snackbar shown when locking a container throws an unexpected error
   ///
   /// In en, this message translates to:
@@ -6698,12 +5510,6 @@ abstract class AppLocalizations {
   /// **'filtered'**
   String get filteredLabel;
 
-  /// Section header label above the storage stats in the vertical (landscape sidebar) stats bar layout
-  ///
-  /// In en, this message translates to:
-  /// **'STORAGE'**
-  String get statsStorageSectionHeader;
-
   /// Count of folders shown in the stats bar
   ///
   /// In en, this message translates to:
@@ -6829,12 +5635,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get fileOpsDismissTooltip;
-
-  /// Destination label for a file operation targeting the root directory
-  ///
-  /// In en, this message translates to:
-  /// **'Root'**
-  String get fileOpsRootDestinationLabel;
 
   /// Status label for a cancelled file operation
   ///
@@ -7046,36 +5846,6 @@ abstract class AppLocalizations {
   /// **'Show thumbnail carousel button when viewing media playlists'**
   String get showPlaylistCarouselDesc;
 
-  /// Accessibility label for the video playback position slider
-  ///
-  /// In en, this message translates to:
-  /// **'Video playback position slider'**
-  String get videoPlaybackSliderLabel;
-
-  /// Accessibility hint on the advanced settings button explaining the long-press action
-  ///
-  /// In en, this message translates to:
-  /// **'Long press for playback diagnostics'**
-  String get longPressPlaybackDiagnosticsHint;
-
-  /// Accessibility label shown for an image in the playlist when slideshow auto-advance is off
-  ///
-  /// In en, this message translates to:
-  /// **'Static image mode'**
-  String get staticImageModeLabel;
-
-  /// Accessibility label shown for an image in the playlist when slideshow auto-advance is on
-  ///
-  /// In en, this message translates to:
-  /// **'Slideshow mode active with {seconds} seconds delay'**
-  String slideshowModeActiveLabel(int seconds);
-
-  /// Accessibility label describing the current video playback mode button
-  ///
-  /// In en, this message translates to:
-  /// **'Video playback mode: {mode}'**
-  String videoPlaybackModeLabel(String mode);
-
   /// Accessibility label for the pause playback button in the media viewer
   ///
   /// In en, this message translates to:
@@ -7111,12 +5881,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing in this folder matches \"{query}\".'**
   String noResultsForQueryMessage(String query);
-
-  /// Tooltip for the button that closes the playlist thumbnail carousel overlay
-  ///
-  /// In en, this message translates to:
-  /// **'Close Carousel'**
-  String get closeCarouselTooltip;
 
   /// Submenu title for playlist scroll mode options in media viewer
   ///
@@ -7346,24 +6110,6 @@ abstract class AppLocalizations {
   /// **'Could not save recording: {error}'**
   String cameraCouldNotSaveRecordingWithReasonMessage(String error);
 
-  /// Error toast when switching to a different camera lens fails
-  ///
-  /// In en, this message translates to:
-  /// **'Could not switch lens'**
-  String get cameraCouldNotSwitchLensMessage;
-
-  /// Busy overlay label shown while a captured photo is being encrypted into the vault
-  ///
-  /// In en, this message translates to:
-  /// **'Encrypting photo…'**
-  String get cameraEncryptingPhotoLabel;
-
-  /// Busy overlay label shown while a recorded video is being encrypted into the vault
-  ///
-  /// In en, this message translates to:
-  /// **'Encrypting video…'**
-  String get cameraEncryptingVideoLabel;
-
   /// Section header on the about screen for the application info section
   ///
   /// In en, this message translates to:
@@ -7592,18 +6338,6 @@ abstract class AppLocalizations {
   /// **'Made with ❤ for privacy.'**
   String get aboutFooterMadeWithLove;
 
-  /// Snackbar message shown after copying version info to the clipboard
-  ///
-  /// In en, this message translates to:
-  /// **'Version info copied — handy for bug reports'**
-  String get aboutVersionCopiedMessage;
-
-  /// Text copied to the clipboard when the user taps the version entry
-  ///
-  /// In en, this message translates to:
-  /// **'VaultExplorer v{version} (Android)'**
-  String aboutVersionClipboardText(String version);
-
   /// Shareable promotional text copied to the clipboard when the user taps share
   ///
   /// In en, this message translates to:
@@ -7789,12 +6523,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{size} px · {quality}% quality'**
   String thumbnailQualitySummary(int size, int quality);
-
-  /// On-screen indicator shown while holding down to fast-forward playback at a multiplier
-  ///
-  /// In en, this message translates to:
-  /// **'{speed}× Speed'**
-  String holdToSpeedIndicatorLabel(String speed);
 
   /// Section header on toolbar settings screen
   ///
@@ -8312,18 +7040,6 @@ abstract class AppLocalizations {
   /// **'Vol {volId} · Mounted'**
   String volMountedSummary(int volId);
 
-  /// Occupied space summary shown on mounted folder vault card (Cryptomator/gocryptfs/CryFS), which have no fixed total size
-  ///
-  /// In en, this message translates to:
-  /// **'{used} used'**
-  String vaultOccupiedSpaceSummary(String used);
-
-  /// Error message when unlocking/verifying container fails due to wrong password or keyfiles
-  ///
-  /// In en, this message translates to:
-  /// **'Incorrect password/keyfiles or unsupported drive'**
-  String get incorrectPasswordOrKeyfilesDriveError;
-
   /// Helper text showing detected USB drive usable capacity
   ///
   /// In en, this message translates to:
@@ -8738,12 +7454,6 @@ abstract class AppLocalizations {
   /// **'Rearrange Bookmarks'**
   String get reorderBookmarksTitle;
 
-  /// No description provided for @reorderBookmarksDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Drag items to reorder them in the bookmark bar'**
-  String get reorderBookmarksDesc;
-
   /// Heading of the navigation drawer section that lists bookmarks of unlocked vaults
   ///
   /// In en, this message translates to:
@@ -9140,18 +7850,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 file} other{{count} files}}'**
   String hashVerifierVaultConfirmFilesLabel(num count);
 
-  /// Warning shown on the vault confirmation step before starting an expensive full-vault check
-  ///
-  /// In en, this message translates to:
-  /// **'Every file in this vault will be read.'**
-  String get hashVerifierVaultConfirmWarning;
-
-  /// Message shown on the confirmation step when the scan discovered zero files
-  ///
-  /// In en, this message translates to:
-  /// **'This vault has no files to check'**
-  String get hashVerifierVaultEmptyMessage;
-
   /// Button on the vault confirmation step that begins hashing every discovered file
   ///
   /// In en, this message translates to:
@@ -9242,12 +7940,6 @@ abstract class AppLocalizations {
   /// **'Check every file in a vault against a loaded manifest'**
   String get hashVerifierVaultActionVerifySubtitle;
 
-  /// Button that returns the Vault tab from a chosen action back to the compute/verify chooser
-  ///
-  /// In en, this message translates to:
-  /// **'Change'**
-  String get hashVerifierVaultChangeActionButton;
-
   /// Button that scans the loaded manifest's vault and verifies every file it finds against it
   ///
   /// In en, this message translates to:
@@ -9307,12 +7999,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stage 3: Verifying full byte hashes...'**
   String get duplicateFinderScanningStage3;
-
-  /// Scan complete status
-  ///
-  /// In en, this message translates to:
-  /// **'Scan Complete'**
-  String get duplicateFinderScanComplete;
 
   /// Title when no duplicate files are found
   ///
@@ -9708,12 +8394,6 @@ abstract class AppLocalizations {
   /// **'{used} of {total} used'**
   String storageAnalyzerUsedOfTotal(String used, String total);
 
-  /// Section header for the largest-files list
-  ///
-  /// In en, this message translates to:
-  /// **'Heaviest Files'**
-  String get storageAnalyzerHeaviestFilesHeader;
-
   /// Section header for the file-type breakdown bar
   ///
   /// In en, this message translates to:
@@ -9851,12 +8531,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This folder is empty.'**
   String get storageAnalyzerEmptyFolder;
-
-  /// Label of the treemap tile that groups many items too small to draw
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 smaller item} other{{count} smaller items}}'**
-  String storageAnalyzerSmallerItems(num count);
 
   /// Hint below the storage treemap
   ///
@@ -10584,12 +9258,6 @@ abstract class AppLocalizations {
   /// **'Delete Selected ({count})'**
   String duplicateFinderDeleteSelectedButton(Object count);
 
-  /// Tooltip for the icon button that switches which mounted vault is being browsed
-  ///
-  /// In en, this message translates to:
-  /// **'Switch Vault'**
-  String get vaultBrowserSwitchVaultTooltip;
-
   /// Breadcrumb label shown when browsing a vault's root folder
   ///
   /// In en, this message translates to:
@@ -10722,30 +9390,6 @@ abstract class AppLocalizations {
   /// **'Compare two folders — in vaults, on this device or on a document provider — and copy over what\'s missing or newer'**
   String get toolVaultSyncSubtitle;
 
-  /// Empty state title shown in Vault Sync when no vaults are mounted
-  ///
-  /// In en, this message translates to:
-  /// **'No Vaults Mounted'**
-  String get vaultSyncNoVaultsTitle;
-
-  /// Empty state message shown in Vault Sync when no vaults are mounted
-  ///
-  /// In en, this message translates to:
-  /// **'Mount at least one vault to compare and sync its files.'**
-  String get vaultSyncNoVaultsMessage;
-
-  /// Label for the left side of a Vault Sync comparison
-  ///
-  /// In en, this message translates to:
-  /// **'Left'**
-  String get vaultSyncLeftLabel;
-
-  /// Label for the right side of a Vault Sync comparison
-  ///
-  /// In en, this message translates to:
-  /// **'Right'**
-  String get vaultSyncRightLabel;
-
   /// Placeholder subtitle shown on a Vault Sync side picker before a location is chosen
   ///
   /// In en, this message translates to:
@@ -10757,12 +9401,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Swap the two storages'**
   String get vaultSyncSwapTooltip;
-
-  /// Warning in Vault Sync when both storages point at the same folder
-  ///
-  /// In en, this message translates to:
-  /// **'The two folders must be different.'**
-  String get vaultSyncSameLocationWarning;
 
   /// Title of the idle-state intro card in Vault Sync before a comparison has run
   ///
@@ -10842,30 +9480,6 @@ abstract class AppLocalizations {
   /// **'{count} files already match on both sides'**
   String vaultSyncInSyncCountLabel(Object count);
 
-  /// Summary badge counting entries that exist only on the Left side
-  ///
-  /// In en, this message translates to:
-  /// **'{count} only on Left'**
-  String vaultSyncBadgeOnlyLeft(Object count);
-
-  /// Summary badge counting entries that exist only on the Right side
-  ///
-  /// In en, this message translates to:
-  /// **'{count} only on Right'**
-  String vaultSyncBadgeOnlyRight(Object count);
-
-  /// Summary badge counting entries where the Left copy is newer
-  ///
-  /// In en, this message translates to:
-  /// **'{count} newer on Left'**
-  String vaultSyncBadgeLeftNewer(Object count);
-
-  /// Summary badge counting entries where the Right copy is newer
-  ///
-  /// In en, this message translates to:
-  /// **'{count} newer on Right'**
-  String vaultSyncBadgeRightNewer(Object count);
-
   /// Summary badge counting entries that can't be resolved automatically
   ///
   /// In en, this message translates to:
@@ -10890,60 +9504,6 @@ abstract class AppLocalizations {
   /// **'Copies missing files and newer versions to the other side.'**
   String get vaultSyncDirectionTwoWaySubtitle;
 
-  /// Sync direction option: only push Left's changes to Right
-  ///
-  /// In en, this message translates to:
-  /// **'Left → Right (one-way)'**
-  String get vaultSyncDirectionLeftToRight;
-
-  /// Explanation of the Left-to-Right one-way sync direction option
-  ///
-  /// In en, this message translates to:
-  /// **'Pushes new and updated files from Left to Right; never changes Left'**
-  String get vaultSyncDirectionLeftToRightSubtitle;
-
-  /// Sync direction option: only push Right's changes to Left
-  ///
-  /// In en, this message translates to:
-  /// **'Right → Left (one-way)'**
-  String get vaultSyncDirectionRightToLeft;
-
-  /// Explanation of the Right-to-Left one-way sync direction option
-  ///
-  /// In en, this message translates to:
-  /// **'Pushes new and updated files from Right to Left; never changes Right'**
-  String get vaultSyncDirectionRightToLeftSubtitle;
-
-  /// Hint text for the search field filtering the Vault Sync diff list
-  ///
-  /// In en, this message translates to:
-  /// **'Search differences'**
-  String get vaultSyncSearchHint;
-
-  /// Status badge for an entry that exists only on the Left side
-  ///
-  /// In en, this message translates to:
-  /// **'Only Left'**
-  String get vaultSyncStatusOnlyLeft;
-
-  /// Status badge for an entry that exists only on the Right side
-  ///
-  /// In en, this message translates to:
-  /// **'Only Right'**
-  String get vaultSyncStatusOnlyRight;
-
-  /// Status badge for an entry where the Left copy is newer
-  ///
-  /// In en, this message translates to:
-  /// **'Left Newer'**
-  String get vaultSyncStatusLeftNewer;
-
-  /// Status badge for an entry where the Right copy is newer
-  ///
-  /// In en, this message translates to:
-  /// **'Right Newer'**
-  String get vaultSyncStatusRightNewer;
-
   /// Status badge for an entry with ambiguous same-time, different-size copies
   ///
   /// In en, this message translates to:
@@ -10956,29 +9516,6 @@ abstract class AppLocalizations {
   /// **'Type Mismatch'**
   String get vaultSyncStatusTypeMismatch;
 
-  /// Detail line for a whole folder that exists only on the Left side
-  ///
-  /// In en, this message translates to:
-  /// **'Folder — only on Left'**
-  String get vaultSyncFolderOnlyLeftDetail;
-
-  /// Detail line for a whole folder that exists only on the Right side
-  ///
-  /// In en, this message translates to:
-  /// **'Folder — only on Right'**
-  String get vaultSyncFolderOnlyRightDetail;
-
-  /// Detail line comparing size and modified date on both sides for a modified/conflicted file
-  ///
-  /// In en, this message translates to:
-  /// **'L: {leftSize} · {leftDate}  →  R: {rightSize} · {rightDate}'**
-  String vaultSyncBothSidesDetail(
-    Object leftSize,
-    Object leftDate,
-    Object rightSize,
-    Object rightDate,
-  );
-
   /// Tooltip explaining why a type-mismatch entry can't be synced automatically
   ///
   /// In en, this message translates to:
@@ -10990,18 +9527,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change sync action'**
   String get vaultSyncChangeActionTooltip;
-
-  /// Per-entry action: copy this entry from Left to Right
-  ///
-  /// In en, this message translates to:
-  /// **'Copy → Right'**
-  String get vaultSyncActionCopyToRight;
-
-  /// Per-entry action: copy this entry from Right to Left
-  ///
-  /// In en, this message translates to:
-  /// **'Copy → Left'**
-  String get vaultSyncActionCopyToLeft;
 
   /// Per-entry action: leave this entry untouched
   ///
@@ -11033,12 +9558,6 @@ abstract class AppLocalizations {
   /// **'This will copy {count} items ({bytes} total) between the two sides. Existing files with the same name will be overwritten.'**
   String vaultSyncConfirmMessage(Object count, Object bytes);
 
-  /// Snackbar shown after enqueueing Vault Sync copy operations
-  ///
-  /// In en, this message translates to:
-  /// **'Sync started — {count} items queued'**
-  String vaultSyncStartedMessage(Object count);
-
   /// App bar title on the Vault Sync location picker sheet, naming which side is being picked
   ///
   /// In en, this message translates to:
@@ -11057,12 +9576,6 @@ abstract class AppLocalizations {
   /// **'Files copied out of a vault to {targets} will be stored unencrypted.'**
   String vaultSyncPlaintextWarning(Object targets);
 
-  /// Label of the storage selector on the Vault Sync location picker (vaults, device storage, document providers)
-  ///
-  /// In en, this message translates to:
-  /// **'Storage'**
-  String get vaultSyncStorageSelectorLabel;
-
   /// Subtitle under a vault in the Vault Sync storage selector
   ///
   /// In en, this message translates to:
@@ -11080,12 +9593,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Document provider · not encrypted'**
   String get vaultSyncTargetKindProvider;
-
-  /// Tooltip for the app bar button on the Vault Sync location picker that opens the system folder picker to add a storage
-  ///
-  /// In en, this message translates to:
-  /// **'Add storage location'**
-  String get vaultSyncAddStorageTooltip;
 
   /// Tooltip for the app bar button on the Vault Sync location picker that requests all-files access so device storage can be used
   ///
@@ -11151,12 +9658,6 @@ abstract class AppLocalizations {
   /// **'Enter your current Master Password to confirm removal:'**
   String get confirmRemoveMasterPasswordMessage;
 
-  /// Biometric prompt reason when removing master password
-  ///
-  /// In en, this message translates to:
-  /// **'Authenticate to remove Master Password'**
-  String get authenticateToRemoveMasterPassword;
-
   /// Error message when entering an incorrect password
   ///
   /// In en, this message translates to:
@@ -11198,12 +9699,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy path'**
   String get copyPathAction;
-
-  /// Header for the automation settings section in the vault configuration screen
-  ///
-  /// In en, this message translates to:
-  /// **'Automation'**
-  String get automationSectionHeader;
 
   /// Title for the automation tile in vault configuration screen
   ///
@@ -11433,12 +9928,6 @@ abstract class AppLocalizations {
   /// **'Emergency purge'**
   String get automationActionEmergencyPurgeLabel;
 
-  /// Closing footnote pointing to the source doc comment for the full extras contract
-  ///
-  /// In en, this message translates to:
-  /// **'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.'**
-  String get automationDocCommentFootnote;
-
   /// Automation tier picker option: automation disabled for this vault
   ///
   /// In en, this message translates to:
@@ -11492,18 +9981,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Display dotfiles and system folders'**
   String get showHiddenFilesDesc;
-
-  /// Label for toggle option to display .nomedia files
-  ///
-  /// In en, this message translates to:
-  /// **'Show .nomedia files'**
-  String get showNoMediaFilesLabel;
-
-  /// Description explaining that .nomedia files will be shown in folder listings
-  ///
-  /// In en, this message translates to:
-  /// **'Display .nomedia files in folder listings'**
-  String get showNoMediaFilesDesc;
 
   /// Checkbox label to remember choice and not prompt again
   ///
@@ -11601,23 +10078,11 @@ abstract class AppLocalizations {
   /// **'Next'**
   String get wizardNextButton;
 
-  /// Short step title/progress-indicator label for a creation wizard's Category/Type Selection step
-  ///
-  /// In en, this message translates to:
-  /// **'Type'**
-  String get wizardStepTypeTitle;
-
   /// Short step title/progress-indicator label for a creation wizard's Basic Configuration step
   ///
   /// In en, this message translates to:
   /// **'Basic Info'**
   String get wizardStepBasicInfoTitle;
-
-  /// Short step title/progress-indicator label for a creation wizard's Advanced/Optional Features step
-  ///
-  /// In en, this message translates to:
-  /// **'Advanced'**
-  String get wizardStepAdvancedTitle;
 
   /// Short step title/progress-indicator label for a creation wizard's Review & Confirm step
   ///
@@ -11642,18 +10107,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Encryption Details'**
   String get wizardEncryptionDetailsRowTitle;
-
-  /// Subtitle shown under the hidden-volume details row once the toggle is on and its modal sheet has been opened
-  ///
-  /// In en, this message translates to:
-  /// **'Configured — tap to review'**
-  String get wizardHiddenVolumeRowSubtitleConfigured;
-
-  /// Subtitle shown under the hidden-volume details row once the toggle is on but its modal sheet hasn't been opened yet
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to set up'**
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup;
 
   /// Heading above the summary card on a creation wizard's Review & Confirm step
   ///
@@ -11757,12 +10210,6 @@ abstract class AppLocalizations {
   /// **'External Subtitles (.srt/.vtt)'**
   String get externalSubtitlesLabel;
 
-  /// Short label indicating external subtitles are active
-  ///
-  /// In en, this message translates to:
-  /// **'External'**
-  String get externalLabel;
-
   /// Label for subtitle font size selector
   ///
   /// In en, this message translates to:
@@ -11859,12 +10306,6 @@ abstract class AppLocalizations {
   /// **'Redact'**
   String get redactToolLabel;
 
-  /// Image editor tooltip: rotate the working image 90 degrees counter-clockwise
-  ///
-  /// In en, this message translates to:
-  /// **'Rotate left'**
-  String get rotateLeftTooltip;
-
   /// Image editor tooltip: rotate the working image 90 degrees clockwise
   ///
   /// In en, this message translates to:
@@ -11888,30 +10329,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Original'**
   String get cropAspectOriginalLabel;
-
-  /// Image editor tooltip: commit the current crop rectangle into the working image
-  ///
-  /// In en, this message translates to:
-  /// **'Apply crop'**
-  String get applyCropTooltip;
-
-  /// Image editor tooltip: choose the color for the current drawing/redaction tool
-  ///
-  /// In en, this message translates to:
-  /// **'Color'**
-  String get annotationColorTooltip;
-
-  /// Image editor tooltip: choose the pen/redaction stroke width
-  ///
-  /// In en, this message translates to:
-  /// **'Stroke width'**
-  String get annotationStrokeWidthTooltip;
-
-  /// Image editor tooltip: remove every pen stroke, text label, and redaction box added this session
-  ///
-  /// In en, this message translates to:
-  /// **'Clear all annotations'**
-  String get clearAnnotationsTooltip;
 
   /// Image editor tooltip: discard every edit and reload the original image
   ///
@@ -11942,12 +10359,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Type something…'**
   String get addTextAnnotationHint;
-
-  /// Hint shown above the toolbar in the image editor while the text tool is active
-  ///
-  /// In en, this message translates to:
-  /// **'Tap the image to add text'**
-  String get textToolHint;
 
   /// Title of the bottom sheet offering how to save image editor changes
   ///
@@ -12417,35 +10828,17 @@ abstract class AppLocalizations {
   /// **'Save PIM'**
   String get automationSavePimButton;
 
-  /// Section header for camera automation
-  ///
-  /// In en, this message translates to:
-  /// **'Camera automation'**
-  String get automationCameraSectionHeader;
-
   /// Description of the camera automation opt-in
   ///
   /// In en, this message translates to:
   /// **'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.'**
   String get automationCameraDescription;
 
-  /// Switch label for allowing camera capture from automation
-  ///
-  /// In en, this message translates to:
-  /// **'Allow camera capture'**
-  String get automationAllowCameraCapture;
-
   /// Dialog title requesting display over other apps permission for camera automation
   ///
   /// In en, this message translates to:
   /// **'Display over other apps'**
   String get automationOverlayPermissionTitle;
-
-  /// Dialog message explaining why display over other apps permission is required for camera automation
-  ///
-  /// In en, this message translates to:
-  /// **'Background camera capture requires permission to display over other apps on Android 14+. Grant this permission to allow automated captures while the screen is locked or the app is in the background.'**
-  String get automationOverlayPermissionMessage;
 
   /// Success message shown after saving PIM
   ///
@@ -12627,18 +11020,6 @@ abstract class AppLocalizations {
   /// **'Computing hash…'**
   String get computingHashMessage;
 
-  /// Helper text shown before hash computation is initiated
-  ///
-  /// In en, this message translates to:
-  /// **'Tap Calculate to verify'**
-  String get tapCalculateToVerifyMessage;
-
-  /// Button label to trigger checksum hash calculation
-  ///
-  /// In en, this message translates to:
-  /// **'Calculate'**
-  String get calculateButton;
-
   /// Button to copy the diagnostics report to clipboard
   ///
   /// In en, this message translates to:
@@ -12801,12 +11182,6 @@ abstract class AppLocalizations {
   /// **'Direct C++ JNI Stream (volId={volId})'**
   String directJniStreamSource(int volId);
 
-  /// Bottom nav label for the archive-browsing tab
-  ///
-  /// In en, this message translates to:
-  /// **'Archives'**
-  String get archivesTabLabel;
-
   /// Bottom nav label for the local storage browsing tab
   ///
   /// In en, this message translates to:
@@ -12819,77 +11194,17 @@ abstract class AppLocalizations {
   /// **'Allow access to browse files on your device.'**
   String get filesPermissionMessage;
 
-  /// Empty state title for an empty folder
-  ///
-  /// In en, this message translates to:
-  /// **'No files here'**
-  String get filesEmptyTitle;
-
   /// Empty state message for an empty folder
   ///
   /// In en, this message translates to:
   /// **'This folder is empty.'**
   String get filesEmptyMessage;
 
-  /// Tooltip for the create-folder app bar action
-  ///
-  /// In en, this message translates to:
-  /// **'New folder'**
-  String get filesNewFolderTooltip;
-
-  /// Title of the create-folder dialog
-  ///
-  /// In en, this message translates to:
-  /// **'New folder'**
-  String get filesNewFolderDialogTitle;
-
-  /// Text field hint used by the rename and new-folder dialogs
-  ///
-  /// In en, this message translates to:
-  /// **'Name'**
-  String get filesNameHint;
-
-  /// Confirm button on the new-folder dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Create'**
-  String get filesCreate;
-
-  /// Rename dialog title/button and selection bar tooltip
-  ///
-  /// In en, this message translates to:
-  /// **'Rename'**
-  String get filesRename;
-
-  /// Delete confirm button and selection bar tooltip
-  ///
-  /// In en, this message translates to:
-  /// **'Delete'**
-  String get filesDelete;
-
-  /// Share selection bar tooltip/button
-  ///
-  /// In en, this message translates to:
-  /// **'Share'**
-  String get filesShare;
-
   /// Copy selection bar tooltip/button
   ///
   /// In en, this message translates to:
   /// **'Copy'**
   String get filesCopy;
-
-  /// Move selection bar tooltip/button
-  ///
-  /// In en, this message translates to:
-  /// **'Move'**
-  String get filesMove;
-
-  /// Delete confirmation dialog title
-  ///
-  /// In en, this message translates to:
-  /// **'Delete permanently?'**
-  String get filesDeleteConfirmTitle;
 
   /// Title of the copy/move destination picker screen
   ///
@@ -12909,95 +11224,11 @@ abstract class AppLocalizations {
   /// **'Copy here'**
   String get filesCopyHere;
 
-  /// Tooltip for the select-all action in selection mode
-  ///
-  /// In en, this message translates to:
-  /// **'Select all'**
-  String get filesSelectAllTooltip;
-
-  /// Tooltip for exiting selection mode
-  ///
-  /// In en, this message translates to:
-  /// **'Close'**
-  String get filesCloseSelectionTooltip;
-
-  /// Snackbar after successfully creating a folder
-  ///
-  /// In en, this message translates to:
-  /// **'Folder created'**
-  String get filesFolderCreated;
-
-  /// Snackbar after failing to create a folder
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t create folder'**
-  String get filesCreateFolderFailed;
-
-  /// Snackbar after a successful rename
-  ///
-  /// In en, this message translates to:
-  /// **'Renamed'**
-  String get filesRenamed;
-
-  /// Snackbar after a failed rename
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t rename'**
-  String get filesRenameFailed;
-
-  /// Snackbar when a rename target name collides
-  ///
-  /// In en, this message translates to:
-  /// **'That name is already taken'**
-  String get filesNameAlreadyExists;
-
-  /// Snackbar after a successful delete
-  ///
-  /// In en, this message translates to:
-  /// **'Deleted'**
-  String get filesDeleted;
-
   /// Snackbar after a failed delete
   ///
   /// In en, this message translates to:
   /// **'Couldn\'t delete'**
   String get filesDeleteFailed;
-
-  /// Snackbar after a successful move
-  ///
-  /// In en, this message translates to:
-  /// **'Moved'**
-  String get filesMoved;
-
-  /// Snackbar after a failed move
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t move'**
-  String get filesMoveFailed;
-
-  /// Snackbar after a successful copy
-  ///
-  /// In en, this message translates to:
-  /// **'Copied'**
-  String get filesCopied;
-
-  /// Snackbar after a failed copy
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t copy'**
-  String get filesCopyFailed;
-
-  /// Snackbar when no app can open a tapped file
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t open this file'**
-  String get filesOpenFailed;
-
-  /// Snackbar when sharing a file fails
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t share this file'**
-  String get filesShareFailed;
 
   /// Tooltip for the type filter app bar action
   ///
@@ -13251,12 +11482,6 @@ abstract class AppLocalizations {
   /// **'PIM (Personal Iteration Multiplier)'**
   String get compositePimFieldLabel;
 
-  /// Helper text for the PIM text field
-  ///
-  /// In en, this message translates to:
-  /// **'Leave empty or 0 for standard default iterations'**
-  String get compositePimFieldHelper;
-
   /// Title for switch to remember composite container
   ///
   /// In en, this message translates to:
@@ -13353,12 +11578,6 @@ abstract class AppLocalizations {
   /// **'Composite carrier detected. A composite container requires all of its carrier files to unlock.'**
   String get compositeSingleCarrierWarningBanner;
 
-  /// Button to trigger picking all carrier files
-  ///
-  /// In en, this message translates to:
-  /// **'Select All Carriers'**
-  String get compositeSelectAllCarriersButton;
-
   /// Title shown when one or more carrier files can no longer be accessed
   ///
   /// In en, this message translates to:
@@ -13376,24 +11595,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Relocate Carrier Files'**
   String get compositeRelocateCarriersButton;
-
-  /// Password field label when password is optional
-  ///
-  /// In en, this message translates to:
-  /// **'Password (optional)'**
-  String get passwordOptionalFieldLabel;
-
-  /// Hint text in password field for unencrypted disk images
-  ///
-  /// In en, this message translates to:
-  /// **'No password needed — this disk image isn\'t encrypted'**
-  String get plainDiskImagePasswordHint;
-
-  /// Hint text in password field for composite containers
-  ///
-  /// In en, this message translates to:
-  /// **'Enter composite container password'**
-  String get compositePasswordHint;
 
   /// Tooltip for the quick password generator icon button
   ///
@@ -13767,12 +11968,6 @@ abstract class AppLocalizations {
   /// **'Master Lock Duress'**
   String get sectionDuressUnlock;
 
-  /// Notice shown when master password is not set
-  ///
-  /// In en, this message translates to:
-  /// **'A Master Password must be enabled in App Security before configuring duress unlock.'**
-  String get duressMasterPasswordRequired;
-
   /// List tile title for the duress password setup
   ///
   /// In en, this message translates to:
@@ -14095,12 +12290,6 @@ abstract class AppLocalizations {
   /// **'Long File Names'**
   String get longFileNameDisplayLabel;
 
-  /// Settings description for long file name display mode
-  ///
-  /// In en, this message translates to:
-  /// **'Choose how names are shortened when they exceed available space'**
-  String get longFileNameDisplayDesc;
-
   /// Option label: ellipsize the beginning of long file names
   ///
   /// In en, this message translates to:
@@ -14185,24 +12374,6 @@ abstract class AppLocalizations {
   /// **'9:16 (Portrait)'**
   String get gridAspectPortraitLabel;
 
-  /// Section header for general file visibility and naming options
-  ///
-  /// In en, this message translates to:
-  /// **'File & Folder Display'**
-  String get fileFolderDisplaySectionHeader;
-
-  /// Section header for breadcrumb, stats, and bookmark bars
-  ///
-  /// In en, this message translates to:
-  /// **'Navigation & Bars'**
-  String get navigationBarsSectionHeader;
-
-  /// Section header for columned list view columns reordering
-  ///
-  /// In en, this message translates to:
-  /// **'Columned List Columns'**
-  String get columnedListViewColumnsSectionHeader;
-
   /// Label for toggle option to auto-hide the top app bar when scrolling down
   ///
   /// In en, this message translates to:
@@ -14275,18 +12446,6 @@ abstract class AppLocalizations {
   /// **'Storage Locations'**
   String get storageLocationsTitle;
 
-  /// Subtitle for storage locations management
-  ///
-  /// In en, this message translates to:
-  /// **'Internal storage, SD cards, and document providers'**
-  String get storageLocationsSubtitle;
-
-  /// Subtitle on the storage locations sheet in decoy mode
-  ///
-  /// In en, this message translates to:
-  /// **'Select active storage'**
-  String get storageLocationsSelectPrompt;
-
   /// Action to pick and add an external storage location
   ///
   /// In en, this message translates to:
@@ -14298,18 +12457,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add an external SD card, USB drive, or folder'**
   String get addStorageLocationSubtitle;
-
-  /// Badge/subtitle for SAF document providers
-  ///
-  /// In en, this message translates to:
-  /// **'Document Provider (SAF)'**
-  String get documentProviderSafLabel;
-
-  /// Label for removable SD card or USB storage
-  ///
-  /// In en, this message translates to:
-  /// **'External Storage'**
-  String get externalStorageLabel;
 
   /// Dialog title for renaming a storage location
   ///
@@ -14328,12 +12475,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove \"{name}\" from storage locations? Files on the storage will not be deleted.'**
   String removeStorageLocationConfirm(String name);
-
-  /// Snackbar shown when an external storage location is successfully linked
-  ///
-  /// In en, this message translates to:
-  /// **'Storage location added'**
-  String get storageLocationAddedSnack;
 
   /// Error shown when a picked folder cannot be resolved to an accessible path
   ///
@@ -14382,96 +12523,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Customize Controls...'**
   String get mediaViewerCustomizeControls;
-
-  /// Title for media player controls settings
-  ///
-  /// In en, this message translates to:
-  /// **'Media Player Controls'**
-  String get mediaViewerControlsTitle;
-
-  /// Message when controls are reset
-  ///
-  /// In en, this message translates to:
-  /// **'Media controls reset to defaults'**
-  String get mediaViewerControlsReset;
-
-  /// Settings section header
-  ///
-  /// In en, this message translates to:
-  /// **'Transport & Display'**
-  String get mediaViewerTransportDisplay;
-
-  /// Settings toggle title
-  ///
-  /// In en, this message translates to:
-  /// **'Show Progress Bar (Scrubber)'**
-  String get mediaViewerShowScrubberTitle;
-
-  /// Settings toggle description
-  ///
-  /// In en, this message translates to:
-  /// **'Display position and duration timeline slider'**
-  String get mediaViewerShowScrubberDesc;
-
-  /// Settings toggle title
-  ///
-  /// In en, this message translates to:
-  /// **'Show Center Transport Controls'**
-  String get mediaViewerShowCenterTransportTitle;
-
-  /// Settings toggle description
-  ///
-  /// In en, this message translates to:
-  /// **'Display large circular play/pause in the center'**
-  String get mediaViewerShowCenterTransportDesc;
-
-  /// Settings toggle title
-  ///
-  /// In en, this message translates to:
-  /// **'Show Next & Previous Buttons'**
-  String get mediaViewerShowPrevNextTitle;
-
-  /// Settings toggle description
-  ///
-  /// In en, this message translates to:
-  /// **'Turn off to keep only the single play button'**
-  String get mediaViewerShowPrevNextDesc;
-
-  /// Settings toggle title
-  ///
-  /// In en, this message translates to:
-  /// **'Show Status Badges'**
-  String get mediaViewerShowStatusBadgeTitle;
-
-  /// Settings toggle description
-  ///
-  /// In en, this message translates to:
-  /// **'Display slideshow delay and static image indicators'**
-  String get mediaViewerShowStatusBadgeDesc;
-
-  /// Settings section header
-  ///
-  /// In en, this message translates to:
-  /// **'Top Bar'**
-  String get mediaViewerTopBarSection;
-
-  /// Settings section header
-  ///
-  /// In en, this message translates to:
-  /// **'Bottom Bar'**
-  String get mediaViewerBottomBarSection;
-
-  /// Settings section header
-  ///
-  /// In en, this message translates to:
-  /// **'Unpinned (Overflow)'**
-  String get mediaViewerUnpinnedSection;
-
-  /// Message when all actions are used
-  ///
-  /// In en, this message translates to:
-  /// **'All controls are already pinned.'**
-  String get mediaViewerAllControlsPinned;
 
   /// Title for media player toolbar customization screen
   ///
@@ -14695,35 +12746,11 @@ abstract class AppLocalizations {
   /// **'Drag actions here for Advanced Settings sheet'**
   String get advancedSettingsActionsEmptyHint;
 
-  /// Text on drop target indicating dropping item at the end of the section
-  ///
-  /// In en, this message translates to:
-  /// **'Drop here at end'**
-  String get dropHereAtEnd;
-
-  /// Default empty state hint for drop target container
-  ///
-  /// In en, this message translates to:
-  /// **'+ Drag items here to add to this section'**
-  String get dragItemsHereToAdd;
-
   /// Tooltip for button moving an action to the advanced settings section
   ///
   /// In en, this message translates to:
   /// **'Move to Advanced Settings'**
   String get moveToAdvancedSettingsTooltip;
-
-  /// Subtitle in the drawer header when no vaults are currently mounted
-  ///
-  /// In en, this message translates to:
-  /// **'No vaults mounted'**
-  String get noVaultsMounted;
-
-  /// Suffix in the drawer header indicating count of mounted vaults
-  ///
-  /// In en, this message translates to:
-  /// **'vault(s) mounted'**
-  String get vaultsMountedSummary;
 
   /// Drawer navigation destination label for the main vault dashboard
   ///
@@ -14737,12 +12764,6 @@ abstract class AppLocalizations {
   /// **'Vaults'**
   String get vaultsSectionTitle;
 
-  /// Status subtitle indicating a vault is unlocked and mounted
-  ///
-  /// In en, this message translates to:
-  /// **'Mounted'**
-  String get vaultStatusMounted;
-
   /// Tooltip for the lock button on an active vault row in the drawer
   ///
   /// In en, this message translates to:
@@ -14754,30 +12775,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lock all'**
   String get lockAllVaultsTitle;
-
-  /// Subtitle for external storage locations mounted via Storage Access Framework
-  ///
-  /// In en, this message translates to:
-  /// **'SAF Provider'**
-  String get safProviderLabel;
-
-  /// Title for the tool to encrypt or decrypt standalone files outside of a vault
-  ///
-  /// In en, this message translates to:
-  /// **'Single-File Crypto'**
-  String get singleFileCryptoTitle;
-
-  /// Subtitle describing single-file encryption tool
-  ///
-  /// In en, this message translates to:
-  /// **'Encrypt / decrypt outside vaults'**
-  String get singleFileCryptoSubtitle;
-
-  /// Title for the quick password generator tool
-  ///
-  /// In en, this message translates to:
-  /// **'Password Generator'**
-  String get passwordGeneratorTitle;
 
   /// Label for item count row in folder info sheet
   ///
@@ -14899,23 +12896,11 @@ abstract class AppLocalizations {
   /// **'Hold-to-Fast-Forward Speed'**
   String get holdSpeedMultiplierTitle;
 
-  /// Description for hold-to-fast-forward speed setting
-  ///
-  /// In en, this message translates to:
-  /// **'Speed while press-and-holding the video'**
-  String get holdSpeedMultiplierSubtitle;
-
   /// Title for default aspect ratio setting
   ///
   /// In en, this message translates to:
   /// **'Default Aspect Ratio'**
   String get defaultAspectRatioTitle;
-
-  /// Description for default aspect ratio setting
-  ///
-  /// In en, this message translates to:
-  /// **'Applied automatically when a video is opened'**
-  String get defaultAspectRatioSubtitle;
 
   /// Label for aspect ratio selection
   ///
@@ -15361,84 +13346,6 @@ abstract class AppLocalizations {
   /// **'Saved {name} to {destination}'**
   String quickCaptureSavedToast(String name, String destination);
 
-  /// Settings toggle title to enable or disable card swipe gestures on the dashboard
-  ///
-  /// In en, this message translates to:
-  /// **'Card Swipe Actions'**
-  String get cardSwipeActionsTitle;
-
-  /// Settings toggle subtitle explaining card swipe actions on the dashboard
-  ///
-  /// In en, this message translates to:
-  /// **'Swipe vault cards to quickly reveal edit and remove actions'**
-  String get cardSwipeActionsSubtitle;
-
-  /// Resolution option label for Standard Definition (480p) video
-  ///
-  /// In en, this message translates to:
-  /// **'480p (SD)'**
-  String get cameraQualitySd;
-
-  /// Resolution option label for High Definition (720p) video
-  ///
-  /// In en, this message translates to:
-  /// **'720p (HD)'**
-  String get cameraQualityHd;
-
-  /// Resolution option label for Full HD (1080p) video
-  ///
-  /// In en, this message translates to:
-  /// **'1080p (FHD)'**
-  String get cameraQualityFhd;
-
-  /// Resolution option label for Ultra HD / 4K video
-  ///
-  /// In en, this message translates to:
-  /// **'4K (UHD)'**
-  String get cameraQualityUhd;
-
-  /// Photo resolution option for maximum sensor resolution
-  ///
-  /// In en, this message translates to:
-  /// **'Full (Max Res)'**
-  String get cameraPhotoResMax;
-
-  /// Photo resolution option for 5 megapixel capture
-  ///
-  /// In en, this message translates to:
-  /// **'5 MP (High)'**
-  String get cameraPhotoResHigh;
-
-  /// Photo resolution option for 2 megapixel capture
-  ///
-  /// In en, this message translates to:
-  /// **'2 MP (Medium)'**
-  String get cameraPhotoResMedium;
-
-  /// Photo resolution option for 1.2 megapixel capture
-  ///
-  /// In en, this message translates to:
-  /// **'1.2 MP (Low)'**
-  String get cameraPhotoResLow;
-
-  /// Label for the ultra-wide camera lens
-  ///
-  /// In en, this message translates to:
-  /// **'Wide'**
-  String get cameraLensWide;
-
-  /// Label for the infrared / night-vision camera lens
-  ///
-  /// In en, this message translates to:
-  /// **'IR'**
-  String get cameraLensInfrared;
-
-  /// Label for the front-facing camera lens
-  ///
-  /// In en, this message translates to:
-  /// **'Front'**
-  String get cameraLensFront;
-
   /// Settings section or option title for configuring how the app locks
   ///
   /// In en, this message translates to:
@@ -15534,12 +13441,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Include subfolders'**
   String get passwordInterchangeIncludeSubfolders;
-
-  /// Section header above the file-format picker
-  ///
-  /// In en, this message translates to:
-  /// **'Format'**
-  String get passwordInterchangeFormatHeader;
 
   /// Dropdown field label for choosing the interchange file format
   ///
@@ -15667,18 +13568,6 @@ abstract class AppLocalizations {
   /// **'Inactivity lock: {duration}'**
   String autoLockIndicatorLocksAfter(String duration);
 
-  /// Concise auto-lock label when the vault locks as soon as the screen turns off
-  ///
-  /// In en, this message translates to:
-  /// **'Screen-off lock'**
-  String get autoLockIndicatorLocksOnScreenOff;
-
-  /// Auto-lock feedback shown when a vault is configured to never auto-lock
-  ///
-  /// In en, this message translates to:
-  /// **'Won\'t auto-lock'**
-  String get autoLockIndicatorNeverLocks;
-
   /// Tooltip explaining that the auto-lock timer resets on interaction; {duration} is a duration like '5 minutes'
   ///
   /// In en, this message translates to:
@@ -15714,48 +13603,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Storage location \"{name}\" is unavailable or disconnected.'**
   String storageLocationUnavailable(String name);
-
-  /// Tooltip for the edit photo button in camera preview
-  ///
-  /// In en, this message translates to:
-  /// **'Edit photo'**
-  String get cameraEditPhotoTooltip;
-
-  /// Tooltip for the trim video button in camera preview
-  ///
-  /// In en, this message translates to:
-  /// **'Trim video'**
-  String get cameraTrimVideoTooltip;
-
-  /// Tooltip for discarding captured photo/video and returning to camera
-  ///
-  /// In en, this message translates to:
-  /// **'Discard'**
-  String get cameraDiscardMediaTooltip;
-
-  /// Tooltip for saving captured photo/video into the vault
-  ///
-  /// In en, this message translates to:
-  /// **'Save to vault'**
-  String get cameraSaveMediaTooltip;
-
-  /// Tooltip for continuing sequential photo capture
-  ///
-  /// In en, this message translates to:
-  /// **'Take another photo'**
-  String get cameraContinueCaptureTooltip;
-
-  /// Badge or label showing the number of captured photos in a batch
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 photo} other{{count} photos}}'**
-  String cameraBatchCount(int count);
-
-  /// Tooltip for opening review screen from the camera tray
-  ///
-  /// In en, this message translates to:
-  /// **'Review captured photos'**
-  String get cameraReviewPhotosTooltip;
 
   /// Vault item type name: a standalone TOTP (2FA) authenticator entry
   ///
@@ -15972,18 +13819,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Immediate lock'**
   String get autoLockIndicatorLocksImmediately;
-
-  /// Title for lock behavior setting after quick capture or share sheet import
-  ///
-  /// In en, this message translates to:
-  /// **'Lock after quick actions'**
-  String get quickActionLockModeTitle;
-
-  /// Subtitle for lock behavior setting after quick capture or share sheet import
-  ///
-  /// In en, this message translates to:
-  /// **'Vault lock behavior when saving from Quick Capture or Share Sheet'**
-  String get quickActionLockModeSubtitle;
 
   /// Label for leave as you found it lock mode
   ///
@@ -16230,12 +14065,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Project Files'**
   String get textEditorProjectFilesTitle;
-
-  /// Tooltip to close editor tab
-  ///
-  /// In en, this message translates to:
-  /// **'Close tab'**
-  String get textEditorCloseTabTooltip;
 
   /// Button label to reset symbols or settings to defaults
   ///
@@ -16729,12 +14558,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{Output: 1 clip · {duration}} other{Output: {count} clips · {duration}}}'**
   String videoEditorOutputSummary(int count, String duration);
 
-  /// Video editor note showing the real start and end of the selected clip after snapping to keyframes
-  ///
-  /// In en, this message translates to:
-  /// **'Lossless cut starts on a keyframe: {start} – {end}'**
-  String videoEditorSnapNote(String start, String end);
-
   /// Snackbar when setting a segment start or end would make the segment too short
   ///
   /// In en, this message translates to:
@@ -16867,41 +14690,17 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 clip · {duration}} other{{count} clips · {duration}}}'**
   String videoEditorExportSummary(int count, String duration);
 
-  /// Export sheet option when there is a single clip
-  ///
-  /// In en, this message translates to:
-  /// **'Save as new video'**
-  String get videoEditorExportSingle;
-
-  /// Subtitle of the single-clip export option
-  ///
-  /// In en, this message translates to:
-  /// **'The original stays untouched.'**
-  String get videoEditorExportSingleHint;
-
   /// Export sheet option that joins all clips into a single video
   ///
   /// In en, this message translates to:
   /// **'Merge into one video'**
   String get videoEditorExportMerge;
 
-  /// Subtitle of the merge export option
-  ///
-  /// In en, this message translates to:
-  /// **'Clips are joined in timeline order.'**
-  String get videoEditorExportMergeHint;
-
   /// Export sheet option that writes one file per clip
   ///
   /// In en, this message translates to:
   /// **'Save as separate videos'**
   String get videoEditorExportSeparate;
-
-  /// Subtitle of the separate-files export option
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{One new file} other{{count} new files}}'**
-  String videoEditorExportSeparateHint(int count);
 
   /// Explanation in the export sheet of why cut points snap to keyframes
   ///
@@ -17149,12 +14948,6 @@ abstract class AppLocalizations {
   /// **'Default'**
   String get fileSkinColorDefault;
 
-  /// Label of the text field where a color is typed as a hex code
-  ///
-  /// In en, this message translates to:
-  /// **'Hex color'**
-  String get fileSkinColorHexLabel;
-
   /// Name of the built-in skin that matches the original look
   ///
   /// In en, this message translates to:
@@ -17202,18 +14995,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unsupported archive — remove it from the selection.'**
   String get compositeArchiveCarrierRowWarning;
-
-  /// Readout of the selected video segment number, time range, and duration.
-  ///
-  /// In en, this message translates to:
-  /// **'Segment {current} of {total}: {start} – {end} ({duration})'**
-  String videoEditorSelectedSegmentSummary(
-    int current,
-    int total,
-    String start,
-    String end,
-    String duration,
-  );
 
   /// Explains that Keep mode exports selected video segments and excludes other footage.
   ///
@@ -18445,18 +16226,6 @@ abstract class AppLocalizations {
   /// **'Outlines, shadows, and modal backdrops.'**
   String get skinOutlinesShadowsAndModalBackdrops;
 
-  /// No description provided for @skinTapAnyPreviewElement.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap any preview element'**
-  String get skinTapAnyPreviewElement;
-
-  /// No description provided for @skinChooseAnAppFileOrEditorColorToSeeWhatItControls.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose an app, file, or editor color to see what it controls.'**
-  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls;
-
   /// No description provided for @skinCustomizeSkin.
   ///
   /// In en, this message translates to:
@@ -18474,12 +16243,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dark'**
   String get skinDark;
-
-  /// No description provided for @skinApp.
-  ///
-  /// In en, this message translates to:
-  /// **'App'**
-  String get skinApp;
 
   /// No description provided for @skinEditor.
   ///
@@ -18541,12 +16304,6 @@ abstract class AppLocalizations {
   /// **'App bar'**
   String get skinAppBar;
 
-  /// No description provided for @skinTheTopNavigationBarIsIndependentFromCardsAndPages.
-  ///
-  /// In en, this message translates to:
-  /// **'The top navigation bar is independent from cards and pages.'**
-  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages;
-
   /// No description provided for @skinTopBarFillColor.
   ///
   /// In en, this message translates to:
@@ -18571,12 +16328,6 @@ abstract class AppLocalizations {
   /// **'Floating action button'**
   String get skinFloatingActionButton;
 
-  /// No description provided for @skinItsFillAndIconColorAreSeparateFromSelectionColors.
-  ///
-  /// In en, this message translates to:
-  /// **'Its fill and icon color are separate from selection colors.'**
-  String get skinItsFillAndIconColorAreSeparateFromSelectionColors;
-
   /// No description provided for @skinButtonFill.
   ///
   /// In en, this message translates to:
@@ -18600,42 +16351,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Icon color on the round + button.'**
   String get skinIconColorOnTheRoundButton;
-
-  /// No description provided for @skinDashboardVaultCards.
-  ///
-  /// In en, this message translates to:
-  /// **'Dashboard vault cards'**
-  String get skinDashboardVaultCards;
-
-  /// No description provided for @skinSetTheBackgroundForLockedAndMountedVaultCards.
-  ///
-  /// In en, this message translates to:
-  /// **'Set the background for locked and mounted vault cards.'**
-  String get skinSetTheBackgroundForLockedAndMountedVaultCards;
-
-  /// No description provided for @skinLockedVaultCard.
-  ///
-  /// In en, this message translates to:
-  /// **'Locked vault card'**
-  String get skinLockedVaultCard;
-
-  /// No description provided for @skinNeutralVaultCardFill.
-  ///
-  /// In en, this message translates to:
-  /// **'Neutral vault card fill.'**
-  String get skinNeutralVaultCardFill;
-
-  /// No description provided for @skinMountedVaultCard.
-  ///
-  /// In en, this message translates to:
-  /// **'Mounted vault card'**
-  String get skinMountedVaultCard;
-
-  /// No description provided for @skinSeparateFillForAnUnlockedMountedVault.
-  ///
-  /// In en, this message translates to:
-  /// **'Separate fill for an unlocked, mounted vault.'**
-  String get skinSeparateFillForAnUnlockedMountedVault;
 
   /// No description provided for @skinFineTuneAppColors.
   ///
@@ -18679,462 +16394,6 @@ abstract class AppLocalizations {
   /// **'Tap the color circle to choose a color.'**
   String get skinTapTheColorCircleToChooseAColor;
 
-  /// No description provided for @skinAppBarBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'App bar background'**
-  String get skinAppBarBackground;
-
-  /// No description provided for @skinTheDashboardAndOtherAppBarsUseThisIndependentColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The dashboard and other app bars use this independent color.'**
-  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor;
-
-  /// No description provided for @skinDashboardMenuIcon.
-  ///
-  /// In en, this message translates to:
-  /// **'Dashboard menu icon'**
-  String get skinDashboardMenuIcon;
-
-  /// No description provided for @skinTheHamburgerButtonUsesTheAppBarIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The hamburger button uses the app bar icon color.'**
-  String get skinTheHamburgerButtonUsesTheAppBarIconColor;
-
-  /// No description provided for @skinDashboardTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Dashboard title'**
-  String get skinDashboardTitle;
-
-  /// No description provided for @skinTheDashboardTitleUsesTheAppBarForegroundColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The dashboard title uses the app bar foreground color.'**
-  String get skinTheDashboardTitleUsesTheAppBarForegroundColor;
-
-  /// No description provided for @skinActionLabelAndIcon.
-  ///
-  /// In en, this message translates to:
-  /// **'Action label and icon'**
-  String get skinActionLabelAndIcon;
-
-  /// No description provided for @skinTheActionAccentColorsLabelsb08a63.
-  ///
-  /// In en, this message translates to:
-  /// **'The action accent colors labels such as Add a vault and their icons.'**
-  String get skinTheActionAccentColorsLabelsb08a63;
-
-  /// No description provided for @skinDashboardAddButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Dashboard add button'**
-  String get skinDashboardAddButton;
-
-  /// No description provided for @skinTheButtonFillAndPlusIconHaveSeparateSkinColors.
-  ///
-  /// In en, this message translates to:
-  /// **'The button fill and plus icon have separate skin colors.'**
-  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors;
-
-  /// No description provided for @skinVaultCardAndIconBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault card and icon background'**
-  String get skinVaultCardAndIconBackground;
-
-  /// No description provided for @skinTheIconTileUsesPrimary5c2f93.
-  ///
-  /// In en, this message translates to:
-  /// **'The icon tile uses Primary container. The mounted vault card blends that color with the raised surface.'**
-  String get skinTheIconTileUsesPrimary5c2f93;
-
-  /// No description provided for @skinVaultFormatIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault format icon color'**
-  String get skinVaultFormatIconColor;
-
-  /// No description provided for @skinVaultFormatInitialsUseOnPrimaryContainer.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault format initials use On primary container.'**
-  String get skinVaultFormatInitialsUseOnPrimaryContainer;
-
-  /// No description provided for @skinVaultStorageDetails.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault storage details'**
-  String get skinVaultStorageDetails;
-
-  /// No description provided for @skinFreeSpaceAndCapacityUseTheSupportingTextColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Free space and capacity use the supporting text color.'**
-  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor;
-
-  /// No description provided for @skin17GBFree5GB.
-  ///
-  /// In en, this message translates to:
-  /// **'1.7 GB free / 5 GB'**
-  String get skin17GBFree5GB;
-
-  /// No description provided for @skinVaultStorageProgress.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault storage progress'**
-  String get skinVaultStorageProgress;
-
-  /// No description provided for @skinTheProgressBarUsesTheba7c98.
-  ///
-  /// In en, this message translates to:
-  /// **'The progress bar uses the app accent, then switches to tertiary and error colors as storage fills.'**
-  String get skinTheProgressBarUsesTheba7c98;
-
-  /// No description provided for @skinLockActionBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'Lock action background'**
-  String get skinLockActionBackground;
-
-  /// No description provided for @skinTheMountedVaultLockButtonUsesPrimaryContainer.
-  ///
-  /// In en, this message translates to:
-  /// **'The mounted-vault lock button uses Primary container.'**
-  String get skinTheMountedVaultLockButtonUsesPrimaryContainer;
-
-  /// No description provided for @skinVaultActionsIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault actions icon color'**
-  String get skinVaultActionsIconColor;
-
-  /// No description provided for @skinTheOverflowMenuUsesTheSupportingIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The overflow menu uses the supporting icon color.'**
-  String get skinTheOverflowMenuUsesTheSupportingIconColor;
-
-  /// No description provided for @skinMountedVaultCardBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'Mounted vault card background'**
-  String get skinMountedVaultCardBackground;
-
-  /// No description provided for @skinThisIsTheBackgroundOfa8d0d3.
-  ///
-  /// In en, this message translates to:
-  /// **'This is the background of the mounted vault card. Its icon tile still uses the main action color.'**
-  String get skinThisIsTheBackgroundOfa8d0d3;
-
-  /// No description provided for @skinLockedVaultCardBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'Locked vault card background'**
-  String get skinLockedVaultCardBackground;
-
-  /// No description provided for @skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard.
-  ///
-  /// In en, this message translates to:
-  /// **'This color is independent from the app bar and mounted vault card.'**
-  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard;
-
-  /// No description provided for @skinLockedVaultFormatIcon.
-  ///
-  /// In en, this message translates to:
-  /// **'Locked vault format icon'**
-  String get skinLockedVaultFormatIcon;
-
-  /// No description provided for @skinLockedVaultIconsUseTheSupportingTextAndIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Locked vault icons use the supporting text and icon color.'**
-  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor;
-
-  /// No description provided for @skinSharedArchive.
-  ///
-  /// In en, this message translates to:
-  /// **'Shared archive'**
-  String get skinSharedArchive;
-
-  /// No description provided for @skinLockedVaultStatusText.
-  ///
-  /// In en, this message translates to:
-  /// **'Locked vault status text'**
-  String get skinLockedVaultStatusText;
-
-  /// No description provided for @skinTheLockedStatusLabelUsesTheSupportingTextColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The locked status label uses the supporting text color.'**
-  String get skinTheLockedStatusLabelUsesTheSupportingTextColor;
-
-  /// No description provided for @skinLockedVaultActionsIcon.
-  ///
-  /// In en, this message translates to:
-  /// **'Locked vault actions icon'**
-  String get skinLockedVaultActionsIcon;
-
-  /// No description provided for @skinVaultActionsMenuBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'Vault actions menu background'**
-  String get skinVaultActionsMenuBackground;
-
-  /// No description provided for @skinTheEditAndRemovePopupUsesTheMenuSurfaceColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The Edit and Remove popup uses the menu surface color.'**
-  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor;
-
-  /// No description provided for @skinEditMenuItem.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit menu item'**
-  String get skinEditMenuItem;
-
-  /// No description provided for @skinTheEditActionUsesTheRegularForegroundColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The Edit action uses the regular foreground color.'**
-  String get skinTheEditActionUsesTheRegularForegroundColor;
-
-  /// No description provided for @skinRemoveMenuItem.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove menu item'**
-  String get skinRemoveMenuItem;
-
-  /// No description provided for @skinDestructiveActionsUseTheErrorColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Destructive actions use the error color.'**
-  String get skinDestructiveActionsUseTheErrorColor;
-
-  /// No description provided for @skinFileManagerAppBar.
-  ///
-  /// In en, this message translates to:
-  /// **'File manager app bar'**
-  String get skinFileManagerAppBar;
-
-  /// No description provided for @skinFileBrowserToolbarsUseTheSameAppBarBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'File browser toolbars use the same app bar background.'**
-  String get skinFileBrowserToolbarsUseTheSameAppBarBackground;
-
-  /// No description provided for @skinFileManagerBackButton.
-  ///
-  /// In en, this message translates to:
-  /// **'File manager back button'**
-  String get skinFileManagerBackButton;
-
-  /// No description provided for @skinToolbarNavigationIconsUseThisColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Toolbar navigation icons use this color.'**
-  String get skinToolbarNavigationIconsUseThisColor;
-
-  /// No description provided for @skinFileManagerTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'File manager title'**
-  String get skinFileManagerTitle;
-
-  /// No description provided for @skinTheCurrentFolderNameUsesTheAppBarForeground.
-  ///
-  /// In en, this message translates to:
-  /// **'The current folder name uses the app bar foreground.'**
-  String get skinTheCurrentFolderNameUsesTheAppBarForeground;
-
-  /// No description provided for @skinFileManagerAppBarActions.
-  ///
-  /// In en, this message translates to:
-  /// **'File manager app bar actions'**
-  String get skinFileManagerAppBarActions;
-
-  /// No description provided for @skinToolbarActionsUseThisIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Toolbar actions use this icon color.'**
-  String get skinToolbarActionsUseThisIconColor;
-
-  /// No description provided for @skinProjects.
-  ///
-  /// In en, this message translates to:
-  /// **'Projects'**
-  String get skinProjects;
-
-  /// No description provided for @skinFolder12Items.
-  ///
-  /// In en, this message translates to:
-  /// **'Folder · 12 items'**
-  String get skinFolder12Items;
-
-  /// No description provided for @skinTextFile4KB.
-  ///
-  /// In en, this message translates to:
-  /// **'Text file · 4 KB'**
-  String get skinTextFile4KB;
-
-  /// No description provided for @skinCompressedFile28MB.
-  ///
-  /// In en, this message translates to:
-  /// **'Compressed file · 28 MB'**
-  String get skinCompressedFile28MB;
-
-  /// No description provided for @skin3Items.
-  ///
-  /// In en, this message translates to:
-  /// **'3 items'**
-  String get skin3Items;
-
-  /// No description provided for @skinFileManagerAddButton.
-  ///
-  /// In en, this message translates to:
-  /// **'File manager add button'**
-  String get skinFileManagerAddButton;
-
-  /// No description provided for @skinAddButtonIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Add button icon color'**
-  String get skinAddButtonIconColor;
-
-  /// No description provided for @skinThePlusIconUsesTheButtonForegroundColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The plus icon uses the button foreground color.'**
-  String get skinThePlusIconUsesTheButtonForegroundColor;
-
-  /// No description provided for @skinEditorFileName.
-  ///
-  /// In en, this message translates to:
-  /// **'Editor file name'**
-  String get skinEditorFileName;
-
-  /// No description provided for @skinTheEditorToolbarUsesTheAppForegroundColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The editor toolbar uses the app foreground color.'**
-  String get skinTheEditorToolbarUsesTheAppForegroundColor;
-
-  /// No description provided for @skinDartUTF8Ln3Col12.
-  ///
-  /// In en, this message translates to:
-  /// **'Ln 3, Col 12'**
-  String get skinDartUTF8Ln3Col12;
-
-  /// No description provided for @skinTheMainBackgroundBehindThisScreen.
-  ///
-  /// In en, this message translates to:
-  /// **'The main background behind this screen.'**
-  String get skinTheMainBackgroundBehindThisScreen;
-
-  /// No description provided for @skinFolderIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Folder icon color'**
-  String get skinFolderIconColor;
-
-  /// No description provided for @skinFileIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'File icon color'**
-  String get skinFileIconColor;
-
-  /// No description provided for @skinText.
-  ///
-  /// In en, this message translates to:
-  /// **' : '**
-  String get skinText;
-
-  /// No description provided for @skinFolderNameColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Folder name color'**
-  String get skinFolderNameColor;
-
-  /// No description provided for @skinFileNameColor.
-  ///
-  /// In en, this message translates to:
-  /// **'File name color'**
-  String get skinFileNameColor;
-
-  /// No description provided for @skinFileDetailsColor.
-  ///
-  /// In en, this message translates to:
-  /// **'File details color'**
-  String get skinFileDetailsColor;
-
-  /// No description provided for @skinTheSmallerDateSizeAndTypeLabelsUseThisColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The smaller date, size, and type labels use this color.'**
-  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor;
-
-  /// No description provided for @skinFileOverflowButton.
-  ///
-  /// In en, this message translates to:
-  /// **'File overflow button'**
-  String get skinFileOverflowButton;
-
-  /// No description provided for @skinEachRowSThreeDotButtonUsesTheSupportingIconColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Each row’s three-dot button uses the supporting icon color.'**
-  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor;
-
-  /// No description provided for @skinSelectedFileRow.
-  ///
-  /// In en, this message translates to:
-  /// **'Selected file row'**
-  String get skinSelectedFileRow;
-
-  /// No description provided for @skinSelectedRowsUseATranslucente0ff21.
-  ///
-  /// In en, this message translates to:
-  /// **'Selected rows use a translucent primary-container highlight; the file list itself stays on the page background.'**
-  String get skinSelectedRowsUseATranslucente0ff21;
-
-  /// No description provided for @skinFileActionsMenuBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'File actions menu background'**
-  String get skinFileActionsMenuBackground;
-
-  /// No description provided for @skinTheFileActionsPopupUsesTheMenuSurfaceColor.
-  ///
-  /// In en, this message translates to:
-  /// **'The file actions popup uses the menu surface color.'**
-  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor;
-
-  /// No description provided for @skinOpenFileMenuItem.
-  ///
-  /// In en, this message translates to:
-  /// **'Open file menu item'**
-  String get skinOpenFileMenuItem;
-
-  /// No description provided for @skinRegularFileActionsUseTheMainTextColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Regular file actions use the main text color.'**
-  String get skinRegularFileActionsUseTheMainTextColor;
-
-  /// No description provided for @skinOpen.
-  ///
-  /// In en, this message translates to:
-  /// **'Open'**
-  String get skinOpen;
-
-  /// No description provided for @skinDeleteFileMenuItem.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete file menu item'**
-  String get skinDeleteFileMenuItem;
-
   /// No description provided for @skinEditorBackground.
   ///
   /// In en, this message translates to:
@@ -19164,12 +16423,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Code text color'**
   String get skinEditorTextColor;
-
-  /// No description provided for @skinTheDefaultCodeAndEditorTextColor.
-  ///
-  /// In en, this message translates to:
-  /// **'Default color for plain code; syntax-highlighted text uses its own colors.'**
-  String get skinTheDefaultCodeAndEditorTextColor;
 
   /// No description provided for @skinEditorCursor.
   ///
@@ -19201,23 +16454,11 @@ abstract class AppLocalizations {
   /// **'Keywords'**
   String get skinEditorKeywords;
 
-  /// Explanation for language keywords syntax element
-  ///
-  /// In en, this message translates to:
-  /// **'Language keywords such as class, void, return, and if.'**
-  String get skinEditorKeywordsExplanation;
-
   /// Label for types and classes syntax element
   ///
   /// In en, this message translates to:
   /// **'Types & classes'**
   String get skinEditorTypes;
-
-  /// Explanation for types and classes syntax element
-  ///
-  /// In en, this message translates to:
-  /// **'Class names, types, and interfaces.'**
-  String get skinEditorTypesExplanation;
 
   /// Label for string literals syntax element
   ///
@@ -19225,23 +16466,11 @@ abstract class AppLocalizations {
   /// **'Strings'**
   String get skinEditorStrings;
 
-  /// Explanation for string literals syntax element
-  ///
-  /// In en, this message translates to:
-  /// **'Quoted text and string literals.'**
-  String get skinEditorStringsExplanation;
-
   /// Label for numeric literals and values syntax element
   ///
   /// In en, this message translates to:
   /// **'Numbers & values'**
   String get skinEditorNumbers;
-
-  /// Explanation for numeric literals and values syntax element
-  ///
-  /// In en, this message translates to:
-  /// **'Numeric literals, booleans, and constants.'**
-  String get skinEditorNumbersExplanation;
 
   /// Label for functions and methods syntax element
   ///
@@ -19249,23 +16478,11 @@ abstract class AppLocalizations {
   /// **'Functions & methods'**
   String get skinEditorFunctions;
 
-  /// Explanation for functions and methods syntax element
-  ///
-  /// In en, this message translates to:
-  /// **'Function names, method calls, and built-ins.'**
-  String get skinEditorFunctionsExplanation;
-
   /// Label for comments syntax element
   ///
   /// In en, this message translates to:
   /// **'Comments'**
   String get skinEditorComments;
-
-  /// Explanation for comments syntax element
-  ///
-  /// In en, this message translates to:
-  /// **'Code comments and documentation blocks.'**
-  String get skinEditorCommentsExplanation;
 
   /// Section title for editor colors and font settings
   ///
@@ -19284,12 +16501,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom colors active'**
   String get textEditorColorsCustomized;
-
-  /// Action to reset editor colors back to defaults
-  ///
-  /// In en, this message translates to:
-  /// **'Reset colors to default'**
-  String get textEditorResetColors;
 
   /// Notice explaining editor colors match the active app skin
   ///
@@ -19374,24 +16585,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Canvas, gutter, cursor, selection, background, and syntax template.'**
   String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate;
-
-  /// No description provided for @skinGutterAndLineNumbers.
-  ///
-  /// In en, this message translates to:
-  /// **'Gutter and line numbers'**
-  String get skinGutterAndLineNumbers;
-
-  /// No description provided for @skinCursor.
-  ///
-  /// In en, this message translates to:
-  /// **'Cursor'**
-  String get skinCursor;
-
-  /// No description provided for @skinSelection.
-  ///
-  /// In en, this message translates to:
-  /// **'Selection'**
-  String get skinSelection;
 
   /// No description provided for @skinEditorBackgroundTemplate.
   ///
@@ -19518,18 +16711,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatic (match light or dark mode)'**
   String get skinAutomaticMatchLightOrDarkMode;
-
-  /// No description provided for @skinSkinExported.
-  ///
-  /// In en, this message translates to:
-  /// **'Skin exported.'**
-  String get skinSkinExported;
-
-  /// No description provided for @skinSkinsExported.
-  ///
-  /// In en, this message translates to:
-  /// **'Skins exported.'**
-  String get skinSkinsExported;
 
   /// No description provided for @skinRemoveSkin.
   ///
@@ -19711,12 +16892,6 @@ abstract class AppLocalizations {
   /// **'“{skin}” will be removed from your saved skins.'**
   String skinRemoveConfirmation(String skin);
 
-  /// Tooltip inviting the user to select a preview element.
-  ///
-  /// In en, this message translates to:
-  /// **'Select {title}'**
-  String skinSelectPreviewElement(String title);
-
   /// Color picker title for a file manager item icon.
   ///
   /// In en, this message translates to:
@@ -19728,18 +16903,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{item} name color'**
   String skinNameColorForItem(String item);
-
-  /// Explanation that the file icon color is configured in the file manager settings.
-  ///
-  /// In en, this message translates to:
-  /// **'This color is controlled by the icon color setting in the file manager section.'**
-  String get skinFileIconColorSettingDescription;
-
-  /// Explanation that the file name color is configured in the file manager settings.
-  ///
-  /// In en, this message translates to:
-  /// **'This color is controlled by the name color setting in the file manager section.'**
-  String get skinFileNameColorSettingDescription;
 
   /// Confirmation shown after exporting a single skin.
   ///
@@ -19813,137 +16976,11 @@ abstract class AppLocalizations {
   /// **'Interface settings applied.'**
   String get skinInterfaceApplied;
 
-  /// Title of the hint card on the automation settings screen asking the user to set battery usage to Unrestricted
-  ///
-  /// In en, this message translates to:
-  /// **'Allow background start'**
-  String get automationBatteryHintTitle;
-
-  /// Body of the automation settings hint card explaining why battery usage should be Unrestricted
-  ///
-  /// In en, this message translates to:
-  /// **'When VaultExplorer is fully closed, Android can block an automation from unlocking this vault. Set VaultExplorer\'s battery usage to Unrestricted so Tasker, MacroDroid and other apps can unlock it in the background.'**
-  String get automationBatteryHintMessage;
-
-  /// Button on the automation battery hint card that opens the app's system settings page
-  ///
-  /// In en, this message translates to:
-  /// **'Open app settings'**
-  String get automationBatteryHintButton;
-
   /// Snackbar shown when the system app settings page could not be opened from the automation battery hint card
   ///
   /// In en, this message translates to:
   /// **'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.'**
   String get automationBatterySettingsOpenFailedMessage;
-
-  /// Label for a mounted vault in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Personal vault'**
-  String get skinPreviewMountedVaultName;
-
-  /// Label for a vault title in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Vault title'**
-  String get skinPreviewVaultName;
-
-  /// Text explaining that the main text color also affects regular menu actions in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Vault titles and regular menu actions share the app main text color.'**
-  String get skinMainTextColorAlsoColorsRegularMenuItems;
-
-  /// Section heading for status banner examples in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Status banners'**
-  String get skinStatusBannerExamples;
-
-  /// Label for the success banner example in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Success banner'**
-  String get skinSuccessBanner;
-
-  /// Label for the warning banner example in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Warning banner'**
-  String get skinWarningBanner;
-
-  /// Label for the error banner example in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Error banner'**
-  String get skinErrorBanner;
-
-  /// Explanation that success banners use success container colors in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'The banner fill and message use success colors.'**
-  String get skinSuccessBannerUsesSuccessContainer;
-
-  /// Explanation that warning banners use warning container colors in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'The banner fill and message use warning colors.'**
-  String get skinWarningBannerUsesWarningContainer;
-
-  /// Explanation that error banners use error container colors in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'The banner fill and message use error colors.'**
-  String get skinErrorBannerUsesErrorContainer;
-
-  /// Status message shown in the skin preview after saving changes
-  ///
-  /// In en, this message translates to:
-  /// **'Changes saved'**
-  String get skinPreviewChangesSaved;
-
-  /// Status message shown in the skin preview when storage is nearly full
-  ///
-  /// In en, this message translates to:
-  /// **'Storage is almost full'**
-  String get skinPreviewStorageAlmostFull;
-
-  /// Status message shown in the skin preview when a vault could not be unlocked
-  ///
-  /// In en, this message translates to:
-  /// **'Could not unlock the vault'**
-  String get skinPreviewCouldNotUnlockVault;
-
-  /// Section heading for surfaces and borders examples in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Surfaces and borders'**
-  String get skinSurfaceAndBorderExamples;
-
-  /// Label for the file row details color in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'File row details color'**
-  String get skinFileRowDetailsColor;
-
-  /// Label for the file row action overflow icon color in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'File row action icon color'**
-  String get skinFileActionOverflowIconColor;
-
-  /// Text explaining that matching preview elements are highlighted together in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'Other preview elements with the same color are highlighted too.'**
-  String get skinMatchingElementsHighlightTogether;
-
-  /// Text explaining that the banner text color is controlled by the selected color in the skin preview
-  ///
-  /// In en, this message translates to:
-  /// **'The banner text uses this color.'**
-  String get skinStatusBannerTextColor;
 
   /// Choice label in the APK open dialog (and the file-associations list in settings): hand the .apk to the Android package installer
   ///
@@ -20106,12 +17143,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Repeating {start} – {end}'**
   String abLoopStartedMessage(String start, String end);
-
-  /// Shown when the end (B) of an A-B repeat section is set at or before its start (A), or too close to it
-  ///
-  /// In en, this message translates to:
-  /// **'B must come after A. Move forward and tap again.'**
-  String get abLoopEndTooCloseMessage;
 
   /// Shown when an A-B repeat section is removed
   ///
@@ -20521,12 +17552,6 @@ abstract class AppLocalizations {
   /// **'Shared palette'**
   String get skinSharedPaletteTitle;
 
-  /// No description provided for @skinSharedPaletteShort.
-  ///
-  /// In en, this message translates to:
-  /// **'Shared'**
-  String get skinSharedPaletteShort;
-
   /// No description provided for @skinSharedPaletteDescription.
   ///
   /// In en, this message translates to:
@@ -20563,330 +17588,6 @@ abstract class AppLocalizations {
   /// **'Reset page colors'**
   String get skinResetPageColors;
 
-  /// No description provided for @skinTokenBackground.
-  ///
-  /// In en, this message translates to:
-  /// **'Page background'**
-  String get skinTokenBackground;
-
-  /// No description provided for @skinTokenBackgroundHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The canvas behind everything on this page.'**
-  String get skinTokenBackgroundHint;
-
-  /// No description provided for @skinTokenText.
-  ///
-  /// In en, this message translates to:
-  /// **'Main text'**
-  String get skinTokenText;
-
-  /// No description provided for @skinTokenTextHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Titles, names and body text on this page.'**
-  String get skinTokenTextHint;
-
-  /// No description provided for @skinTokenTextSecondary.
-  ///
-  /// In en, this message translates to:
-  /// **'Secondary text and icons'**
-  String get skinTokenTextSecondary;
-
-  /// No description provided for @skinTokenTextSecondaryHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Subtitles, details, hints and quiet icons.'**
-  String get skinTokenTextSecondaryHint;
-
-  /// No description provided for @skinTokenAppBar.
-  ///
-  /// In en, this message translates to:
-  /// **'Top bar'**
-  String get skinTokenAppBar;
-
-  /// No description provided for @skinTokenAppBarHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Fill of the top bar on this page.'**
-  String get skinTokenAppBarHint;
-
-  /// No description provided for @skinTokenOnAppBar.
-  ///
-  /// In en, this message translates to:
-  /// **'Top bar text and icons'**
-  String get skinTokenOnAppBar;
-
-  /// No description provided for @skinTokenOnAppBarHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Title and icon color on the top bar.'**
-  String get skinTokenOnAppBarHint;
-
-  /// No description provided for @skinTokenCard.
-  ///
-  /// In en, this message translates to:
-  /// **'Cards and rows'**
-  String get skinTokenCard;
-
-  /// No description provided for @skinTokenCardHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Cards, list rows and grouped panels.'**
-  String get skinTokenCardHint;
-
-  /// No description provided for @skinTokenCardActive.
-  ///
-  /// In en, this message translates to:
-  /// **'Active card'**
-  String get skinTokenCardActive;
-
-  /// No description provided for @skinTokenCardActiveHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The highlighted card, such as an unlocked vault.'**
-  String get skinTokenCardActiveHint;
-
-  /// No description provided for @skinTokenRaised.
-  ///
-  /// In en, this message translates to:
-  /// **'Chips and controls'**
-  String get skinTokenRaised;
-
-  /// No description provided for @skinTokenRaisedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Search fields, chips, thumbnails and icon tiles.'**
-  String get skinTokenRaisedHint;
-
-  /// No description provided for @skinTokenOverlay.
-  ///
-  /// In en, this message translates to:
-  /// **'Menus, dialogs and sheets'**
-  String get skinTokenOverlay;
-
-  /// No description provided for @skinTokenOverlayHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Popup menus, dialogs and bottom sheets opened from this page.'**
-  String get skinTokenOverlayHint;
-
-  /// No description provided for @skinTokenAccent.
-  ///
-  /// In en, this message translates to:
-  /// **'Accent'**
-  String get skinTokenAccent;
-
-  /// No description provided for @skinTokenAccentHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Buttons, links, progress and active icons.'**
-  String get skinTokenAccentHint;
-
-  /// No description provided for @skinTokenOnAccent.
-  ///
-  /// In en, this message translates to:
-  /// **'Text on accent'**
-  String get skinTokenOnAccent;
-
-  /// No description provided for @skinTokenOnAccentHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Labels and icons drawn on accent-filled buttons.'**
-  String get skinTokenOnAccentHint;
-
-  /// No description provided for @skinTokenSelection.
-  ///
-  /// In en, this message translates to:
-  /// **'Selection'**
-  String get skinTokenSelection;
-
-  /// No description provided for @skinTokenSelectionHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Selected rows and highlighted icon tiles.'**
-  String get skinTokenSelectionHint;
-
-  /// No description provided for @skinTokenOnSelection.
-  ///
-  /// In en, this message translates to:
-  /// **'Text on selection'**
-  String get skinTokenOnSelection;
-
-  /// No description provided for @skinTokenOnSelectionHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Icons and text drawn on selected items.'**
-  String get skinTokenOnSelectionHint;
-
-  /// No description provided for @skinTokenDivider.
-  ///
-  /// In en, this message translates to:
-  /// **'Dividers'**
-  String get skinTokenDivider;
-
-  /// No description provided for @skinTokenDividerHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Thin separator lines and subtle borders.'**
-  String get skinTokenDividerHint;
-
-  /// No description provided for @skinTokenOutline.
-  ///
-  /// In en, this message translates to:
-  /// **'Outlines'**
-  String get skinTokenOutline;
-
-  /// No description provided for @skinTokenOutlineHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Stronger borders on outlined buttons and fields.'**
-  String get skinTokenOutlineHint;
-
-  /// No description provided for @skinTokenFab.
-  ///
-  /// In en, this message translates to:
-  /// **'Round add button'**
-  String get skinTokenFab;
-
-  /// No description provided for @skinTokenFabHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Fill of the round add button.'**
-  String get skinTokenFabHint;
-
-  /// No description provided for @skinTokenOnFab.
-  ///
-  /// In en, this message translates to:
-  /// **'Round add button icon'**
-  String get skinTokenOnFab;
-
-  /// No description provided for @skinTokenOnFabHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The plus icon on the round add button.'**
-  String get skinTokenOnFabHint;
-
-  /// No description provided for @skinPreviewConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Confirm'**
-  String get skinPreviewConfirm;
-
-  /// No description provided for @skinPreviewCancelButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get skinPreviewCancelButton;
-
-  /// No description provided for @skinPreviewSaveButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Save'**
-  String get skinPreviewSaveButton;
-
-  /// No description provided for @skinPreviewRunButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Run'**
-  String get skinPreviewRunButton;
-
-  /// No description provided for @skinPreviewPasteButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Paste here'**
-  String get skinPreviewPasteButton;
-
-  /// No description provided for @skinPreviewUnlockButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Unlock'**
-  String get skinPreviewUnlockButton;
-
-  /// No description provided for @skinPreviewSortChip.
-  ///
-  /// In en, this message translates to:
-  /// **'Sort: Name'**
-  String get skinPreviewSortChip;
-
-  /// No description provided for @skinPreviewSearchChip.
-  ///
-  /// In en, this message translates to:
-  /// **'Search files'**
-  String get skinPreviewSearchChip;
-
-  /// No description provided for @skinPreviewPinnedBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Pinned'**
-  String get skinPreviewPinnedBadge;
-
-  /// No description provided for @skinPreviewVaultsHeader.
-  ///
-  /// In en, this message translates to:
-  /// **'VAULTS'**
-  String get skinPreviewVaultsHeader;
-
-  /// No description provided for @skinPreviewToolsSection.
-  ///
-  /// In en, this message translates to:
-  /// **'File cryptography'**
-  String get skinPreviewToolsSection;
-
-  /// No description provided for @skinPreviewToolOne.
-  ///
-  /// In en, this message translates to:
-  /// **'Keyfile and passphrase generator'**
-  String get skinPreviewToolOne;
-
-  /// No description provided for @skinPreviewToolOneHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Generate passwords and keyfiles'**
-  String get skinPreviewToolOneHint;
-
-  /// No description provided for @skinPreviewToolTwo.
-  ///
-  /// In en, this message translates to:
-  /// **'Checksum and hash verifier'**
-  String get skinPreviewToolTwo;
-
-  /// No description provided for @skinPreviewToolTwoHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Verify large files were not corrupted'**
-  String get skinPreviewToolTwoHint;
-
-  /// No description provided for @skinPreviewSettingsSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Security'**
-  String get skinPreviewSettingsSection;
-
-  /// No description provided for @skinPreviewSettingOne.
-  ///
-  /// In en, this message translates to:
-  /// **'App lock'**
-  String get skinPreviewSettingOne;
-
-  /// No description provided for @skinPreviewSettingOneHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Biometrics and auto-lock'**
-  String get skinPreviewSettingOneHint;
-
-  /// No description provided for @skinPreviewSettingTwo.
-  ///
-  /// In en, this message translates to:
-  /// **'Storage'**
-  String get skinPreviewSettingTwo;
-
-  /// No description provided for @skinPreviewSettingTwoHint.
-  ///
-  /// In en, this message translates to:
-  /// **'External storage and cloud bridges'**
-  String get skinPreviewSettingTwoHint;
-
   /// Done button label for the in-place media viewer control layout editor
   ///
   /// In en, this message translates to:
@@ -20904,12 +17605,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drag actions between docks or tap to organize'**
   String get inPlaceEditHint;
-
-  /// Header for the unplaced actions picker panel in in-place editor
-  ///
-  /// In en, this message translates to:
-  /// **'Available Actions'**
-  String get inPlaceEditAvailable;
 
   /// Label for the top bar dock in the in-place layout editor
   ///
@@ -21367,12 +18062,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 vault now follows the default} other{{count} vaults now follow the default}}'**
   String resetVaultThumbnailsDone(num count);
 
-  /// Confirmation shown before switching the app-wide thumbnail default to storing inside vaults; count is how many vaults follow the default
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 vault follows this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.} other{{count} vaults follow this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.}}'**
-  String thumbnailGlobalInContainerConfirmMessage(num count);
-
   /// Title of the document scanner step where the user drags the four corners to fit the page
   ///
   /// In en, this message translates to:
@@ -21499,12 +18188,6 @@ abstract class AppLocalizations {
   /// **'Not enough free space — need {required}, only {available} free.'**
   String createArchiveInsufficientSpace(String required, String available);
 
-  /// Banner informing user that Store compression was automatically selected for pre-compressed media files
-  ///
-  /// In en, this message translates to:
-  /// **'Pre-compressed media files detected. \"Store\" compression auto-selected to save CPU and battery.'**
-  String get createArchiveMediaRecommendation;
-
   /// Label above the archive filename field in the create archive sheet
   ///
   /// In en, this message translates to:
@@ -21523,23 +18206,11 @@ abstract class AppLocalizations {
   /// **'Select format'**
   String get createArchiveSelectFormatTooltip;
 
-  /// Header for the security/password section in the create archive sheet
-  ///
-  /// In en, this message translates to:
-  /// **'Security'**
-  String get createArchiveSecuritySection;
-
   /// Label for optional password field when creating an archive
   ///
   /// In en, this message translates to:
   /// **'Password (Optional)'**
   String get createArchivePasswordLabel;
-
-  /// Hint text for entering an archive password
-  ///
-  /// In en, this message translates to:
-  /// **'Enter password'**
-  String get createArchivePasswordHintText;
 
   /// Label for the confirm password field when creating an archive
   ///
@@ -21547,53 +18218,17 @@ abstract class AppLocalizations {
   /// **'Confirm Password'**
   String get createArchiveConfirmPasswordLabel;
 
-  /// Hint text for repeating the password
-  ///
-  /// In en, this message translates to:
-  /// **'Repeat password'**
-  String get createArchiveConfirmPasswordHint;
-
   /// Medium-low qualitative password strength rating
   ///
   /// In en, this message translates to:
   /// **'Fair'**
   String get passphraseStrengthFair;
 
-  /// Subtitle for encrypt file names toggle when no password has been entered yet
-  ///
-  /// In en, this message translates to:
-  /// **'Requires password to preview files'**
-  String get createArchiveEncryptFilenamesNeedsPassword;
-
-  /// Subtitle for encrypt file names toggle when enabled
-  ///
-  /// In en, this message translates to:
-  /// **'Hides file list until unlocked'**
-  String get createArchiveEncryptFilenamesActive;
-
-  /// Accordion header for advanced archive settings
-  ///
-  /// In en, this message translates to:
-  /// **'Advanced Options'**
-  String get createArchiveAdvancedOptions;
-
   /// Label for the compression level dropdown
   ///
   /// In en, this message translates to:
   /// **'Compression Level'**
   String get createArchiveCompressionLevel;
-
-  /// Hint shown when a ZIP archive will be split into parts
-  ///
-  /// In en, this message translates to:
-  /// **'Saved as .z01, .z02 … plus a final .zip. Keep all parts together in one folder.'**
-  String get createArchiveSplitHintZip;
-
-  /// Hint shown when a 7z archive will be split into parts
-  ///
-  /// In en, this message translates to:
-  /// **'Saved as .7z.001, .7z.002 … Keep all parts together in one folder.'**
-  String get createArchiveSplitHintSevenZip;
 
   /// Label for splitting archive into volume chunks
   ///
@@ -21667,47 +18302,11 @@ abstract class AppLocalizations {
   /// **'Smallest size, slower compression'**
   String get archiveCompressionUltraDesc;
 
-  /// Title of the error state in the document viewer (Word/Excel/PowerPoint/OpenDocument preview)
-  ///
-  /// In en, this message translates to:
-  /// **'Can\'t preview this document'**
-  String get officeViewerErrorTitle;
-
-  /// Document viewer error: the file is encrypted / password-protected
-  ///
-  /// In en, this message translates to:
-  /// **'This document is password-protected, and encrypted Office files can\'t be previewed.'**
-  String get officeViewerEncrypted;
-
-  /// Document viewer error: the file is corrupt or in an unsupported format
-  ///
-  /// In en, this message translates to:
-  /// **'This file couldn\'t be read. It may be damaged, or use a format the viewer doesn\'t support.'**
-  String get officeViewerUnsupported;
-
-  /// Document viewer error: the file exceeds the preview size limit
-  ///
-  /// In en, this message translates to:
-  /// **'This document is too large to preview in the app.'**
-  String get officeViewerTooLarge;
-
-  /// Label of the collapsible speaker-notes section under a slide in the document viewer
-  ///
-  /// In en, this message translates to:
-  /// **'Speaker notes'**
-  String get officeViewerSpeakerNotes;
-
   /// File association label: files open in the built-in document viewer (Word, Excel, PowerPoint, OpenDocument)
   ///
   /// In en, this message translates to:
   /// **'In-app Document Viewer'**
   String get fileAssocDocumentViewer;
-
-  /// Subtitle of the 'In-app Document Viewer' choice in the Open with dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Preview Word, Excel, PowerPoint and OpenDocument files in the app'**
-  String get viewOfficeDocumentsInApp;
 
   /// Label for the compression method dropdown in the create archive sheet (7-Zip only)
   ///
@@ -21732,24 +18331,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Fastest, with larger files and the widest support. Also used by ZIP and .tar.gz.'**
   String get archiveMethodDeflateDesc;
-
-  /// Note shown for archive formats that always use one compression method. format is the format name (e.g. ZIP), method the technical method name (e.g. Deflate)
-  ///
-  /// In en, this message translates to:
-  /// **'{format} always compresses with {method}.'**
-  String archiveMethodFixedInfo(String format, String method);
-
-  /// Hint shown after the fixed-method note: LZMA2 and LZMA are only available when creating 7-Zip archives
-  ///
-  /// In en, this message translates to:
-  /// **'LZMA2 and LZMA are available in 7-Zip archives.'**
-  String get archiveMethodMoreInSevenZip;
-
-  /// Note shown instead of the method dropdown when the compression level is Store (no compression)
-  ///
-  /// In en, this message translates to:
-  /// **'Store doesn\'t compress, so there is no method to choose.'**
-  String get archiveMethodStoreNote;
 
   /// Setting that enables or disables tabs in the file manager
   ///
@@ -21793,12 +18374,6 @@ abstract class AppLocalizations {
   /// **'Move to other pane'**
   String get browserTabMoveToOtherPane;
 
-  /// Tooltip for the button that flips back to the previously used file manager tab
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to previous tab'**
-  String get browserTabSwitchPrevious;
-
   /// Item action that opens the selected folder in a new file manager tab
   ///
   /// In en, this message translates to:
@@ -21822,12 +18397,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close tabs to the right'**
   String get browserTabCloseToRight;
-
-  /// Action in the file manager's tab menu that closes every tab (and with it the file manager)
-  ///
-  /// In en, this message translates to:
-  /// **'Close all'**
-  String get browserTabCloseAll;
 
   /// Setting that shows two file manager tabs side by side.
   ///
@@ -22369,41 +18938,11 @@ abstract class AppLocalizations {
   /// **'Angle'**
   String get imageEditorAngle;
 
-  /// Font size option: small
-  ///
-  /// In en, this message translates to:
-  /// **'Small'**
-  String get fontSizeSmall;
-
-  /// Font size option: medium
-  ///
-  /// In en, this message translates to:
-  /// **'Medium'**
-  String get fontSizeMedium;
-
-  /// Font size option: large
-  ///
-  /// In en, this message translates to:
-  /// **'Large'**
-  String get fontSizeLarge;
-
-  /// Font size option: extra large
-  ///
-  /// In en, this message translates to:
-  /// **'Extra Large'**
-  String get fontSizeExtraLarge;
-
   /// Default placeholder text shown on a newly added text annotation in the image editor
   ///
   /// In en, this message translates to:
   /// **'DOUBLE TAP HERE TO CHANGE TEXT'**
   String get imageEditorTextPlaceholder;
-
-  /// Sample text shown in the font size picker to preview how the selected size looks
-  ///
-  /// In en, this message translates to:
-  /// **'Sample preview ABC 123'**
-  String get imageEditorFontSizePreview;
 
   /// Default file name for a photo captured from camera in the image editor
   ///
@@ -22458,12 +18997,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Audio only'**
   String get floatingPlayerAudioOnly;
-
-  /// Label of the small chip that replaces the floating video window while it is audio only; tapping it brings the video back
-  ///
-  /// In en, this message translates to:
-  /// **'Show video'**
-  String get floatingPlayerShowVideo;
 
   /// Settings section and toggle title for the app-wide lock (password, PIN or pattern)
   ///
@@ -23803,12 +20336,6 @@ abstract class AppLocalizations {
   /// **'Current'**
   String get vaultSyncCurrentStorageBadge;
 
-  /// Tooltip of the button that returns from the folder picker to the storage list
-  ///
-  /// In en, this message translates to:
-  /// **'Change storage'**
-  String get vaultSyncChangeStorageTooltip;
-
   /// Title of the Vault Sync folder picker. {storage} is the storage name
   ///
   /// In en, this message translates to:
@@ -23856,12 +20383,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Categories'**
   String get categoriesSectionTitle;
-
-  /// Tooltip of the drawer button that opens the category shortcut settings
-  ///
-  /// In en, this message translates to:
-  /// **'Manage categories'**
-  String get manageCategoriesTooltip;
 
   /// Settings section title and sheet title for choosing which category shortcuts the drawer shows
   ///
@@ -23988,12 +20509,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lock anyway'**
   String get lockAnywayButton;
-
-  /// Count of symbolic links found in the current vault folder
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =0 {0 symbolic links} one {1 symbolic link} other {{count} symbolic links}}'**
-  String vaultListingSymbolicLinkCount(int count);
 
   /// Count of vault entries that could not be listed in the current folder
   ///
@@ -24745,12 +21260,6 @@ abstract class AppLocalizations {
   /// **'The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.'**
   String get motionPhotoCopyNote;
 
-  /// Hint shown in the PIM input before the user types a value; leaving it empty or entering 0 uses the default PIM.
-  ///
-  /// In en, this message translates to:
-  /// **'Empty or 0 for defaults'**
-  String get pimInputHint;
-
   /// Label for the independent storage location of the gallery metadata index.
   ///
   /// In en, this message translates to:
@@ -24828,12 +21337,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hidden folder'**
   String get musicIndexHiddenFolderOption;
-
-  /// No description provided for @musicIndexHiddenFolderDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Stored in an unencrypted hidden folder in Local Storage.'**
-  String get musicIndexHiddenFolderDesc;
 
   /// No description provided for @libraryStorageHiddenFolder.
   ///

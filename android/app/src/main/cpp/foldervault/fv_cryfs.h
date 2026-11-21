@@ -188,7 +188,6 @@ public:
     // [visit] runs right after each load, so BlockStore::lastViolation() still describes that block.
     void walkBlocks(const BlockId& root, const std::function<void(const BlockId&, bool loaded)>& visit);
     void patchFirstLeafBytes(const BlockId& root, size_t offset, const uint8_t* bytes, size_t n);
-    size_t maxLeafPayload() const { return maxLeaf_; }
     // Upstream CryFS refuses to load inner nodes deeper than this, so a bigger blob could never be read back by it.
     static constexpr int kMaxTreeDepth = 10;
     // Most leaves a blob may have (maxChildren^kMaxTreeDepth, saturating).

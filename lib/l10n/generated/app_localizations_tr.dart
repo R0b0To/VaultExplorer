@@ -63,9 +63,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get pdfViewerNextMatch => 'Sonraki eşleşme';
 
   @override
-  String get pdfViewerCloseSearch => 'Aramayı kapat';
-
-  @override
   String get pdfViewerPrintTooltip => 'Belgeyi yazdır';
 
   @override
@@ -76,15 +73,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get pdfViewerFailedToLoad => 'PDF yüklenemedi';
-
-  @override
-  String get pdfViewerEditTooltip => 'Düzenle';
-
-  @override
-  String get pdfViewerDoneEditingTooltip => 'Düzenlemeyi bitir';
-
-  @override
-  String get pdfViewerSaveFailed => 'Bu PDF\'deki değişiklikler kaydedilemedi';
 
   @override
   String get pdfViewerEditUnavailable =>
@@ -146,9 +134,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get advancedParametersTitle => 'Gelişmiş Parametreler';
 
   @override
-  String get pimFieldLabel => 'PIM (varsayılan için boş bırak)';
-
-  @override
   String get encryptionAlgorithmLabel => 'Şifreleme algoritması';
 
   @override
@@ -196,16 +181,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get dismiss => 'Kapat';
 
   @override
-  String byteProgressText(String transferred, String total, int pct) {
-    return '$transferred / $total  ($pct%)';
-  }
-
-  @override
-  String countProgressText(int done, int total, int pct) {
-    return '$done / $total  ($pct%)';
-  }
-
-  @override
   String multiOpLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -214,11 +189,6 @@ class AppLocalizationsTr extends AppLocalizations {
       one: '1 aktarım',
     );
     return '$_temp0';
-  }
-
-  @override
-  String multiOpSublabel(String summary) {
-    return '$summary · tümünü görmek için dokun';
   }
 
   @override
@@ -327,19 +297,11 @@ class AppLocalizationsTr extends AppLocalizations {
   String get readOnlyContainerWarning => 'Bu kapsayıcı salt okunur bağlandı.';
 
   @override
-  String get hiddenVolumeProtectionTriggeredWarning =>
-      'Bu dış birime yapılan bir yazma, gizli birimi zarar görebileceği için engellendi. Bu kapsayıcı, oturum boyunca salt okunur moda alındı.';
-
-  @override
   String get protectHiddenVolumeToggleTitle => 'Gizli birimi koru';
 
   @override
   String get protectHiddenVolumeToggleSubtitle =>
       'Dış birime yazmanın neden olacağı hasarı önler';
-
-  @override
-  String get protectHiddenVolumeCredentialsRequired =>
-      'Gizli birimi korumak için gizli birim parolası veya anahtar dosyası gerekli';
 
   @override
   String deleteItemsTitle(num count) {
@@ -647,9 +609,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get removeFromBookmarks => 'Yer imlerinden kaldır';
 
   @override
-  String get addToBookmarks => 'Yer imlerine ekle';
-
-  @override
   String get edit => 'Düzenle';
 
   @override
@@ -743,85 +702,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get archiveExplorerPermissionTitle => 'Depolama erişimi gerekli';
 
   @override
-  String get archiveExplorerPermissionMessage =>
-      'İndirilenler klasöründeki .zip arşivlerine göz atmak ve çıkarmak için dosyalarına erişim izni ver.';
-
-  @override
   String get archiveExplorerGrantAccess => 'Erişim ver';
-
-  @override
-  String get archiveExplorerEmptyTitle => 'Arşiv bulunamadı';
-
-  @override
-  String get archiveExplorerEmptyMessage =>
-      'İndirdiğin zip dosyaları burada görünecek.';
-
-  @override
-  String get archiveExplorerRefreshTooltip => 'Yenile';
-
-  @override
-  String archiveExplorerEntryCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count öğe',
-      one: '1 öğe',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get archiveExplorerExtractAll => 'Tümünü çıkar';
-
-  @override
-  String get archiveExplorerExtracting => 'Çıkarılıyor…';
-
-  @override
-  String archiveExplorerExtractSuccess(int count, String name) {
-    return 'Çıkarıldı: $count dosya → Download/Extracted/$name';
-  }
-
-  @override
-  String get archiveExplorerExtractFailed => 'Bu arşiv çıkarılamadı.';
-
-  @override
-  String get archiveExplorerOpenFailed => 'Bu arşiv açılamadı.';
-
-  @override
-  String get archiveExplorerOpenArchive => 'Arşiv aç…';
-
-  @override
-  String get archiveExplorerUnresolvedPath =>
-      'Bu dosyaya doğrudan erişilemedi. Bunun yerine İndirilenler\'den bir dosya seçmeyi dene.';
-
-  @override
-  String get archiveExplorerExtractTo => 'Şuraya çıkar…';
-
-  @override
-  String get archiveExplorerPreview => 'Önizleme';
-
-  @override
-  String get archiveExplorerChoosingDestination => 'Hedef seçiliyor…';
-
-  @override
-  String get archiveExplorerNoDestinationChosen => 'Hedef seçilmedi.';
-
-  @override
-  String archiveExplorerExtractSuccessTo(int count, String path) {
-    return 'Çıkarıldı: $count dosya → $path';
-  }
-
-  @override
-  String get archiveBrowserEmptyTitle => 'Klasör boş';
-
-  @override
-  String get archiveBrowserEmptyMessage => 'Bu klasörde hiç dosya yok.';
-
-  @override
-  String get archiveBrowserRoot => 'Arşiv';
-
-  @override
-  String get archiveBrowserOpenFileFailed => 'Bu dosya açılamadı.';
 
   @override
   String get fileAssocInAppTextEditor => 'Uygulama içi metin düzenleyici';
@@ -857,10 +738,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Etkin — kaldırmak için anahtara dokunun';
 
   @override
-  String get masterPasswordInactiveSubtitle =>
-      'Uygulamayı açmak için parola iste';
-
-  @override
   String get newPasswordLabel => 'Yeni parola';
 
   @override
@@ -877,16 +754,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get biometricUnlockTitle => 'Biyometrik kilit açma';
-
-  @override
-  String get biometricUnlockSubtitle =>
-      'Kapsayıcıyı güvenle bağlamak için kimlik doğrula';
-
-  @override
-  String get changeMasterPasswordTitle => 'Ana Parolayı Değiştir';
-
-  @override
-  String get changeMasterPasswordSubtitle => 'Ana parola bilgilerini güncelle';
 
   @override
   String get autoLockContainersTitle => 'Kapsayıcıları otomatik kilitle';
@@ -1018,28 +885,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Uygulama renklerini duvar kağıdınıza uydur (Android 12+)';
 
   @override
-  String get pureBlackThemeTitle => 'Saf Siyah (OLED)';
-
-  @override
-  String get pureBlackThemeSubtitle =>
-      'Pil tasarrufu ve OLED ekranlarda daha az parlama için gerçek siyah arka plan (yalnızca koyu tema)';
-
-  @override
   String get sortContainersByLabel => 'Kapsayıcıları sırala';
-
-  @override
-  String get swapCardSwipeActionsTitle => 'Kart kaydırma işlemlerini değiştir';
-
-  @override
-  String get swapCardSwipeActionsSubtitle =>
-      'Kartları kaydırınca solda Düzenle, sağda Kaldır görünsün';
-
-  @override
-  String get swipeGestureHintTitle => 'Kaydırma ipucu';
-
-  @override
-  String get swipeGestureHintSubtitle =>
-      'İlk kapsayıcıda kart önizleme animasyonunu göster';
 
   @override
   String get autoOpenOnUnlockTitle => 'Kilit açılınca otomatik aç';
@@ -1084,10 +930,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get localStorageCardTitle => 'Yerel depolama';
-
-  @override
-  String get localStorageCardSubtitle =>
-      'Şifrelenmemiş — kasalarla hızlı aktarımlar için';
 
   @override
   String get enableFastStorageAccessTitle =>
@@ -1365,9 +1207,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get unlock => 'Kilidi aç';
 
   @override
-  String get useBiometric => 'Biyometri kullan';
-
-  @override
   String get connectAtLeast4Dots => 'En az 4 noktayı birleştirin';
 
   @override
@@ -1399,15 +1238,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get enterUnlockPinTitle => 'Kilit açma PIN\'ini girin';
-
-  @override
-  String get wrongPinTryAgain => 'Yanlış PIN, tekrar dene';
-
-  @override
-  String get enterYourPinSequence => 'PIN\'ini gir';
-
-  @override
-  String get enterPinToMount => 'Bağlamak için PIN\'ini gir';
 
   @override
   String get noPinConfiguredMessage =>
@@ -1443,63 +1273,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get incorrectPinError => 'Yanlış PIN';
 
   @override
-  String removedFromListSnack(String name) {
-    return 'Kaldırıldı: \"$name\" (listeden)';
-  }
-
-  @override
-  String get clearRecentHistoryTitle => 'Son geçmiş silinsin mi?';
-
-  @override
-  String get clearRecentHistoryMessage =>
-      'Bu işlem, son belgeler listesindeki tüm kayıtları kaldırır. Cihazındaki gerçek dosyalara dokunulmaz.';
-
-  @override
-  String get clearAll => 'Hepsini temizle';
-
-  @override
-  String get recentHistoryClearedSnack => 'Son geçmiş temizlendi';
-
-  @override
   String get moreOptionsTooltip => 'Diğer seçenekler';
-
-  @override
-  String get clearHistoryMenuItem => 'Geçmişi temizle';
-
-  @override
-  String get openPdfFile => 'PDF dosyası aç';
-
-  @override
-  String get noDocumentsYetTitle => 'Henüz belge yok';
-
-  @override
-  String get openPdfToStartMessage =>
-      'Okumaya başlamak için cihazından bir PDF aç.';
-
-  @override
-  String get removeFromListMenuItem => 'Listeden kaldır';
-
-  @override
-  String get justNow => 'Az önce';
-
-  @override
-  String minutesAgo(int count) {
-    return '$count dk önce';
-  }
-
-  @override
-  String hoursAgo(int count) {
-    return '$count sa önce';
-  }
-
-  @override
-  String daysAgo(int count) {
-    return '$count gün önce';
-  }
-
-  @override
-  String get usbDriveDisconnectedLocked =>
-      'USB sürücü çıkarıldı — kapsayıcı kilitlendi';
 
   @override
   String get containerAlreadyMounted => 'Bu kapsayıcı zaten bağlı.';
@@ -1523,27 +1297,8 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get selectContainerFirst => 'Önce bir kapsayıcı seç';
-
-  @override
   String get passwordOrKeyfilesRequired =>
       'Parola veya anahtar dosyaları gerekli';
-
-  @override
-  String get slowPerformanceWarningTitle => 'Yavaş performans uyarısı';
-
-  @override
-  String get slowPerformanceWarningMessage =>
-      'Doğrudan depolama erişimi şu an kapalı.\n\nCryFS, dosyaları binlerce küçük blok hâlinde saklar. Boş olmayan CryFS kasalarını Android SAF üzerinden açmak çok yavaş olur.\n\n\'Tüm Dosyalara Erişim\' iznini verip hızlı erişim için Ayarlar\'ı açmak ister misin?';
-
-  @override
-  String get unlockAnyway => 'Yine de kilidini aç';
-
-  @override
-  String get defaultVaultName => 'Kasa';
-
-  @override
-  String get defaultContainerName => 'Kapsayıcı';
 
   @override
   String get incorrectPasswordOrInvalidVault =>
@@ -1552,9 +1307,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get incorrectPasswordOrInvalidContainer =>
       'Yanlış parola veya geçersiz kapsayıcı';
-
-  @override
-  String get genericUnknownError => 'Bilinmeyen hata';
 
   @override
   String get decryptingLabel => 'Şifre çözülüyor…';
@@ -1592,12 +1344,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get mountContainerTitle => 'Kapsayıcıyı bağla';
 
   @override
-  String get containerFileSegmentLabel => 'Kapsayıcı dosyası';
-
-  @override
-  String get folderVaultSegmentLabel => 'Klasör kasası';
-
-  @override
   String formatContainerLabel(String format) {
     return '$format Kapsayıcı';
   }
@@ -1605,11 +1351,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String formatVaultLabel(String format) {
     return '$format Kasa';
-  }
-
-  @override
-  String formatDriveLabel(String format) {
-    return '$format Sürücü';
   }
 
   @override
@@ -1626,9 +1367,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get containerMissingTitle => 'Kapsayıcı bulunamadı';
 
   @override
-  String get filePathCouldNotBeResolved => 'Dosya yolu çözümlenemedi';
-
-  @override
   String get containerMissingExplanation =>
       'Kapsayıcı dosyası taşınmış veya silinmiş olabilir ya da barındıran depolama şu anda bağlı değil.';
 
@@ -1639,35 +1377,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get locateFileButtonLabel => 'Dosyayı bul';
 
   @override
-  String get authenticateToMountSubtitle =>
-      'Kapsayıcıyı güvenle bağlamak için kimlik doğrula';
-
-  @override
   String get usePasswordButtonLabel => 'Parola kullan';
 
   @override
   String get authenticateButtonLabel => 'Kimlik doğrula';
 
   @override
-  String get drawUnlockPatternCardTitle => 'Kilit açma desenini çizin';
-
-  @override
-  String get wrongPatternTryAgain => 'Yanlış desen, tekrar dene';
-
-  @override
-  String get connectYourPatternSequence => 'Desenini çiz';
-
-  @override
   String get usePasswordInsteadButtonLabel => 'Bunun yerine parola kullan';
-
-  @override
-  String get passwordHintFolderVault => 'Kasa parolasını girin';
-
-  @override
-  String get passwordHintBitlocker => 'Parola veya kurtarma anahtarını girin';
-
-  @override
-  String get passwordHintContainer => 'Kapsayıcı parolasını girin';
 
   @override
   String get usingSavedPasswordTooltip => 'Kayıtlı parola kullanılıyor';
@@ -1675,10 +1391,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get luksKeyfileReplacesPasswordNote =>
       'LUKS kapsayıcılarında anahtar dosyası parolanın yerini alır.';
-
-  @override
-  String get readOnlyModeUsbSubtitle =>
-      'Bu sürücüde değişiklik yapılmadan bağla';
 
   @override
   String get readOnlyModeContainerSubtitle =>
@@ -1706,10 +1418,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get decryptingDriveLabel => 'Sürücünün şifresi çözülüyor…';
-
-  @override
-  String get usbDeviceAlreadyActiveMounted =>
-      'Bu USB aygıt zaten etkin ve bağlı.';
 
   @override
   String reconnectUsbDriveTitle(String label) {
@@ -1750,13 +1458,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get mountExistingContainerSubtitle =>
       'Sahip olduğunuz bir dosya kapsayıcısının kilidini açın';
-
-  @override
-  String get mountSplitContainerTitle => 'Bölünmüş kapsayıcıyı bağla';
-
-  @override
-  String get mountSplitContainerSubtitle =>
-      'Önce birleştirmeden bölünmüş kapsayıcının kilidini doğrudan aç';
 
   @override
   String get mountUsbDriveTitle => 'USB sürücü bağla';
@@ -1807,9 +1508,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String pdfViewerFailedToInspectSize(String error) {
     return 'PDF dosya boyutu incelenemedi: $error';
   }
-
-  @override
-  String get pdfViewerErrorLoadingTitle => 'PDF yüklenirken hata';
 
   @override
   String get pdfViewerNoDocumentLoaded => 'Yüklenmiş PDF belgesi yok.';
@@ -1872,20 +1570,11 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String archiveFormatNotSupported(String ext) {
-    return '.$ext arşiv biçimi henüz desteklenmiyor';
-  }
-
-  @override
   String get archivePasswordPromptTitle => 'Parola korumalı';
 
   @override
   String get archivePasswordPromptMessage =>
       'Bu arşiv parola korumalı. İçeriğini görmek için parolayı girin.';
-
-  @override
-  String get archiveSolidWarning =>
-      'Bu bir solid arşiv — dosyaları açmak özellikle sona doğru daha yavaş olabilir.';
 
   @override
   String get failedToReadFileFromArchive => 'Dosya arşivden okunamadı';
@@ -2024,11 +1713,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String deletedWithFailures(int deleted, int failed) {
-    return '$deleted silindi · $failed başarısız';
-  }
-
-  @override
   String exportedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2042,11 +1726,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get exportCancelledOrFailed =>
       'Dışa aktarma iptal edildi veya başarısız oldu';
-
-  @override
-  String exportError(String type) {
-    return 'Dışa aktarma hatası: $type';
-  }
 
   @override
   String get deleteOriginalTitle => 'Orijinal silinsin mi?';
@@ -2121,37 +1800,12 @@ class AppLocalizationsTr extends AppLocalizations {
   String get createArchiveTitle => 'Arşiv oluştur';
 
   @override
-  String get archiveNameHint => 'arsiv.zip';
-
-  @override
-  String archivedCount(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Arşivlendi: $count dosya',
-      one: 'Arşivlendi: 1 dosya',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String failedToArchiveGeneric(String type) {
     return 'Arşiv oluşturulamadı: $type';
   }
 
   @override
-  String get createArchivePasswordHint => 'İsteğe bağlı parola (AES-256)';
-
-  @override
-  String get createArchivePasswordUnavailableForFormat =>
-      'Parola koruması yalnızca ZIP ve 7-Zip için kullanılabilir';
-
-  @override
   String get createArchiveEncryptFilenames => 'Dosya adlarını şifrele';
-
-  @override
-  String get createArchiveEncryptFilenamesHint =>
-      'Parola gerektirir. Parola, içeriği listelemek için bile istenir.';
 
   @override
   String get closeSearchTooltip => 'Aramayı kapat';
@@ -2230,9 +1884,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get formatFileSystemLabel => 'Dosya sistemini biçimlendir';
-
-  @override
-  String get standardVolumeHeader => 'Standart birim';
 
   @override
   String get containerFormatLabel => 'Kapsayıcı biçimi';
@@ -2345,14 +1996,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get unitGbShort => 'GB';
 
   @override
-  String failedToListUsbDevices(String error) {
-    return 'USB aygıtları listelenemedi: $error';
-  }
-
-  @override
-  String get usbPermissionDenied => 'USB izni reddedildi';
-
-  @override
   String get couldNotReadDriveCapacity =>
       'Sürücü kapasitesi okunamadı — boyutu elle girin.';
 
@@ -2381,9 +2024,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get usbContainerCreationFailed => 'USB kapsayıcı oluşturulamadı.';
-
-  @override
-  String get usbStandardVolumeSectionHeader => 'USB Sürücü ve Standart Birim';
 
   @override
   String get formattingErasesEverythingWarning =>
@@ -2455,15 +2095,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get playlistTransitionFlipLabel => '3B çevirme';
 
   @override
-  String get unlockVaultTitle => 'Kasanın kilidini aç';
-
-  @override
-  String get openContainerTitle => 'Kapsayıcı aç';
-
-  @override
-  String get selectContainerFileOrFolder => 'Dosya veya klasör seç';
-
-  @override
   String get useBackupHeaderToggleTitle => 'Yedek başlığı kullan';
 
   @override
@@ -2474,30 +2105,12 @@ class AppLocalizationsTr extends AppLocalizations {
   String get keepCurrentOption => 'Mevcut olanı koru';
 
   @override
-  String get toolExpandVolumeTitle => 'VeraCrypt birimini genişlet';
-
-  @override
   String get toolExpandVolumeSubtitle =>
       'Standart bir birimi, masaüstündeki Volume Expander gibi büyütün';
 
   @override
-  String get toolExpandLuksVolumeTitle => 'LUKS kapsayıcısını genişlet';
-
-  @override
-  String get toolExpandLuksVolumeSubtitle =>
-      'LUKS1 ve LUKS2 kapsayıcılarını, sabit boyutlu LUKS2 üst verisi dahil büyütün';
-
-  @override
   String get luksToolsExpandNote =>
       'Önce kapsayıcının yedeğini alın. LUKS1 ve LUKS2 desteklenir. NTFS ve ext2/3/4 dosya sistemleri yerinde genişletilebilir (FAT ve exFAT genişletilemez). Eklenen alan şifreli sıfırlarla doldurulabilir. Anahtar dosyası kullanılıyorsa parolanın yerine geçer.';
-
-  @override
-  String get toolExpandBitLockerVolumeTitle =>
-      'BitLocker kapsayıcısını genişlet';
-
-  @override
-  String get toolExpandBitLockerVolumeSubtitle =>
-      'Bir BitLocker birim dosyasını veya VHD/VHDX görüntüsünü büyütün ve NTFS dosya sistemini genişletin';
 
   @override
   String get bitlockerToolsExpandNote =>
@@ -2514,9 +2127,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Mevcut bir standart birimin içinde gizli birim oluşturun';
 
   @override
-  String get vcToolsPickContainer => 'Kapsayıcı seç';
-
-  @override
   String get vcToolsNoContainer => 'Kapsayıcı seçilmedi';
 
   @override
@@ -2524,9 +2134,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get vcToolsPimLabel => 'PIM (isteğe bağlı)';
-
-  @override
-  String get vcToolsNewSizeLabel => 'Yeni kapsayıcı boyutu (MiB)';
 
   @override
   String get vcToolsInitFreeSpace => 'Yeni alanı hazırla';
@@ -2628,23 +2235,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get readOnlyModeLabel => 'Salt okunur mod';
 
   @override
-  String get readOnlyModeSubtitle =>
-      'Kasa üzerinde her türlü yazma veya değiştirme işlemini engeller';
-
-  @override
   String get alwaysOpenReadOnlyLabel => 'Her zaman salt okunur';
 
   @override
   String get alwaysOpenReadOnlySubtitle => 'Yeni oturumlar salt okunur başlar.';
-
-  @override
-  String get selectUsbDeviceLabel => 'USB aygıt seç';
-
-  @override
-  String get noUsbDevicesFound => 'Uyumlu USB depolama aygıtı bulunamadı';
-
-  @override
-  String get containerConfigTitle => 'Kasa yapılandırması';
 
   @override
   String get changePasswordTitle => 'Parolayı değiştir';
@@ -2653,45 +2247,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get confirmNewPasswordLabel => 'Yeni parolayı onayla';
 
   @override
-  String get cameraCaptureTitle => 'Kasa kamerası';
-
-  @override
-  String get takingPhoto => 'Fotoğraf çekiliyor…';
-
-  @override
-  String get noVaultSelected => 'Kasa seçilmedi';
-
-  @override
   String get mediaDiagnosticsTitle => 'Medya tanılama';
 
   @override
-  String get advancedViewerSettingsTitle => 'Görüntüleyici ayarları';
-
-  @override
-  String get textEditorSwitchToReadModeTooltip => 'Salt okunur moda geç';
-
-  @override
-  String get textEditorSwitchToEditModeTooltip => 'Düzenleme moduna geç';
-
-  @override
   String get textEditorReadOnlyIndicatorLabel => 'Salt okunur';
-
-  @override
-  String get textEditorMoveCursorLeftTooltip => 'İmleci sola taşı';
-
-  @override
-  String get textEditorMoveCursorRightTooltip => 'İmleci sağa taşı';
-
-  @override
-  String get textEditorSelectWordTooltip => 'Kelimeyi seç';
-
-  @override
-  String get textEditorSwitchToHorizontalScrollTooltip =>
-      'Yatay kaydırmaya geç';
-
-  @override
-  String get textEditorSwitchToSoftWrapTooltip =>
-      'Yumuşak satır kaydırmaya geç';
 
   @override
   String get textEditorCaretScrubberLabel =>
@@ -2775,19 +2334,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get goToLineButton => 'Git';
 
   @override
-  String get textEditorSaveConfirmTitle => 'Kaydedilmemiş değişiklikler';
-
-  @override
-  String get textEditorSaveConfirmMessage =>
-      'Kapatmadan önce değişikliklerini kaydetmek ister misin?';
-
-  @override
-  String get saveAndClose => 'Kaydet ve kapat';
-
-  @override
-  String get discardChanges => 'Değişiklikleri at';
-
-  @override
   String selectionBarSelectedCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2805,9 +2351,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get deselectAll => 'Tüm seçimi kaldır';
 
   @override
-  String get sortOptionsTitle => 'Dosyaları sırala';
-
-  @override
   String get layoutModeList => 'Liste görünümü';
 
   @override
@@ -2817,29 +2360,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get layoutModeMasonry => 'Mozaik görünüm';
 
   @override
-  String get fileOperationsTitle => 'Dosya işlemleri';
-
-  @override
   String get conflictResolutionTitle => 'Dosya çakışması';
 
   @override
   String get replaceExistingFile => 'Mevcut dosyanın üzerine yaz';
-
-  @override
-  String get keepBothFiles => 'İkisini de tut (yeni dosyayı yeniden adlandır)';
-
-  @override
-  String get skipFile => 'Bu dosyayı atla';
-
-  @override
-  String get noVaultsFoundTitle => 'Kasa bulunamadı';
-
-  @override
-  String get noVaultsFoundSubtitle =>
-      'Başlamak için yeni bir şifreli kapsayıcı oluştur veya mevcut bir kasa ekle.';
-
-  @override
-  String get addExistingVaultButton => 'Mevcut kasa ekle';
 
   @override
   String get sortContainersModeManual => 'Elle (sürükleyerek sırala)';
@@ -2892,46 +2416,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get unlockContainerTitle => 'Kapsayıcının kilidini aç';
 
   @override
-  String get containerFileSegment => 'Kapsayıcı dosyası';
-
-  @override
-  String get folderVaultSegment => 'Klasör kasası';
-
-  @override
   String get enableButtonLabel => 'Etkinleştir';
-
-  @override
-  String get retryButtonLabelShort => 'Yeniden dene';
-
-  @override
-  String get locateFileButton => 'Dosyayı bul';
-
-  @override
-  String get authenticateButton => 'Kimlik doğrula';
-
-  @override
-  String get cancelUnlockButton => 'Kilit açmayı iptal et';
-
-  @override
-  String tryingKeyslotProgress(int attempted, int total) {
-    return 'Anahtar yuvası deneniyor: $attempted / $total…';
-  }
-
-  @override
-  String get tryingKeyslotSingle => 'Anahtar yuvası deneniyor…';
-
-  @override
-  String verifyingCredentialProgress(int attempted, int total) {
-    return 'Kimlik bilgisi doğrulanıyor: $attempted / $total…';
-  }
-
-  @override
-  String get verifyingCredentialSingle => 'Kimlik bilgisi doğrulanıyor…';
-
-  @override
-  String tryingAlgoSlot(String algo, String slotName) {
-    return 'Deneniyor: $algo ($slotName)…';
-  }
 
   @override
   String get hiddenVolumeSlotName => 'Gizli birim';
@@ -2940,38 +2425,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get standardVolumeSlotName => 'Standart birim';
 
   @override
-  String get containerMissingSubtitle => 'Dosya yolu çözümlenemedi';
-
-  @override
-  String get containerMissingBody =>
-      'Kapsayıcı dosyası taşınmış veya silinmiş olabilir ya da barındıran depolama şu anda bağlı değil.';
-
-  @override
-  String get connectPatternSequence => 'Desenini çiz';
-
-  @override
   String get passwordLabel => 'Parola';
-
-  @override
-  String get enterVaultPasswordHint => 'Kasa parolasını girin';
-
-  @override
-  String get enterBitlockerPasswordHint =>
-      'Parola veya kurtarma anahtarını girin';
-
-  @override
-  String get enterContainerPasswordHint => 'Kapsayıcı parolasını girin';
-
-  @override
-  String get readOnlyModeUsbSubtitleDrive =>
-      'Bu sürücüde değişiklik yapılmadan bağla';
-
-  @override
-  String get rememberDriveLabel => 'Sürücüyü hatırla';
-
-  @override
-  String get rememberDriveSubtitle =>
-      'Hızlı erişim için sürücüyü panoya sabitle';
 
   @override
   String get unlockVaultButtonLabel => 'Kasanın kilidini aç';
@@ -2988,50 +2442,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get requestingPermission => 'İzin isteniyor…';
 
   @override
-  String get unlockAndMountButton => 'Kilidi aç ve bağla';
-
-  @override
   String get unlockDriveButton => 'Sürücünün kilidini aç';
 
   @override
-  String couldntFindDevice(String deviceName) {
-    return 'Bulunamadı: \"$deviceName\"';
-  }
-
-  @override
-  String get plugDriveBackInRetry =>
-      'Sürücüyü tekrar tak ve Yeniden Dene\'ye dokun. Farklı bir adla görünüyorsa aşağıdan seç.';
-
-  @override
-  String get retryConnectionButton => 'Bağlantıyı yeniden dene';
-
-  @override
-  String get refreshDevicesButton => 'Aygıtları yenile';
-
-  @override
-  String get connectOtgDriveToMount => 'Bağlamak için bir OTG flash sürücü tak';
-
-  @override
-  String get alreadyActive => 'Zaten etkin';
-
-  @override
   String get active => 'Etkin';
-
-  @override
-  String get readyToUnlock => 'Kilidi açmaya hazır';
-
-  @override
-  String get enterUsbPartitionPassword => 'USB bölümünün parolasını gir';
-
-  @override
-  String get biometricAuthenticationTitle => 'Biyometrik kimlik doğrulama';
-
-  @override
-  String get biometricAuthUsbSubtitle =>
-      'Bu USB aygıtının kilidini açmak ve bağlamak için kimlik doğrula';
-
-  @override
-  String get connectPatternSequenceToMount => 'Bağlamak için desenini çiz';
 
   @override
   String get selectAllAction => 'Tümünü seç';
@@ -3083,9 +2497,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get exposeAsDocumentProviderMenu => 'Belge sağlayıcı olarak sun';
-
-  @override
-  String get moreOptionsTooltipShort => 'Diğer seçenekler';
 
   @override
   String get copyTooltip => 'Kopyala';
@@ -3274,11 +2685,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get enterFullscreenMenu => 'Tam ekrana geç';
 
   @override
-  String failedToOpenExternalApp(String error) {
-    return 'Harici uygulamada açılamadı: $error';
-  }
-
-  @override
   String get thisFolderMenu => 'Bu klasör';
 
   @override
@@ -3292,21 +2698,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get playlistOptionsTooltip => 'Oynatma listesi seçenekleri';
-
-  @override
-  String get enablePlaylistTooltip => 'Oynatma listesini etkinleştir';
-
-  @override
-  String get moreActionsTooltip => 'Diğer işlemler';
-
-  @override
-  String get forcePortraitMenu => 'Dikey zorla';
-
-  @override
-  String get forceLandscapeMenu => 'Yatay zorla';
-
-  @override
-  String get autoRotateSensorMenu => 'Otomatik döndür (sensör)';
 
   @override
   String get screenOrientationMenu => 'Ekran yönü';
@@ -3337,52 +2728,10 @@ class AppLocalizationsTr extends AppLocalizations {
       'Tanılama bilgisi panoya kopyalandı';
 
   @override
-  String get diagnosticsTitle => 'Tanılama';
-
-  @override
-  String get copyDiagnosticsTooltip => 'Tanılama bilgisini kopyala';
-
-  @override
   String get closeTooltip => 'Kapat';
 
   @override
-  String get diagnosticsPlaybackSection => 'Oynatma';
-
-  @override
-  String get diagnosticsEngineSection => 'Motor';
-
-  @override
-  String get diagnosticsStateLabel => 'Durum';
-
-  @override
-  String get diagnosticsResolutionLabel => 'Çözünürlük';
-
-  @override
-  String get diagnosticsAspectRatioLabel => 'En boy oranı';
-
-  @override
-  String get diagnosticsPositionLabel => 'Konum';
-
-  @override
-  String get diagnosticsDurationLabel => 'Süre';
-
-  @override
   String get diagnosticsErrorLabel => 'Hata';
-
-  @override
-  String get diagnosticsPlayerLabel => 'Oynatıcı';
-
-  @override
-  String get diagnosticsDecodingLabel => 'Kod çözme';
-
-  @override
-  String get diagnosticsExoPlayerValue => 'ExoPlayer (Android)';
-
-  @override
-  String get diagnosticsHardwareAcceleratedValue => 'Donanım hızlandırmalı';
-
-  @override
-  String get diagnosticsUnknownValue => 'Bilinmiyor';
 
   @override
   String get diagnosticsStateBuffering => 'Arabelleğe alınıyor';
@@ -3392,9 +2741,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get diagnosticsStatePaused => 'Duraklatıldı';
-
-  @override
-  String get diagnosticsDurationUnavailable => '--:--';
 
   @override
   String get rotate90Label => '90° döndür';
@@ -3410,9 +2756,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get subtitlesLabel => 'Altyazılar';
-
-  @override
-  String get imageSettingsTitle => 'Görüntü ayarları';
 
   @override
   String get playbackSettingsTitle => 'Oynatma ayarları';
@@ -3452,9 +2795,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get settingsTooltipShort => 'Ayarlar';
-
-  @override
   String get sourceCodeTooltip => 'Kaynak kodu';
 
   @override
@@ -3467,12 +2807,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get resetToDefaultsTooltip => 'Varsayılanlara sıfırla';
 
   @override
-  String get usbUnlockContainerTitle => 'USB kapsayıcının kilidini aç';
-
-  @override
-  String get usbMountContainerTitle => 'USB sürücü bağla';
-
-  @override
   String get staticLabel => 'Statik';
 
   @override
@@ -3480,15 +2814,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get muteTooltip => 'Sesi kapat';
-
-  @override
-  String get playOnceDisabledTooltip => 'Bir kez oynat (otomatik geçiş kapalı)';
-
-  @override
-  String get playAndAdvanceTooltip => 'Oynat ve sonrakine geç';
-
-  @override
-  String get loopCurrentVideoTooltip => 'Geçerli videoyu döngüye al';
 
   @override
   String get clearThumbnailCacheDialogTitle =>
@@ -3549,10 +2874,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get patternSetupRequiredBeforeSaving =>
       'Kaydetmeden önce bir desen belirleyin.';
-
-  @override
-  String get passwordKeystoreEncryptedHelperText =>
-      'Parola Android Keystore ile şifrelenir. Yalnızca anahtar dosyası kullanıyorsan boş bırak.';
 
   @override
   String get changePatternButton => 'Deseni değiştir';
@@ -3779,12 +3100,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bir işlem sürüyor. Kilitlemeden önce lütfen bekleyin.';
 
   @override
-  String get reconnectUsbTooltip => 'USB\'yi yeniden bağla';
-
-  @override
-  String get unlockContainerTooltip => 'Kapsayıcının kilidini aç';
-
-  @override
   String lockFailedMessage(String errorType) {
     return 'Kilitleme başarısız: $errorType';
   }
@@ -3913,9 +3228,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get filteredLabel => 'filtrelendi';
 
   @override
-  String get statsStorageSectionHeader => 'DEPOLAMA';
-
-  @override
   String statsFolderCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4006,9 +3318,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get fileOpsDismissTooltip => 'Kapat';
-
-  @override
-  String get fileOpsRootDestinationLabel => 'Kök';
 
   @override
   String get fileOpsCancelledStatusLabel => 'İptal edildi';
@@ -4147,26 +3456,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Medya oynatma listelerini görüntülerken küçük resim şeridi düğmesini göster';
 
   @override
-  String get videoPlaybackSliderLabel => 'Video oynatma konumu kaydırıcısı';
-
-  @override
-  String get longPressPlaybackDiagnosticsHint =>
-      'Oynatma tanılaması için uzun bas';
-
-  @override
-  String get staticImageModeLabel => 'Sabit görüntü modu';
-
-  @override
-  String slideshowModeActiveLabel(int seconds) {
-    return 'Slayt gösterisi etkin, $seconds saniye gecikmeyle';
-  }
-
-  @override
-  String videoPlaybackModeLabel(String mode) {
-    return 'Video oynatma modu: $mode';
-  }
-
-  @override
   String get pauseLabel => 'Duraklat';
 
   @override
@@ -4186,9 +3475,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String noResultsForQueryMessage(String query) {
     return 'Bu klasörde eşleşen öğe yok: \"$query\".';
   }
-
-  @override
-  String get closeCarouselTooltip => 'Karuseli kapat';
 
   @override
   String get playlistScrollModeMenu => 'Oynatma listesi kaydırma modu';
@@ -4329,15 +3615,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get cameraCouldNotSwitchLensMessage => 'Lens değiştirilemedi';
-
-  @override
-  String get cameraEncryptingPhotoLabel => 'Fotoğraf şifreleniyor…';
-
-  @override
-  String get cameraEncryptingVideoLabel => 'Video şifreleniyor…';
-
-  @override
   String get aboutApplicationSectionHeader => 'Uygulama';
 
   @override
@@ -4466,15 +3743,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get aboutFooterMadeWithLove => 'Gizlilik için ❤ ile yapıldı.';
 
   @override
-  String get aboutVersionCopiedMessage =>
-      'Sürüm bilgisi kopyalandı — hata bildirimleri için kullanışlı';
-
-  @override
-  String aboutVersionClipboardText(String version) {
-    return 'VaultExplorer v$version (Android)';
-  }
-
-  @override
   String aboutShareText(String url) {
     return 'VaultExplorer — Android için ücretsiz, açık kaynaklı, çevrimdışı bir kasa.\n\nParolalarını, notlarını ve dosyalarını şifreli bir kapsayıcıda sakla (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$url';
   }
@@ -4586,11 +3854,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size px · $quality% kalite';
-  }
-
-  @override
-  String holdToSpeedIndicatorLabel(String speed) {
-    return '$speed× hız';
   }
 
   @override
@@ -4927,15 +4190,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String vaultOccupiedSpaceSummary(String used) {
-    return '$used kullanıldı';
-  }
-
-  @override
-  String get incorrectPasswordOrKeyfilesDriveError =>
-      'Parola/anahtar dosyaları yanlış veya sürücü desteklenmiyor';
-
-  @override
   String driveUsableCapacity(int mb) {
     return 'Sürücünün kullanılabilir kapasitesi: $mb MB. Bunu aşmamalıdır.';
   }
@@ -5208,10 +4462,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get reorderBookmarksTitle => 'Yer imlerini yeniden düzenle';
-
-  @override
-  String get reorderBookmarksDesc =>
-      'Yer imi çubuğundaki öğeleri sürükleyerek sırala';
 
   @override
   String get drawerBookmarksSectionTitle => 'Yer imleri';
@@ -5506,14 +4756,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierVaultConfirmWarning =>
-      'Bu kasadaki her dosya okunacak.';
-
-  @override
-  String get hashVerifierVaultEmptyMessage =>
-      'Bu kasada kontrol edilecek dosya yok';
-
-  @override
   String get hashVerifierVaultStartButton => 'Denetimi başlat';
 
   @override
@@ -5595,9 +4837,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bir kasadaki her dosyayı yüklü bir manifeste göre denetle';
 
   @override
-  String get hashVerifierVaultChangeActionButton => 'Değiştir';
-
-  @override
   String get hashVerifierVaultVerifyButton => 'Tüm kasayı doğrula';
 
   @override
@@ -5630,9 +4869,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get duplicateFinderScanningStage3 =>
       '3. Aşama: Tam bayt özetleri doğrulanıyor...';
-
-  @override
-  String get duplicateFinderScanComplete => 'Tarama tamamlandı';
 
   @override
   String get duplicateFinderNoDuplicatesTitle => 'Yinelenen dosya bulunamadı';
@@ -5885,9 +5121,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get storageAnalyzerHeaviestFilesHeader => 'En büyük dosyalar';
-
-  @override
   String get storageAnalyzerBreakdownHeader => 'Dosya türüne göre';
 
   @override
@@ -5981,17 +5214,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get storageAnalyzerEmptyFolder => 'Bu klasör boş.';
-
-  @override
-  String storageAnalyzerSmallerItems(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count daha küçük öğe',
-      one: '1 daha küçük öğe',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get storageAnalyzerMapHint =>
@@ -6442,9 +5664,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get vaultBrowserSwitchVaultTooltip => 'Kasa değiştir';
-
-  @override
   String get vaultBrowserRootFolderLabel => 'Kök klasör';
 
   @override
@@ -6524,27 +5743,11 @@ class AppLocalizationsTr extends AppLocalizations {
       'İki klasörü karşılaştırın — kasalarda, bu cihazda veya bir belge sağlayıcıda — ve eksik ya da daha yeni olanı kopyalayın';
 
   @override
-  String get vaultSyncNoVaultsTitle => 'Bağlı kasa yok';
-
-  @override
-  String get vaultSyncNoVaultsMessage =>
-      'Dosyalarını karşılaştırmak ve eşitlemek için en az bir kasa bağla.';
-
-  @override
-  String get vaultSyncLeftLabel => 'Sol';
-
-  @override
-  String get vaultSyncRightLabel => 'Sağ';
-
-  @override
   String get vaultSyncTapToSelect =>
       'Bir depolama ve klasör seçmek için dokunun';
 
   @override
   String get vaultSyncSwapTooltip => 'İki depolamayı değiştir';
-
-  @override
-  String get vaultSyncSameLocationWarning => 'İki klasör farklı olmalıdır.';
 
   @override
   String get vaultSyncIntroTitle => 'İki klasörü karşılaştır';
@@ -6596,26 +5799,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeOnlyLeft(Object count) {
-    return '$count yalnızca solda';
-  }
-
-  @override
-  String vaultSyncBadgeOnlyRight(Object count) {
-    return '$count yalnızca sağda';
-  }
-
-  @override
-  String vaultSyncBadgeLeftNewer(Object count) {
-    return '$count solda daha yeni';
-  }
-
-  @override
-  String vaultSyncBadgeRightNewer(Object count) {
-    return '$count sağda daha yeni';
-  }
-
-  @override
   String vaultSyncBadgeConflicts(Object count) {
     return '$count inceleme gerekli';
   }
@@ -6631,55 +5814,10 @@ class AppLocalizationsTr extends AppLocalizations {
       'Eksik dosyaları ve daha yeni sürümleri diğer tarafa kopyalar.';
 
   @override
-  String get vaultSyncDirectionLeftToRight => 'Sol → Sağ (tek yönlü)';
-
-  @override
-  String get vaultSyncDirectionLeftToRightSubtitle =>
-      'Yeni ve güncellenen dosyaları soldan sağa iter; solu asla değiştirmez';
-
-  @override
-  String get vaultSyncDirectionRightToLeft => 'Sağ → Sol (tek yönlü)';
-
-  @override
-  String get vaultSyncDirectionRightToLeftSubtitle =>
-      'Yeni ve güncellenen dosyaları sağdan sola iter; sağı asla değiştirmez';
-
-  @override
-  String get vaultSyncSearchHint => 'Farkları ara';
-
-  @override
-  String get vaultSyncStatusOnlyLeft => 'Yalnızca solda';
-
-  @override
-  String get vaultSyncStatusOnlyRight => 'Yalnızca sağda';
-
-  @override
-  String get vaultSyncStatusLeftNewer => 'Sol daha yeni';
-
-  @override
-  String get vaultSyncStatusRightNewer => 'Sağ daha yeni';
-
-  @override
   String get vaultSyncStatusConflict => 'İnceleme gerekli';
 
   @override
   String get vaultSyncStatusTypeMismatch => 'Tür uyuşmazlığı';
-
-  @override
-  String get vaultSyncFolderOnlyLeftDetail => 'Klasör — yalnızca solda';
-
-  @override
-  String get vaultSyncFolderOnlyRightDetail => 'Klasör — yalnızca sağda';
-
-  @override
-  String vaultSyncBothSidesDetail(
-    Object leftSize,
-    Object leftDate,
-    Object rightSize,
-    Object rightDate,
-  ) {
-    return 'Sol: $leftSize · $leftDate  →  Sağ: $rightSize · $rightDate';
-  }
 
   @override
   String get vaultSyncTypeMismatchTooltip =>
@@ -6687,12 +5825,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get vaultSyncChangeActionTooltip => 'Eşitleme eylemini değiştir';
-
-  @override
-  String get vaultSyncActionCopyToRight => 'Kopyala → Sağ';
-
-  @override
-  String get vaultSyncActionCopyToLeft => 'Kopyala → Sol';
 
   @override
   String get vaultSyncActionSkip => 'Atla';
@@ -6714,11 +5846,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String vaultSyncStartedMessage(Object count) {
-    return 'Eşitleme başladı — $count öğe sıraya alındı';
-  }
-
-  @override
   String vaultSyncPickLocationTitle(Object side) {
     return 'Seç: $side klasörü';
   }
@@ -6733,9 +5860,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Depolama';
-
-  @override
   String get vaultSyncTargetKindVault => 'Şifreli kasa';
 
   @override
@@ -6743,9 +5867,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get vaultSyncTargetKindProvider => 'Belge sağlayıcı · şifreli değil';
-
-  @override
-  String get vaultSyncAddStorageTooltip => 'Depolama konumu ekle';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip =>
@@ -6788,10 +5909,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Kaldırmayı onaylamak için mevcut Ana Parolanızı girin:';
 
   @override
-  String get authenticateToRemoveMasterPassword =>
-      'Ana parolayı kaldırmak için kimlik doğrula';
-
-  @override
   String get incorrectPassword => 'Yanlış parola';
 
   @override
@@ -6813,9 +5930,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get copyPathAction => 'Yolu kopyala';
-
-  @override
-  String get automationSectionHeader => 'Otomasyon';
 
   @override
   String get automationTileTitle => 'Otomasyon';
@@ -6945,10 +6059,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get automationActionEmergencyPurgeLabel => 'Acil temizleme';
 
   @override
-  String get automationDocCommentFootnote =>
-      'Tüm ek parametreler ve sonuç yayını sözleşmesi VaultAutomationReceiver.kt içinde belgelenmiştir.';
-
-  @override
   String get automationTierOffLabel => 'Kapalı';
 
   @override
@@ -6978,13 +6088,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get showHiddenFilesDesc =>
       'Nokta ile başlayan dosyaları ve sistem klasörlerini göster';
-
-  @override
-  String get showNoMediaFilesLabel => '.nomedia ile gizlenen medyayı göster';
-
-  @override
-  String get showNoMediaFilesDesc =>
-      'İçinde .nomedia dosyası bulunan klasörlerdeki medyayı da dahil et';
 
   @override
   String get dontAskAgain => 'Bir daha sorma';
@@ -7041,13 +6144,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get wizardNextButton => 'Sonraki';
 
   @override
-  String get wizardStepTypeTitle => 'Tür';
-
-  @override
   String get wizardStepBasicInfoTitle => 'Temel bilgiler';
-
-  @override
-  String get wizardStepAdvancedTitle => 'Gelişmiş';
 
   @override
   String get wizardStepReviewTitle => 'Gözden geçir';
@@ -7060,13 +6157,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get wizardEncryptionDetailsRowTitle => 'Şifreleme ayrıntıları';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Yapılandırıldı — incelemek için dokun';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Kurmak için dokun';
 
   @override
   String get wizardSummaryTitle => 'Özet';
@@ -7126,9 +6216,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get externalSubtitlesLabel => 'Harici altyazılar (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'Harici';
-
-  @override
   String get subtitleSizeLabel => 'Boyut';
 
   @override
@@ -7178,9 +6265,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get redactToolLabel => 'Karart';
 
   @override
-  String get rotateLeftTooltip => 'Sola döndür';
-
-  @override
   String get rotateRightTooltip => 'Sağa döndür';
 
   @override
@@ -7191,18 +6275,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get cropAspectOriginalLabel => 'Orijinal';
-
-  @override
-  String get applyCropTooltip => 'Kırpmayı uygula';
-
-  @override
-  String get annotationColorTooltip => 'Renk';
-
-  @override
-  String get annotationStrokeWidthTooltip => 'Çizgi kalınlığı';
-
-  @override
-  String get clearAnnotationsTooltip => 'Tüm açıklamaları temizle';
 
   @override
   String get resetImageTooltip => 'Orijinale sıfırla';
@@ -7219,9 +6291,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get addTextAnnotationHint => 'Bir şeyler yazın…';
-
-  @override
-  String get textToolHint => 'Metin eklemek için görüntüye dokun';
 
   @override
   String get saveImageSheetTitle => 'Değişiklikleri kaydet';
@@ -7501,22 +6570,12 @@ class AppLocalizationsTr extends AppLocalizations {
   String get automationSavePimButton => 'PIM\'i kaydet';
 
   @override
-  String get automationCameraSectionHeader => 'Kamera otomasyonu';
-
-  @override
   String get automationCameraDescription =>
       'Otomasyonun bu kasa için TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING tetiklemesine izin verir. Tam erişimde bile varsayılan olarak kapalıdır -- dosya içe/dışa aktarmanın aksine, fotoğraf çekmek ekranda hiçbir gösterge gerektirmez, bu yüzden ayrı ve açık bir onay gerekir.';
 
   @override
-  String get automationAllowCameraCapture => 'Kamera çekimine izin ver';
-
-  @override
   String get automationOverlayPermissionTitle =>
       'Diğer uygulamaların üzerinde göster';
-
-  @override
-  String get automationOverlayPermissionMessage =>
-      'Android 14 ve üzeri sürümlerde arka planda kamera çekimi, diğer uygulamaların üzerinde gösterme izni gerektirir. Ekran kilitliyken veya uygulama arka plandayken otomatik çekimlere izin vermek için bu izni ver.';
 
   @override
   String get automationPimSavedMessage => 'PIM kaydedildi';
@@ -7607,12 +6666,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get computingHashMessage => 'Özet hesaplanıyor…';
-
-  @override
-  String get tapCalculateToVerifyMessage => 'Doğrulamak için Hesapla\'ya dokun';
-
-  @override
-  String get calculateButton => 'Hesapla';
 
   @override
   String get copyDiagnosticsButton => 'Tanılama bilgisini kopyala';
@@ -7708,9 +6761,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Arşivler';
-
-  @override
   String get filesTabLabel => 'Dosyalar';
 
   @override
@@ -7718,40 +6768,10 @@ class AppLocalizationsTr extends AppLocalizations {
       'Cihazınızdaki dosyalara göz atmak için erişime izin verin.';
 
   @override
-  String get filesEmptyTitle => 'Burada dosya yok';
-
-  @override
   String get filesEmptyMessage => 'Bu klasör boş.';
 
   @override
-  String get filesNewFolderTooltip => 'Yeni klasör';
-
-  @override
-  String get filesNewFolderDialogTitle => 'Yeni klasör';
-
-  @override
-  String get filesNameHint => 'Ad';
-
-  @override
-  String get filesCreate => 'Oluştur';
-
-  @override
-  String get filesRename => 'Yeniden adlandır';
-
-  @override
-  String get filesDelete => 'Sil';
-
-  @override
-  String get filesShare => 'Paylaş';
-
-  @override
   String get filesCopy => 'Kopyala';
-
-  @override
-  String get filesMove => 'Taşı';
-
-  @override
-  String get filesDeleteConfirmTitle => 'Kalıcı olarak silinsin mi?';
 
   @override
   String get filesChooseDestinationTitle => 'Bir klasör seçin';
@@ -7763,49 +6783,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get filesCopyHere => 'Buraya kopyala';
 
   @override
-  String get filesSelectAllTooltip => 'Tümünü seç';
-
-  @override
-  String get filesCloseSelectionTooltip => 'Kapat';
-
-  @override
-  String get filesFolderCreated => 'Klasör oluşturuldu';
-
-  @override
-  String get filesCreateFolderFailed => 'Klasör oluşturulamadı';
-
-  @override
-  String get filesRenamed => 'Yeniden adlandırıldı';
-
-  @override
-  String get filesRenameFailed => 'Yeniden adlandırılamadı';
-
-  @override
-  String get filesNameAlreadyExists => 'Bu ad zaten kullanılıyor';
-
-  @override
-  String get filesDeleted => 'silindi';
-
-  @override
   String get filesDeleteFailed => 'Silinemedi';
-
-  @override
-  String get filesMoved => 'taşındı';
-
-  @override
-  String get filesMoveFailed => 'Taşınamadı';
-
-  @override
-  String get filesCopied => 'kopyalandı';
-
-  @override
-  String get filesCopyFailed => 'Kopyalanamadı';
-
-  @override
-  String get filesOpenFailed => 'Bu dosya açılamadı';
-
-  @override
-  String get filesShareFailed => 'Bu dosya paylaşılamadı';
 
   @override
   String get filesFilterTooltip => 'Filtre';
@@ -7955,10 +6933,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get compositePimFieldLabel => 'PIM (Kişisel yineleme çarpanı)';
 
   @override
-  String get compositePimFieldHelper =>
-      'Standart varsayılan iterasyon için boş bırak veya 0 yaz';
-
-  @override
   String get compositeRememberContainerTitle => 'Bu kapsayıcıyı hatırla';
 
   @override
@@ -8017,9 +6991,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Bileşik taşıyıcı algılandı. Bileşik bir kapsayıcının kilidini açmak için tüm taşıyıcı dosyaları gerekir.';
 
   @override
-  String get compositeSelectAllCarriersButton => 'Tüm taşıyıcıları seç';
-
-  @override
   String get compositeCarriersMissingTitle => 'Bileşik taşıyıcılar eksik';
 
   @override
@@ -8029,16 +7000,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get compositeRelocateCarriersButton =>
       'Taşıyıcı dosyaları yeniden bul';
-
-  @override
-  String get passwordOptionalFieldLabel => 'Parola (isteğe bağlı)';
-
-  @override
-  String get plainDiskImagePasswordHint =>
-      'Parola gerekmez — bu disk imajı şifreli değil';
-
-  @override
-  String get compositePasswordHint => 'Bileşik kapsayıcı parolasını girin';
 
   @override
   String get generateStrongPasswordTooltip => 'Güçlü parola oluştur';
@@ -8279,10 +7240,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get sectionDuressUnlock => 'Ana kilit baskı altı modu';
 
   @override
-  String get duressMasterPasswordRequired =>
-      'Baskı altı kilit açmayı yapılandırmadan önce Uygulama Güvenliği\'nde bir Ana Parola etkinleştirilmelidir.';
-
-  @override
   String get duressPasswordTitle => 'Baskı altı parolası';
 
   @override
@@ -8489,10 +7446,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get longFileNameDisplayLabel => 'Uzun dosya adları';
 
   @override
-  String get longFileNameDisplayDesc =>
-      'Adlar kullanılabilir alanı aştığında nasıl kısaltılacağını seç';
-
-  @override
   String get longFileNameEllipsizeStartLabel => 'Başı kısalt';
 
   @override
@@ -8540,15 +7493,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get gridAspectPortraitLabel => '9:16 (Dikey)';
 
   @override
-  String get fileFolderDisplaySectionHeader => 'Dosya ve klasör görünümü';
-
-  @override
-  String get navigationBarsSectionHeader => 'Gezinme ve çubuklar';
-
-  @override
-  String get columnedListViewColumnsSectionHeader => 'Sütunlu liste sütunları';
-
-  @override
   String get autoHideAppBarLabel =>
       'Kaydırırken uygulama çubuğunu otomatik gizle';
 
@@ -8593,24 +7537,11 @@ class AppLocalizationsTr extends AppLocalizations {
   String get storageLocationsTitle => 'Depolama konumları';
 
   @override
-  String get storageLocationsSubtitle =>
-      'Dahili depolama, SD kartlar ve belge sağlayıcılar';
-
-  @override
-  String get storageLocationsSelectPrompt => 'Etkin depolamayı seç';
-
-  @override
   String get addStorageLocationTitle => 'Depolama konumu ekle';
 
   @override
   String get addStorageLocationSubtitle =>
       'Harici bir SD kart, USB sürücü veya klasör ekle';
-
-  @override
-  String get documentProviderSafLabel => 'Belge sağlayıcı (SAF)';
-
-  @override
-  String get externalStorageLabel => 'Harici depolama';
 
   @override
   String get renameStorageLocationTitle => 'Konumu yeniden adlandır';
@@ -8622,9 +7553,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return '\"$name\" depolama konumlarından kaldırılsın mı? Depolamadaki dosyalar silinmez.';
   }
-
-  @override
-  String get storageLocationAddedSnack => 'Depolama konumu eklendi';
 
   @override
   String get storageLocationUnresolvedError =>
@@ -8651,59 +7579,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get mediaViewerCustomizeControls => 'Denetimleri özelleştir...';
-
-  @override
-  String get mediaViewerControlsTitle => 'Medya oynatıcı denetimleri';
-
-  @override
-  String get mediaViewerControlsReset =>
-      'Medya denetimleri varsayılanlara sıfırlandı';
-
-  @override
-  String get mediaViewerTransportDisplay => 'Oynatma ve görünüm';
-
-  @override
-  String get mediaViewerShowScrubberTitle =>
-      'İlerleme çubuğunu göster (kaydırıcı)';
-
-  @override
-  String get mediaViewerShowScrubberDesc =>
-      'Konum ve süre zaman çizelgesi kaydırıcısını göster';
-
-  @override
-  String get mediaViewerShowCenterTransportTitle =>
-      'Ortadaki oynatma denetimlerini göster';
-
-  @override
-  String get mediaViewerShowCenterTransportDesc =>
-      'Ortada büyük yuvarlak oynat/duraklat düğmesini göster';
-
-  @override
-  String get mediaViewerShowPrevNextTitle =>
-      'Sonraki ve önceki düğmelerini göster';
-
-  @override
-  String get mediaViewerShowPrevNextDesc =>
-      'Yalnızca tek oynat düğmesi kalsın diye kapat';
-
-  @override
-  String get mediaViewerShowStatusBadgeTitle => 'Durum rozetlerini göster';
-
-  @override
-  String get mediaViewerShowStatusBadgeDesc =>
-      'Slayt gecikmesi ve sabit görüntü göstergelerini göster';
-
-  @override
-  String get mediaViewerTopBarSection => 'Üst çubuk';
-
-  @override
-  String get mediaViewerBottomBarSection => 'Alt çubuk';
-
-  @override
-  String get mediaViewerUnpinnedSection => 'Sabitlenmemiş (taşan)';
-
-  @override
-  String get mediaViewerAllControlsPinned => 'Tüm denetimler zaten sabitlendi.';
 
   @override
   String get mediaPlayerControlsTitle => 'Medya oynatıcı denetimleri';
@@ -8833,20 +7708,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Gelişmiş Ayarlar paneli için işlemleri buraya sürükle';
 
   @override
-  String get dropHereAtEnd => 'Sona bırakmak için buraya bırak';
-
-  @override
-  String get dragItemsHereToAdd =>
-      '+ Bu bölüme eklemek için öğeleri buraya sürükle';
-
-  @override
   String get moveToAdvancedSettingsTooltip => 'Gelişmiş ayarlara taşı';
-
-  @override
-  String get noVaultsMounted => 'Bağlı kasa yok';
-
-  @override
-  String get vaultsMountedSummary => 'kasa bağlı';
 
   @override
   String get dashboardNavLabel => 'Pano';
@@ -8855,26 +7717,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get vaultsSectionTitle => 'Kasalar';
 
   @override
-  String get vaultStatusMounted => 'Bağlı';
-
-  @override
   String get lockVaultTooltip => 'Kasayı kilitle';
 
   @override
   String get lockAllVaultsTitle => 'Tümünü kilitle';
-
-  @override
-  String get safProviderLabel => 'SAF sağlayıcı';
-
-  @override
-  String get singleFileCryptoTitle => 'Tek dosya şifreleme';
-
-  @override
-  String get singleFileCryptoSubtitle =>
-      'Kasaların dışında şifrele / şifresini çöz';
-
-  @override
-  String get passwordGeneratorTitle => 'Parola oluşturucu';
 
   @override
   String get contentsLabel => 'İçerik';
@@ -8952,15 +7798,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Basılı tutarak hızlı ileri sarma hızı';
 
   @override
-  String get holdSpeedMultiplierSubtitle =>
-      'Videoya basılı tutarken uygulanan hız';
-
-  @override
   String get defaultAspectRatioTitle => 'Varsayılan en boy oranı';
-
-  @override
-  String get defaultAspectRatioSubtitle =>
-      'Bir video açıldığında otomatik uygulanır';
 
   @override
   String get aspectRatioModeLabel => 'En boy oranı';
@@ -9227,46 +8065,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get cardSwipeActionsTitle => 'Kart kaydırma işlemleri';
-
-  @override
-  String get cardSwipeActionsSubtitle =>
-      'Düzenle ve kaldır işlemlerini hızlıca açmak için kasa kartlarını kaydır';
-
-  @override
-  String get cameraQualitySd => '480p (SD)';
-
-  @override
-  String get cameraQualityHd => '720p (HD)';
-
-  @override
-  String get cameraQualityFhd => '1080p (FHD)';
-
-  @override
-  String get cameraQualityUhd => '4K (UHD)';
-
-  @override
-  String get cameraPhotoResMax => 'Tam (en yüksek çözünürlük)';
-
-  @override
-  String get cameraPhotoResHigh => '5 MP (yüksek)';
-
-  @override
-  String get cameraPhotoResMedium => '2 MP (orta)';
-
-  @override
-  String get cameraPhotoResLow => '1,2 MP (düşük)';
-
-  @override
-  String get cameraLensWide => 'Geniş';
-
-  @override
-  String get cameraLensInfrared => 'IR';
-
-  @override
-  String get cameraLensFront => 'Ön';
-
-  @override
   String get appLockBehaviorTitle => 'Uygulama kilidi davranışı';
 
   @override
@@ -9319,9 +8117,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get passwordInterchangeIncludeSubfolders => 'Alt klasörleri dahil et';
-
-  @override
-  String get passwordInterchangeFormatHeader => 'Biçim';
 
   @override
   String get passwordInterchangeFormatLabel => 'Dosya biçimi';
@@ -9437,12 +8232,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get autoLockIndicatorLocksOnScreenOff => 'Ekran kapanınca kilitlenir';
-
-  @override
-  String get autoLockIndicatorNeverLocks => 'Otomatik kilitlenmez';
-
-  @override
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return '$duration hareketsizlikten sonra kilitlenir (uygulama kullanılırken sıfırlanır)';
   }
@@ -9465,35 +8254,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'Depolama konumu \"$name\" kullanılamıyor veya bağlı değil.';
   }
-
-  @override
-  String get cameraEditPhotoTooltip => 'Fotoğrafı düzenle';
-
-  @override
-  String get cameraTrimVideoTooltip => 'Videoyu kırp';
-
-  @override
-  String get cameraDiscardMediaTooltip => 'Vazgeç';
-
-  @override
-  String get cameraSaveMediaTooltip => 'Kasaya kaydet';
-
-  @override
-  String get cameraContinueCaptureTooltip => 'Bir fotoğraf daha çek';
-
-  @override
-  String cameraBatchCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count fotoğraf',
-      one: '1 fotoğraf',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get cameraReviewPhotosTooltip => 'Çekilen fotoğrafları incele';
 
   @override
   String get vaultItemTypeAuthenticator => 'Authenticator';
@@ -9607,13 +8367,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get autoLockIndicatorLocksImmediately => 'Anında kilit';
-
-  @override
-  String get quickActionLockModeTitle => 'Hızlı işlemlerden sonra kilitle';
-
-  @override
-  String get quickActionLockModeSubtitle =>
-      'Hızlı Yakalama veya Paylaşım menüsünden kaydederken kasanın kilit davranışı';
 
   @override
   String get quickActionLockModeLeaveAsFoundLabel => 'Bulduğun gibi bırak';
@@ -9749,9 +8502,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get textEditorProjectFilesTitle => 'Proje dosyaları';
-
-  @override
-  String get textEditorCloseTabTooltip => 'Sekmeyi kapat';
 
   @override
   String get textEditorResetToDefault => 'Varsayılanlara sıfırla';
@@ -10033,11 +8783,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String videoEditorSnapNote(String start, String end) {
-    return 'Kayıpsız kesim bir ana karede başlar: $start – $end';
-  }
-
-  @override
   String get videoEditorBoundaryInvalid => 'Bu, bölümü çok kısa bırakır.';
 
   @override
@@ -10127,31 +8872,10 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get videoEditorExportSingle => 'Yeni video olarak kaydet';
-
-  @override
-  String get videoEditorExportSingleHint => 'Orijinal dosyaya dokunulmaz.';
-
-  @override
   String get videoEditorExportMerge => 'Tek videoda birleştir';
 
   @override
-  String get videoEditorExportMergeHint =>
-      'Klipler zaman çizelgesi sırasıyla birleştirilir.';
-
-  @override
   String get videoEditorExportSeparate => 'Ayrı videolar olarak kaydet';
-
-  @override
-  String videoEditorExportSeparateHint(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count yeni dosya',
-      one: 'Yeni bir dosya',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get videoEditorLosslessNote =>
@@ -10282,9 +9006,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get fileSkinColorDefault => 'Varsayılan';
 
   @override
-  String get fileSkinColorHexLabel => 'Hex renk';
-
-  @override
   String get fileSkinPresetClassic => 'Klasik';
 
   @override
@@ -10309,17 +9030,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get compositeArchiveCarrierRowWarning =>
       'Desteklenmeyen arşiv — seçimden kaldırın.';
-
-  @override
-  String videoEditorSelectedSegmentSummary(
-    int current,
-    int total,
-    String start,
-    String end,
-    String duration,
-  ) {
-    return 'Bölüm $current / $total: $start – $end ($duration)';
-  }
 
   @override
   String get videoEditorKeepModeDescription =>
@@ -11036,14 +9746,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Çerçeveler, gölgeler ve iletişim kutusu arka perdeleri.';
 
   @override
-  String get skinTapAnyPreviewElement =>
-      'Herhangi bir önizleme öğesine dokunun';
-
-  @override
-  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls =>
-      'Neyi denetlediğini görmek için bir uygulama, dosya veya düzenleyici rengi seçin.';
-
-  @override
   String get skinCustomizeSkin => 'Temayı özelleştir';
 
   @override
@@ -11051,9 +9753,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get skinDark => 'Koyu';
-
-  @override
-  String get skinApp => 'Uygulama';
 
   @override
   String get skinEditor => 'Düzenleyici';
@@ -11088,10 +9787,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get skinAppBar => 'Uygulama çubuğu';
 
   @override
-  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages =>
-      'Üst gezinme çubuğu kartlardan ve sayfalardan bağımsızdır.';
-
-  @override
   String get skinTopBarFillColor => 'Üst çubuk dolgu rengi.';
 
   @override
@@ -11102,10 +9797,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get skinFloatingActionButton => 'Yüzen eylem düğmesi';
-
-  @override
-  String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
-      'Dolgu ve simge rengi seçim renklerinden ayrıdır.';
 
   @override
   String get skinButtonFill => 'Düğme dolgusu';
@@ -11120,26 +9811,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get skinIconColorOnTheRoundButton =>
       'Yuvarlak + düğmesindeki simge rengi.';
-
-  @override
-  String get skinDashboardVaultCards => 'Panodaki kasa kartları';
-
-  @override
-  String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
-      'Kilitli ve bağlı kasa kartlarının arka planını belirle.';
-
-  @override
-  String get skinLockedVaultCard => 'Kilitli kasa kartı';
-
-  @override
-  String get skinNeutralVaultCardFill => 'Nötr kasa kartı dolgusu.';
-
-  @override
-  String get skinMountedVaultCard => 'Bağlı kasa kartı';
-
-  @override
-  String get skinSeparateFillForAnUnlockedMountedVault =>
-      'Kilidi açık, bağlı kasa için ayrı dolgu.';
 
   @override
   String get skinFineTuneAppColors => 'Uygulama renklerine ince ayar';
@@ -11168,267 +9839,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Renk seçmek için renk dairesine dokunun.';
 
   @override
-  String get skinAppBarBackground => 'Uygulama çubuğu arka planı';
-
-  @override
-  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
-      'Pano ve diğer üst çubuklar bu bağımsız rengi kullanır.';
-
-  @override
-  String get skinDashboardMenuIcon => 'Pano menü simgesi';
-
-  @override
-  String get skinTheHamburgerButtonUsesTheAppBarIconColor =>
-      'Menü düğmesi üst çubuk simge rengini kullanır.';
-
-  @override
-  String get skinDashboardTitle => 'Pano başlığı';
-
-  @override
-  String get skinTheDashboardTitleUsesTheAppBarForegroundColor =>
-      'Pano başlığı üst çubuk ön plan rengini kullanır.';
-
-  @override
-  String get skinActionLabelAndIcon => 'İşlem etiketi ve simgesi';
-
-  @override
-  String get skinTheActionAccentColorsLabelsb08a63 =>
-      'Kasa ekle gibi işlem etiketlerinin ve simgelerinin vurgu renkleri.';
-
-  @override
-  String get skinDashboardAddButton => 'Pano ekle düğmesi';
-
-  @override
-  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
-      'Düğme dolgusu ve artı simgesi ayrı tema renklerine sahip.';
-
-  @override
-  String get skinVaultCardAndIconBackground => 'Kasa kartı ve simge arka planı';
-
-  @override
-  String get skinTheIconTileUsesPrimary5c2f93 =>
-      'Simge karosu Birincil kapsayıcıyı kullanır. Bağlı kasa kartı bu rengi yükseltilmiş yüzeyle harmanlar.';
-
-  @override
-  String get skinVaultFormatIconColor => 'Kasa biçimi simge rengi';
-
-  @override
-  String get skinVaultFormatInitialsUseOnPrimaryContainer =>
-      'Kasa biçimi baş harfleri Birincil kapsayıcı üzerindeki rengi kullanır.';
-
-  @override
-  String get skinVaultStorageDetails => 'Kasa depolama ayrıntıları';
-
-  @override
-  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor =>
-      'Boş alan ve kapasite destekleyici metin rengini kullanır.';
-
-  @override
-  String get skin17GBFree5GB => '1.7 GB boş / 5 GB';
-
-  @override
-  String get skinVaultStorageProgress => 'Kasa depolama ilerlemesi';
-
-  @override
-  String get skinTheProgressBarUsesTheba7c98 =>
-      'İlerleme çubuğu uygulama vurgusunu kullanır, depolama doldukça üçüncül ve hata renklerine geçer.';
-
-  @override
-  String get skinLockActionBackground => 'Kilit eylemi arka planı';
-
-  @override
-  String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
-      'Bağlı kasa kilit düğmesi Birincil kapsayıcıyı kullanır.';
-
-  @override
-  String get skinVaultActionsIconColor => 'Kasa eylemleri simge rengi';
-
-  @override
-  String get skinTheOverflowMenuUsesTheSupportingIconColor =>
-      'Taşan menü destekleyici simge rengini kullanır.';
-
-  @override
-  String get skinMountedVaultCardBackground => 'Bağlı kasa kartı arka planı';
-
-  @override
-  String get skinThisIsTheBackgroundOfa8d0d3 =>
-      'Bu, bağlı kasa kartının arka planıdır. Simge karosu yine ana eylem rengini kullanır.';
-
-  @override
-  String get skinLockedVaultCardBackground => 'Kilitli kasa kartı arka planı';
-
-  @override
-  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
-      'Bu renk uygulama çubuğundan ve bağlı kasa kartından bağımsızdır.';
-
-  @override
-  String get skinLockedVaultFormatIcon => 'Kilitli kasa biçimi simgesi';
-
-  @override
-  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor =>
-      'Kilitli kasa simgeleri destekleyici metin ve simge rengini kullanır.';
-
-  @override
-  String get skinSharedArchive => 'Paylaşılan arşiv';
-
-  @override
-  String get skinLockedVaultStatusText => 'Kilitli kasa durum metni';
-
-  @override
-  String get skinTheLockedStatusLabelUsesTheSupportingTextColor =>
-      'Kilitli durum etiketi destekleyici metin rengini kullanır.';
-
-  @override
-  String get skinLockedVaultActionsIcon => 'Kilitli kasa eylemleri simgesi';
-
-  @override
-  String get skinVaultActionsMenuBackground =>
-      'Kasa eylemleri menüsü arka planı';
-
-  @override
-  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
-      'Düzenle ve Kaldır açılır penceresi menü yüzey rengini kullanır.';
-
-  @override
-  String get skinEditMenuItem => 'Düzenle menü öğesi';
-
-  @override
-  String get skinTheEditActionUsesTheRegularForegroundColor =>
-      'Düzenle işlemi normal ön plan rengini kullanır.';
-
-  @override
-  String get skinRemoveMenuItem => 'Kaldır menü öğesi';
-
-  @override
-  String get skinDestructiveActionsUseTheErrorColor =>
-      'Yıkıcı eylemler hata rengini kullanır.';
-
-  @override
-  String get skinFileManagerAppBar => 'Dosya yöneticisi uygulama çubuğu';
-
-  @override
-  String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
-      'Dosya tarayıcısı araç çubukları aynı uygulama çubuğu arka planını kullanır.';
-
-  @override
-  String get skinFileManagerBackButton => 'Dosya yöneticisi geri düğmesi';
-
-  @override
-  String get skinToolbarNavigationIconsUseThisColor =>
-      'Araç çubuğu gezinme simgeleri bu rengi kullanır.';
-
-  @override
-  String get skinFileManagerTitle => 'Dosya yöneticisi başlığı';
-
-  @override
-  String get skinTheCurrentFolderNameUsesTheAppBarForeground =>
-      'Geçerli klasör adı uygulama çubuğu ön planını kullanır.';
-
-  @override
-  String get skinFileManagerAppBarActions =>
-      'Dosya yöneticisi uygulama çubuğu eylemleri';
-
-  @override
-  String get skinToolbarActionsUseThisIconColor =>
-      'Araç çubuğu eylemleri bu simge rengini kullanır.';
-
-  @override
-  String get skinProjects => 'Projeler';
-
-  @override
-  String get skinFolder12Items => 'Klasör · 12 öğe';
-
-  @override
-  String get skinTextFile4KB => 'Metin dosyası · 4 KB';
-
-  @override
-  String get skinCompressedFile28MB => 'Sıkıştırılmış dosya · 28 MB';
-
-  @override
-  String get skin3Items => '3 öğe';
-
-  @override
-  String get skinFileManagerAddButton => 'Dosya yöneticisi ekle düğmesi';
-
-  @override
-  String get skinAddButtonIconColor => 'Ekle düğmesi simge rengi';
-
-  @override
-  String get skinThePlusIconUsesTheButtonForegroundColor =>
-      'Artı simgesi düğmenin ön plan rengini kullanır.';
-
-  @override
-  String get skinEditorFileName => 'Düzenleyici dosya adı';
-
-  @override
-  String get skinTheEditorToolbarUsesTheAppForegroundColor =>
-      'Düzenleyici araç çubuğu uygulama ön plan rengini kullanır.';
-
-  @override
-  String get skinDartUTF8Ln3Col12 => 'Sat 3, Sütun 12';
-
-  @override
-  String get skinTheMainBackgroundBehindThisScreen =>
-      'Bu ekranın arkasındaki ana arka plan.';
-
-  @override
-  String get skinFolderIconColor => 'Klasör simge rengi';
-
-  @override
-  String get skinFileIconColor => 'Dosya simge rengi';
-
-  @override
-  String get skinText => ' :';
-
-  @override
-  String get skinFolderNameColor => 'Klasör adı rengi';
-
-  @override
-  String get skinFileNameColor => 'Dosya adı rengi';
-
-  @override
-  String get skinFileDetailsColor => 'Dosya ayrıntı rengi';
-
-  @override
-  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor =>
-      'Daha küçük tarih, boyut ve tür etiketleri bu rengi kullanır.';
-
-  @override
-  String get skinFileOverflowButton => 'Dosya taşma düğmesi';
-
-  @override
-  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor =>
-      'Her satırın üç noktalı düğmesi destekleyici simge rengini kullanır.';
-
-  @override
-  String get skinSelectedFileRow => 'Seçili dosya satırı';
-
-  @override
-  String get skinSelectedRowsUseATranslucente0ff21 =>
-      'Seçili satırlar yarı saydam birincil kapsayıcı vurgusu kullanır; dosya listesinin kendisi sayfa arka planında kalır.';
-
-  @override
-  String get skinFileActionsMenuBackground =>
-      'Dosya eylemleri menüsü arka planı';
-
-  @override
-  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
-      'Dosya eylemleri açılır penceresi menü yüzey rengini kullanır.';
-
-  @override
-  String get skinOpenFileMenuItem => 'Dosyayı aç menü öğesi';
-
-  @override
-  String get skinRegularFileActionsUseTheMainTextColor =>
-      'Normal dosya eylemleri ana metin rengini kullanır.';
-
-  @override
-  String get skinOpen => 'Aç';
-
-  @override
-  String get skinDeleteFileMenuItem => 'Dosyayı sil menü öğesi';
-
-  @override
   String get skinEditorBackground => 'Düzenleyici arka planı';
 
   @override
@@ -11444,10 +9854,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get skinEditorTextColor => 'Kod metni rengi';
-
-  @override
-  String get skinTheDefaultCodeAndEditorTextColor =>
-      'Düz kod için varsayılan renk; sözdizimi vurgulu metin kendi renklerini kullanır.';
 
   @override
   String get skinEditorCursor => 'Düzenleyici imleci';
@@ -11466,42 +9872,19 @@ class AppLocalizationsTr extends AppLocalizations {
   String get skinEditorKeywords => 'Anahtar sözcükler';
 
   @override
-  String get skinEditorKeywordsExplanation =>
-      'class, void, return ve if gibi dil anahtar sözcükleri.';
-
-  @override
   String get skinEditorTypes => 'Türler ve sınıflar';
-
-  @override
-  String get skinEditorTypesExplanation => 'Sınıf adları, türler ve arayüzler.';
 
   @override
   String get skinEditorStrings => 'Dizeler';
 
   @override
-  String get skinEditorStringsExplanation =>
-      'Tırnak içindeki metin ve dize değişmezleri.';
-
-  @override
   String get skinEditorNumbers => 'Sayılar ve değerler';
-
-  @override
-  String get skinEditorNumbersExplanation =>
-      'Sayısal değişmezler, mantıksal değerler ve sabitler.';
 
   @override
   String get skinEditorFunctions => 'İşlevler ve yöntemler';
 
   @override
-  String get skinEditorFunctionsExplanation =>
-      'İşlev adları, yöntem çağrıları ve yerleşik öğeler.';
-
-  @override
   String get skinEditorComments => 'Yorumlar';
-
-  @override
-  String get skinEditorCommentsExplanation =>
-      'Kod yorumları ve belgeleme blokları.';
 
   @override
   String get textEditorColorsSectionTitle =>
@@ -11512,9 +9895,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get textEditorColorsCustomized => 'Özel renkler etkin';
-
-  @override
-  String get textEditorResetColors => 'Renkleri varsayılana sıfırla';
 
   @override
   String get textEditorFollowAppSkinNotice =>
@@ -11563,15 +9943,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
       'Tuval, oluk, imleç, seçim, arka plan ve sözdizimi şablonu.';
-
-  @override
-  String get skinGutterAndLineNumbers => 'Kenar boşluğu ve satır numaraları';
-
-  @override
-  String get skinCursor => 'İmleç';
-
-  @override
-  String get skinSelection => 'Seçim';
 
   @override
   String get skinEditorBackgroundTemplate => 'Düzenleyici arka plan şablonu';
@@ -11641,12 +10012,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get skinAutomaticMatchLightOrDarkMode =>
       'Otomatik (açık veya koyu moda uy)';
-
-  @override
-  String get skinSkinExported => 'Tema dışa aktarıldı.';
-
-  @override
-  String get skinSkinsExported => 'Temalar dışa aktarıldı.';
 
   @override
   String get skinRemoveSkin => 'Tema kaldırılsın mı?';
@@ -11760,11 +10125,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String skinSelectPreviewElement(String title) {
-    return 'Seç: $title';
-  }
-
-  @override
   String skinIconColorForItem(String item) {
     return '$item simge rengi';
   }
@@ -11773,14 +10133,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String skinNameColorForItem(String item) {
     return '$item ad rengi';
   }
-
-  @override
-  String get skinFileIconColorSettingDescription =>
-      'Bu renk, dosya yöneticisi bölümündeki simge rengi ayarıyla denetlenir.';
-
-  @override
-  String get skinFileNameColorSettingDescription =>
-      'Bu renk, dosya yöneticisi bölümündeki ad rengi ayarıyla denetlenir.';
 
   @override
   String get skinExportedSingle => 'Tema dışa aktarıldı.';
@@ -11822,78 +10174,8 @@ class AppLocalizationsTr extends AppLocalizations {
   String get skinInterfaceApplied => 'Arayüz ayarları uygulandı.';
 
   @override
-  String get automationBatteryHintTitle => 'Arka planda başlatmaya izin ver';
-
-  @override
-  String get automationBatteryHintMessage =>
-      'VaultExplorer tamamen kapalıyken Android, bir otomasyonun bu kasanın kilidini açmasını engelleyebilir. Tasker, MacroDroid ve diğer uygulamaların kasanın kilidini arka planda açabilmesi için VaultExplorer\'ın pil kullanımını Kısıtlama Yok olarak ayarla.';
-
-  @override
-  String get automationBatteryHintButton => 'Uygulama ayarlarını aç';
-
-  @override
   String get automationBatterySettingsOpenFailedMessage =>
       'Uygulama ayarları açılamadı. Ayarlar > Uygulamalar > VaultExplorer > Pil bölümünü açıp Kısıtlanmamış seçeneğini seçin.';
-
-  @override
-  String get skinPreviewMountedVaultName => 'Kişisel kasa';
-
-  @override
-  String get skinPreviewVaultName => 'Kasa başlığı';
-
-  @override
-  String get skinMainTextColorAlsoColorsRegularMenuItems =>
-      'Kasa başlıkları ve normal menü eylemleri uygulamanın ana metin rengini paylaşır.';
-
-  @override
-  String get skinStatusBannerExamples => 'Durum bannerları';
-
-  @override
-  String get skinSuccessBanner => 'Başarı bannerı';
-
-  @override
-  String get skinWarningBanner => 'Uyarı bannerı';
-
-  @override
-  String get skinErrorBanner => 'Hata bannerı';
-
-  @override
-  String get skinSuccessBannerUsesSuccessContainer =>
-      'Banner dolgusu ve iletisi başarı renklerini kullanır.';
-
-  @override
-  String get skinWarningBannerUsesWarningContainer =>
-      'Banner dolgusu ve iletisi uyarı renklerini kullanır.';
-
-  @override
-  String get skinErrorBannerUsesErrorContainer =>
-      'Banner dolgusu ve iletisi hata renklerini kullanır.';
-
-  @override
-  String get skinPreviewChangesSaved => 'Değişiklikler kaydedildi';
-
-  @override
-  String get skinPreviewStorageAlmostFull => 'Depolama neredeyse dolu';
-
-  @override
-  String get skinPreviewCouldNotUnlockVault => 'Kasanın kilidi açılamadı';
-
-  @override
-  String get skinSurfaceAndBorderExamples => 'Yüzeyler ve kenarlıklar';
-
-  @override
-  String get skinFileRowDetailsColor => 'Dosya satırı ayrıntı rengi';
-
-  @override
-  String get skinFileActionOverflowIconColor =>
-      'Dosya satırı eylem simgesi rengi';
-
-  @override
-  String get skinMatchingElementsHighlightTogether =>
-      'Aynı renge sahip diğer önizleme öğeleri de vurgulanır.';
-
-  @override
-  String get skinStatusBannerTextColor => 'Banner metni bu rengi kullanır.';
 
   @override
   String get apkOpenPackageInstaller => 'Paket yükleyici';
@@ -11999,10 +10281,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String abLoopStartedMessage(String start, String end) {
     return 'Tekrarlanıyor: $start – $end';
   }
-
-  @override
-  String get abLoopEndTooCloseMessage =>
-      'B, A\'dan sonra gelmeli. İleri git ve tekrar dokun.';
 
   @override
   String get abLoopClearedMessage => 'A-B tekrarı kapalı';
@@ -12229,9 +10507,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get skinSharedPaletteTitle => 'Ortak palet';
 
   @override
-  String get skinSharedPaletteShort => 'Ortak';
-
-  @override
   String get skinSharedPaletteDescription =>
       'Her sayfanın kendi rengini belirleyene kadar devraldığı renkler. Kilit açma ve kamera gibi kendi bölümü olmayan ekranlar bunları doğrudan kullanır.';
 
@@ -12254,183 +10529,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get skinResetPageColors => 'Sayfa renklerini sıfırla';
 
   @override
-  String get skinTokenBackground => 'Sayfa arka planı';
-
-  @override
-  String get skinTokenBackgroundHint =>
-      'Bu sayfadaki her şeyin arkasındaki tuval.';
-
-  @override
-  String get skinTokenText => 'Ana metin';
-
-  @override
-  String get skinTokenTextHint =>
-      'Bu sayfadaki başlıklar, adlar ve gövde metni.';
-
-  @override
-  String get skinTokenTextSecondary => 'İkincil metin ve simgeler';
-
-  @override
-  String get skinTokenTextSecondaryHint =>
-      'Alt başlıklar, ayrıntılar, ipuçları ve sakin simgeler.';
-
-  @override
-  String get skinTokenAppBar => 'Üst çubuk';
-
-  @override
-  String get skinTokenAppBarHint => 'Bu sayfadaki üst çubuğun dolgusu.';
-
-  @override
-  String get skinTokenOnAppBar => 'Üst çubuk metni ve simgeleri';
-
-  @override
-  String get skinTokenOnAppBarHint => 'Üst çubuktaki başlık ve simge rengi.';
-
-  @override
-  String get skinTokenCard => 'Kartlar ve satırlar';
-
-  @override
-  String get skinTokenCardHint =>
-      'Kartlar, liste satırları ve gruplanmış paneller.';
-
-  @override
-  String get skinTokenCardActive => 'Etkin kart';
-
-  @override
-  String get skinTokenCardActiveHint =>
-      'Kilidi açık bir kasa gibi vurgulanan kart.';
-
-  @override
-  String get skinTokenRaised => 'Çipler ve denetimler';
-
-  @override
-  String get skinTokenRaisedHint =>
-      'Arama alanları, çipler, küçük resimler ve simge karoları.';
-
-  @override
-  String get skinTokenOverlay => 'Menüler, iletişim kutuları ve sayfalar';
-
-  @override
-  String get skinTokenOverlayHint =>
-      'Bu sayfadan açılan açılır menüler, iletişim kutuları ve alt sayfalar.';
-
-  @override
-  String get skinTokenAccent => 'Vurgu';
-
-  @override
-  String get skinTokenAccentHint =>
-      'Düğmeler, bağlantılar, ilerleme ve etkin simgeler.';
-
-  @override
-  String get skinTokenOnAccent => 'Vurgu üzerindeki metin';
-
-  @override
-  String get skinTokenOnAccentHint =>
-      'Vurgu dolgulu düğmeler üzerindeki etiketler ve simgeler.';
-
-  @override
-  String get skinTokenSelection => 'Seçim';
-
-  @override
-  String get skinTokenSelectionHint =>
-      'Seçili satırlar ve vurgulanan simge karoları.';
-
-  @override
-  String get skinTokenOnSelection => 'Seçim üzerindeki metin';
-
-  @override
-  String get skinTokenOnSelectionHint =>
-      'Seçili öğeler üzerindeki simgeler ve metin.';
-
-  @override
-  String get skinTokenDivider => 'Ayırıcılar';
-
-  @override
-  String get skinTokenDividerHint =>
-      'İnce ayırıcı çizgiler ve hafif kenarlıklar.';
-
-  @override
-  String get skinTokenOutline => 'Çerçeveler';
-
-  @override
-  String get skinTokenOutlineHint =>
-      'Çerçeveli düğmelerde ve alanlarda daha güçlü kenarlıklar.';
-
-  @override
-  String get skinTokenFab => 'Yuvarlak ekle düğmesi';
-
-  @override
-  String get skinTokenFabHint => 'Yuvarlak ekle düğmesinin dolgusu.';
-
-  @override
-  String get skinTokenOnFab => 'Yuvarlak ekle düğmesi simgesi';
-
-  @override
-  String get skinTokenOnFabHint => 'Yuvarlak ekle düğmesindeki artı simgesi.';
-
-  @override
-  String get skinPreviewConfirm => 'Onayla';
-
-  @override
-  String get skinPreviewCancelButton => 'İptal';
-
-  @override
-  String get skinPreviewSaveButton => 'Kaydet';
-
-  @override
-  String get skinPreviewRunButton => 'Çalıştır';
-
-  @override
-  String get skinPreviewPasteButton => 'Buraya yapıştır';
-
-  @override
-  String get skinPreviewUnlockButton => 'Kilidi aç';
-
-  @override
-  String get skinPreviewSortChip => 'Sırala: Ad';
-
-  @override
-  String get skinPreviewSearchChip => 'Dosyalarda ara';
-
-  @override
-  String get skinPreviewPinnedBadge => 'Sabitlendi';
-
-  @override
-  String get skinPreviewVaultsHeader => 'KASALAR';
-
-  @override
-  String get skinPreviewToolsSection => 'Dosya şifreleme';
-
-  @override
-  String get skinPreviewToolOne =>
-      'Anahtar dosyası ve parola ifadesi oluşturucu';
-
-  @override
-  String get skinPreviewToolOneHint => 'Parola ve anahtar dosyası oluşturun';
-
-  @override
-  String get skinPreviewToolTwo => 'Sağlama toplamı ve özet doğrulayıcı';
-
-  @override
-  String get skinPreviewToolTwoHint =>
-      'Büyük dosyaların bozulmadığını doğrulayın';
-
-  @override
-  String get skinPreviewSettingsSection => 'Güvenlik';
-
-  @override
-  String get skinPreviewSettingOne => 'Uygulama kilidi';
-
-  @override
-  String get skinPreviewSettingOneHint => 'Biyometri ve otomatik kilit';
-
-  @override
-  String get skinPreviewSettingTwo => 'Depolama';
-
-  @override
-  String get skinPreviewSettingTwoHint => 'Harici depolama ve bulut köprüleri';
-
-  @override
   String get inPlaceEditDone => 'Bitti';
 
   @override
@@ -12439,9 +10537,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get inPlaceEditHint =>
       'Eylemleri çubuklar arasında sürükleyin veya düzenlemek için dokunun';
-
-  @override
-  String get inPlaceEditAvailable => 'Kullanılabilir işlemler';
 
   @override
   String get inPlaceEditTopDock => 'Üst çubuk';
@@ -12737,19 +10832,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String thumbnailGlobalInContainerConfirmMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count kasa bu varsayılanı izler ve küçük resimleri kasanın içinde saklamaya başlar. Bu daha yavaştır ve salt okunur kasalarda kullanılamaz.',
-      one:
-          '1 kasa bu varsayılanı izler ve küçük resimleri kasanın içinde saklamaya başlar. Bu daha yavaştır ve salt okunur kasalarda kullanılamaz.',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String get scanAdjustCornersTitle => 'Köşeleri ayarla';
 
   @override
@@ -12820,10 +10902,6 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get createArchiveMediaRecommendation =>
-      'Önceden sıkıştırılmış medya dosyaları algılandı. CPU ve pil tasarrufu için \"Depolama\" sıkıştırması otomatik seçildi.';
-
-  @override
   String get createArchiveNameLabel => 'Arşiv adı';
 
   @override
@@ -12833,44 +10911,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get createArchiveSelectFormatTooltip => 'Biçim seç';
 
   @override
-  String get createArchiveSecuritySection => 'Güvenlik';
-
-  @override
   String get createArchivePasswordLabel => 'Parola (isteğe bağlı)';
-
-  @override
-  String get createArchivePasswordHintText => 'Parolayı girin';
 
   @override
   String get createArchiveConfirmPasswordLabel => 'Parolayı onayla';
 
   @override
-  String get createArchiveConfirmPasswordHint => 'Parolayı yineleyin';
-
-  @override
   String get passphraseStrengthFair => 'Orta';
 
   @override
-  String get createArchiveEncryptFilenamesNeedsPassword =>
-      'Dosyaları önizlemek için parola gerekir';
-
-  @override
-  String get createArchiveEncryptFilenamesActive =>
-      'Kilit açılana kadar dosya listesini gizler';
-
-  @override
-  String get createArchiveAdvancedOptions => 'Gelişmiş seçenekler';
-
-  @override
   String get createArchiveCompressionLevel => 'Sıkıştırma düzeyi';
-
-  @override
-  String get createArchiveSplitHintZip =>
-      '.z01, .z02 … ve son .zip olarak kaydedilir. Tüm parçaları aynı klasörde tut.';
-
-  @override
-  String get createArchiveSplitHintSevenZip =>
-      '.7z.001, .7z.002 … olarak kaydedilir. Tüm parçaları aynı klasörde tut.';
 
   @override
   String get createArchiveSplitVolumes => 'Ciltlere böl';
@@ -12912,29 +10962,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'En küçük boyut, daha yavaş sıkıştırma';
 
   @override
-  String get officeViewerErrorTitle => 'Bu belge önizlenemiyor';
-
-  @override
-  String get officeViewerEncrypted =>
-      'Bu belge parola korumalı ve şifreli Office dosyaları önizlenemez.';
-
-  @override
-  String get officeViewerUnsupported =>
-      'Bu dosya okunamadı. Hasarlı olabilir veya görüntüleyicinin desteklemediği bir biçim kullanıyor olabilir.';
-
-  @override
-  String get officeViewerTooLarge =>
-      'Bu belge uygulama içinde önizleme için çok büyük.';
-
-  @override
-  String get officeViewerSpeakerNotes => 'Konuşmacı notları';
-
-  @override
   String get fileAssocDocumentViewer => 'Uygulama içi belge görüntüleyici';
-
-  @override
-  String get viewOfficeDocumentsInApp =>
-      'Word, Excel, PowerPoint ve OpenDocument dosyalarını uygulama içinde önizle';
 
   @override
   String get archiveCompressionMethodLabel => 'Sıkıştırma yöntemi';
@@ -12950,19 +10978,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get archiveMethodDeflateDesc =>
       'En hızlısı, daha büyük dosyalar ve en geniş destek. ZIP ve .tar.gz için de kullanılır.';
-
-  @override
-  String archiveMethodFixedInfo(String format, String method) {
-    return '$format her zaman şununla sıkıştırır: $method.';
-  }
-
-  @override
-  String get archiveMethodMoreInSevenZip =>
-      'LZMA2 ve LZMA, 7-Zip arşivlerinde kullanılabilir.';
-
-  @override
-  String get archiveMethodStoreNote =>
-      'Depolama sıkıştırma yapmaz, bu yüzden seçilecek bir yöntem yok.';
 
   @override
   String get browserTabsEnabledTitle => 'Dosya yöneticisi sekmelerini kullan';
@@ -12987,9 +11002,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get browserTabMoveToOtherPane => 'Diğer bölmeye taşı';
 
   @override
-  String get browserTabSwitchPrevious => 'Önceki sekmeye geç';
-
-  @override
   String get browserTabOpenInNewTab => 'Yeni sekmede aç';
 
   @override
@@ -13002,9 +11014,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get browserTabCloseToRight => 'Sağdaki sekmeleri kapat';
-
-  @override
-  String get browserTabCloseAll => 'Tümünü kapat';
 
   @override
   String get dualPaneEnabledTitle => 'Çift bölme kullan';
@@ -13310,23 +11319,8 @@ class AppLocalizationsTr extends AppLocalizations {
   String get imageEditorAngle => 'Açı';
 
   @override
-  String get fontSizeSmall => 'Küçük';
-
-  @override
-  String get fontSizeMedium => 'Orta';
-
-  @override
-  String get fontSizeLarge => 'Büyük';
-
-  @override
-  String get fontSizeExtraLarge => 'Çok büyük';
-
-  @override
   String get imageEditorTextPlaceholder =>
       'METNİ DEĞİŞTİRMEK İÇİN BURAYA ÇİFT DOKUNUN';
-
-  @override
-  String get imageEditorFontSizePreview => 'Örnek önizleme ABC 123';
 
   @override
   String imageEditorPhotoLabel(int index) {
@@ -13358,9 +11352,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get floatingPlayerAudioOnly => 'Yalnızca ses';
-
-  @override
-  String get floatingPlayerShowVideo => 'Videoyu göster';
 
   @override
   String get masterLockTitle => 'Ana kilit';
@@ -14145,9 +12136,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get vaultSyncCurrentStorageBadge => 'Geçerli';
 
   @override
-  String get vaultSyncChangeStorageTooltip => 'Depolamayı değiştir';
-
-  @override
   String vaultSyncPickFolderTitle(String storage) {
     return 'Klasör: $storage';
   }
@@ -14172,9 +12160,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get categoriesSectionTitle => 'Kategoriler';
-
-  @override
-  String get manageCategoriesTooltip => 'Kategorileri yönet';
 
   @override
   String get categoryShortcutsTitle => 'Kategori kısayolları';
@@ -14261,18 +12246,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Yine de kilitle';
-
-  @override
-  String vaultListingSymbolicLinkCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count sembolik bağlantı',
-      one: '1 sembolik bağlantı',
-      zero: '0 sembolik bağlantı',
-    );
-    return '$_temp0';
-  }
 
   @override
   String vaultListingHiddenEntryCount(int count) {
@@ -14710,10 +12683,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Düzenlenen kopya hareketsiz bir görüntü olur. Orijinal dosya, EXIF meta verileri ve varsa dosyaya gömülü video değişmeden kalır.';
 
   @override
-  String get pimInputHint =>
-      'Varsayılan değerler için boş bırakın veya 0 girin';
-
-  @override
   String get galleryMetadataIndexStorageLabel =>
       'Galeri meta veri dizininin depolama konumu';
 
@@ -14756,10 +12725,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get musicIndexHiddenFolderOption => 'Gizli klasör';
-
-  @override
-  String get musicIndexHiddenFolderDesc =>
-      'Yerel Depolama\'da şifrelenmemiş gizli bir klasörde saklanır.';
 
   @override
   String get libraryStorageHiddenFolder =>

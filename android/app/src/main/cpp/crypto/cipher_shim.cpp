@@ -233,13 +233,6 @@ static void hashHmacFast(HashId hash, const HmacPrecomputed& pre,
     hashFinal(hash, &outerCtx, out);
 }
 
-static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
-                     const unsigned char* data, size_t dataLen, unsigned char* out) {
-    HmacPrecomputed pre;
-    hmacPrecompute(hash, key, keyLen, pre);
-    hashHmacFast(hash, pre, data, dataLen, out);
-}
-
 static bool pbkdf2SingleBlockCustom(HashId hash, const HmacPrecomputed& pre,
                                      const unsigned char* salt, size_t saltLen,
                                      unsigned int block, unsigned int iterations,

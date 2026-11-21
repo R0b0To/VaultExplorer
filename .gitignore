@@ -74,3 +74,4 @@ devtools_options.yaml
 .flutter
 copy/
 android/local.properties
+CMakeFiles/

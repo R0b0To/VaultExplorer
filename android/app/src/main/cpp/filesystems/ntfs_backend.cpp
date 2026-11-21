@@ -840,15 +840,6 @@ std::vector<std::string> ntfsSplitPath(const std::string& path) {
     return parts;
 }
 
-std::string ntfsJoinPath(const std::vector<std::string>& parts) {
-    std::string out;
-    for (const auto& part : parts) {
-        if (!out.empty()) out.push_back('/');
-        out += part;
-    }
-    return out;
-}
-
 // Number of directories between [dir] and the volume root, found by following each directory's parent: the
 // PHYSICAL depth. A path as written can be shallower or deeper than the directory it names when a folder link
 // is part of it, and a target's ".." steps are applied from where the link really lives. [dir] stays owned by

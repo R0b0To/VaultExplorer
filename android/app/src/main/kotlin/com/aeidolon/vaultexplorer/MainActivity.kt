@@ -367,7 +367,6 @@ private object ChannelMethods {
     const val SAF_MOVE_FILE             = "safMoveFile"
     const val SAF_DELETE_FILE           = "safDeleteFile"
     const val SAF_GET_SPACE_INFO        = "safGetSpaceInfo"
-    const val SAF_GET_THUMBNAIL         = "safGetThumbnail"
     const val SAF_OPEN_WITH_APP         = "safOpenWithApp"
     const val SAF_SHARE_FILES           = "safShareFiles"
     const val SAF_GET_DOCUMENT_URI      = "safGetDocumentUri"
@@ -1421,17 +1420,6 @@ open class MainActivity : FlutterFragmentActivity() {
                     ioExecutor.execute {
                         val space = safStorageManager.getSpaceInfo(treeUri)
                         runOnUiThread { result.success(space) }
-                    }
-                }
-                ChannelMethods.SAF_GET_THUMBNAIL -> {
-                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
-                    val filePath = call.argument<String>("filePath") ?: ""
-                    val targetSize = call.argument<Int>("targetSize") ?: 180
-                    val quality = call.argument<Int>("quality") ?: 70
-                    val isVideo = call.argument<Boolean>("isVideo") ?: false
-                    ioExecutor.execute {
-                        val thumb = safStorageManager.getThumbnail(treeUri, filePath, targetSize, quality, isVideo)
-                        runOnUiThread { result.success(thumb) }
                     }
                 }
                 ChannelMethods.SAF_OPEN_WITH_APP -> {

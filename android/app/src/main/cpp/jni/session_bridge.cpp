@@ -310,18 +310,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getContainerFormat(JNIEnv* env, job
     JNI_CATCH_RETURN(-1)
 }
 
-extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedPartitionOffset(JNIEnv* env, jobject, jint volId) {
-    JNI_TRY
-
-    if (volId < 0 || volId >= MAX_VOLUMES) return -1;
-    std::shared_lock<std::shared_mutex> lock(volumes[volId].mutex);
-    if (!volumes[volId].isUsbSource) return -1;
-    return static_cast<jlong>(volumes[volId].partitionStartSector);
-
-    JNI_CATCH_RETURN(-1)
-}
-
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,

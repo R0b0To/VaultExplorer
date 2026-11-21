@@ -63,9 +63,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get pdfViewerNextMatch => 'Наступний збіг';
 
   @override
-  String get pdfViewerCloseSearch => 'Закрити пошук';
-
-  @override
   String get pdfViewerPrintTooltip => 'Друкувати документ';
 
   @override
@@ -76,15 +73,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get pdfViewerFailedToLoad => 'Помилка завантаження PDF';
-
-  @override
-  String get pdfViewerEditTooltip => 'Редагувати';
-
-  @override
-  String get pdfViewerDoneEditingTooltip => 'Завершити редагування';
-
-  @override
-  String get pdfViewerSaveFailed => 'Не вдалося зберегти зміни до цього PDF';
 
   @override
   String get pdfViewerEditUnavailable =>
@@ -150,9 +138,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get advancedParametersTitle => 'Розширені параметри';
 
   @override
-  String get pimFieldLabel => 'PIM (залиште порожнім за замовчуванням)';
-
-  @override
   String get encryptionAlgorithmLabel => 'Алгоритм шифрування';
 
   @override
@@ -201,16 +186,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get dismiss => 'Закрити';
 
   @override
-  String byteProgressText(String transferred, String total, int pct) {
-    return '$transferred / $total ($pct%)';
-  }
-
-  @override
-  String countProgressText(int done, int total, int pct) {
-    return '$done / $total ($pct%)';
-  }
-
-  @override
   String multiOpLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -221,11 +196,6 @@ class AppLocalizationsUk extends AppLocalizations {
       one: '1 операція',
     );
     return '$_temp0';
-  }
-
-  @override
-  String multiOpSublabel(String summary) {
-    return '$summary · торкніться для перегляду';
   }
 
   @override
@@ -335,19 +305,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'Цей контейнер змонтовано лише для читання.';
 
   @override
-  String get hiddenVolumeProtectionTriggeredWarning =>
-      'Запис у цей том міг пошкодити прихований том і був заблокований. Сховище переведено в режим лише для читання.';
-
-  @override
   String get protectHiddenVolumeToggleTitle => 'Захистити прихований том';
 
   @override
   String get protectHiddenVolumeToggleSubtitle =>
       'Запобігати пошкодженню при записі в зовнішній том';
-
-  @override
-  String get protectHiddenVolumeCredentialsRequired =>
-      'Для захисту потрібен пароль або ключовий файл прихованого тома';
 
   @override
   String deleteItemsTitle(num count) {
@@ -662,9 +624,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get removeFromBookmarks => 'Вилучити із закладок';
 
   @override
-  String get addToBookmarks => 'Додати до закладок';
-
-  @override
   String get edit => 'Редагувати';
 
   @override
@@ -758,88 +717,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get archiveExplorerPermissionTitle => 'Потрібен доступ до файлів';
 
   @override
-  String get archiveExplorerPermissionMessage =>
-      'Надайте доступ до пам\'яті для перегляду та видобування zip-архівів із папки Завантаження.';
-
-  @override
   String get archiveExplorerGrantAccess => 'Надати доступ';
-
-  @override
-  String get archiveExplorerEmptyTitle => 'Архіви не знайдено';
-
-  @override
-  String get archiveExplorerEmptyMessage =>
-      'Завантажені zip-файли з\'являтимуться тут.';
-
-  @override
-  String get archiveExplorerRefreshTooltip => 'Оновити';
-
-  @override
-  String archiveExplorerEntryCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count елементів',
-      many: '$count елементів',
-      few: '$count елементи',
-      one: '1 елемент',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get archiveExplorerExtractAll => 'Видобути все';
-
-  @override
-  String get archiveExplorerExtracting => 'Видобування...';
-
-  @override
-  String archiveExplorerExtractSuccess(int count, String name) {
-    return 'Видобуто $count файлів до Download/Extracted/$name';
-  }
-
-  @override
-  String get archiveExplorerExtractFailed => 'Не вдалося видобути цей архів.';
-
-  @override
-  String get archiveExplorerOpenFailed => 'Не вдалося відкрити цей архів.';
-
-  @override
-  String get archiveExplorerOpenArchive => 'Відкрити архів…';
-
-  @override
-  String get archiveExplorerUnresolvedPath =>
-      'Не вдалося отримати прямий доступ до файлу. Виберіть файл із папки Завантаження.';
-
-  @override
-  String get archiveExplorerExtractTo => 'Видобути до…';
-
-  @override
-  String get archiveExplorerPreview => 'Попередній перегляд';
-
-  @override
-  String get archiveExplorerChoosingDestination => 'Вибір місця призначення…';
-
-  @override
-  String get archiveExplorerNoDestinationChosen =>
-      'Місце призначення не вибрано.';
-
-  @override
-  String archiveExplorerExtractSuccessTo(int count, String path) {
-    return 'Видобуто $count файлів до $path';
-  }
-
-  @override
-  String get archiveBrowserEmptyTitle => 'Порожня папка';
-
-  @override
-  String get archiveBrowserEmptyMessage => 'Ця папка не містить файлів.';
-
-  @override
-  String get archiveBrowserRoot => 'Архів';
-
-  @override
-  String get archiveBrowserOpenFileFailed => 'Не вдалося відкрити цей файл.';
 
   @override
   String get fileAssocInAppTextEditor => 'Вбудований текстовий редактор';
@@ -875,10 +753,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Активний · торкніться перемикача для видалення';
 
   @override
-  String get masterPasswordInactiveSubtitle =>
-      'Вимагати пароль для відкриття програми';
-
-  @override
   String get newPasswordLabel => 'Новий пароль';
 
   @override
@@ -895,17 +769,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get biometricUnlockTitle => 'Біометричне розблокування';
-
-  @override
-  String get biometricUnlockSubtitle =>
-      'Підтвердьте особу для безпечного відкриття контейнера';
-
-  @override
-  String get changeMasterPasswordTitle => 'Змінити головний пароль';
-
-  @override
-  String get changeMasterPasswordSubtitle =>
-      'Оновити облікові дані головного пароля';
 
   @override
   String get autoLockContainersTitle => 'Автоматичне блокування сховища';
@@ -1042,29 +905,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Адаптувати кольори програми до шпалер (Android 12+)';
 
   @override
-  String get pureBlackThemeTitle => 'Чистий чорний (OLED)';
-
-  @override
-  String get pureBlackThemeSubtitle =>
-      'Чисто чорний фон для економії заряду на OLED-екранах (лише темна тема)';
-
-  @override
   String get sortContainersByLabel => 'Сортувати сховища за';
-
-  @override
-  String get swapCardSwipeActionsTitle =>
-      'Змінити порядок дій під час свайпу карток';
-
-  @override
-  String get swapCardSwipeActionsSubtitle =>
-      'Під час свайпу карток: \"Редагувати\" ліворуч, \"Видалити\" праворуч';
-
-  @override
-  String get swipeGestureHintTitle => 'Показувати підказку свайпу';
-
-  @override
-  String get swipeGestureHintSubtitle =>
-      'Показати анімацію-підказку свайпу для контейнера';
 
   @override
   String get autoOpenOnUnlockTitle => 'Автоматично переходити до файлів';
@@ -1109,10 +950,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get localStorageCardTitle => 'Локальне сховище';
-
-  @override
-  String get localStorageCardSubtitle =>
-      'Не зашифровано — для швидкого обміну зі сховищами';
 
   @override
   String get enableFastStorageAccessTitle => 'Увімкнути швидкий доступ';
@@ -1397,9 +1234,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get unlock => 'Розблокувати';
 
   @override
-  String get useBiometric => 'Біометрія';
-
-  @override
   String get connectAtLeast4Dots => 'З\'єднайте щонайменше 4 точки';
 
   @override
@@ -1432,15 +1266,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get enterUnlockPinTitle => 'Введіть PIN-код розблокування';
-
-  @override
-  String get wrongPinTryAgain => 'Неправильний PIN-код — спробуйте ще раз';
-
-  @override
-  String get enterYourPinSequence => 'Введіть ваш PIN-код';
-
-  @override
-  String get enterPinToMount => 'Введіть PIN-код для відкриття';
 
   @override
   String get noPinConfiguredMessage =>
@@ -1476,63 +1301,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get incorrectPinError => 'Неправильний PIN-код';
 
   @override
-  String removedFromListSnack(String name) {
-    return 'Вилучено \"$name\" зі списку';
-  }
-
-  @override
-  String get clearRecentHistoryTitle => 'Очистити історію?';
-
-  @override
-  String get clearRecentHistoryMessage =>
-      'Це очистить список нещодавніх документів. Файли на вашому пристрої залишаться без змін.';
-
-  @override
-  String get clearAll => 'Очистити все';
-
-  @override
-  String get recentHistoryClearedSnack => 'Історію очищено';
-
-  @override
   String get moreOptionsTooltip => 'Інші параметри';
-
-  @override
-  String get clearHistoryMenuItem => 'Очистити історію';
-
-  @override
-  String get openPdfFile => 'Відкрити файл PDF';
-
-  @override
-  String get noDocumentsYetTitle => 'Документів ще немає';
-
-  @override
-  String get openPdfToStartMessage =>
-      'Відкрийте PDF-документ із вашого пристрою, щоб почати читання.';
-
-  @override
-  String get removeFromListMenuItem => 'Видалити зі списку';
-
-  @override
-  String get justNow => 'Щойно';
-
-  @override
-  String minutesAgo(int count) {
-    return '$count хв тому';
-  }
-
-  @override
-  String hoursAgo(int count) {
-    return '$count год тому';
-  }
-
-  @override
-  String daysAgo(int count) {
-    return '$count дн тому';
-  }
-
-  @override
-  String get usbDriveDisconnectedLocked =>
-      'USB-диск відключено — сховище заблоковано';
 
   @override
   String get containerAlreadyMounted => 'Цей контейнер уже змонтовано.';
@@ -1556,26 +1325,7 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get selectContainerFirst => 'Спочатку виберіть контейнер';
-
-  @override
   String get passwordOrKeyfilesRequired => 'Потрібен пароль або ключові файли';
-
-  @override
-  String get slowPerformanceWarningTitle => 'Попередження про низьку швидкість';
-
-  @override
-  String get slowPerformanceWarningMessage =>
-      'Прямий доступ до сховища наразі вимкнено.\n\nCryFS зберігає файли у вигляді тисяч дрібних блоків. Відкриття таких сховищ через системний Android SAF буде повільним.\n\nБажаєте відкрити Налаштування та надати дозвіл \"Доступ до всіх файлів\" для максимальної швидкості?';
-
-  @override
-  String get unlockAnyway => 'Все одно розблокувати';
-
-  @override
-  String get defaultVaultName => 'Сховище';
-
-  @override
-  String get defaultContainerName => 'Контейнер';
 
   @override
   String get incorrectPasswordOrInvalidVault =>
@@ -1584,9 +1334,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get incorrectPasswordOrInvalidContainer =>
       'Неправильний пароль або пошкоджений контейнер';
-
-  @override
-  String get genericUnknownError => 'Невідома помилка';
 
   @override
   String get decryptingLabel => 'Розшифрування…';
@@ -1623,12 +1370,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get mountContainerTitle => 'Змонтувати контейнер';
 
   @override
-  String get containerFileSegmentLabel => 'Файл контейнера';
-
-  @override
-  String get folderVaultSegmentLabel => 'Захищена папка';
-
-  @override
   String formatContainerLabel(String format) {
     return 'Контейнер $format';
   }
@@ -1636,11 +1377,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String formatVaultLabel(String format) {
     return 'Сховище $format';
-  }
-
-  @override
-  String formatDriveLabel(String format) {
-    return 'Диск $format';
   }
 
   @override
@@ -1657,9 +1393,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get containerMissingTitle => 'Контейнер відсутній';
 
   @override
-  String get filePathCouldNotBeResolved => 'Не вдалося знайти шлях до файлу';
-
-  @override
   String get containerMissingExplanation =>
       'Файл контейнера міг бути переміщений, видалений, або носій наразі відключено.';
 
@@ -1670,35 +1403,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get locateFileButtonLabel => 'Знайти файл';
 
   @override
-  String get authenticateToMountSubtitle =>
-      'Підтвердьте особу для безпечного відкриття контейнера';
-
-  @override
   String get usePasswordButtonLabel => 'Використати пароль';
 
   @override
   String get authenticateButtonLabel => 'Підтвердити';
 
   @override
-  String get drawUnlockPatternCardTitle => 'Намалюйте ключ розблокування';
-
-  @override
-  String get wrongPatternTryAgain => 'Неправильний ключ — спробуйте ще раз';
-
-  @override
-  String get connectYourPatternSequence => 'З\'єднайте точки графічного ключа';
-
-  @override
   String get usePasswordInsteadButtonLabel => 'Використати пароль';
-
-  @override
-  String get passwordHintFolderVault => 'Введіть пароль до сховища';
-
-  @override
-  String get passwordHintBitlocker => 'Введіть пароль або ключ відновлення';
-
-  @override
-  String get passwordHintContainer => 'Введіть пароль до контейнера';
 
   @override
   String get usingSavedPasswordTooltip => 'Використовується збережений пароль';
@@ -1706,10 +1417,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get luksKeyfileReplacesPasswordNote =>
       'Для контейнерів LUKS ключовий файл замінює пароль.';
-
-  @override
-  String get readOnlyModeUsbSubtitle =>
-      'Відкрити без можливості внесення змін до диска';
 
   @override
   String get readOnlyModeContainerSubtitle =>
@@ -1737,10 +1444,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get decryptingDriveLabel => 'Розшифрування диска…';
-
-  @override
-  String get usbDeviceAlreadyActiveMounted =>
-      'Цей USB-пристрій уже підключено та змонтовано.';
 
   @override
   String reconnectUsbDriveTitle(String label) {
@@ -1781,13 +1484,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get mountExistingContainerSubtitle =>
       'Відкрити створений раніше файл контейнера';
-
-  @override
-  String get mountSplitContainerTitle => 'Змонтувати розділений контейнер';
-
-  @override
-  String get mountSplitContainerSubtitle =>
-      'Відкрити контейнер, розділений на частини, без попереднього об\'єднання';
 
   @override
   String get mountUsbDriveTitle => 'Змонтувати USB-диск';
@@ -1838,9 +1534,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String pdfViewerFailedToInspectSize(String error) {
     return 'Не вдалося визначити розмір PDF: $error';
   }
-
-  @override
-  String get pdfViewerErrorLoadingTitle => 'Помилка завантаження PDF';
 
   @override
   String get pdfViewerNoDocumentLoaded => 'Документ PDF не завантажено.';
@@ -1907,20 +1600,11 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String archiveFormatNotSupported(String ext) {
-    return 'Формат архіву .$ext поки що не підтримується';
-  }
-
-  @override
   String get archivePasswordPromptTitle => 'Захищено паролем';
 
   @override
   String get archivePasswordPromptMessage =>
       'Цей архів захищено паролем. Введіть пароль для перегляду його вмісту.';
-
-  @override
-  String get archiveSolidWarning =>
-      'Це безперервний (solid) архів — відкриття файлів може бути повільнішим, особливо ближче до кінця.';
 
   @override
   String get failedToReadFileFromArchive =>
@@ -2062,11 +1746,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String deletedWithFailures(int deleted, int failed) {
-    return 'Видалено: $deleted · Помилок: $failed';
-  }
-
-  @override
   String exportedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2082,11 +1761,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get exportCancelledOrFailed =>
       'Експорт скасовано або завершено з помилкою';
-
-  @override
-  String exportError(String type) {
-    return 'Помилка експорту: $type';
-  }
 
   @override
   String get deleteOriginalTitle => 'Видалити оригінал?';
@@ -2165,39 +1839,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get createArchiveTitle => 'Створити архів';
 
   @override
-  String get archiveNameHint => 'архів.zip';
-
-  @override
-  String archivedCount(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Заархівовано $count файлів',
-      many: 'Заархівовано $count файлів',
-      few: 'Заархівовано $count файли',
-      one: 'Заархівовано 1 файл',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String failedToArchiveGeneric(String type) {
     return 'Не вдалося створити архів: $type';
   }
 
   @override
-  String get createArchivePasswordHint => 'Необов\'язковий пароль (AES-256)';
-
-  @override
-  String get createArchivePasswordUnavailableForFormat =>
-      'Захист паролем доступний лише для ZIP та 7-Zip';
-
-  @override
   String get createArchiveEncryptFilenames => 'Шифрувати імена файлів';
-
-  @override
-  String get createArchiveEncryptFilenamesHint =>
-      'Потрібен пароль. Тоді пароль потрібен навіть для перегляду вмісту.';
 
   @override
   String get closeSearchTooltip => 'Закрити пошук';
@@ -2275,9 +1922,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get formatFileSystemLabel => 'Файлова система тома';
-
-  @override
-  String get standardVolumeHeader => 'Стандартний том';
 
   @override
   String get containerFormatLabel => 'Формат контейнера';
@@ -2391,14 +2035,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get unitGbShort => 'ГБ';
 
   @override
-  String failedToListUsbDevices(String error) {
-    return 'Не вдалося отримати список USB-пристроїв: $error';
-  }
-
-  @override
-  String get usbPermissionDenied => 'Доступ до USB заборонено';
-
-  @override
   String get couldNotReadDriveCapacity =>
       'Не вдалося визначити розмір накопичувача — введіть вручну.';
 
@@ -2427,9 +2063,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get usbContainerCreationFailed => 'Не вдалося створити USB-контейнер.';
-
-  @override
-  String get usbStandardVolumeSectionHeader => 'USB-диск і стандартний том';
 
   @override
   String get formattingErasesEverythingWarning =>
@@ -2500,15 +2133,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get playlistTransitionFlipLabel => '3D Перегортання';
 
   @override
-  String get unlockVaultTitle => 'Розблокувати сховище';
-
-  @override
-  String get openContainerTitle => 'Відкрити контейнер';
-
-  @override
-  String get selectContainerFileOrFolder => 'Виберіть файл або папку';
-
-  @override
   String get useBackupHeaderToggleTitle =>
       'Використовувати резервний заголовок';
 
@@ -2520,29 +2144,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get keepCurrentOption => 'Зберегти поточний';
 
   @override
-  String get toolExpandVolumeTitle => 'Розширити том VeraCrypt';
-
-  @override
   String get toolExpandVolumeSubtitle =>
       'Збільшити стандартний том, як у десктопній утиліті розширення томів';
 
   @override
-  String get toolExpandLuksVolumeTitle => 'Розширити контейнер LUKS';
-
-  @override
-  String get toolExpandLuksVolumeSubtitle =>
-      'Збільшення контейнерів LUKS1 та LUKS2, включно з метаданими LUKS2 фіксованого розміру';
-
-  @override
   String get luksToolsExpandNote =>
       'Спочатку створіть резервну копію контейнера. Підтримуються LUKS1 та LUKS2. Файлові системи NTFS та ext2/3/4 можна розширювати безпосередньо (FAT та exFAT не підтримуються). Додане місце можна ініціалізувати зашифрованими нулями. Файл ключа замінює пароль, якщо використовується.';
-
-  @override
-  String get toolExpandBitLockerVolumeTitle => 'Розширити контейнер BitLocker';
-
-  @override
-  String get toolExpandBitLockerVolumeSubtitle =>
-      'Збільшує файл тому BitLocker або образ VHD/VHDX і розширює файлову систему NTFS';
 
   @override
   String get bitlockerToolsExpandNote =>
@@ -2559,9 +2166,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Створити прихований том усередині наявного стандартного тому';
 
   @override
-  String get vcToolsPickContainer => 'Вибрати контейнер';
-
-  @override
   String get vcToolsNoContainer => 'Контейнер не вибрано';
 
   @override
@@ -2569,9 +2173,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vcToolsPimLabel => 'PIM (необов’язково)';
-
-  @override
-  String get vcToolsNewSizeLabel => 'Новий розмір контейнера (МіБ)';
 
   @override
   String get vcToolsInitFreeSpace => 'Ініціалізувати новий простір';
@@ -2672,24 +2273,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get readOnlyModeLabel => 'Режим лише для читання';
 
   @override
-  String get readOnlyModeSubtitle =>
-      'Забороняє будь-які операції запису або зміни у сховищі';
-
-  @override
   String get alwaysOpenReadOnlyLabel => 'Завжди лише для читання';
 
   @override
   String get alwaysOpenReadOnlySubtitle =>
       'Нові сеанси починаються в режимі лише для читання.';
-
-  @override
-  String get selectUsbDeviceLabel => 'Виберіть USB-пристрій';
-
-  @override
-  String get noUsbDevicesFound => 'Сумісних USB-накопичувачів не знайдено';
-
-  @override
-  String get containerConfigTitle => 'Конфігурація сховища';
 
   @override
   String get changePasswordTitle => 'Змінити пароль';
@@ -2698,47 +2286,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get confirmNewPasswordLabel => 'Підтвердьте новий пароль';
 
   @override
-  String get cameraCaptureTitle => 'Камера сховища';
-
-  @override
-  String get takingPhoto => 'Знімання фото…';
-
-  @override
-  String get noVaultSelected => 'Сховище не вибрано';
-
-  @override
   String get mediaDiagnosticsTitle => 'Діагностика медіа';
 
   @override
-  String get advancedViewerSettingsTitle => 'Налаштування переглядача';
-
-  @override
-  String get textEditorSwitchToReadModeTooltip =>
-      'Перемкнути в режим лише для читання';
-
-  @override
-  String get textEditorSwitchToEditModeTooltip =>
-      'Перемкнути в режим редагування';
-
-  @override
   String get textEditorReadOnlyIndicatorLabel => 'Лише читання';
-
-  @override
-  String get textEditorMoveCursorLeftTooltip => 'Перемістити курсор ліворуч';
-
-  @override
-  String get textEditorMoveCursorRightTooltip => 'Перемістити курсор праворуч';
-
-  @override
-  String get textEditorSelectWordTooltip => 'Виділити слово';
-
-  @override
-  String get textEditorSwitchToHorizontalScrollTooltip =>
-      'Перемкнути на горизонтальне прокручування';
-
-  @override
-  String get textEditorSwitchToSoftWrapTooltip =>
-      'Перемкнути на перенесення рядків';
 
   @override
   String get textEditorCaretScrubberLabel =>
@@ -2822,19 +2373,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get goToLineButton => 'Перейти';
 
   @override
-  String get textEditorSaveConfirmTitle => 'Незбережені зміни';
-
-  @override
-  String get textEditorSaveConfirmMessage =>
-      'Бажаєте зберегти зміни перед закриттям?';
-
-  @override
-  String get saveAndClose => 'Зберегти і закрити';
-
-  @override
-  String get discardChanges => 'Відкинути зміни';
-
-  @override
   String selectionBarSelectedCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2854,9 +2392,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get deselectAll => 'Зняти виділення';
 
   @override
-  String get sortOptionsTitle => 'Сортування файлів';
-
-  @override
   String get layoutModeList => 'Список';
 
   @override
@@ -2866,29 +2401,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get layoutModeMasonry => 'Мозаїка';
 
   @override
-  String get fileOperationsTitle => 'Операції з файлами';
-
-  @override
   String get conflictResolutionTitle => 'Конфлікт імен файлів';
 
   @override
   String get replaceExistingFile => 'Замінити наявний файл';
-
-  @override
-  String get keepBothFiles => 'Зберегти обидва (перейменувати)';
-
-  @override
-  String get skipFile => 'Пропустити цей файл';
-
-  @override
-  String get noVaultsFoundTitle => 'Сховищ не знайдено';
-
-  @override
-  String get noVaultsFoundSubtitle =>
-      'Створіть новий контейнер або додайте наявне сховище для початку роботи.';
-
-  @override
-  String get addExistingVaultButton => 'Додати наявне сховище';
 
   @override
   String get sortContainersModeManual => 'Вручну (перетягування)';
@@ -2940,46 +2456,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get unlockContainerTitle => 'Розблокувати контейнер';
 
   @override
-  String get containerFileSegment => 'Файл контейнера';
-
-  @override
-  String get folderVaultSegment => 'Захищена папка';
-
-  @override
   String get enableButtonLabel => 'Увімкнути';
-
-  @override
-  String get retryButtonLabelShort => 'Повторити';
-
-  @override
-  String get locateFileButton => 'Знайти файл';
-
-  @override
-  String get authenticateButton => 'Підтвердити';
-
-  @override
-  String get cancelUnlockButton => 'Скасувати';
-
-  @override
-  String tryingKeyslotProgress(int attempted, int total) {
-    return 'Перевірка ключового слота $attempted з $total…';
-  }
-
-  @override
-  String get tryingKeyslotSingle => 'Перевірка ключового слота…';
-
-  @override
-  String verifyingCredentialProgress(int attempted, int total) {
-    return 'Перевірка облікових даних $attempted з $total…';
-  }
-
-  @override
-  String get verifyingCredentialSingle => 'Перевірка облікових даних…';
-
-  @override
-  String tryingAlgoSlot(String algo, String slotName) {
-    return 'Спроба $algo ($slotName)…';
-  }
 
   @override
   String get hiddenVolumeSlotName => 'Прихований том';
@@ -2988,37 +2465,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get standardVolumeSlotName => 'Стандартний том';
 
   @override
-  String get containerMissingSubtitle => 'Не вдалося знайти шлях до файлу';
-
-  @override
-  String get containerMissingBody =>
-      'Файл контейнера міг бути переміщений або видалений.';
-
-  @override
-  String get connectPatternSequence => 'З\'єднайте точки графічного ключа';
-
-  @override
   String get passwordLabel => 'Пароль';
-
-  @override
-  String get enterVaultPasswordHint => 'Введіть пароль до сховища';
-
-  @override
-  String get enterBitlockerPasswordHint =>
-      'Введіть пароль або ключ відновлення';
-
-  @override
-  String get enterContainerPasswordHint => 'Введіть пароль до контейнера';
-
-  @override
-  String get readOnlyModeUsbSubtitleDrive =>
-      'Відкрити без можливості внесення змін до цього диска';
-
-  @override
-  String get rememberDriveLabel => 'Запам\'ятати диск';
-
-  @override
-  String get rememberDriveSubtitle => 'Закріпити диск на головному екрані';
 
   @override
   String get unlockVaultButtonLabel => 'Розблокувати сховище';
@@ -3035,52 +2482,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get requestingPermission => 'Запит дозволу…';
 
   @override
-  String get unlockAndMountButton => 'Розблокувати та змонтувати';
-
-  @override
   String get unlockDriveButton => 'Розблокувати диск';
 
   @override
-  String couldntFindDevice(String deviceName) {
-    return 'Не вдалося знайти \"$deviceName\"';
-  }
-
-  @override
-  String get plugDriveBackInRetry =>
-      'Підключіть накопичувач знову та натисніть \"Повторити\", або виберіть його нижче, якщо він відображається під іншою назвою.';
-
-  @override
-  String get retryConnectionButton => 'Повторити підключення';
-
-  @override
-  String get refreshDevicesButton => 'Оновити пристрої';
-
-  @override
-  String get connectOtgDriveToMount =>
-      'Підключіть флеш-диск OTG для монтування';
-
-  @override
-  String get alreadyActive => 'Вже активний';
-
-  @override
   String get active => 'Активний';
-
-  @override
-  String get readyToUnlock => 'Готовий до розблокування';
-
-  @override
-  String get enterUsbPartitionPassword => 'Введіть пароль розділу USB';
-
-  @override
-  String get biometricAuthenticationTitle => 'Біометрична автентифікація';
-
-  @override
-  String get biometricAuthUsbSubtitle =>
-      'Підтвердьте особу для відкриття цього USB-пристрою';
-
-  @override
-  String get connectPatternSequenceToMount =>
-      'Намалюйте графічний ключ для відкриття';
 
   @override
   String get selectAllAction => 'Вибрати все';
@@ -3132,9 +2537,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get exposeAsDocumentProviderMenu => 'Надати доступ до папки';
-
-  @override
-  String get moreOptionsTooltipShort => 'Інші параметри';
 
   @override
   String get copyTooltip => 'Копіювати';
@@ -3323,11 +2725,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get enterFullscreenMenu => 'На весь екран';
 
   @override
-  String failedToOpenExternalApp(String error) {
-    return 'Не вдалося відкрити у зовнішній програмі: $error';
-  }
-
-  @override
   String get thisFolderMenu => 'Ця папка';
 
   @override
@@ -3341,21 +2738,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get playlistOptionsTooltip => 'Параметри списку';
-
-  @override
-  String get enablePlaylistTooltip => 'Увімкнути список відтворення';
-
-  @override
-  String get moreActionsTooltip => 'Додаткові дії';
-
-  @override
-  String get forcePortraitMenu => 'Портретна орієнтація';
-
-  @override
-  String get forceLandscapeMenu => 'Альбомна орієнтація';
-
-  @override
-  String get autoRotateSensorMenu => 'Автоповорот (за датчиком)';
 
   @override
   String get screenOrientationMenu => 'Орієнтація екрана';
@@ -3385,52 +2767,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get diagnosticsCopiedToClipboard => 'Діагностику скопійовано в буфер';
 
   @override
-  String get diagnosticsTitle => 'Діагностика';
-
-  @override
-  String get copyDiagnosticsTooltip => 'Скопіювати діагностику';
-
-  @override
   String get closeTooltip => 'Закрити';
 
   @override
-  String get diagnosticsPlaybackSection => 'Відтворення';
-
-  @override
-  String get diagnosticsEngineSection => 'Рушій';
-
-  @override
-  String get diagnosticsStateLabel => 'Стан';
-
-  @override
-  String get diagnosticsResolutionLabel => 'Роздільність';
-
-  @override
-  String get diagnosticsAspectRatioLabel => 'Співвідношення сторін';
-
-  @override
-  String get diagnosticsPositionLabel => 'Позиція';
-
-  @override
-  String get diagnosticsDurationLabel => 'Тривалість';
-
-  @override
   String get diagnosticsErrorLabel => 'Помилка';
-
-  @override
-  String get diagnosticsPlayerLabel => 'Програвач';
-
-  @override
-  String get diagnosticsDecodingLabel => 'Декодування';
-
-  @override
-  String get diagnosticsExoPlayerValue => 'ExoPlayer (Android)';
-
-  @override
-  String get diagnosticsHardwareAcceleratedValue => 'Апаратне прискорення';
-
-  @override
-  String get diagnosticsUnknownValue => 'Невідомо';
 
   @override
   String get diagnosticsStateBuffering => 'Буферизація';
@@ -3440,9 +2780,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get diagnosticsStatePaused => 'Пауза';
-
-  @override
-  String get diagnosticsDurationUnavailable => '--:--';
 
   @override
   String get rotate90Label => 'Повернути на 90°';
@@ -3458,9 +2795,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get subtitlesLabel => 'Субтитри';
-
-  @override
-  String get imageSettingsTitle => 'Налаштування зображень';
 
   @override
   String get playbackSettingsTitle => 'Налаштування відтворення';
@@ -3500,9 +2834,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get settingsTooltipShort => 'Налаштування';
-
-  @override
   String get sourceCodeTooltip => 'Вихідний код';
 
   @override
@@ -3515,12 +2846,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get resetToDefaultsTooltip => 'Скинути до початкових';
 
   @override
-  String get usbUnlockContainerTitle => 'Розблокувати USB-контейнер';
-
-  @override
-  String get usbMountContainerTitle => 'Змонтувати USB-диск';
-
-  @override
   String get staticLabel => 'Статично';
 
   @override
@@ -3528,15 +2853,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get muteTooltip => 'Вимкнути звук';
-
-  @override
-  String get playOnceDisabledTooltip => 'Один раз (автоперехід вимкнено)';
-
-  @override
-  String get playAndAdvanceTooltip => 'Грати і перейти далі';
-
-  @override
-  String get loopCurrentVideoTooltip => 'Повторювати це відео';
 
   @override
   String get clearThumbnailCacheDialogTitle => 'Очистити кеш мініатюр?';
@@ -3596,10 +2912,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get patternSetupRequiredBeforeSaving =>
       'Встановіть графічний ключ перед збереженням.';
-
-  @override
-  String get passwordKeystoreEncryptedHelperText =>
-      'Пароль шифрується за допомогою Android Keystore. Залиште порожнім, якщо використовуються лише ключові файли.';
 
   @override
   String get changePatternButton => 'Змінити ключ';
@@ -3833,12 +3145,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Операція триває. Будь ласка, зачекайте перед блокуванням.';
 
   @override
-  String get reconnectUsbTooltip => 'Перепідключити USB';
-
-  @override
-  String get unlockContainerTooltip => 'Розблокувати контейнер';
-
-  @override
   String lockFailedMessage(String errorType) {
     return 'Помилка блокування: $errorType';
   }
@@ -3966,9 +3272,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get filteredLabel => 'відфільтровано';
 
   @override
-  String get statsStorageSectionHeader => 'ПАМ\'ЯТЬ';
-
-  @override
   String statsFolderCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -4065,9 +3368,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get fileOpsDismissTooltip => 'Закрити';
-
-  @override
-  String get fileOpsRootDestinationLabel => 'Корінь';
 
   @override
   String get fileOpsCancelledStatusLabel => 'Скасовано';
@@ -4209,26 +3509,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Кнопка каруселі мініатюр під час перегляду списку медіа';
 
   @override
-  String get videoPlaybackSliderLabel => 'Повзунок позиції відео';
-
-  @override
-  String get longPressPlaybackDiagnosticsHint =>
-      'Затисніть для діагностики відтворення';
-
-  @override
-  String get staticImageModeLabel => 'Режим статичного зображення';
-
-  @override
-  String slideshowModeActiveLabel(int seconds) {
-    return 'Активне слайд-шоу із затримкою $seconds с';
-  }
-
-  @override
-  String videoPlaybackModeLabel(String mode) {
-    return 'Режим відтворення відео: $mode';
-  }
-
-  @override
   String get pauseLabel => 'Пауза';
 
   @override
@@ -4248,9 +3528,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String noResultsForQueryMessage(String query) {
     return 'У цій папці немає збігів за запитом \"$query\".';
   }
-
-  @override
-  String get closeCarouselTooltip => 'Закрити карусель';
 
   @override
   String get playlistScrollModeMenu => 'Режим прокручування списку';
@@ -4393,16 +3670,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get cameraCouldNotSwitchLensMessage =>
-      'Не вдалося перемкнути об\'єктив';
-
-  @override
-  String get cameraEncryptingPhotoLabel => 'Шифрування фото…';
-
-  @override
-  String get cameraEncryptingVideoLabel => 'Шифрування відео…';
-
-  @override
   String get aboutApplicationSectionHeader => 'Програма';
 
   @override
@@ -4532,14 +3799,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get aboutFooterMadeWithLove => 'Створено з ❤ для приватності.';
 
   @override
-  String get aboutVersionCopiedMessage => 'Інформацію про версію скопійовано';
-
-  @override
-  String aboutVersionClipboardText(String version) {
-    return 'VaultExplorer v$version (Android)';
-  }
-
-  @override
   String aboutShareText(String url) {
     return 'VaultExplorer — безкоштовне, відкрите та автономне зашифроване сховище для Android.\n\nЗберігайте паролі, нотатки та файли всередині зашифрованих контейнерів (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$url';
   }
@@ -4652,11 +3911,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size пкс · $quality% якості';
-  }
-
-  @override
-  String holdToSpeedIndicatorLabel(String speed) {
-    return '$speed× швидкість';
   }
 
   @override
@@ -4995,15 +4249,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String vaultOccupiedSpaceSummary(String used) {
-    return 'Використано $used';
-  }
-
-  @override
-  String get incorrectPasswordOrKeyfilesDriveError =>
-      'Неправильний пароль / ключ. файл або непідтримуваний диск';
-
-  @override
   String driveUsableCapacity(int mb) {
     return 'Корисна місткість диска: $mb МБ. Розмір не повинен перевищувати це значення.';
   }
@@ -5286,10 +4531,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get reorderBookmarksTitle => 'Впорядкувати закладки';
-
-  @override
-  String get reorderBookmarksDesc =>
-      'Перетягуйте елементи для зміни їхнього порядку';
 
   @override
   String get drawerBookmarksSectionTitle => 'Закладки';
@@ -5600,14 +4841,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierVaultConfirmWarning =>
-      'Буде прочитано кожен файл у цьому сховищі.';
-
-  @override
-  String get hashVerifierVaultEmptyMessage =>
-      'У цьому сховищі немає файлів для перевірки';
-
-  @override
   String get hashVerifierVaultStartButton => 'Почати перевірку';
 
   @override
@@ -5696,9 +4929,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Перевірити всі файли сховища за завантаженим маніфестом';
 
   @override
-  String get hashVerifierVaultChangeActionButton => 'Змінити';
-
-  @override
   String get hashVerifierVaultVerifyButton => 'Перевірити все сховище';
 
   @override
@@ -5731,9 +4961,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get duplicateFinderScanningStage3 =>
       'Етап 3: Повна перевірка хешів SHA-256...';
-
-  @override
-  String get duplicateFinderScanComplete => 'Сканування завершено';
 
   @override
   String get duplicateFinderNoDuplicatesTitle => 'Дублікатів не знайдено';
@@ -5995,9 +5222,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get storageAnalyzerHeaviestFilesHeader => 'Найбільші файли';
-
-  @override
   String get storageAnalyzerBreakdownHeader => 'За типами файлів';
 
   @override
@@ -6093,18 +5317,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get storageAnalyzerEmptyFolder => 'Ця папка порожня.';
-
-  @override
-  String storageAnalyzerSmallerItems(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count менших елементів',
-      few: '$count менші елементи',
-      one: '1 менший елемент',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get storageAnalyzerMapHint =>
@@ -6558,9 +5770,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get vaultBrowserSwitchVaultTooltip => 'Змінити сховище';
-
-  @override
   String get vaultBrowserRootFolderLabel => 'Коренева папка';
 
   @override
@@ -6641,26 +5850,10 @@ class AppLocalizationsUk extends AppLocalizations {
       'Порівняння двох сховищ і копіювання відсутніх або новіших файлів';
 
   @override
-  String get vaultSyncNoVaultsTitle => 'Немає змонтованих сховищ';
-
-  @override
-  String get vaultSyncNoVaultsMessage =>
-      'Змонтуйте щонайменше одне сховище, щоб порівнювати та синхронізувати його файли.';
-
-  @override
-  String get vaultSyncLeftLabel => 'Зліва';
-
-  @override
-  String get vaultSyncRightLabel => 'Справа';
-
-  @override
   String get vaultSyncTapToSelect => 'Торкніться, щоб вибрати сховище та папку';
 
   @override
   String get vaultSyncSwapTooltip => 'Поміняти місцями два сховища';
-
-  @override
-  String get vaultSyncSameLocationWarning => 'Ці дві папки мають відрізнятися.';
 
   @override
   String get vaultSyncIntroTitle => 'Порівняння двох сховищ';
@@ -6712,26 +5905,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeOnlyLeft(Object count) {
-    return '$count лише зліва';
-  }
-
-  @override
-  String vaultSyncBadgeOnlyRight(Object count) {
-    return '$count лише справа';
-  }
-
-  @override
-  String vaultSyncBadgeLeftNewer(Object count) {
-    return '$count новіших зліва';
-  }
-
-  @override
-  String vaultSyncBadgeRightNewer(Object count) {
-    return '$count новіших справа';
-  }
-
-  @override
   String vaultSyncBadgeConflicts(Object count) {
     return '$count потребують перегляду';
   }
@@ -6747,55 +5920,10 @@ class AppLocalizationsUk extends AppLocalizations {
       'Копіює відсутні файли й новіші версії на інший бік.';
 
   @override
-  String get vaultSyncDirectionLeftToRight => 'Зліва → Справа (в один бік)';
-
-  @override
-  String get vaultSyncDirectionLeftToRightSubtitle =>
-      'Передає нові й оновлені файли зліва направо; ніколи не змінює ліву сторону';
-
-  @override
-  String get vaultSyncDirectionRightToLeft => 'Справа → Зліва (в один бік)';
-
-  @override
-  String get vaultSyncDirectionRightToLeftSubtitle =>
-      'Передає нові й оновлені файли справа наліво; ніколи не змінює праву сторону';
-
-  @override
-  String get vaultSyncSearchHint => 'Пошук відмінностей';
-
-  @override
-  String get vaultSyncStatusOnlyLeft => 'Лише зліва';
-
-  @override
-  String get vaultSyncStatusOnlyRight => 'Лише справа';
-
-  @override
-  String get vaultSyncStatusLeftNewer => 'Новіший зліва';
-
-  @override
-  String get vaultSyncStatusRightNewer => 'Новіший справа';
-
-  @override
   String get vaultSyncStatusConflict => 'Потребує перегляду';
 
   @override
   String get vaultSyncStatusTypeMismatch => 'Невідповідність типу';
-
-  @override
-  String get vaultSyncFolderOnlyLeftDetail => 'Папка — лише зліва';
-
-  @override
-  String get vaultSyncFolderOnlyRightDetail => 'Папка — лише справа';
-
-  @override
-  String vaultSyncBothSidesDetail(
-    Object leftSize,
-    Object leftDate,
-    Object rightSize,
-    Object rightDate,
-  ) {
-    return 'Л: $leftSize · $leftDate  →  П: $rightSize · $rightDate';
-  }
 
   @override
   String get vaultSyncTypeMismatchTooltip =>
@@ -6803,12 +5931,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultSyncChangeActionTooltip => 'Змінити дію синхронізації';
-
-  @override
-  String get vaultSyncActionCopyToRight => 'Копіювати → Справа';
-
-  @override
-  String get vaultSyncActionCopyToLeft => 'Копіювати → Зліва';
 
   @override
   String get vaultSyncActionSkip => 'Пропустити';
@@ -6830,11 +5952,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String vaultSyncStartedMessage(Object count) {
-    return 'Синхронізацію розпочато — $count елементів у черзі';
-  }
-
-  @override
   String vaultSyncPickLocationTitle(Object side) {
     return 'Виберіть сховище та папку ($side)';
   }
@@ -6849,9 +5966,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Сховище';
-
-  @override
   String get vaultSyncTargetKindVault => 'Зашифроване сховище';
 
   @override
@@ -6860,9 +5974,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get vaultSyncTargetKindProvider =>
       'Провайдер документів · незашифровано';
-
-  @override
-  String get vaultSyncAddStorageTooltip => 'Додати місце зберігання';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip =>
@@ -6905,10 +6016,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Введіть поточний головний пароль для підтвердження видалення:';
 
   @override
-  String get authenticateToRemoveMasterPassword =>
-      'Підтвердьте особу для видалення головного пароля';
-
-  @override
   String get incorrectPassword => 'Неправильний пароль';
 
   @override
@@ -6930,9 +6037,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get copyPathAction => 'Копіювати шлях';
-
-  @override
-  String get automationSectionHeader => 'Автоматизація';
 
   @override
   String get automationTileTitle => 'Автоматизація';
@@ -7062,10 +6166,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get automationActionEmergencyPurgeLabel => 'Екстрене очищення';
 
   @override
-  String get automationDocCommentFootnote =>
-      'Повний список параметрів extras та протокол відповідей задокументовано у VaultAutomationReceiver.kt.';
-
-  @override
   String get automationTierOffLabel => 'Вимкнено';
 
   @override
@@ -7096,13 +6196,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get showHiddenFilesDesc =>
       'Відображати файли з крапкою на початку та системні папки';
-
-  @override
-  String get showNoMediaFilesLabel => 'Показувати файли .nomedia';
-
-  @override
-  String get showNoMediaFilesDesc =>
-      'Показувати файли .nomedia у списках папок';
 
   @override
   String get dontAskAgain => 'Більше не запитувати';
@@ -7159,13 +6252,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get wizardNextButton => 'Далі';
 
   @override
-  String get wizardStepTypeTitle => 'Тип';
-
-  @override
   String get wizardStepBasicInfoTitle => 'Основні дані';
-
-  @override
-  String get wizardStepAdvancedTitle => 'Розширені';
 
   @override
   String get wizardStepReviewTitle => 'Огляд';
@@ -7178,14 +6265,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get wizardEncryptionDetailsRowTitle => 'Параметри шифрування';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Налаштовано — торкніться для перегляду';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup =>
-      'Торкніться для налаштування';
 
   @override
   String get wizardSummaryTitle => 'Підсумок';
@@ -7245,9 +6324,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get externalSubtitlesLabel => 'Зовнішні субтитри (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'Зовнішні';
-
-  @override
   String get subtitleSizeLabel => 'Розмір';
 
   @override
@@ -7297,9 +6373,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get redactToolLabel => 'Приховати';
 
   @override
-  String get rotateLeftTooltip => 'Повернути ліворуч';
-
-  @override
   String get rotateRightTooltip => 'Повернути праворуч';
 
   @override
@@ -7310,18 +6383,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get cropAspectOriginalLabel => 'Оригінал';
-
-  @override
-  String get applyCropTooltip => 'Застосувати обрізання';
-
-  @override
-  String get annotationColorTooltip => 'Колір';
-
-  @override
-  String get annotationStrokeWidthTooltip => 'Товщина лінії';
-
-  @override
-  String get clearAnnotationsTooltip => 'Очистити всі анотації';
 
   @override
   String get resetImageTooltip => 'Скинути до оригіналу';
@@ -7338,9 +6399,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get addTextAnnotationHint => 'Введіть текст…';
-
-  @override
-  String get textToolHint => 'Торкніться зображення, щоб додати текст';
 
   @override
   String get saveImageSheetTitle => 'Зберегти зміни';
@@ -7620,21 +6678,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get automationSavePimButton => 'Зберегти PIM';
 
   @override
-  String get automationCameraSectionHeader => 'Автоматизація камери';
-
-  @override
   String get automationCameraDescription =>
       'Дозволяє автоматизації викликати TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING для цього сховища. Вимкнено за замовчуванням навіть при повному доступі — на відміну від імпорту/експорту файлів, знімання не потребує жодних індикацій на екрані, тому це окремий явний дозвіл.';
 
   @override
-  String get automationAllowCameraCapture => 'Дозволити знімання камерою';
-
-  @override
   String get automationOverlayPermissionTitle => 'Показ поверх інших програм';
-
-  @override
-  String get automationOverlayPermissionMessage =>
-      'Для знімання камерою у фоновому режимі на Android 14+ потрібен дозвіл «Показ поверх інших програм». Надайте цей дозвіл, щоб дозволити автоматичне знімання, коли екран заблоковано або програма працює у фоні.';
 
   @override
   String get automationPimSavedMessage => 'PIM збережено';
@@ -7725,13 +6773,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get computingHashMessage => 'Обчислення хешу…';
-
-  @override
-  String get tapCalculateToVerifyMessage =>
-      'Торкніться «Обчислити», щоб перевірити';
-
-  @override
-  String get calculateButton => 'Обчислити';
 
   @override
   String get copyDiagnosticsButton => 'Копіювати діагностику';
@@ -7830,9 +6871,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Архіви';
-
-  @override
   String get filesTabLabel => 'Файли';
 
   @override
@@ -7840,40 +6878,10 @@ class AppLocalizationsUk extends AppLocalizations {
       'Надайте доступ для перегляду файлів на вашому пристрої.';
 
   @override
-  String get filesEmptyTitle => 'Тут немає файлів';
-
-  @override
   String get filesEmptyMessage => 'Ця папка порожня.';
 
   @override
-  String get filesNewFolderTooltip => 'Нова папка';
-
-  @override
-  String get filesNewFolderDialogTitle => 'Нова папка';
-
-  @override
-  String get filesNameHint => 'Назва';
-
-  @override
-  String get filesCreate => 'Створити';
-
-  @override
-  String get filesRename => 'Перейменувати';
-
-  @override
-  String get filesDelete => 'Видалити';
-
-  @override
-  String get filesShare => 'Поділитися';
-
-  @override
   String get filesCopy => 'Копіювати';
-
-  @override
-  String get filesMove => 'Перемістити';
-
-  @override
-  String get filesDeleteConfirmTitle => 'Видалити назавжди?';
 
   @override
   String get filesChooseDestinationTitle => 'Виберіть папку';
@@ -7885,49 +6893,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get filesCopyHere => 'Копіювати сюди';
 
   @override
-  String get filesSelectAllTooltip => 'Вибрати все';
-
-  @override
-  String get filesCloseSelectionTooltip => 'Закрити';
-
-  @override
-  String get filesFolderCreated => 'Папку створено';
-
-  @override
-  String get filesCreateFolderFailed => 'Не вдалося створити папку';
-
-  @override
-  String get filesRenamed => 'Перейменовано';
-
-  @override
-  String get filesRenameFailed => 'Не вдалося перейменувати';
-
-  @override
-  String get filesNameAlreadyExists => 'Ця назва вже зайнята';
-
-  @override
-  String get filesDeleted => 'Видалено';
-
-  @override
   String get filesDeleteFailed => 'Не вдалося видалити';
-
-  @override
-  String get filesMoved => 'Переміщено';
-
-  @override
-  String get filesMoveFailed => 'Не вдалося перемістити';
-
-  @override
-  String get filesCopied => 'Скопійовано';
-
-  @override
-  String get filesCopyFailed => 'Не вдалося скопіювати';
-
-  @override
-  String get filesOpenFailed => 'Не вдалося відкрити цей файл';
-
-  @override
-  String get filesShareFailed => 'Не вдалося поділитися цим файлом';
 
   @override
   String get filesFilterTooltip => 'Фільтр';
@@ -8078,10 +7044,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get compositePimFieldLabel => 'PIM (Персональний множник ітерацій)';
 
   @override
-  String get compositePimFieldHelper =>
-      'Залиште порожнім або 0 для стандартної кількості ітерацій';
-
-  @override
   String get compositeRememberContainerTitle => 'Запам\'ятати цей контейнер';
 
   @override
@@ -8140,9 +7102,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Виявлено композитний носій. Для розблокування композитного контейнера потрібні всі його файли-носії.';
 
   @override
-  String get compositeSelectAllCarriersButton => 'Вибрати всі носії';
-
-  @override
   String get compositeCarriersMissingTitle => 'Відсутні композитні носії';
 
   @override
@@ -8151,16 +7110,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get compositeRelocateCarriersButton => 'Вказати розташування носіїв';
-
-  @override
-  String get passwordOptionalFieldLabel => 'Пароль (необов\'язково)';
-
-  @override
-  String get plainDiskImagePasswordHint =>
-      'Пароль не потрібен — цей образ диска не зашифрований';
-
-  @override
-  String get compositePasswordHint => 'Введіть пароль композитного контейнера';
 
   @override
   String get generateStrongPasswordTooltip => 'Згенерувати надійний пароль';
@@ -8405,10 +7354,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get sectionDuressUnlock => 'Розблокування під примусом';
 
   @override
-  String get duressMasterPasswordRequired =>
-      'Перед налаштуванням розблокування під примусом необхідно увімкнути головний пароль у розділі безпеки.';
-
-  @override
   String get duressPasswordTitle => 'Пароль під примусом';
 
   @override
@@ -8625,10 +7570,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get longFileNameDisplayLabel => 'Довгі імена файлів';
 
   @override
-  String get longFileNameDisplayDesc =>
-      'Виберіть, як скорочувати імена, якщо вони перевищують доступне місце';
-
-  @override
   String get longFileNameEllipsizeStartLabel => 'Скорочувати на початку';
 
   @override
@@ -8677,16 +7618,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get gridAspectPortraitLabel => '9:16 (Портретна)';
 
   @override
-  String get fileFolderDisplaySectionHeader => 'Відображення файлів і папок';
-
-  @override
-  String get navigationBarsSectionHeader => 'Навігація та панелі';
-
-  @override
-  String get columnedListViewColumnsSectionHeader =>
-      'Стовпці списку зі стовпцями';
-
-  @override
   String get autoHideAppBarLabel =>
       'Автоматично приховувати панель під час прокручування';
 
@@ -8732,24 +7663,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get storageLocationsTitle => 'Місця зберігання';
 
   @override
-  String get storageLocationsSubtitle =>
-      'Внутрішня пам\'ять, карти SD та провайдери документів';
-
-  @override
-  String get storageLocationsSelectPrompt => 'Виберіть активне сховище';
-
-  @override
   String get addStorageLocationTitle => 'Додати місце зберігання';
 
   @override
   String get addStorageLocationSubtitle =>
       'Додати зовнішню карту SD, USB-накопичувач або папку';
-
-  @override
-  String get documentProviderSafLabel => 'Провайдер документів (SAF)';
-
-  @override
-  String get externalStorageLabel => 'Зовнішнє сховище';
 
   @override
   String get renameStorageLocationTitle => 'Перейменувати місце';
@@ -8761,9 +7679,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return 'Вилучити «$name» з місць зберігання? Файли не буде видалено.';
   }
-
-  @override
-  String get storageLocationAddedSnack => 'Місце зберігання додано';
 
   @override
   String get storageLocationUnresolvedError =>
@@ -8790,59 +7705,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get mediaViewerCustomizeControls => 'Налаштувати керування';
-
-  @override
-  String get mediaViewerControlsTitle => 'Елементи керування медіаплеєром';
-
-  @override
-  String get mediaViewerControlsReset =>
-      'Елементи керування скинуто до початкових';
-
-  @override
-  String get mediaViewerTransportDisplay => 'Керування відтворенням та екран';
-
-  @override
-  String get mediaViewerShowScrubberTitle => 'Показувати шкалу прогресу';
-
-  @override
-  String get mediaViewerShowScrubberDesc =>
-      'Відображати повзунок позиції та тривалості';
-
-  @override
-  String get mediaViewerShowCenterTransportTitle =>
-      'Показувати центральні кнопки відтворення';
-
-  @override
-  String get mediaViewerShowCenterTransportDesc =>
-      'Показувати велику кнопку відтворення/паузи по центру';
-
-  @override
-  String get mediaViewerShowPrevNextTitle =>
-      'Показувати кнопки «Назад» і «Далі»';
-
-  @override
-  String get mediaViewerShowPrevNextDesc =>
-      'Вимкніть, щоб залишити лише одну кнопку відтворення';
-
-  @override
-  String get mediaViewerShowStatusBadgeTitle => 'Показувати значки стану';
-
-  @override
-  String get mediaViewerShowStatusBadgeDesc =>
-      'Відображає затримку слайд-шоу та індикатори статичних зображень';
-
-  @override
-  String get mediaViewerTopBarSection => 'Верхня панель';
-
-  @override
-  String get mediaViewerBottomBarSection => 'Нижня панель';
-
-  @override
-  String get mediaViewerUnpinnedSection => 'Відкріплені (додаткове меню)';
-
-  @override
-  String get mediaViewerAllControlsPinned =>
-      'Усі елементи керування вже закріплені.';
 
   @override
   String get mediaPlayerControlsTitle => 'Керування плеєром';
@@ -8973,21 +7835,8 @@ class AppLocalizationsUk extends AppLocalizations {
       'Перетягніть дії сюди для вікна розширених налаштувань';
 
   @override
-  String get dropHereAtEnd => 'Відпустити тут наприкінці';
-
-  @override
-  String get dragItemsHereToAdd =>
-      '+ Перетягніть елементи сюди, щоб додати до цього розділу';
-
-  @override
   String get moveToAdvancedSettingsTooltip =>
       'Перемістити до розширених налаштувань';
-
-  @override
-  String get noVaultsMounted => 'Немає змонтованих сховищ';
-
-  @override
-  String get vaultsMountedSummary => 'сховищ(а) змонтовано';
 
   @override
   String get dashboardNavLabel => 'Панель керування';
@@ -8996,26 +7845,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultsSectionTitle => 'Сховища';
 
   @override
-  String get vaultStatusMounted => 'Змонтовано';
-
-  @override
   String get lockVaultTooltip => 'Заблокувати сховище';
 
   @override
   String get lockAllVaultsTitle => 'Заблокувати всі сховища';
-
-  @override
-  String get safProviderLabel => 'Провайдер SAF';
-
-  @override
-  String get singleFileCryptoTitle => 'Шифрування окремого файлу';
-
-  @override
-  String get singleFileCryptoSubtitle =>
-      'Шифрування або розшифрування за межами сховищ';
-
-  @override
-  String get passwordGeneratorTitle => 'Генератор паролів';
 
   @override
   String get contentsLabel => 'Вміст';
@@ -9095,16 +7928,8 @@ class AppLocalizationsUk extends AppLocalizations {
   String get holdSpeedMultiplierTitle => 'Швидкість прискорення утриманням';
 
   @override
-  String get holdSpeedMultiplierSubtitle =>
-      'Швидкість під час натискання та утримання відео';
-
-  @override
   String get defaultAspectRatioTitle =>
       'Співвідношення сторін за замовчуванням';
-
-  @override
-  String get defaultAspectRatioSubtitle =>
-      'Застосовується автоматично під час відкриття відео';
 
   @override
   String get aspectRatioModeLabel => 'Співвідношення сторін';
@@ -9372,46 +8197,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get cardSwipeActionsTitle => 'Жести змахування карток';
-
-  @override
-  String get cardSwipeActionsSubtitle =>
-      'Проведіть по картці сховища, щоб швидко відкрити дії редагування та вилучення';
-
-  @override
-  String get cameraQualitySd => '480p (SD)';
-
-  @override
-  String get cameraQualityHd => '720p (HD)';
-
-  @override
-  String get cameraQualityFhd => '1080p (FHD)';
-
-  @override
-  String get cameraQualityUhd => '4K (UHD)';
-
-  @override
-  String get cameraPhotoResMax => 'Повна (макс. роздільність)';
-
-  @override
-  String get cameraPhotoResHigh => '5 Мп (висока)';
-
-  @override
-  String get cameraPhotoResMedium => '2 Мп (середня)';
-
-  @override
-  String get cameraPhotoResLow => '1,2 Мп (низька)';
-
-  @override
-  String get cameraLensWide => 'Ширококутна';
-
-  @override
-  String get cameraLensInfrared => 'ІЧ';
-
-  @override
-  String get cameraLensFront => 'Фронтальна';
-
-  @override
   String get appLockBehaviorTitle => 'Поведінка блокування програми';
 
   @override
@@ -9466,9 +8251,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get passwordInterchangeIncludeSubfolders => 'Включно з підпапками';
-
-  @override
-  String get passwordInterchangeFormatHeader => 'Формат';
 
   @override
   String get passwordInterchangeFormatLabel => 'Формат файлу';
@@ -9596,13 +8378,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get autoLockIndicatorLocksOnScreenOff =>
-      'Блокування після вимкнення екрана';
-
-  @override
-  String get autoLockIndicatorNeverLocks => 'Не блокується автоматично';
-
-  @override
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return 'Блокується після $duration бездіяльності (скидається під час використання програми)';
   }
@@ -9625,37 +8400,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'Місце зберігання \"$name\" недоступне або відключено.';
   }
-
-  @override
-  String get cameraEditPhotoTooltip => 'Редагувати фото';
-
-  @override
-  String get cameraTrimVideoTooltip => 'Обрізати відео';
-
-  @override
-  String get cameraDiscardMediaTooltip => 'Відхилити';
-
-  @override
-  String get cameraSaveMediaTooltip => 'Зберегти у сховище';
-
-  @override
-  String get cameraContinueCaptureTooltip => 'Зробити ще одне фото';
-
-  @override
-  String cameraBatchCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count фото',
-      many: '$count фото',
-      few: '$count фото',
-      one: '1 фото',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get cameraReviewPhotosTooltip => 'Переглянути зроблені фото';
 
   @override
   String get vaultItemTypeAuthenticator => 'Автентифікатор';
@@ -9770,13 +8514,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoLockIndicatorLocksImmediately => 'Миттєве блокування';
-
-  @override
-  String get quickActionLockModeTitle => 'Блокувати після швидких дій';
-
-  @override
-  String get quickActionLockModeSubtitle =>
-      'Поведінка блокування сховища під час збереження зі швидкого захоплення або вікна «Поділитися»';
 
   @override
   String get quickActionLockModeLeaveAsFoundLabel => 'Залишати як було';
@@ -9912,9 +8649,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get textEditorProjectFilesTitle => 'Файли проєкту';
-
-  @override
-  String get textEditorCloseTabTooltip => 'Закрити вкладку';
 
   @override
   String get textEditorResetToDefault => 'Скинути до початкових';
@@ -10199,11 +8933,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String videoEditorSnapNote(String start, String end) {
-    return 'Нарізка без втрат починається з ключового кадру: $start – $end';
-  }
-
-  @override
   String get videoEditorBoundaryInvalid => 'Сегмент вийде занадто коротким.';
 
   @override
@@ -10298,33 +9027,10 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get videoEditorExportSingle => 'Зберегти як нове відео';
-
-  @override
-  String get videoEditorExportSingleHint => 'Оригінал залишиться без змін.';
-
-  @override
   String get videoEditorExportMerge => 'Об\'єднати в одне відео';
 
   @override
-  String get videoEditorExportMergeHint =>
-      'Фрагменти об\'єднуються в порядку часової шкали.';
-
-  @override
   String get videoEditorExportSeparate => 'Зберегти окремими відео';
-
-  @override
-  String videoEditorExportSeparateHint(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count нових файлів',
-      many: '$count нових файлів',
-      few: '$count нові файли',
-      one: '1 новий файл',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get videoEditorLosslessNote =>
@@ -10455,9 +9161,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileSkinColorDefault => 'Типовий';
 
   @override
-  String get fileSkinColorHexLabel => 'Колір у форматі HEX';
-
-  @override
   String get fileSkinPresetClassic => 'Класична';
 
   @override
@@ -10482,17 +9185,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get compositeArchiveCarrierRowWarning =>
       'Непідтримуваний архів — вилучіть його з набору.';
-
-  @override
-  String videoEditorSelectedSegmentSummary(
-    int current,
-    int total,
-    String start,
-    String end,
-    String duration,
-  ) {
-    return 'Сегмент $current із $total: $start – $end ($duration)';
-  }
 
   @override
   String get videoEditorKeepModeDescription =>
@@ -11210,14 +9902,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Контури, тіні та модальні підкладки.';
 
   @override
-  String get skinTapAnyPreviewElement =>
-      'Торкніться будь-якого елемента попереднього перегляду';
-
-  @override
-  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls =>
-      'Виберіть колір програми, файлу чи редактора, щоб побачити, чим він керує.';
-
-  @override
   String get skinCustomizeSkin => 'Налаштувати тему оформлення';
 
   @override
@@ -11225,9 +9909,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinDark => 'Темна';
-
-  @override
-  String get skinApp => 'Програма';
 
   @override
   String get skinEditor => 'Редактор';
@@ -11262,10 +9943,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinAppBar => 'Панель програми';
 
   @override
-  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages =>
-      'Верхня панель навігації незалежна від карток і сторінок.';
-
-  @override
   String get skinTopBarFillColor => 'Колір заливки верхньої панелі.';
 
   @override
@@ -11279,10 +9956,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinFloatingActionButton => 'Плаваюча кнопка дії';
 
   @override
-  String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
-      'Її заливка та колір піктограми відокремлені від кольорів виділення.';
-
-  @override
   String get skinButtonFill => 'Заливка кнопки';
 
   @override
@@ -11294,26 +9967,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinIconColorOnTheRoundButton =>
       'Колір піктограми на круглій кнопці «+».';
-
-  @override
-  String get skinDashboardVaultCards => 'Картки сховищ на панелі';
-
-  @override
-  String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
-      'Встановіть фон для карток заблокованих і підключених сховищ.';
-
-  @override
-  String get skinLockedVaultCard => 'Картка заблокованого сховища';
-
-  @override
-  String get skinNeutralVaultCardFill => 'Нейтральна заливка картки сховища.';
-
-  @override
-  String get skinMountedVaultCard => 'Картка підключеного сховища';
-
-  @override
-  String get skinSeparateFillForAnUnlockedMountedVault =>
-      'Окрема заливка для розблокованого, підключеного сховища.';
 
   @override
   String get skinFineTuneAppColors => 'Тонке налаштування кольорів програми';
@@ -11342,269 +9995,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Торкніться колірного кола, щоб вибрати колір.';
 
   @override
-  String get skinAppBarBackground => 'Фон панелі програми';
-
-  @override
-  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
-      'Панель керування та інші панелі програми використовують цей окремий колір.';
-
-  @override
-  String get skinDashboardMenuIcon => 'Піктограма меню панелі';
-
-  @override
-  String get skinTheHamburgerButtonUsesTheAppBarIconColor =>
-      'Кнопка-гамбургер використовує колір піктограм панелі програми.';
-
-  @override
-  String get skinDashboardTitle => 'Заголовок панелі';
-
-  @override
-  String get skinTheDashboardTitleUsesTheAppBarForegroundColor =>
-      'Заголовок панелі використовує колір переднього плану панелі програми.';
-
-  @override
-  String get skinActionLabelAndIcon => 'Мітка та піктограма дії';
-
-  @override
-  String get skinTheActionAccentColorsLabelsb08a63 =>
-      'Акцент дій забарвлює такі мітки, як «Додати сховище», та їхні піктограми.';
-
-  @override
-  String get skinDashboardAddButton => 'Кнопка додавання на панелі';
-
-  @override
-  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
-      'Заливка кнопки та піктограма плюса мають окремі кольори теми.';
-
-  @override
-  String get skinVaultCardAndIconBackground =>
-      'Фон картки та піктограми сховища';
-
-  @override
-  String get skinTheIconTileUsesPrimary5c2f93 =>
-      'Плитка піктограми використовує основний контейнер. Картка підключеного сховища змішує цей колір із піднятою поверхнею.';
-
-  @override
-  String get skinVaultFormatIconColor => 'Колір піктограми формату сховища';
-
-  @override
-  String get skinVaultFormatInitialsUseOnPrimaryContainer =>
-      'Ініціали формату сховища використовують колір на основному контейнері.';
-
-  @override
-  String get skinVaultStorageDetails => 'Деталі сховища даних';
-
-  @override
-  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor =>
-      'Вільне місце та місткість використовують колір допоміжного тексту.';
-
-  @override
-  String get skin17GBFree5GB => '1,7 ГБ вільно / 5 ГБ';
-
-  @override
-  String get skinVaultStorageProgress => 'Перебіг сховища даних';
-
-  @override
-  String get skinTheProgressBarUsesTheba7c98 =>
-      'Індикатор перебігу використовує акцент програми, а в міру заповнення сховища перемикається на третинний колір і колір помилки.';
-
-  @override
-  String get skinLockActionBackground => 'Фон дії блокування';
-
-  @override
-  String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
-      'Кнопка блокування підключеного сховища використовує основний контейнер.';
-
-  @override
-  String get skinVaultActionsIconColor => 'Колір піктограми дій сховища';
-
-  @override
-  String get skinTheOverflowMenuUsesTheSupportingIconColor =>
-      'Меню додаткових дій використовує колір допоміжних піктограм.';
-
-  @override
-  String get skinMountedVaultCardBackground =>
-      'Фон картки підключеного сховища';
-
-  @override
-  String get skinThisIsTheBackgroundOfa8d0d3 =>
-      'Це фон картки підключеного сховища. Її плитка піктограми все одно використовує колір основної дії.';
-
-  @override
-  String get skinLockedVaultCardBackground =>
-      'Фон картки заблокованого сховища';
-
-  @override
-  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
-      'Цей колір незалежний від панелі програми та картки підключеного сховища.';
-
-  @override
-  String get skinLockedVaultFormatIcon =>
-      'Піктограма формату заблокованого сховища';
-
-  @override
-  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor =>
-      'Піктограми заблокованого сховища використовують колір допоміжного тексту та піктограм.';
-
-  @override
-  String get skinSharedArchive => 'Спільний архів';
-
-  @override
-  String get skinLockedVaultStatusText => 'Текст статусу заблокованого сховища';
-
-  @override
-  String get skinTheLockedStatusLabelUsesTheSupportingTextColor =>
-      'Мітка заблокованого статусу використовує колір допоміжного тексту.';
-
-  @override
-  String get skinLockedVaultActionsIcon =>
-      'Піктограма дій заблокованого сховища';
-
-  @override
-  String get skinVaultActionsMenuBackground => 'Фон меню дій сховища';
-
-  @override
-  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
-      'Спливне вікно «Редагувати» та «Видалити» використовує колір поверхні меню.';
-
-  @override
-  String get skinEditMenuItem => 'Пункт меню «Редагувати»';
-
-  @override
-  String get skinTheEditActionUsesTheRegularForegroundColor =>
-      'Дія «Редагувати» використовує звичайний колір переднього плану.';
-
-  @override
-  String get skinRemoveMenuItem => 'Пункт меню «Видалити»';
-
-  @override
-  String get skinDestructiveActionsUseTheErrorColor =>
-      'Деструктивні дії використовують колір помилки.';
-
-  @override
-  String get skinFileManagerAppBar => 'Панель менеджера файлів';
-
-  @override
-  String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
-      'Панелі інструментів переглядача файлів використовують той самий фон панелі програми.';
-
-  @override
-  String get skinFileManagerBackButton => 'Кнопка «Назад» менеджера файлів';
-
-  @override
-  String get skinToolbarNavigationIconsUseThisColor =>
-      'Піктограми навігації на панелі інструментів використовують цей колір.';
-
-  @override
-  String get skinFileManagerTitle => 'Заголовок менеджера файлів';
-
-  @override
-  String get skinTheCurrentFolderNameUsesTheAppBarForeground =>
-      'Назва поточної папки використовує передній план панелі програми.';
-
-  @override
-  String get skinFileManagerAppBarActions => 'Дії на панелі менеджера файлів';
-
-  @override
-  String get skinToolbarActionsUseThisIconColor =>
-      'Дії на панелі інструментів використовують цей колір піктограм.';
-
-  @override
-  String get skinProjects => 'Проєкти';
-
-  @override
-  String get skinFolder12Items => 'Папка · 12 елементів';
-
-  @override
-  String get skinTextFile4KB => 'Текстовий файл · 4 КБ';
-
-  @override
-  String get skinCompressedFile28MB => 'Стиснутий файл · 28 МБ';
-
-  @override
-  String get skin3Items => '3 елементи';
-
-  @override
-  String get skinFileManagerAddButton => 'Кнопка додавання у менеджері файлів';
-
-  @override
-  String get skinAddButtonIconColor => 'Колір піктограми кнопки додавання';
-
-  @override
-  String get skinThePlusIconUsesTheButtonForegroundColor =>
-      'Піктограма плюса використовує колір переднього плану кнопки.';
-
-  @override
-  String get skinEditorFileName => 'Назва файлу в редакторі';
-
-  @override
-  String get skinTheEditorToolbarUsesTheAppForegroundColor =>
-      'Панель інструментів редактора використовує колір переднього плану програми.';
-
-  @override
-  String get skinDartUTF8Ln3Col12 => ' Ряд 3, Стовп 12';
-
-  @override
-  String get skinTheMainBackgroundBehindThisScreen =>
-      'Основний фон позаду цього екрана.';
-
-  @override
-  String get skinFolderIconColor => 'Колір піктограми папки';
-
-  @override
-  String get skinFileIconColor => 'Колір піктограми файлу';
-
-  @override
-  String get skinText => ' : ';
-
-  @override
-  String get skinFolderNameColor => 'Колір назви папки';
-
-  @override
-  String get skinFileNameColor => 'Колір назви файлу';
-
-  @override
-  String get skinFileDetailsColor => 'Колір деталей файлу';
-
-  @override
-  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor =>
-      'Менші мітки дати, розміру та типу використовують цей колір.';
-
-  @override
-  String get skinFileOverflowButton => 'Кнопка додаткових дій файлу';
-
-  @override
-  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor =>
-      'Кнопка з трьома крапками кожного рядка використовує колір допоміжної піктограми.';
-
-  @override
-  String get skinSelectedFileRow => 'Рядок вибраного файлу';
-
-  @override
-  String get skinSelectedRowsUseATranslucente0ff21 =>
-      'Вибрані рядки мають напівпрозоре підсвічування основного контейнера; сам список файлів залишається на фоні сторінки.';
-
-  @override
-  String get skinFileActionsMenuBackground => 'Фон меню дій з файлом';
-
-  @override
-  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
-      'Спливне вікно дій над файлом використовує колір поверхні меню.';
-
-  @override
-  String get skinOpenFileMenuItem => 'Пункт меню «Відкрити файл»';
-
-  @override
-  String get skinRegularFileActionsUseTheMainTextColor =>
-      'Звичайні дії над файлами використовують основний колір тексту.';
-
-  @override
-  String get skinOpen => 'Відкрити';
-
-  @override
-  String get skinDeleteFileMenuItem => 'Пункт меню «Видалити файл»';
-
-  @override
   String get skinEditorBackground => 'Фон редактора';
 
   @override
@@ -11619,10 +10009,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinEditorTextColor => 'Колір тексту коду';
-
-  @override
-  String get skinTheDefaultCodeAndEditorTextColor =>
-      'Стандартний колір звичайного коду; текст із підсвічуванням синтаксису має власні кольори.';
 
   @override
   String get skinEditorCursor => 'Курсор редактора';
@@ -11641,42 +10027,19 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinEditorKeywords => 'Ключові слова';
 
   @override
-  String get skinEditorKeywordsExplanation =>
-      'Ключові слова мови, такі як class, void, return та if.';
-
-  @override
   String get skinEditorTypes => 'Типи та класи';
-
-  @override
-  String get skinEditorTypesExplanation => 'Назви класів, типи та інтерфейси.';
 
   @override
   String get skinEditorStrings => 'Рядки';
 
   @override
-  String get skinEditorStringsExplanation =>
-      'Текст у лапках та рядкові літерали.';
-
-  @override
   String get skinEditorNumbers => 'Числа та значення';
-
-  @override
-  String get skinEditorNumbersExplanation =>
-      'Числові літерали, логічні значення та константи.';
 
   @override
   String get skinEditorFunctions => 'Функції та методи';
 
   @override
-  String get skinEditorFunctionsExplanation =>
-      'Назви функцій, виклики методів і вбудовані елементи.';
-
-  @override
   String get skinEditorComments => 'Коментарі';
-
-  @override
-  String get skinEditorCommentsExplanation =>
-      'Коментарі до коду та блоки документації.';
 
   @override
   String get textEditorColorsSectionTitle => 'Кольори та шрифт редактора';
@@ -11687,9 +10050,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get textEditorColorsCustomized => 'Користувацькі кольори активні';
-
-  @override
-  String get textEditorResetColors => 'Скинути кольори до стандартних';
 
   @override
   String get textEditorFollowAppSkinNotice =>
@@ -11738,15 +10098,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
       'Полотно, бічна смуга, курсор, виділення, фон та шаблон синтаксису.';
-
-  @override
-  String get skinGutterAndLineNumbers => 'Бічна смуга та номери рядків';
-
-  @override
-  String get skinCursor => 'Курсор';
-
-  @override
-  String get skinSelection => 'Виділення';
 
   @override
   String get skinEditorBackgroundTemplate => 'Шаблон фону редактора';
@@ -11818,12 +10169,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinAutomaticMatchLightOrDarkMode =>
       'Автоматично (відповідно до світлого чи темного режиму)';
-
-  @override
-  String get skinSkinExported => 'Тему експортовано.';
-
-  @override
-  String get skinSkinsExported => 'Теми експортовано.';
 
   @override
   String get skinRemoveSkin => 'Видалити тему?';
@@ -11941,11 +10286,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String skinSelectPreviewElement(String title) {
-    return 'Вибрати $title';
-  }
-
-  @override
   String skinIconColorForItem(String item) {
     return 'Колір піктограми $item';
   }
@@ -11954,14 +10294,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String skinNameColorForItem(String item) {
     return 'Колір назви $item';
   }
-
-  @override
-  String get skinFileIconColorSettingDescription =>
-      'Цей колір контролюється налаштуванням кольору піктограми в розділі менеджера файлів.';
-
-  @override
-  String get skinFileNameColorSettingDescription =>
-      'Цей колір контролюється налаштуванням кольору назви в розділі менеджера файлів.';
 
   @override
   String get skinExportedSingle => 'Тему експортовано.';
@@ -12003,79 +10335,8 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinInterfaceApplied => 'Налаштування інтерфейсу застосовано.';
 
   @override
-  String get automationBatteryHintTitle => 'Дозволити запуск у фоні';
-
-  @override
-  String get automationBatteryHintMessage =>
-      'Коли VaultExplorer повністю закрито, Android може заблокувати автоматичне розблокування цього сховища. Установіть використання батареї VaultExplorer на «Без обмежень», щоб Tasker, MacroDroid та інші програми могли розблоковувати його у фоновому режимі.';
-
-  @override
-  String get automationBatteryHintButton => 'Відкрити налаштування програми';
-
-  @override
   String get automationBatterySettingsOpenFailedMessage =>
       'Не вдалося відкрити налаштування програми. Відкрийте Налаштування > Програми > VaultExplorer > Батарея та виберіть «Без обмежень».';
-
-  @override
-  String get skinPreviewMountedVaultName => 'Особисте сховище';
-
-  @override
-  String get skinPreviewVaultName => 'Назва сховища';
-
-  @override
-  String get skinMainTextColorAlsoColorsRegularMenuItems =>
-      'Назви сховищ і звичайні дії меню використовують основний колір тексту програми.';
-
-  @override
-  String get skinStatusBannerExamples => 'Банери стану';
-
-  @override
-  String get skinSuccessBanner => 'Банер успіху';
-
-  @override
-  String get skinWarningBanner => 'Банер попередження';
-
-  @override
-  String get skinErrorBanner => 'Банер помилки';
-
-  @override
-  String get skinSuccessBannerUsesSuccessContainer =>
-      'Заливка банера та повідомлення використовують кольори успіху.';
-
-  @override
-  String get skinWarningBannerUsesWarningContainer =>
-      'Заливка банера та повідомлення використовують кольори попередження.';
-
-  @override
-  String get skinErrorBannerUsesErrorContainer =>
-      'Заливка банера та повідомлення використовують кольори помилки.';
-
-  @override
-  String get skinPreviewChangesSaved => 'Зміни збережено';
-
-  @override
-  String get skinPreviewStorageAlmostFull => 'Сховище майже заповнене';
-
-  @override
-  String get skinPreviewCouldNotUnlockVault =>
-      'Не вдалося розблокувати сховище';
-
-  @override
-  String get skinSurfaceAndBorderExamples => 'Поверхні та межі';
-
-  @override
-  String get skinFileRowDetailsColor => 'Колір деталей рядка файлу';
-
-  @override
-  String get skinFileActionOverflowIconColor => 'Колір значка дії рядка файлу';
-
-  @override
-  String get skinMatchingElementsHighlightTogether =>
-      'Інші елементи попереднього перегляду з таким самим кольором також виділяються.';
-
-  @override
-  String get skinStatusBannerTextColor =>
-      'Текст банера використовує цей колір.';
 
   @override
   String get apkOpenPackageInstaller => 'Інсталятор пакетів';
@@ -12183,10 +10444,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String abLoopStartedMessage(String start, String end) {
     return 'Повторення $start – $end';
   }
-
-  @override
-  String get abLoopEndTooCloseMessage =>
-      'B має бути після A. Перемотайте вперед і торкніться знову.';
 
   @override
   String get abLoopClearedMessage => 'Повторення A-B вимкнено';
@@ -12414,9 +10671,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinSharedPaletteTitle => 'Спільна палітра';
 
   @override
-  String get skinSharedPaletteShort => 'Спільна';
-
-  @override
   String get skinSharedPaletteDescription =>
       'Кольори, які кожна сторінка успадковує, доки не встановить власні. Екрани без власного розділу, як-от розблокування та камера, використовують їх безпосередньо.';
 
@@ -12439,182 +10693,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get skinResetPageColors => 'Скинути кольори сторінки';
 
   @override
-  String get skinTokenBackground => 'Фон сторінки';
-
-  @override
-  String get skinTokenBackgroundHint =>
-      'Полотно позаду всіх елементів на цій сторінці.';
-
-  @override
-  String get skinTokenText => 'Основний текст';
-
-  @override
-  String get skinTokenTextHint =>
-      'Заголовки, назви та основний текст на цій сторінці.';
-
-  @override
-  String get skinTokenTextSecondary => 'Вторинний текст та значки';
-
-  @override
-  String get skinTokenTextSecondaryHint =>
-      'Підзаголовки, деталі, підказки та другорядні значки.';
-
-  @override
-  String get skinTokenAppBar => 'Верхня панель';
-
-  @override
-  String get skinTokenAppBarHint => 'Заливка верхньої панелі на цій сторінці.';
-
-  @override
-  String get skinTokenOnAppBar => 'Текст та значки верхньої панелі';
-
-  @override
-  String get skinTokenOnAppBarHint =>
-      'Колір заголовка та значків на верхній панелі.';
-
-  @override
-  String get skinTokenCard => 'Картки та рядки';
-
-  @override
-  String get skinTokenCardHint => 'Картки, рядки списку та згруповані панелі.';
-
-  @override
-  String get skinTokenCardActive => 'Активна картка';
-
-  @override
-  String get skinTokenCardActiveHint =>
-      'Виділена картка, наприклад розблоковане сховище.';
-
-  @override
-  String get skinTokenRaised => 'Чіпи та елементи керування';
-
-  @override
-  String get skinTokenRaisedHint =>
-      'Поля пошуку, чіпи, мініатюри та плитки значків.';
-
-  @override
-  String get skinTokenOverlay => 'Меню, діалоги та панелі';
-
-  @override
-  String get skinTokenOverlayHint =>
-      'Спливаючі меню, діалоги та нижні панелі, відкриті з цієї сторінки.';
-
-  @override
-  String get skinTokenAccent => 'Акцент';
-
-  @override
-  String get skinTokenAccentHint =>
-      'Кнопки, посилання, індикатори прогресу та активні значки.';
-
-  @override
-  String get skinTokenOnAccent => 'Текст на акценті';
-
-  @override
-  String get skinTokenOnAccentHint =>
-      'Мітки та значки на кнопках з акцентною заливкою.';
-
-  @override
-  String get skinTokenSelection => 'Виділення';
-
-  @override
-  String get skinTokenSelectionHint =>
-      'Вибрані рядки та виділені плитки значків.';
-
-  @override
-  String get skinTokenOnSelection => 'Текст на виділенні';
-
-  @override
-  String get skinTokenOnSelectionHint =>
-      'Значки та текст на вибраних елементах.';
-
-  @override
-  String get skinTokenDivider => 'Роздільники';
-
-  @override
-  String get skinTokenDividerHint =>
-      'Тонкі розділові лінії та непомітні рамки.';
-
-  @override
-  String get skinTokenOutline => 'Контури';
-
-  @override
-  String get skinTokenOutlineHint =>
-      'Помітніші контури на кнопках із рамкою та полях введення.';
-
-  @override
-  String get skinTokenFab => 'Кругла кнопка додавання';
-
-  @override
-  String get skinTokenFabHint => 'Заливка круглої кнопки додавання.';
-
-  @override
-  String get skinTokenOnFab => 'Значок круглої кнопки додавання';
-
-  @override
-  String get skinTokenOnFabHint => 'Значок «плюс» на круглій кнопці додавання.';
-
-  @override
-  String get skinPreviewConfirm => 'Підтвердити';
-
-  @override
-  String get skinPreviewCancelButton => 'Скасувати';
-
-  @override
-  String get skinPreviewSaveButton => 'Зберегти';
-
-  @override
-  String get skinPreviewRunButton => 'Запустити';
-
-  @override
-  String get skinPreviewPasteButton => 'Вставити сюди';
-
-  @override
-  String get skinPreviewUnlockButton => 'Розблокувати';
-
-  @override
-  String get skinPreviewSortChip => 'Сортування: Назва';
-
-  @override
-  String get skinPreviewSearchChip => 'Пошук файлів';
-
-  @override
-  String get skinPreviewPinnedBadge => 'Закріплено';
-
-  @override
-  String get skinPreviewVaultsHeader => 'СХОВИЩА';
-
-  @override
-  String get skinPreviewToolsSection => 'Криптографія файлів';
-
-  @override
-  String get skinPreviewToolOne => 'Генератор ключових файлів і парольних фраз';
-
-  @override
-  String get skinPreviewToolOneHint => 'Генерація паролів і ключових файлів';
-
-  @override
-  String get skinPreviewToolTwo => 'Перевірка контрольних сум і хешів';
-
-  @override
-  String get skinPreviewToolTwoHint =>
-      'Перевірка великих файлів на пошкодження';
-
-  @override
-  String get skinPreviewSettingsSection => 'Безпека';
-
-  @override
-  String get skinPreviewSettingOne => 'Блокування програми';
-
-  @override
-  String get skinPreviewSettingOneHint => 'Біометрія та автоблокування';
-
-  @override
-  String get skinPreviewSettingTwo => 'Сховище даних';
-
-  @override
-  String get skinPreviewSettingTwoHint => 'Зовнішні сховища та хмарні мости';
-
-  @override
   String get inPlaceEditDone => 'Готово';
 
   @override
@@ -12623,9 +10701,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get inPlaceEditHint =>
       'Перетягуйте дії між панелями або торкніться для налаштування';
-
-  @override
-  String get inPlaceEditAvailable => 'Доступні дії';
 
   @override
   String get inPlaceEditTopDock => 'Верхня панель';
@@ -12938,23 +11013,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String thumbnailGlobalInContainerConfirmMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count сховищ дотримуються цього налаштування за замовчуванням і почнуть зберігати мініатюри всередині сховища. Це повільніше й неможливо для сховищ лише для читання.',
-      many:
-          '$count сховищ дотримуються цього налаштування за замовчуванням і почнуть зберігати мініатюри всередині сховища. Це повільніше й неможливо для сховищ лише для читання.',
-      few:
-          '$count сховища дотримуються цього налаштування за замовчуванням і почнуть зберігати мініатюри всередині сховища. Це повільніше й неможливо для сховищ лише для читання.',
-      one:
-          '$count сховище дотримується цього налаштування за замовчуванням і почне зберігати мініатюри всередині сховища. Це повільніше й неможливо для сховищ лише для читання.',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String get scanAdjustCornersTitle => 'Налаштування кутів';
 
   @override
@@ -13025,10 +11083,6 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get createArchiveMediaRecommendation =>
-      'Виявлено попередньо стиснені медіафайли. Режим «Без стиснення» вибрано автоматично для економії процесора та заряду.';
-
-  @override
   String get createArchiveNameLabel => 'Назва архіву';
 
   @override
@@ -13038,44 +11092,16 @@ class AppLocalizationsUk extends AppLocalizations {
   String get createArchiveSelectFormatTooltip => 'Вибрати формат';
 
   @override
-  String get createArchiveSecuritySection => 'Безпека';
-
-  @override
   String get createArchivePasswordLabel => 'Пароль (необов\'язково)';
-
-  @override
-  String get createArchivePasswordHintText => 'Введіть пароль';
 
   @override
   String get createArchiveConfirmPasswordLabel => 'Підтвердіть пароль';
 
   @override
-  String get createArchiveConfirmPasswordHint => 'Повторіть пароль';
-
-  @override
   String get passphraseStrengthFair => 'Задовільний';
 
   @override
-  String get createArchiveEncryptFilenamesNeedsPassword =>
-      'Потрібен пароль для попереднього перегляду файлів';
-
-  @override
-  String get createArchiveEncryptFilenamesActive =>
-      'Приховує список файлів до розблокування';
-
-  @override
-  String get createArchiveAdvancedOptions => 'Розширені параметри';
-
-  @override
   String get createArchiveCompressionLevel => 'Рівень стиснення';
-
-  @override
-  String get createArchiveSplitHintZip =>
-      'Збережеться як .z01, .z02 … і фінальний .zip. Тримайте всі частини в одній папці.';
-
-  @override
-  String get createArchiveSplitHintSevenZip =>
-      'Збережеться як .7z.001, .7z.002 … Тримайте всі частини в одній папці.';
 
   @override
   String get createArchiveSplitVolumes => 'Розділити на томи';
@@ -13119,29 +11145,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Найменший розмір, повільніше стиснення';
 
   @override
-  String get officeViewerErrorTitle => 'Неможливо переглянути цей документ';
-
-  @override
-  String get officeViewerEncrypted =>
-      'Цей документ захищено паролем, а зашифровані файли Office переглянути неможливо.';
-
-  @override
-  String get officeViewerUnsupported =>
-      'Не вдалося прочитати цей файл. Він може бути пошкоджений або мати формат, який переглядач не підтримує.';
-
-  @override
-  String get officeViewerTooLarge =>
-      'Цей документ завеликий для перегляду в програмі.';
-
-  @override
-  String get officeViewerSpeakerNotes => 'Нотатки доповідача';
-
-  @override
   String get fileAssocDocumentViewer => 'Вбудований переглядач документів';
-
-  @override
-  String get viewOfficeDocumentsInApp =>
-      'Перегляд файлів Word, Excel, PowerPoint і OpenDocument у програмі';
 
   @override
   String get archiveCompressionMethodLabel => 'Метод стиснення';
@@ -13157,19 +11161,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get archiveMethodDeflateDesc =>
       'Найшвидший, але файли більші, а сумісність найширша. Також використовується в ZIP і .tar.gz.';
-
-  @override
-  String archiveMethodFixedInfo(String format, String method) {
-    return '$format завжди стискає за допомогою $method.';
-  }
-
-  @override
-  String get archiveMethodMoreInSevenZip =>
-      'LZMA2 і LZMA доступні в архівах 7-Zip.';
-
-  @override
-  String get archiveMethodStoreNote =>
-      'Режим «Без стиснення» не стискає, тому методу для вибору немає.';
 
   @override
   String get browserTabsEnabledTitle =>
@@ -13195,9 +11186,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get browserTabMoveToOtherPane => 'Перемістити в іншу панель';
 
   @override
-  String get browserTabSwitchPrevious => 'Перейти на попередню вкладку';
-
-  @override
   String get browserTabOpenInNewTab => 'Відкрити в новій вкладці';
 
   @override
@@ -13210,9 +11198,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get browserTabCloseToRight => 'Закрити вкладки праворуч';
-
-  @override
-  String get browserTabCloseAll => 'Закрити всі';
 
   @override
   String get dualPaneEnabledTitle => 'Використовувати дві панелі';
@@ -13522,23 +11507,8 @@ class AppLocalizationsUk extends AppLocalizations {
   String get imageEditorAngle => 'Кут';
 
   @override
-  String get fontSizeSmall => 'Малий';
-
-  @override
-  String get fontSizeMedium => 'Середній';
-
-  @override
-  String get fontSizeLarge => 'Великий';
-
-  @override
-  String get fontSizeExtraLarge => 'Дуже великий';
-
-  @override
   String get imageEditorTextPlaceholder =>
       'ДВІЧІ ТОРКНІТЬСЯ, ЩОБ ЗМІНИТИ ТЕКСТ';
-
-  @override
-  String get imageEditorFontSizePreview => 'Приклад перегляду ABC 123';
 
   @override
   String imageEditorPhotoLabel(int index) {
@@ -13570,9 +11540,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get floatingPlayerAudioOnly => 'Лише аудіо';
-
-  @override
-  String get floatingPlayerShowVideo => 'Показати відео';
 
   @override
   String get masterLockTitle => 'Головне блокування';
@@ -14369,9 +12336,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncCurrentStorageBadge => 'Поточне';
 
   @override
-  String get vaultSyncChangeStorageTooltip => 'Змінити сховище';
-
-  @override
   String vaultSyncPickFolderTitle(String storage) {
     return 'Папка в $storage';
   }
@@ -14396,9 +12360,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get categoriesSectionTitle => 'Категорії';
-
-  @override
-  String get manageCategoriesTooltip => 'Керування категоріями';
 
   @override
   String get categoryShortcutsTitle => 'Ярлики категорій';
@@ -14490,20 +12451,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Усе одно заблокувати';
-
-  @override
-  String vaultListingSymbolicLinkCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '# символічного посилання',
-      many: '# символічних посилань',
-      few: '# символічні посилання',
-      one: '# символічне посилання',
-      zero: 'Символічних посилань немає',
-    );
-    return '$_temp0';
-  }
 
   @override
   String vaultListingHiddenEntryCount(int count) {
@@ -14943,9 +12890,6 @@ class AppLocalizationsUk extends AppLocalizations {
       'Відредагована копія буде нерухомим зображенням. Оригінальний файл, дані EXIF і будь-яке вбудоване відео залишаться незмінними.';
 
   @override
-  String get pimInputHint => 'Порожньо або 0 за замовчуванням';
-
-  @override
   String get galleryMetadataIndexStorageLabel =>
       'Gallery metadata index storage';
 
@@ -14988,10 +12932,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get musicIndexHiddenFolderOption => 'Hidden folder';
-
-  @override
-  String get musicIndexHiddenFolderDesc =>
-      'Stored in an unencrypted hidden folder in Local Storage.';
 
   @override
   String get libraryStorageHiddenFolder =>

@@ -77,10 +77,6 @@
   "@pdfViewerNextMatch": {
     "description": "Tooltip for the next search match button"
   },
-  "pdfViewerCloseSearch": "Close search",
-  "@pdfViewerCloseSearch": {
-    "description": "Tooltip for closing the PDF search bar"
-  },
   "pdfViewerPrintTooltip": "Print document",
   "@pdfViewerPrintTooltip": {
     "description": "Tooltip for the print action"
@@ -96,18 +92,6 @@
   "pdfViewerFailedToLoad": "Failed to load PDF",
   "@pdfViewerFailedToLoad": {
     "description": "Fallback error message when the platform view reports an error without a message"
-  },
-  "pdfViewerEditTooltip": "Edit",
-  "@pdfViewerEditTooltip": {
-    "description": "Tooltip for the button that switches the PDF viewer into edit mode"
-  },
-  "pdfViewerDoneEditingTooltip": "Done editing",
-  "@pdfViewerDoneEditingTooltip": {
-    "description": "Tooltip for the button that saves and exits PDF edit mode"
-  },
-  "pdfViewerSaveFailed": "Couldn't save changes to this PDF",
-  "@pdfViewerSaveFailed": {
-    "description": "Snackbar message when re-encrypting an edited PDF back into the vault fails"
   },
   "pdfViewerEditUnavailable": "Editing isn't available for this document",
   "@pdfViewerEditUnavailable": {
@@ -191,10 +175,6 @@
   "@advancedParametersTitle": {
     "description": "Expansion tile title for PIM/cipher/hash advanced options"
   },
-  "pimFieldLabel": "PIM  (leave blank for default)",
-  "@pimFieldLabel": {
-    "description": "Label for the optional PIM (Personal Iterations Multiplier) field"
-  },
   "encryptionAlgorithmLabel": "Encryption Algorithm",
   "@encryptionAlgorithmLabel": {
     "description": "Label for the cipher/encryption algorithm picker"
@@ -256,51 +236,12 @@
   "@dismiss": {
     "description": "Generic dismiss action tooltip"
   },
-  "byteProgressText": "{transferred} / {total}  ({pct}%)",
-  "@byteProgressText": {
-    "description": "Byte transfer progress, e.g. '1.2 MB / 4.0 MB (30%)'",
-    "placeholders": {
-      "transferred": {
-        "type": "String"
-      },
-      "total": {
-        "type": "String"
-      },
-      "pct": {
-        "type": "int"
-      }
-    }
-  },
-  "countProgressText": "{done} / {total}  ({pct}%)",
-  "@countProgressText": {
-    "description": "Item count transfer progress, e.g. '3 / 10 (30%)'",
-    "placeholders": {
-      "done": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      },
-      "pct": {
-        "type": "int"
-      }
-    }
-  },
   "multiOpLabel": "{count, plural, =1{1 transfer} other{{count} transfers}}",
   "@multiOpLabel": {
     "description": "Label shown when multiple file operations are running at once",
     "placeholders": {
       "count": {
         "type": "num"
-      }
-    }
-  },
-  "multiOpSublabel": "{summary} · tap to view all",
-  "@multiOpSublabel": {
-    "description": "Sublabel under the multi-operation activity pill",
-    "placeholders": {
-      "summary": {
-        "type": "String"
       }
     }
   },
@@ -505,10 +446,6 @@
   "@readOnlyContainerWarning": {
     "description": "Snackbar shown when trying to modify a read-only mounted container"
   },
-  "hiddenVolumeProtectionTriggeredWarning": "A write to this outer volume would have damaged the hidden volume, so it was blocked. This container has been switched to read-only for the rest of this session.",
-  "@hiddenVolumeProtectionTriggeredWarning": {
-    "description": "Snackbar/warning shown when hidden volume protection blocks a write and switches the outer volume to read-only for the rest of the session"
-  },
   "protectHiddenVolumeToggleTitle": "Protect hidden volume",
   "@protectHiddenVolumeToggleTitle": {
     "description": "Title for the \"protect hidden volume\" toggle in the unlock advanced options"
@@ -516,10 +453,6 @@
   "protectHiddenVolumeToggleSubtitle": "Prevent damage caused by writing to the outer volume",
   "@protectHiddenVolumeToggleSubtitle": {
     "description": "Subtitle explaining the \"protect hidden volume\" toggle"
-  },
-  "protectHiddenVolumeCredentialsRequired": "A hidden volume password or keyfile is required to protect it",
-  "@protectHiddenVolumeCredentialsRequired": {
-    "description": "Validation error shown when \"protect hidden volume\" is enabled but no hidden password/keyfiles were entered"
   },
   "deleteItemsTitle": "{count, plural, =1{Delete 1 item?} other{Delete {count} items?}}",
   "@deleteItemsTitle": {
@@ -911,10 +844,6 @@
   "@removeFromBookmarks": {
     "description": "Tooltip for the star/bookmark toggle when the item is currently bookmarked"
   },
-  "addToBookmarks": "Add to bookmarks",
-  "@addToBookmarks": {
-    "description": "Tooltip for the star/bookmark toggle when the item is not currently bookmarked"
-  },
   "edit": "Edit",
   "@edit": {
     "description": "Generic Edit action label"
@@ -1049,114 +978,9 @@
   "@archiveExplorerPermissionTitle": {
     "description": "Title shown on the decoy Archive Explorer screen when file access hasn't been granted yet"
   },
-  "archiveExplorerPermissionMessage": "Allow access to your files to browse and extract .zip archives from Downloads.",
-  "@archiveExplorerPermissionMessage": {
-    "description": "Explanatory message shown alongside the grant-access button on the decoy Archive Explorer screen"
-  },
   "archiveExplorerGrantAccess": "Grant Access",
   "@archiveExplorerGrantAccess": {
     "description": "Button label to request all-files storage access from the decoy Archive Explorer screen"
-  },
-  "archiveExplorerEmptyTitle": "No archives found",
-  "@archiveExplorerEmptyTitle": {
-    "description": "Empty state title on the decoy Archive Explorer screen when no .zip files exist in Downloads"
-  },
-  "archiveExplorerEmptyMessage": "Zip files you download will show up here.",
-  "@archiveExplorerEmptyMessage": {
-    "description": "Empty state message on the decoy Archive Explorer screen when no .zip files exist in Downloads"
-  },
-  "archiveExplorerRefreshTooltip": "Refresh",
-  "@archiveExplorerRefreshTooltip": {
-    "description": "Tooltip for the refresh button on the decoy Archive Explorer screen"
-  },
-  "archiveExplorerEntryCount": "{count, plural, one{1 item} other{{count} items}}",
-  "@archiveExplorerEntryCount": {
-    "description": "Number of entries inside a zip archive shown on the decoy Archive Explorer screen",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "archiveExplorerExtractAll": "Extract All",
-  "@archiveExplorerExtractAll": {
-    "description": "Button label to extract every entry from a zip archive on the decoy Archive Explorer screen"
-  },
-  "archiveExplorerExtracting": "Extracting…",
-  "@archiveExplorerExtracting": {
-    "description": "Progress label shown while a zip archive is being extracted on the decoy Archive Explorer screen"
-  },
-  "archiveExplorerExtractSuccess": "Extracted {count} files to Download/Extracted/{name}",
-  "@archiveExplorerExtractSuccess": {
-    "description": "Confirmation snackbar after successfully extracting a zip archive on the decoy Archive Explorer screen",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "archiveExplorerExtractFailed": "Couldn't extract that archive.",
-  "@archiveExplorerExtractFailed": {
-    "description": "Error snackbar shown when extracting a zip archive fails on the decoy Archive Explorer screen"
-  },
-  "archiveExplorerOpenFailed": "Couldn't open that archive.",
-  "@archiveExplorerOpenFailed": {
-    "description": "Error snackbar shown when a zip archive can't be parsed on the decoy Archive Explorer screen"
-  },
-  "archiveExplorerOpenArchive": "Open archive…",
-  "@archiveExplorerOpenArchive": {
-    "description": "App-bar action on the decoy Archive Explorer screen to pick any .zip file via the system file picker, not just ones in Downloads"
-  },
-  "archiveExplorerUnresolvedPath": "Couldn't access that file directly. Try picking one from Downloads instead.",
-  "@archiveExplorerUnresolvedPath": {
-    "description": "Error snackbar on the decoy Archive Explorer screen when a picked document can't be resolved to a real filesystem path"
-  },
-  "archiveExplorerExtractTo": "Extract to…",
-  "@archiveExplorerExtractTo": {
-    "description": "Menu item on the decoy Archive Explorer screen to extract a zip archive to a user-chosen folder instead of the default location"
-  },
-  "archiveExplorerPreview": "Preview",
-  "@archiveExplorerPreview": {
-    "description": "Menu item / action on the decoy Archive Explorer screen to browse a zip archive's contents without extracting it"
-  },
-  "archiveExplorerChoosingDestination": "Choosing destination…",
-  "@archiveExplorerChoosingDestination": {
-    "description": "Transient status shown on the decoy Archive Explorer screen while the folder picker for a custom extraction destination is open"
-  },
-  "archiveExplorerNoDestinationChosen": "No destination chosen.",
-  "@archiveExplorerNoDestinationChosen": {
-    "description": "Snackbar shown on the decoy Archive Explorer screen when the user cancels the extraction-destination folder picker"
-  },
-  "archiveExplorerExtractSuccessTo": "Extracted {count} files to {path}",
-  "@archiveExplorerExtractSuccessTo": {
-    "description": "Confirmation snackbar after extracting a zip archive to a user-chosen destination on the decoy Archive Explorer screen",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "path": {
-        "type": "String"
-      }
-    }
-  },
-  "archiveBrowserEmptyTitle": "Empty folder",
-  "@archiveBrowserEmptyTitle": {
-    "description": "Empty state title shown when browsing into an empty folder inside an archive on the decoy Archive Explorer screen"
-  },
-  "archiveBrowserEmptyMessage": "This folder doesn't contain any files.",
-  "@archiveBrowserEmptyMessage": {
-    "description": "Empty state message shown when browsing into an empty folder inside an archive on the decoy Archive Explorer screen"
-  },
-  "archiveBrowserRoot": "Archive",
-  "@archiveBrowserRoot": {
-    "description": "Breadcrumb label for the root of an archive being browsed on the decoy Archive Explorer screen"
-  },
-  "archiveBrowserOpenFileFailed": "Couldn't open that file.",
-  "@archiveBrowserOpenFileFailed": {
-    "description": "Error snackbar shown when extracting a single entry for preview fails while browsing an archive on the decoy Archive Explorer screen"
   },
   "fileAssocInAppTextEditor": "In-app Text Editor",
   "@fileAssocInAppTextEditor": {
@@ -1203,10 +1027,6 @@
   "@masterPasswordActiveSubtitle": {
     "description": "Settings toggle subtitle when a master password is set"
   },
-  "masterPasswordInactiveSubtitle": "Require a password to open the app",
-  "@masterPasswordInactiveSubtitle": {
-    "description": "Settings toggle subtitle when no master password is set"
-  },
   "newPasswordLabel": "New Password",
   "@newPasswordLabel": {
     "description": "Label for new password input field"
@@ -1230,18 +1050,6 @@
   "biometricUnlockTitle": "Biometric Unlock",
   "@biometricUnlockTitle": {
     "description": "Title of the biometric unlock card"
-  },
-  "biometricUnlockSubtitle": "Authenticate to securely mount the container",
-  "@biometricUnlockSubtitle": {
-    "description": "Subtitle of the biometric unlock card"
-  },
-  "changeMasterPasswordTitle": "Change Master Password",
-  "@changeMasterPasswordTitle": {
-    "description": "Settings row title to open the change-password form"
-  },
-  "changeMasterPasswordSubtitle": "Update master password credentials",
-  "@changeMasterPasswordSubtitle": {
-    "description": "Settings row subtitle"
   },
   "autoLockContainersTitle": "Auto-Lock Containers",
   "@autoLockContainersTitle": {
@@ -1385,33 +1193,9 @@
   "@useMaterialYouSubtitle": {
     "description": "Settings toggle subtitle"
   },
-  "pureBlackThemeTitle": "Pure Black (OLED)",
-  "@pureBlackThemeTitle": {
-    "description": "Settings toggle title"
-  },
-  "pureBlackThemeSubtitle": "True black backgrounds to save battery and reduce glare on OLED screens (dark theme only)",
-  "@pureBlackThemeSubtitle": {
-    "description": "Settings toggle subtitle"
-  },
   "sortContainersByLabel": "Sort Containers By",
   "@sortContainersByLabel": {
     "description": "Settings picker label"
-  },
-  "swapCardSwipeActionsTitle": "Swap Card Swipe Actions",
-  "@swapCardSwipeActionsTitle": {
-    "description": "Settings toggle title"
-  },
-  "swapCardSwipeActionsSubtitle": "Reveal Edit on left and Remove on right when swiping cards",
-  "@swapCardSwipeActionsSubtitle": {
-    "description": "Settings toggle subtitle"
-  },
-  "swipeGestureHintTitle": "Swipe Gesture Hint",
-  "@swipeGestureHintTitle": {
-    "description": "Settings toggle title"
-  },
-  "swipeGestureHintSubtitle": "Show card peek animation on first container",
-  "@swipeGestureHintSubtitle": {
-    "description": "Settings toggle subtitle"
   },
   "autoOpenOnUnlockTitle": "Auto-Open on Unlock",
   "@autoOpenOnUnlockTitle": {
@@ -1460,10 +1244,6 @@
   "localStorageCardTitle": "Local Storage",
   "@localStorageCardTitle": {
     "description": "Title of the pinned dashboard card that opens real device storage, and the app bar title of the screen it opens"
-  },
-  "localStorageCardSubtitle": "Not encrypted — for quick transfers with vaults",
-  "@localStorageCardSubtitle": {
-    "description": "Subtitle of the pinned dashboard card that opens real device storage"
   },
   "enableFastStorageAccessTitle": "Enable Fast Storage Access",
   "@enableFastStorageAccessTitle": {
@@ -1794,10 +1574,6 @@
   "@unlock": {
     "description": "Button label to submit the master password and unlock the app"
   },
-  "useBiometric": "Use Biometric",
-  "@useBiometric": {
-    "description": "Button label to trigger biometric authentication"
-  },
   "connectAtLeast4Dots": "Connect at least 4 dots",
   "@connectAtLeast4Dots": {
     "description": "Instruction/error for the pattern lock setup, shown as both a hint and a validation error"
@@ -1842,18 +1618,6 @@
   "@enterUnlockPinTitle": {
     "description": "Card title shown above the PIN keypad when unlocking a container, both from local storage and from a USB drive"
   },
-  "wrongPinTryAgain": "Wrong PIN — try again",
-  "@wrongPinTryAgain": {
-    "description": "Error subtitle shown after a failed PIN unlock attempt"
-  },
-  "enterYourPinSequence": "Enter your PIN",
-  "@enterYourPinSequence": {
-    "description": "Non-error subtitle shown above the PIN keypad on the local-file unlock sheet"
-  },
-  "enterPinToMount": "Enter your PIN to mount",
-  "@enterPinToMount": {
-    "description": "Non-error subtitle shown above the PIN keypad on the USB unlock sheet"
-  },
   "noPinConfiguredMessage": "No PIN configured. Please enter password manually.",
   "@noPinConfiguredMessage": {
     "description": "Shown when a container is set to PIN unlock but no PIN hash is stored"
@@ -1895,89 +1659,9 @@
   "@incorrectPinError": {
     "description": "Error shown when the entered PIN doesn't match while re-authenticating into locked container settings"
   },
-  "removedFromListSnack": "Removed \"{name}\" from list",
-  "@removedFromListSnack": {
-    "description": "Snackbar confirming a recent document was removed from the decoy reader's history",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "clearRecentHistoryTitle": "Clear Recent History?",
-  "@clearRecentHistoryTitle": {
-    "description": "Confirmation dialog title for clearing the decoy reader's recent documents list"
-  },
-  "clearRecentHistoryMessage": "This will remove all recent documents from your list. The actual files on your device will not be affected.",
-  "@clearRecentHistoryMessage": {
-    "description": "Confirmation dialog body for clearing the decoy reader's recent documents list"
-  },
-  "clearAll": "Clear All",
-  "@clearAll": {
-    "description": "Button label to confirm clearing the entire recent documents list"
-  },
-  "recentHistoryClearedSnack": "Recent history cleared",
-  "@recentHistoryClearedSnack": {
-    "description": "Snackbar confirming the recent documents list was cleared"
-  },
   "moreOptionsTooltip": "More options",
   "@moreOptionsTooltip": {
     "description": "Tooltip for an overflow/more-options menu button"
-  },
-  "clearHistoryMenuItem": "Clear history",
-  "@clearHistoryMenuItem": {
-    "description": "Menu item label to clear the recent documents list"
-  },
-  "openPdfFile": "Open PDF File",
-  "@openPdfFile": {
-    "description": "Button label to open a PDF file from local storage"
-  },
-  "noDocumentsYetTitle": "No documents yet",
-  "@noDocumentsYetTitle": {
-    "description": "Empty state title on the decoy PDF reader home screen"
-  },
-  "openPdfToStartMessage": "Open a PDF from your device to start reading.",
-  "@openPdfToStartMessage": {
-    "description": "Empty state message on the decoy PDF reader home screen"
-  },
-  "removeFromListMenuItem": "Remove from list",
-  "@removeFromListMenuItem": {
-    "description": "Menu item label to remove a single document from the recent list"
-  },
-  "justNow": "Just now",
-  "@justNow": {
-    "description": "Relative time label for an event that happened less than a minute ago"
-  },
-  "minutesAgo": "{count}m ago",
-  "@minutesAgo": {
-    "description": "Abbreviated relative time label, e.g. '5m ago'",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "hoursAgo": "{count}h ago",
-  "@hoursAgo": {
-    "description": "Abbreviated relative time label, e.g. '3h ago'",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "daysAgo": "{count}d ago",
-  "@daysAgo": {
-    "description": "Abbreviated relative time label, e.g. '2d ago'",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "usbDriveDisconnectedLocked": "USB drive disconnected — container locked",
-  "@usbDriveDisconnectedLocked": {
-    "description": "Warning snackbar when a USB container auto-locks because the drive was unplugged"
   },
   "containerAlreadyMounted": "This container is already mounted.",
   "@containerAlreadyMounted": {
@@ -2009,33 +1693,9 @@
       }
     }
   },
-  "selectContainerFirst": "Select a container first",
-  "@selectContainerFirst": {
-    "description": "Error when trying to unlock without having picked a container"
-  },
   "passwordOrKeyfilesRequired": "Password or keyfiles required",
   "@passwordOrKeyfilesRequired": {
     "description": "Error when neither a password nor keyfiles were provided to unlock"
-  },
-  "slowPerformanceWarningTitle": "Slow Performance Warning",
-  "@slowPerformanceWarningTitle": {
-    "description": "Title of the dialog warning about slow CryFS performance without Direct Storage Access"
-  },
-  "slowPerformanceWarningMessage": "Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant \"All Files Access\" for fast speed?",
-  "@slowPerformanceWarningMessage": {
-    "description": "Message explaining the slow-performance tradeoff for CryFS without Direct Storage Access"
-  },
-  "unlockAnyway": "Unlock Anyway",
-  "@unlockAnyway": {
-    "description": "Button to dismiss the slow-performance warning and proceed with unlocking regardless"
-  },
-  "defaultVaultName": "Vault",
-  "@defaultVaultName": {
-    "description": "Fallback display name for a folder vault when none was resolved"
-  },
-  "defaultContainerName": "Container",
-  "@defaultContainerName": {
-    "description": "Fallback display name for a container when none was resolved"
   },
   "incorrectPasswordOrInvalidVault": "Incorrect password or invalid vault",
   "@incorrectPasswordOrInvalidVault": {
@@ -2044,10 +1704,6 @@
   "incorrectPasswordOrInvalidContainer": "Incorrect password or invalid container",
   "@incorrectPasswordOrInvalidContainer": {
     "description": "Error message when container unlock fails"
-  },
-  "genericUnknownError": "Unknown error",
-  "@genericUnknownError": {
-    "description": "Fallback error text when no specific error message is available"
   },
   "decryptingLabel": "Decrypting…",
   "@decryptingLabel": {
@@ -2109,14 +1765,6 @@
   "@mountContainerTitle": {
     "description": "Title of the sheet when mounting a brand-new container (none picked yet)"
   },
-  "containerFileSegmentLabel": "Container File",
-  "@containerFileSegmentLabel": {
-    "description": "Segmented control option for choosing a single-file container"
-  },
-  "folderVaultSegmentLabel": "Folder Vault",
-  "@folderVaultSegmentLabel": {
-    "description": "Segmented control option for choosing a folder-based vault"
-  },
   "formatContainerLabel": "{format} Container",
   "@formatContainerLabel": {
     "description": "Detected container-type label combining an untranslated format/brand name with 'Container', e.g. 'LUKS Container'",
@@ -2129,15 +1777,6 @@
   "formatVaultLabel": "{format} Vault",
   "@formatVaultLabel": {
     "description": "Detected container-type label combining an untranslated format/brand name with 'Vault', e.g. 'Cryptomator Vault'",
-    "placeholders": {
-      "format": {
-        "type": "String"
-      }
-    }
-  },
-  "formatDriveLabel": "{format} Drive",
-  "@formatDriveLabel": {
-    "description": "Detected container-type label combining an untranslated format/brand name with 'Drive', e.g. 'BitLocker Drive'",
     "placeholders": {
       "format": {
         "type": "String"
@@ -2160,10 +1799,6 @@
   "@containerMissingTitle": {
     "description": "Error card title when the container file cannot be found"
   },
-  "filePathCouldNotBeResolved": "File path could not be resolved",
-  "@filePathCouldNotBeResolved": {
-    "description": "Subtitle shown alongside the container-missing title"
-  },
   "containerMissingExplanation": "The container file may have been moved, deleted, or its host storage is currently disconnected.",
   "@containerMissingExplanation": {
     "description": "Longer explanation shown when a saved container's file can't be found"
@@ -2176,10 +1811,6 @@
   "@locateFileButtonLabel": {
     "description": "Button to re-pick the location of a missing container's file"
   },
-  "authenticateToMountSubtitle": "Authenticate to securely mount the container",
-  "@authenticateToMountSubtitle": {
-    "description": "Subtitle under the biometric-unlock title, explaining what authenticating will do"
-  },
   "usePasswordButtonLabel": "Use Password",
   "@usePasswordButtonLabel": {
     "description": "Button to switch from biometric prompt to manual password entry"
@@ -2188,33 +1819,9 @@
   "@authenticateButtonLabel": {
     "description": "Button to trigger the biometric authentication prompt"
   },
-  "drawUnlockPatternCardTitle": "Draw Unlock Pattern",
-  "@drawUnlockPatternCardTitle": {
-    "description": "Title of the pattern-unlock card shown on the unlock sheet"
-  },
-  "wrongPatternTryAgain": "Wrong pattern — try again",
-  "@wrongPatternTryAgain": {
-    "description": "Message shown under the pattern title after an incorrect pattern attempt"
-  },
-  "connectYourPatternSequence": "Connect your pattern sequence",
-  "@connectYourPatternSequence": {
-    "description": "Message shown under the pattern title prompting the user to draw their pattern"
-  },
   "usePasswordInsteadButtonLabel": "Use Password instead",
   "@usePasswordInsteadButtonLabel": {
     "description": "Button to switch from pattern entry to manual password entry"
-  },
-  "passwordHintFolderVault": "Enter vault password",
-  "@passwordHintFolderVault": {
-    "description": "Password field hint text when unlocking a folder vault"
-  },
-  "passwordHintBitlocker": "Enter password or recovery key",
-  "@passwordHintBitlocker": {
-    "description": "Password field hint text when unlocking a BitLocker drive"
-  },
-  "passwordHintContainer": "Enter container password",
-  "@passwordHintContainer": {
-    "description": "Password field hint text when unlocking a regular container"
   },
   "usingSavedPasswordTooltip": "Using saved password",
   "@usingSavedPasswordTooltip": {
@@ -2223,10 +1830,6 @@
   "luksKeyfileReplacesPasswordNote": "For LUKS containers the keyfile replaces the password.",
   "@luksKeyfileReplacesPasswordNote": {
     "description": "Helper note shown under the keyfile picker for LUKS containers"
-  },
-  "readOnlyModeUsbSubtitle": "Mount without allowing changes to this drive",
-  "@readOnlyModeUsbSubtitle": {
-    "description": "Subtitle explaining read-only mode for a USB drive"
   },
   "readOnlyModeContainerSubtitle": "Mount without allowing changes to this container",
   "@readOnlyModeContainerSubtitle": {
@@ -2259,10 +1862,6 @@
   "decryptingDriveLabel": "Decrypting drive…",
   "@decryptingDriveLabel": {
     "description": "Progress label shown while a USB drive is being decrypted"
-  },
-  "usbDeviceAlreadyActiveMounted": "This USB device is already active and mounted.",
-  "@usbDeviceAlreadyActiveMounted": {
-    "description": "Error shown when trying to unlock a USB device that is already mounted"
   },
   "reconnectUsbDriveTitle": "Reconnect \"{label}\"",
   "@reconnectUsbDriveTitle": {
@@ -2317,14 +1916,6 @@
   },
   "mountExistingContainerSubtitle": "Unlock a file container you already have",
   "@mountExistingContainerSubtitle": {
-    "description": "Add-vault option subtitle"
-  },
-  "mountSplitContainerTitle": "Mount split container",
-  "@mountSplitContainerTitle": {
-    "description": "Add-vault option title"
-  },
-  "mountSplitContainerSubtitle": "Unlock a split container directly, without joining it first",
-  "@mountSplitContainerSubtitle": {
     "description": "Add-vault option subtitle"
   },
   "mountUsbDriveTitle": "Mount USB Drive",
@@ -2392,10 +1983,6 @@
         "type": "String"
       }
     }
-  },
-  "pdfViewerErrorLoadingTitle": "Error loading PDF",
-  "@pdfViewerErrorLoadingTitle": {
-    "description": "Error banner title shown by the PDF rendering engine when a document fails to parse"
   },
   "pdfViewerNoDocumentLoaded": "No PDF document loaded.",
   "@pdfViewerNoDocumentLoaded": {
@@ -2476,15 +2063,6 @@
       }
     }
   },
-  "archiveFormatNotSupported": "Archive format .{ext} is not yet supported",
-  "@archiveFormatNotSupported": {
-    "description": "Error status when tapping an archive file whose format isn't supported",
-    "placeholders": {
-      "ext": {
-        "type": "String"
-      }
-    }
-  },
   "archivePasswordPromptTitle": "Password Protected",
   "@archivePasswordPromptTitle": {
     "description": "Title of the dialog prompting for a password to open an encrypted archive"
@@ -2492,10 +2070,6 @@
   "archivePasswordPromptMessage": "This archive is password protected. Enter the password to view its contents.",
   "@archivePasswordPromptMessage": {
     "description": "Explanatory message in the dialog prompting for an archive's password"
-  },
-  "archiveSolidWarning": "This is a solid archive — opening files may be slower, especially near the end.",
-  "@archiveSolidWarning": {
-    "description": "Status message shown after opening a solid archive (e.g. RAR or 7z) warning that per-file extraction can be slow"
   },
   "failedToReadFileFromArchive": "Failed to read file from archive",
   "@failedToReadFileFromArchive": {
@@ -2672,18 +2246,6 @@
       }
     }
   },
-  "deletedWithFailures": "{deleted} deleted · {failed} failed",
-  "@deletedWithFailures": {
-    "description": "Status message after a batch delete with some failures",
-    "placeholders": {
-      "deleted": {
-        "type": "int"
-      },
-      "failed": {
-        "type": "int"
-      }
-    }
-  },
   "exportedCount": "{count, plural, =1{Exported 1 file} other{Exported {count} files}}",
   "@exportedCount": {
     "description": "Status message after exporting files to device storage",
@@ -2696,15 +2258,6 @@
   "exportCancelledOrFailed": "Export cancelled or failed",
   "@exportCancelledOrFailed": {
     "description": "Status message when an export operation returns zero files"
-  },
-  "exportError": "Export error: {type}",
-  "@exportError": {
-    "description": "Error status when exporting files throws",
-    "placeholders": {
-      "type": {
-        "type": "String"
-      }
-    }
   },
   "deleteOriginalTitle": "Delete original?",
   "@deleteOriginalTitle": {
@@ -2795,19 +2348,6 @@
   "@createArchiveTitle": {
     "description": "Title of the dialog for naming a new archive before it's compressed"
   },
-  "archiveNameHint": "archive.zip",
-  "@archiveNameHint": {
-    "description": "Hint text example shown in the empty archive-name field"
-  },
-  "archivedCount": "{count, plural, =1{Archived 1 file} other{Archived {count} files}}",
-  "@archivedCount": {
-    "description": "Status message after successfully compressing a selection into an archive",
-    "placeholders": {
-      "count": {
-        "type": "num"
-      }
-    }
-  },
   "failedToArchiveGeneric": "Failed to create archive: {type}",
   "@failedToArchiveGeneric": {
     "description": "Error status when compressing a selection into an archive throws",
@@ -2817,21 +2357,9 @@
       }
     }
   },
-  "createArchivePasswordHint": "Optional password (AES-256)",
-  "@createArchivePasswordHint": {
-    "description": "Hint text for the optional password field in the create-archive dialog"
-  },
-  "createArchivePasswordUnavailableForFormat": "Password protection is only available for ZIP and 7-Zip",
-  "@createArchivePasswordUnavailableForFormat": {
-    "description": "Helper text shown under the disabled password field when the selected archive format doesn't support encryption"
-  },
   "createArchiveEncryptFilenames": "Encrypt file names",
   "@createArchiveEncryptFilenames": {
     "description": "Checkbox label in the create-archive dialog (7z only): also encrypt the file names inside the archive, not just their contents"
-  },
-  "createArchiveEncryptFilenamesHint": "Needs a password. The password is then required even to list the contents.",
-  "@createArchiveEncryptFilenamesHint": {
-    "description": "Helper text under the encrypt-file-names checkbox: it needs a password, and the password is then needed even to list the contents"
   },
   "closeSearchTooltip": "Close search",
   "@closeSearchTooltip": {
@@ -2933,10 +2461,6 @@
   "formatFileSystemLabel": "Format File System",
   "@formatFileSystemLabel": {
     "description": "Label for the inner filesystem picker when creating a container"
-  },
-  "standardVolumeHeader": "Standard Volume",
-  "@standardVolumeHeader": {
-    "description": "Section header for the main/outer volume creation form"
   },
   "containerFormatLabel": "Container Format",
   "@containerFormatLabel": {
@@ -3074,19 +2598,6 @@
   "@unitGbShort": {
     "description": "Short abbreviation for gigabytes"
   },
-  "failedToListUsbDevices": "Failed to list USB devices: {error}",
-  "@failedToListUsbDevices": {
-    "description": "Error when enumerating connected USB storage devices fails",
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "usbPermissionDenied": "USB permission denied",
-  "@usbPermissionDenied": {
-    "description": "Error when the user denies the USB device access permission prompt"
-  },
   "couldNotReadDriveCapacity": "Could not read drive capacity — enter size manually.",
   "@couldNotReadDriveCapacity": {
     "description": "Error when the USB drive's capacity can't be auto-detected"
@@ -3123,10 +2634,6 @@
   "usbContainerCreationFailed": "USB container creation failed.",
   "@usbContainerCreationFailed": {
     "description": "Error shown when USB container creation returns failure"
-  },
-  "usbStandardVolumeSectionHeader": "USB Drive & Standard Volume",
-  "@usbStandardVolumeSectionHeader": {
-    "description": "Section header for the USB drive selection and outer volume form"
   },
   "formattingErasesEverythingWarning": "Formatting erases everything currently on the selected drive.",
   "@formattingErasesEverythingWarning": {
@@ -3212,18 +2719,6 @@
   "@playlistTransitionFlipLabel": {
     "description": "Playlist transition effect: 3D card flip"
   },
-  "unlockVaultTitle": "Unlock Vault",
-  "@unlockVaultTitle": {
-    "description": "Title for the vault unlock bottom sheet"
-  },
-  "openContainerTitle": "Open Container",
-  "@openContainerTitle": {
-    "description": "Title when opening an unmounted container"
-  },
-  "selectContainerFileOrFolder": "Select File or Folder",
-  "@selectContainerFileOrFolder": {
-    "description": "Label for picking a container file or folder"
-  },
   "useBackupHeaderToggleTitle": "Use backup header",
   "@useBackupHeaderToggleTitle": {
     "description": "Unlock option: open the volume using the backup header embedded at its end"
@@ -3236,33 +2731,13 @@
   "@keepCurrentOption": {
     "description": "Picker choice that leaves a setting unchanged (e.g. keep the header PRF when changing a password)"
   },
-  "toolExpandVolumeTitle": "Expand VeraCrypt volume",
-  "@toolExpandVolumeTitle": {
-    "description": "Tools row: enlarge a standard VeraCrypt volume"
-  },
   "toolExpandVolumeSubtitle": "Make a standard volume larger, like the desktop Volume Expander",
   "@toolExpandVolumeSubtitle": {
     "description": "Tools row subtitle for volume expansion"
   },
-  "toolExpandLuksVolumeTitle": "Expand LUKS container",
-  "@toolExpandLuksVolumeTitle": {
-    "description": "Tools row: enlarge a LUKS1 or LUKS2 file container"
-  },
-  "toolExpandLuksVolumeSubtitle": "Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata",
-  "@toolExpandLuksVolumeSubtitle": {
-    "description": "Tools row subtitle for LUKS container expansion"
-  },
   "luksToolsExpandNote": "Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.",
   "@luksToolsExpandNote": {
     "description": "Explains LUKS container expansion behavior and supported in-place filesystem growth"
-  },
-  "toolExpandBitLockerVolumeTitle": "Expand BitLocker container",
-  "@toolExpandBitLockerVolumeTitle": {
-    "description": "Tools row: enlarge a raw BitLocker volume file"
-  },
-  "toolExpandBitLockerVolumeSubtitle": "Grow a BitLocker volume file or VHD/VHDX image and extend its NTFS file system",
-  "@toolExpandBitLockerVolumeSubtitle": {
-    "description": "Tools row subtitle for BitLocker container expansion"
   },
   "bitlockerToolsExpandNote": "Back up the container first. This rewrites BitLocker's metadata so the encrypted volume covers the added space, so check the result on a copy before relying on it. Works on fully encrypted BitLocker volumes from Windows 7 or later, either as a raw volume file or inside a fixed or dynamic VHD or VHDX. For a disk image enter the new total disk size: the virtual disk and its last partition (MBR or GPT) are enlarged too, so the BitLocker partition must be the last one. BitLocker To Go and encrypt-on-write (used-space-only) volumes are not supported. NTFS can be expanded in place (FAT and exFAT cannot). The added space can optionally be filled with encrypted zeros. Unlock with the password or the 48-digit recovery key.",
   "@bitlockerToolsExpandNote": {
@@ -3280,10 +2755,6 @@
   "@toolHiddenInExistingSubtitle": {
     "description": "Tools row subtitle for direct-mode hidden volume creation"
   },
-  "vcToolsPickContainer": "Choose container",
-  "@vcToolsPickContainer": {
-    "description": "Button: pick the container file"
-  },
   "vcToolsNoContainer": "No container selected",
   "@vcToolsNoContainer": {
     "description": "Shown before a container is picked"
@@ -3295,10 +2766,6 @@
   "vcToolsPimLabel": "PIM (optional)",
   "@vcToolsPimLabel": {
     "description": "PIM field"
-  },
-  "vcToolsNewSizeLabel": "New container size (MiB)",
-  "@vcToolsNewSizeLabel": {
-    "description": "Target size of the container after expansion, in MiB"
   },
   "vcToolsInitFreeSpace": "Initialize new space",
   "@vcToolsInitFreeSpace": {
@@ -3416,24 +2883,8 @@
   "@readOnlyModeLabel": {
     "description": "Checkbox label for mounting in read-only mode"
   },
-  "readOnlyModeSubtitle": "Prevents any write or modify operations on the vault",
   "alwaysOpenReadOnlyLabel": "Always read-only",
   "alwaysOpenReadOnlySubtitle": "New sessions start read-only.",
-  "@readOnlyModeSubtitle": {
-    "description": "Subtitle explaining read-only mode"
-  },
-  "selectUsbDeviceLabel": "Select USB Device",
-  "@selectUsbDeviceLabel": {
-    "description": "Label for USB device selector"
-  },
-  "noUsbDevicesFound": "No compatible USB storage devices found",
-  "@noUsbDevicesFound": {
-    "description": "Message when no USB devices are detected"
-  },
-  "containerConfigTitle": "Vault Configuration",
-  "@containerConfigTitle": {
-    "description": "Title for container configuration sheet"
-  },
   "changePasswordTitle": "Change Password",
   "@changePasswordTitle": {
     "description": "Title for the change password screen/button"
@@ -3442,57 +2893,13 @@
   "@confirmNewPasswordLabel": {
     "description": "Label for confirm new password input field"
   },
-  "cameraCaptureTitle": "Vault Camera",
-  "@cameraCaptureTitle": {
-    "description": "Title for in-app secure camera screen"
-  },
-  "takingPhoto": "Capturing photo…",
-  "@takingPhoto": {
-    "description": "Status text while taking a photo"
-  },
-  "noVaultSelected": "No vault selected",
-  "@noVaultSelected": {
-    "description": "Message when camera is launched without a target vault"
-  },
   "mediaDiagnosticsTitle": "Media Diagnostics",
   "@mediaDiagnosticsTitle": {
     "description": "Title of the media diagnostics dialog"
   },
-  "advancedViewerSettingsTitle": "Viewer Settings",
-  "@advancedViewerSettingsTitle": {
-    "description": "Title for advanced media viewer settings sheet"
-  },
-  "textEditorSwitchToReadModeTooltip": "Switch to read-only mode",
-  "@textEditorSwitchToReadModeTooltip": {
-    "description": "Tooltip for the button that locks the text editor into read-only/inspection mode and disables the on-screen keyboard"
-  },
-  "textEditorSwitchToEditModeTooltip": "Switch to edit mode",
-  "@textEditorSwitchToEditModeTooltip": {
-    "description": "Tooltip for the button that unlocks the text editor for editing again"
-  },
   "textEditorReadOnlyIndicatorLabel": "Read-only",
   "@textEditorReadOnlyIndicatorLabel": {
     "description": "Status bar label shown while the text editor is locked to read-only/inspection mode"
-  },
-  "textEditorMoveCursorLeftTooltip": "Move cursor left",
-  "@textEditorMoveCursorLeftTooltip": {
-    "description": "Tooltip for the accessory key bar button that moves the caret one character left"
-  },
-  "textEditorMoveCursorRightTooltip": "Move cursor right",
-  "@textEditorMoveCursorRightTooltip": {
-    "description": "Tooltip for the accessory key bar button that moves the caret one character right"
-  },
-  "textEditorSelectWordTooltip": "Select word",
-  "@textEditorSelectWordTooltip": {
-    "description": "Tooltip for the accessory key bar button that selects the word at the caret"
-  },
-  "textEditorSwitchToHorizontalScrollTooltip": "Switch to horizontal scroll",
-  "@textEditorSwitchToHorizontalScrollTooltip": {
-    "description": "Tooltip for the button that turns off soft wrap, so long lines scroll horizontally instead"
-  },
-  "textEditorSwitchToSoftWrapTooltip": "Switch to soft wrap",
-  "@textEditorSwitchToSoftWrapTooltip": {
-    "description": "Tooltip for the button that turns soft wrap back on, so long lines wrap instead of scrolling horizontally"
   },
   "textEditorCaretScrubberLabel": "Drag left or right to move the cursor",
   "@textEditorCaretScrubberLabel": {
@@ -3604,22 +3011,6 @@
   "@goToLineButton": {
     "description": "Confirm button label in the go-to-line dialog"
   },
-  "textEditorSaveConfirmTitle": "Unsaved Changes",
-  "@textEditorSaveConfirmTitle": {
-    "description": "Title for unsaved changes confirm dialog in text editor"
-  },
-  "textEditorSaveConfirmMessage": "Do you want to save your changes before closing?",
-  "@textEditorSaveConfirmMessage": {
-    "description": "Message for unsaved changes confirm dialog in text editor"
-  },
-  "saveAndClose": "Save & Close",
-  "@saveAndClose": {
-    "description": "Button label to save changes and close editor"
-  },
-  "discardChanges": "Discard Changes",
-  "@discardChanges": {
-    "description": "Button label to discard changes and close editor"
-  },
   "selectionBarSelectedCount": "{count, plural, =1{1 item selected} other{{count} items selected}}",
   "@selectionBarSelectedCount": {
     "description": "Plural label for selection app bar",
@@ -3637,10 +3028,6 @@
   "@deselectAll": {
     "description": "Action label to clear item selection"
   },
-  "sortOptionsTitle": "Sort Files",
-  "@sortOptionsTitle": {
-    "description": "Title for file browser sort options sheet"
-  },
   "layoutModeList": "List View",
   "@layoutModeList": {
     "description": "Menu option for list layout mode"
@@ -3653,10 +3040,6 @@
   "@layoutModeMasonry": {
     "description": "Menu option for masonry layout mode"
   },
-  "fileOperationsTitle": "File Operations",
-  "@fileOperationsTitle": {
-    "description": "Title for file operations action sheet"
-  },
   "conflictResolutionTitle": "File Conflict",
   "@conflictResolutionTitle": {
     "description": "Title for conflict resolution sheet when copying/moving files"
@@ -3664,26 +3047,6 @@
   "replaceExistingFile": "Replace existing file",
   "@replaceExistingFile": {
     "description": "Option to overwrite existing file in conflict resolution"
-  },
-  "keepBothFiles": "Keep both (rename new file)",
-  "@keepBothFiles": {
-    "description": "Option to keep both files in conflict resolution"
-  },
-  "skipFile": "Skip this file",
-  "@skipFile": {
-    "description": "Option to skip file in conflict resolution"
-  },
-  "noVaultsFoundTitle": "No Vaults Found",
-  "@noVaultsFoundTitle": {
-    "description": "Title for dashboard empty state"
-  },
-  "noVaultsFoundSubtitle": "Create a new encrypted container or add an existing vault to get started.",
-  "@noVaultsFoundSubtitle": {
-    "description": "Subtitle for dashboard empty state"
-  },
-  "addExistingVaultButton": "Add Existing Vault",
-  "@addExistingVaultButton": {
-    "description": "Button label to add an existing vault"
   },
   "sortContainersModeManual": "Manual (drag to reorder)",
   "@sortContainersModeManual": {
@@ -3745,77 +3108,9 @@
   "@unlockContainerTitle": {
     "description": "AppBar title when unlocking a known container"
   },
-  "containerFileSegment": "Container File",
-  "@containerFileSegment": {
-    "description": "Segmented button label for container-file unlock mode"
-  },
-  "folderVaultSegment": "Folder Vault",
-  "@folderVaultSegment": {
-    "description": "Segmented button label for folder-vault unlock mode"
-  },
   "enableButtonLabel": "Enable",
   "@enableButtonLabel": {
     "description": "Button label to enable a feature (e.g. storage access)"
-  },
-  "retryButtonLabelShort": "Retry",
-  "@retryButtonLabelShort": {
-    "description": "Short retry button label"
-  },
-  "locateFileButton": "Locate File",
-  "@locateFileButton": {
-    "description": "Button to relocate a missing container file"
-  },
-  "authenticateButton": "Authenticate",
-  "@authenticateButton": {
-    "description": "Button label to trigger biometric authentication"
-  },
-  "cancelUnlockButton": "Cancel Unlock",
-  "@cancelUnlockButton": {
-    "description": "Button to cancel an in-progress unlock operation"
-  },
-  "tryingKeyslotProgress": "Trying keyslot {attempted} of {total}…",
-  "@tryingKeyslotProgress": {
-    "description": "LUKS unlock progress with multiple keyslots",
-    "placeholders": {
-      "attempted": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "tryingKeyslotSingle": "Trying keyslot…",
-  "@tryingKeyslotSingle": {
-    "description": "LUKS unlock progress with a single keyslot"
-  },
-  "verifyingCredentialProgress": "Verifying credential {attempted} of {total}…",
-  "@verifyingCredentialProgress": {
-    "description": "BitLocker unlock progress with multiple credentials",
-    "placeholders": {
-      "attempted": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "verifyingCredentialSingle": "Verifying credential…",
-  "@verifyingCredentialSingle": {
-    "description": "BitLocker unlock progress with a single credential"
-  },
-  "tryingAlgoSlot": "Trying {algo} ({slotName})…",
-  "@tryingAlgoSlot": {
-    "description": "VeraCrypt unlock progress showing algorithm and slot",
-    "placeholders": {
-      "algo": {
-        "type": "String"
-      },
-      "slotName": {
-        "type": "String"
-      }
-    }
   },
   "hiddenVolumeSlotName": "Hidden Volume",
   "@hiddenVolumeSlotName": {
@@ -3825,45 +3120,9 @@
   "@standardVolumeSlotName": {
     "description": "Slot name for VeraCrypt standard volume during unlock"
   },
-  "containerMissingSubtitle": "File path could not be resolved",
-  "@containerMissingSubtitle": {
-    "description": "Error card subtitle when the container file cannot be found"
-  },
-  "containerMissingBody": "The container file may have been moved, deleted, or its host storage is currently disconnected.",
-  "@containerMissingBody": {
-    "description": "Explanation text when a container is missing"
-  },
-  "connectPatternSequence": "Connect your pattern sequence",
-  "@connectPatternSequence": {
-    "description": "Subtitle prompting the user to draw their pattern"
-  },
   "passwordLabel": "Password",
   "@passwordLabel": {
     "description": "Label for password text field"
-  },
-  "enterVaultPasswordHint": "Enter vault password",
-  "@enterVaultPasswordHint": {
-    "description": "Hint text for folder-vault password field"
-  },
-  "enterBitlockerPasswordHint": "Enter password or recovery key",
-  "@enterBitlockerPasswordHint": {
-    "description": "Hint text for BitLocker password field"
-  },
-  "enterContainerPasswordHint": "Enter container password",
-  "@enterContainerPasswordHint": {
-    "description": "Hint text for container password field"
-  },
-  "readOnlyModeUsbSubtitleDrive": "Mount without allowing changes to this drive",
-  "@readOnlyModeUsbSubtitleDrive": {
-    "description": "Read-only toggle subtitle specific to USB drives"
-  },
-  "rememberDriveLabel": "Remember drive",
-  "@rememberDriveLabel": {
-    "description": "Toggle label to pin a USB drive on the dashboard"
-  },
-  "rememberDriveSubtitle": "Pin drive on dashboard for quick access",
-  "@rememberDriveSubtitle": {
-    "description": "Subtitle for remember-drive toggle"
   },
   "unlockVaultButtonLabel": "Unlock Vault",
   "@unlockVaultButtonLabel": {
@@ -3881,66 +3140,13 @@
   "@requestingPermission": {
     "description": "Progress label while requesting USB permission"
   },
-  "unlockAndMountButton": "Unlock & Mount",
-  "@unlockAndMountButton": {
-    "description": "Button label for USB reconnect unlock"
-  },
   "unlockDriveButton": "Unlock Drive",
   "@unlockDriveButton": {
     "description": "Button label to unlock a USB drive"
   },
-  "couldntFindDevice": "Couldn't find \"{deviceName}\"",
-  "@couldntFindDevice": {
-    "description": "Error title when a saved USB device is not found",
-    "placeholders": {
-      "deviceName": {
-        "type": "String"
-      }
-    }
-  },
-  "plugDriveBackInRetry": "Plug the drive back in and tap Retry, or select it below if it shows up under a different name.",
-  "@plugDriveBackInRetry": {
-    "description": "Instruction when a saved USB device is not found"
-  },
-  "retryConnectionButton": "Retry Connection",
-  "@retryConnectionButton": {
-    "description": "Button to retry USB device connection"
-  },
-  "refreshDevicesButton": "Refresh Devices",
-  "@refreshDevicesButton": {
-    "description": "Button to refresh USB device list"
-  },
-  "connectOtgDriveToMount": "Connect an OTG flash drive to mount",
-  "@connectOtgDriveToMount": {
-    "description": "Empty state subtitle when no USB devices are detected"
-  },
-  "alreadyActive": "Already active",
-  "@alreadyActive": {
-    "description": "Status label for an already-mounted USB device"
-  },
   "active": "Active",
   "@active": {
     "description": "Short badge label for an already-active USB device"
-  },
-  "readyToUnlock": "Ready to unlock",
-  "@readyToUnlock": {
-    "description": "Status label for a USB device with permission granted"
-  },
-  "enterUsbPartitionPassword": "Enter USB partition password",
-  "@enterUsbPartitionPassword": {
-    "description": "Hint text for USB partition password field"
-  },
-  "biometricAuthenticationTitle": "Biometric Authentication",
-  "@biometricAuthenticationTitle": {
-    "description": "Title of the biometric auth card on USB unlock"
-  },
-  "biometricAuthUsbSubtitle": "Authenticate to unlock and mount this USB device",
-  "@biometricAuthUsbSubtitle": {
-    "description": "Subtitle of the biometric auth card on USB unlock"
-  },
-  "connectPatternSequenceToMount": "Connect your pattern sequence to mount",
-  "@connectPatternSequenceToMount": {
-    "description": "Subtitle prompting the user to draw their pattern to mount USB"
   },
   "selectAllAction": "Select All",
   "@selectAllAction": {
@@ -4009,10 +3215,6 @@
   "exposeAsDocumentProviderMenu": "Expose as Document Provider",
   "@exposeAsDocumentProviderMenu": {
     "description": "Menu item to expose a folder as a document provider"
-  },
-  "moreOptionsTooltipShort": "More options",
-  "@moreOptionsTooltipShort": {
-    "description": "Tooltip for the more-options overflow menu"
   },
   "copyTooltip": "Copy",
   "@copyTooltip": {
@@ -4257,15 +3459,6 @@
   "@enterFullscreenMenu": {
     "description": "Menu item to enter fullscreen mode"
   },
-  "failedToOpenExternalApp": "Failed to open in external app: {error}",
-  "@failedToOpenExternalApp": {
-    "description": "Snackbar error when opening a file in external app fails",
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "thisFolderMenu": "This Folder",
   "@thisFolderMenu": {
     "description": "Menu item for current-folder-only playlist scope"
@@ -4285,26 +3478,6 @@
   "playlistOptionsTooltip": "Playlist Options",
   "@playlistOptionsTooltip": {
     "description": "Tooltip when playlist is active"
-  },
-  "enablePlaylistTooltip": "Enable Playlist",
-  "@enablePlaylistTooltip": {
-    "description": "Tooltip when playlist is not active"
-  },
-  "moreActionsTooltip": "More Actions",
-  "@moreActionsTooltip": {
-    "description": "Tooltip for the more-actions menu"
-  },
-  "forcePortraitMenu": "Force Portrait",
-  "@forcePortraitMenu": {
-    "description": "Menu item to force portrait orientation"
-  },
-  "forceLandscapeMenu": "Force Landscape",
-  "@forceLandscapeMenu": {
-    "description": "Menu item to force landscape orientation"
-  },
-  "autoRotateSensorMenu": "Auto-Rotate (Sensor)",
-  "@autoRotateSensorMenu": {
-    "description": "Menu item to follow sensor orientation"
   },
   "screenOrientationMenu": "Screen Orientation",
   "@screenOrientationMenu": {
@@ -4342,69 +3515,13 @@
   "@diagnosticsCopiedToClipboard": {
     "description": "Snackbar message when diagnostics are copied"
   },
-  "diagnosticsTitle": "Diagnostics",
-  "@diagnosticsTitle": {
-    "description": "Title of the diagnostics sheet"
-  },
-  "copyDiagnosticsTooltip": "Copy diagnostics",
-  "@copyDiagnosticsTooltip": {
-    "description": "Tooltip for copy diagnostics button"
-  },
   "closeTooltip": "Close",
   "@closeTooltip": {
     "description": "Tooltip for close button"
   },
-  "diagnosticsPlaybackSection": "Playback",
-  "@diagnosticsPlaybackSection": {
-    "description": "Section header for playback stats in the diagnostics sheet"
-  },
-  "diagnosticsEngineSection": "Engine",
-  "@diagnosticsEngineSection": {
-    "description": "Section header for engine stats in the diagnostics sheet"
-  },
-  "diagnosticsStateLabel": "State",
-  "@diagnosticsStateLabel": {
-    "description": "Stat row label for playback state in the diagnostics sheet"
-  },
-  "diagnosticsResolutionLabel": "Resolution",
-  "@diagnosticsResolutionLabel": {
-    "description": "Stat row label for video resolution in the diagnostics sheet"
-  },
-  "diagnosticsAspectRatioLabel": "Aspect Ratio",
-  "@diagnosticsAspectRatioLabel": {
-    "description": "Stat row label for aspect ratio in the diagnostics sheet"
-  },
-  "diagnosticsPositionLabel": "Position",
-  "@diagnosticsPositionLabel": {
-    "description": "Stat row label for playback position in the diagnostics sheet"
-  },
-  "diagnosticsDurationLabel": "Duration",
-  "@diagnosticsDurationLabel": {
-    "description": "Stat row label for media duration in the diagnostics sheet"
-  },
   "diagnosticsErrorLabel": "Error",
   "@diagnosticsErrorLabel": {
     "description": "Stat row label and playback state value for an error condition in the diagnostics sheet"
-  },
-  "diagnosticsPlayerLabel": "Player",
-  "@diagnosticsPlayerLabel": {
-    "description": "Stat row label for the playback engine name in the diagnostics sheet"
-  },
-  "diagnosticsDecodingLabel": "Decoding",
-  "@diagnosticsDecodingLabel": {
-    "description": "Stat row label for the decoding method in the diagnostics sheet"
-  },
-  "diagnosticsExoPlayerValue": "ExoPlayer (Android)",
-  "@diagnosticsExoPlayerValue": {
-    "description": "Stat row value naming the playback engine in the diagnostics sheet"
-  },
-  "diagnosticsHardwareAcceleratedValue": "Hardware-accelerated",
-  "@diagnosticsHardwareAcceleratedValue": {
-    "description": "Stat row value describing the decoding method in the diagnostics sheet"
-  },
-  "diagnosticsUnknownValue": "Unknown",
-  "@diagnosticsUnknownValue": {
-    "description": "Fallback stat value in the diagnostics sheet when resolution or aspect ratio is unavailable"
   },
   "diagnosticsStateBuffering": "Buffering",
   "@diagnosticsStateBuffering": {
@@ -4417,10 +3534,6 @@
   "diagnosticsStatePaused": "Paused",
   "@diagnosticsStatePaused": {
     "description": "Playback state value shown in the diagnostics sheet while media is paused"
-  },
-  "diagnosticsDurationUnavailable": "--:--",
-  "@diagnosticsDurationUnavailable": {
-    "description": "Fallback duration/position value in the diagnostics sheet when the time is negative or unavailable"
   },
   "rotate90Label": "Rotate 90°",
   "@rotate90Label": {
@@ -4441,10 +3554,6 @@
   "subtitlesLabel": "Subtitles",
   "@subtitlesLabel": {
     "description": "Label for subtitles toggle"
-  },
-  "imageSettingsTitle": "Image Settings",
-  "@imageSettingsTitle": {
-    "description": "Sheet title for image settings"
   },
   "playbackSettingsTitle": "Playback Settings",
   "@playbackSettingsTitle": {
@@ -4507,10 +3616,6 @@
       }
     }
   },
-  "settingsTooltipShort": "Settings",
-  "@settingsTooltipShort": {
-    "description": "Tooltip for settings menu button"
-  },
   "sourceCodeTooltip": "Source Code",
   "@sourceCodeTooltip": {
     "description": "Tooltip for source code link on about screen"
@@ -4527,14 +3632,6 @@
   "@resetToDefaultsTooltip": {
     "description": "Tooltip for reset to defaults button on toolbar settings"
   },
-  "usbUnlockContainerTitle": "Unlock USB Container",
-  "@usbUnlockContainerTitle": {
-    "description": "AppBar title when unlocking a USB container"
-  },
-  "usbMountContainerTitle": "Mount USB Drive",
-  "@usbMountContainerTitle": {
-    "description": "AppBar title when mounting a new USB drive"
-  },
   "staticLabel": "Static",
   "@staticLabel": {
     "description": "Label when slideshow auto-advance is off"
@@ -4546,18 +3643,6 @@
   "muteTooltip": "Mute",
   "@muteTooltip": {
     "description": "Tooltip for mute button"
-  },
-  "playOnceDisabledTooltip": "Play Once (Auto-Advance Disabled)",
-  "@playOnceDisabledTooltip": {
-    "description": "Tooltip for play once mode"
-  },
-  "playAndAdvanceTooltip": "Play & Advance to Next",
-  "@playAndAdvanceTooltip": {
-    "description": "Tooltip for play and advance mode"
-  },
-  "loopCurrentVideoTooltip": "Loop Current Video",
-  "@loopCurrentVideoTooltip": {
-    "description": "Tooltip for loop video mode"
   },
   "clearThumbnailCacheDialogTitle": "Clear Thumbnail Cache?",
   "@clearThumbnailCacheDialogTitle": {
@@ -4626,10 +3711,6 @@
   "patternSetupRequiredBeforeSaving": "Set up a pattern before saving.",
   "@patternSetupRequiredBeforeSaving": {
     "description": "Warning shown when trying to save container settings without setting up a pattern"
-  },
-  "passwordKeystoreEncryptedHelperText": "Password is encrypted using Android Keystore. Leave blank if using keyfiles only.",
-  "@passwordKeystoreEncryptedHelperText": {
-    "description": "Helper text under the password field when updating saved container credentials"
   },
   "changePatternButton": "Change Pattern",
   "@changePatternButton": {
@@ -4905,14 +3986,6 @@
   "@operationInProgressWaitMessage": {
     "description": "Message shown when trying to lock a container while another operation is running"
   },
-  "reconnectUsbTooltip": "Reconnect USB",
-  "@reconnectUsbTooltip": {
-    "description": "Tooltip for reconnecting a saved but disconnected USB drive"
-  },
-  "unlockContainerTooltip": "Unlock container",
-  "@unlockContainerTooltip": {
-    "description": "Tooltip for unlocking a container from the dashboard"
-  },
   "lockFailedMessage": "Lock failed: {errorType}",
   "@lockFailedMessage": {
     "description": "Snackbar shown when locking a container throws an unexpected error",
@@ -5080,10 +4153,6 @@
   "@filteredLabel": {
     "description": "Label indicating the current file list is filtered"
   },
-  "statsStorageSectionHeader": "STORAGE",
-  "@statsStorageSectionHeader": {
-    "description": "Section header label above the storage stats in the vertical (landscape sidebar) stats bar layout"
-  },
   "statsFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
   "@statsFolderCount": {
     "description": "Count of folders shown in the stats bar",
@@ -5182,10 +4251,6 @@
   "fileOpsDismissTooltip": "Dismiss",
   "@fileOpsDismissTooltip": {
     "description": "Tooltip for the button that removes a single finished operation from the file operations history"
-  },
-  "fileOpsRootDestinationLabel": "Root",
-  "@fileOpsRootDestinationLabel": {
-    "description": "Destination label for a file operation targeting the root directory"
   },
   "fileOpsCancelledStatusLabel": "Cancelled",
   "@fileOpsCancelledStatusLabel": {
@@ -5373,36 +4438,6 @@
   "@showPlaylistCarouselDesc": {
     "description": "Toggle description for showing the playlist thumbnail carousel"
   },
-  "videoPlaybackSliderLabel": "Video playback position slider",
-  "@videoPlaybackSliderLabel": {
-    "description": "Accessibility label for the video playback position slider"
-  },
-  "longPressPlaybackDiagnosticsHint": "Long press for playback diagnostics",
-  "@longPressPlaybackDiagnosticsHint": {
-    "description": "Accessibility hint on the advanced settings button explaining the long-press action"
-  },
-  "staticImageModeLabel": "Static image mode",
-  "@staticImageModeLabel": {
-    "description": "Accessibility label shown for an image in the playlist when slideshow auto-advance is off"
-  },
-  "slideshowModeActiveLabel": "Slideshow mode active with {seconds} seconds delay",
-  "@slideshowModeActiveLabel": {
-    "description": "Accessibility label shown for an image in the playlist when slideshow auto-advance is on",
-    "placeholders": {
-      "seconds": {
-        "type": "int"
-      }
-    }
-  },
-  "videoPlaybackModeLabel": "Video playback mode: {mode}",
-  "@videoPlaybackModeLabel": {
-    "description": "Accessibility label describing the current video playback mode button",
-    "placeholders": {
-      "mode": {
-        "type": "String"
-      }
-    }
-  },
   "pauseLabel": "Pause",
   "@pauseLabel": {
     "description": "Accessibility label for the pause playback button in the media viewer"
@@ -5431,10 +4466,6 @@
         "type": "String"
       }
     }
-  },
-  "closeCarouselTooltip": "Close Carousel",
-  "@closeCarouselTooltip": {
-    "description": "Tooltip for the button that closes the playlist thumbnail carousel overlay"
   },
   "playlistScrollModeMenu": "Playlist Scroll Mode",
   "@playlistScrollModeMenu": {
@@ -5623,18 +4654,6 @@
       }
     }
   },
-  "cameraCouldNotSwitchLensMessage": "Could not switch lens",
-  "@cameraCouldNotSwitchLensMessage": {
-    "description": "Error toast when switching to a different camera lens fails"
-  },
-  "cameraEncryptingPhotoLabel": "Encrypting photo…",
-  "@cameraEncryptingPhotoLabel": {
-    "description": "Busy overlay label shown while a captured photo is being encrypted into the vault"
-  },
-  "cameraEncryptingVideoLabel": "Encrypting video…",
-  "@cameraEncryptingVideoLabel": {
-    "description": "Busy overlay label shown while a recorded video is being encrypted into the vault"
-  },
   "aboutApplicationSectionHeader": "Application",
   "@aboutApplicationSectionHeader": {
     "description": "Section header on the about screen for the application info section"
@@ -5792,19 +4811,6 @@
   "@aboutFooterMadeWithLove": {
     "description": "Footer text at the bottom of the about screen"
   },
-  "aboutVersionCopiedMessage": "Version info copied — handy for bug reports",
-  "@aboutVersionCopiedMessage": {
-    "description": "Snackbar message shown after copying version info to the clipboard"
-  },
-  "aboutVersionClipboardText": "VaultExplorer v{version} (Android)",
-  "@aboutVersionClipboardText": {
-    "description": "Text copied to the clipboard when the user taps the version entry",
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
   "aboutShareText": "VaultExplorer — a free, open-source, offline vault for Android.\n\nStore passwords, notes, and files inside an encrypted container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n{url}",
   "@aboutShareText": {
     "description": "Shareable promotional text copied to the clipboard when the user taps share",
@@ -5949,15 +4955,6 @@
       },
       "quality": {
         "type": "int"
-      }
-    }
-  },
-  "holdToSpeedIndicatorLabel": "{speed}× Speed",
-  "@holdToSpeedIndicatorLabel": {
-    "description": "On-screen indicator shown while holding down to fast-forward playback at a multiplier",
-    "placeholders": {
-      "speed": {
-        "type": "String"
       }
     }
   },
@@ -6369,19 +5366,6 @@
       }
     }
   },
-  "vaultOccupiedSpaceSummary": "{used} used",
-  "@vaultOccupiedSpaceSummary": {
-    "description": "Occupied space summary shown on mounted folder vault card (Cryptomator/gocryptfs/CryFS), which have no fixed total size",
-    "placeholders": {
-      "used": {
-        "type": "String"
-      }
-    }
-  },
-  "incorrectPasswordOrKeyfilesDriveError": "Incorrect password/keyfiles or unsupported drive",
-  "@incorrectPasswordOrKeyfilesDriveError": {
-    "description": "Error message when unlocking/verifying container fails due to wrong password or keyfiles"
-  },
   "driveUsableCapacity": "Drive usable capacity: {mb} MB. Must not exceed this.",
   "@driveUsableCapacity": {
     "description": "Helper text showing detected USB drive usable capacity",
@@ -6724,7 +5708,6 @@
   },
   "noBookmarksYet": "No items bookmarked yet",
   "reorderBookmarksTitle": "Rearrange Bookmarks",
-  "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar",
   "drawerBookmarksSectionTitle": "Bookmarks",
   "@drawerBookmarksSectionTitle": {
     "description": "Heading of the navigation drawer section that lists bookmarks of unlocked vaults"
@@ -7035,14 +6018,6 @@
       "count": {}
     }
   },
-  "hashVerifierVaultConfirmWarning": "Every file in this vault will be read.",
-  "@hashVerifierVaultConfirmWarning": {
-    "description": "Warning shown on the vault confirmation step before starting an expensive full-vault check"
-  },
-  "hashVerifierVaultEmptyMessage": "This vault has no files to check",
-  "@hashVerifierVaultEmptyMessage": {
-    "description": "Message shown on the confirmation step when the scan discovered zero files"
-  },
   "hashVerifierVaultStartButton": "Start Check",
   "@hashVerifierVaultStartButton": {
     "description": "Button on the vault confirmation step that begins hashing every discovered file"
@@ -7125,10 +6100,6 @@
   "@hashVerifierVaultActionVerifySubtitle": {
     "description": "Subtitle of the 'check every file in a vault against a manifest' option on the Vault tab's action chooser"
   },
-  "hashVerifierVaultChangeActionButton": "Change",
-  "@hashVerifierVaultChangeActionButton": {
-    "description": "Button that returns the Vault tab from a chosen action back to the compute/verify chooser"
-  },
   "hashVerifierVaultVerifyButton": "Verify Entire Vault",
   "@hashVerifierVaultVerifyButton": {
     "description": "Button that scans the loaded manifest's vault and verifies every file it finds against it"
@@ -7168,10 +6139,6 @@
   "duplicateFinderScanningStage3": "Stage 3: Verifying full byte hashes...",
   "@duplicateFinderScanningStage3": {
     "description": "Stage 3 scanning status"
-  },
-  "duplicateFinderScanComplete": "Scan Complete",
-  "@duplicateFinderScanComplete": {
-    "description": "Scan complete status"
   },
   "duplicateFinderNoDuplicatesTitle": "No Duplicate Files Found",
   "@duplicateFinderNoDuplicatesTitle": {
@@ -7470,10 +6437,6 @@
       }
     }
   },
-  "storageAnalyzerHeaviestFilesHeader": "Heaviest Files",
-  "@storageAnalyzerHeaviestFilesHeader": {
-    "description": "Section header for the largest-files list"
-  },
   "storageAnalyzerBreakdownHeader": "By File Type",
   "@storageAnalyzerBreakdownHeader": {
     "description": "Section header for the file-type breakdown bar"
@@ -7598,15 +6561,6 @@
   "storageAnalyzerEmptyFolder": "This folder is empty.",
   "@storageAnalyzerEmptyFolder": {
     "description": "Shown when the folder being viewed has no content"
-  },
-  "storageAnalyzerSmallerItems": "{count, plural, =1{1 smaller item} other{{count} smaller items}}",
-  "@storageAnalyzerSmallerItems": {
-    "description": "Label of the treemap tile that groups many items too small to draw",
-    "placeholders": {
-      "count": {
-        "type": "num"
-      }
-    }
   },
   "storageAnalyzerMapHint": "Tap a folder to open it. Press and hold to select.",
   "@storageAnalyzerMapHint": {
@@ -8217,10 +7171,6 @@
       "count": {}
     }
   },
-  "vaultBrowserSwitchVaultTooltip": "Switch Vault",
-  "@vaultBrowserSwitchVaultTooltip": {
-    "description": "Tooltip for the icon button that switches which mounted vault is being browsed"
-  },
   "vaultBrowserRootFolderLabel": "Root Folder",
   "@vaultBrowserRootFolderLabel": {
     "description": "Breadcrumb label shown when browsing a vault's root folder"
@@ -8321,22 +7271,6 @@
   "@toolVaultSyncSubtitle": {
     "description": "Tool card subtitle for the Vault-to-Vault Synchronizer / Diff tool"
   },
-  "vaultSyncNoVaultsTitle": "No Vaults Mounted",
-  "@vaultSyncNoVaultsTitle": {
-    "description": "Empty state title shown in Vault Sync when no vaults are mounted"
-  },
-  "vaultSyncNoVaultsMessage": "Mount at least one vault to compare and sync its files.",
-  "@vaultSyncNoVaultsMessage": {
-    "description": "Empty state message shown in Vault Sync when no vaults are mounted"
-  },
-  "vaultSyncLeftLabel": "Left",
-  "@vaultSyncLeftLabel": {
-    "description": "Label for the left side of a Vault Sync comparison"
-  },
-  "vaultSyncRightLabel": "Right",
-  "@vaultSyncRightLabel": {
-    "description": "Label for the right side of a Vault Sync comparison"
-  },
   "vaultSyncTapToSelect": "Tap to select a storage & folder",
   "@vaultSyncTapToSelect": {
     "description": "Placeholder subtitle shown on a Vault Sync side picker before a location is chosen"
@@ -8344,10 +7278,6 @@
   "vaultSyncSwapTooltip": "Swap the two storages",
   "@vaultSyncSwapTooltip": {
     "description": "Tooltip of the swap button in Vault Sync"
-  },
-  "vaultSyncSameLocationWarning": "The two folders must be different.",
-  "@vaultSyncSameLocationWarning": {
-    "description": "Warning in Vault Sync when both storages point at the same folder"
   },
   "vaultSyncIntroTitle": "Compare Two Folders",
   "@vaultSyncIntroTitle": {
@@ -8414,34 +7344,6 @@
       "count": {}
     }
   },
-  "vaultSyncBadgeOnlyLeft": "{count} only on Left",
-  "@vaultSyncBadgeOnlyLeft": {
-    "description": "Summary badge counting entries that exist only on the Left side",
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "vaultSyncBadgeOnlyRight": "{count} only on Right",
-  "@vaultSyncBadgeOnlyRight": {
-    "description": "Summary badge counting entries that exist only on the Right side",
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "vaultSyncBadgeLeftNewer": "{count} newer on Left",
-  "@vaultSyncBadgeLeftNewer": {
-    "description": "Summary badge counting entries where the Left copy is newer",
-    "placeholders": {
-      "count": {}
-    }
-  },
-  "vaultSyncBadgeRightNewer": "{count} newer on Right",
-  "@vaultSyncBadgeRightNewer": {
-    "description": "Summary badge counting entries where the Right copy is newer",
-    "placeholders": {
-      "count": {}
-    }
-  },
   "vaultSyncBadgeConflicts": "{count} need review",
   "@vaultSyncBadgeConflicts": {
     "description": "Summary badge counting entries that can't be resolved automatically",
@@ -8461,42 +7363,6 @@
   "@vaultSyncDirectionTwoWaySubtitle": {
     "description": "Explanation of the two-way sync direction option"
   },
-  "vaultSyncDirectionLeftToRight": "Left → Right (one-way)",
-  "@vaultSyncDirectionLeftToRight": {
-    "description": "Sync direction option: only push Left's changes to Right"
-  },
-  "vaultSyncDirectionLeftToRightSubtitle": "Pushes new and updated files from Left to Right; never changes Left",
-  "@vaultSyncDirectionLeftToRightSubtitle": {
-    "description": "Explanation of the Left-to-Right one-way sync direction option"
-  },
-  "vaultSyncDirectionRightToLeft": "Right → Left (one-way)",
-  "@vaultSyncDirectionRightToLeft": {
-    "description": "Sync direction option: only push Right's changes to Left"
-  },
-  "vaultSyncDirectionRightToLeftSubtitle": "Pushes new and updated files from Right to Left; never changes Right",
-  "@vaultSyncDirectionRightToLeftSubtitle": {
-    "description": "Explanation of the Right-to-Left one-way sync direction option"
-  },
-  "vaultSyncSearchHint": "Search differences",
-  "@vaultSyncSearchHint": {
-    "description": "Hint text for the search field filtering the Vault Sync diff list"
-  },
-  "vaultSyncStatusOnlyLeft": "Only Left",
-  "@vaultSyncStatusOnlyLeft": {
-    "description": "Status badge for an entry that exists only on the Left side"
-  },
-  "vaultSyncStatusOnlyRight": "Only Right",
-  "@vaultSyncStatusOnlyRight": {
-    "description": "Status badge for an entry that exists only on the Right side"
-  },
-  "vaultSyncStatusLeftNewer": "Left Newer",
-  "@vaultSyncStatusLeftNewer": {
-    "description": "Status badge for an entry where the Left copy is newer"
-  },
-  "vaultSyncStatusRightNewer": "Right Newer",
-  "@vaultSyncStatusRightNewer": {
-    "description": "Status badge for an entry where the Right copy is newer"
-  },
   "vaultSyncStatusConflict": "Needs Review",
   "@vaultSyncStatusConflict": {
     "description": "Status badge for an entry with ambiguous same-time, different-size copies"
@@ -8505,24 +7371,6 @@
   "@vaultSyncStatusTypeMismatch": {
     "description": "Status badge for an entry that's a file on one side and a folder on the other"
   },
-  "vaultSyncFolderOnlyLeftDetail": "Folder — only on Left",
-  "@vaultSyncFolderOnlyLeftDetail": {
-    "description": "Detail line for a whole folder that exists only on the Left side"
-  },
-  "vaultSyncFolderOnlyRightDetail": "Folder — only on Right",
-  "@vaultSyncFolderOnlyRightDetail": {
-    "description": "Detail line for a whole folder that exists only on the Right side"
-  },
-  "vaultSyncBothSidesDetail": "L: {leftSize} · {leftDate}  →  R: {rightSize} · {rightDate}",
-  "@vaultSyncBothSidesDetail": {
-    "description": "Detail line comparing size and modified date on both sides for a modified/conflicted file",
-    "placeholders": {
-      "leftSize": {},
-      "leftDate": {},
-      "rightSize": {},
-      "rightDate": {}
-    }
-  },
   "vaultSyncTypeMismatchTooltip": "A file on one side and a folder on the other — resolve manually in the file browser",
   "@vaultSyncTypeMismatchTooltip": {
     "description": "Tooltip explaining why a type-mismatch entry can't be synced automatically"
@@ -8530,14 +7378,6 @@
   "vaultSyncChangeActionTooltip": "Change sync action",
   "@vaultSyncChangeActionTooltip": {
     "description": "Tooltip on the per-entry action button in the Vault Sync diff list"
-  },
-  "vaultSyncActionCopyToRight": "Copy → Right",
-  "@vaultSyncActionCopyToRight": {
-    "description": "Per-entry action: copy this entry from Left to Right"
-  },
-  "vaultSyncActionCopyToLeft": "Copy → Left",
-  "@vaultSyncActionCopyToLeft": {
-    "description": "Per-entry action: copy this entry from Right to Left"
   },
   "vaultSyncActionSkip": "Skip",
   "@vaultSyncActionSkip": {
@@ -8566,13 +7406,6 @@
       "bytes": {}
     }
   },
-  "vaultSyncStartedMessage": "Sync started — {count} items queued",
-  "@vaultSyncStartedMessage": {
-    "description": "Snackbar shown after enqueueing Vault Sync copy operations",
-    "placeholders": {
-      "count": {}
-    }
-  },
   "vaultSyncPickLocationTitle": "Select {side} Folder",
   "@vaultSyncPickLocationTitle": {
     "description": "App bar title on the Vault Sync location picker sheet, naming which side is being picked",
@@ -8591,10 +7424,6 @@
       "targets": {}
     }
   },
-  "vaultSyncStorageSelectorLabel": "Storage",
-  "@vaultSyncStorageSelectorLabel": {
-    "description": "Label of the storage selector on the Vault Sync location picker (vaults, device storage, document providers)"
-  },
   "vaultSyncTargetKindVault": "Encrypted vault",
   "@vaultSyncTargetKindVault": {
     "description": "Subtitle under a vault in the Vault Sync storage selector"
@@ -8606,10 +7435,6 @@
   "vaultSyncTargetKindProvider": "Document provider · not encrypted",
   "@vaultSyncTargetKindProvider": {
     "description": "Subtitle under a document-provider folder (SD card, cloud drive) in the Vault Sync storage selector"
-  },
-  "vaultSyncAddStorageTooltip": "Add storage location",
-  "@vaultSyncAddStorageTooltip": {
-    "description": "Tooltip for the app bar button on the Vault Sync location picker that opens the system folder picker to add a storage"
   },
   "vaultSyncEnableLocalStorageTooltip": "Enable Local Storage access",
   "@vaultSyncEnableLocalStorageTooltip": {
@@ -8656,10 +7481,6 @@
   "@confirmRemoveMasterPasswordMessage": {
     "description": "Prompt message when removing master password"
   },
-  "authenticateToRemoveMasterPassword": "Authenticate to remove Master Password",
-  "@authenticateToRemoveMasterPassword": {
-    "description": "Biometric prompt reason when removing master password"
-  },
   "incorrectPassword": "Incorrect password",
   "@incorrectPassword": {
     "description": "Error message when entering an incorrect password"
@@ -8687,10 +7508,6 @@
   "copyPathAction": "Copy path",
   "@copyPathAction": {
     "description": "Menu item label that copies the path of the selected file or folder to the clipboard"
-  },
-  "automationSectionHeader": "Automation",
-  "@automationSectionHeader": {
-    "description": "Header for the automation settings section in the vault configuration screen"
   },
   "automationTileTitle": "Automation",
   "@automationTileTitle": {
@@ -8844,10 +7661,6 @@
   "@automationActionEmergencyPurgeLabel": {
     "description": "Row label for the copyable EMERGENCY_PURGE action string"
   },
-  "automationDocCommentFootnote": "Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.",
-  "@automationDocCommentFootnote": {
-    "description": "Closing footnote pointing to the source doc comment for the full extras contract"
-  },
   "automationTierOffLabel": "Off",
   "@automationTierOffLabel": {
     "description": "Automation tier picker option: automation disabled for this vault"
@@ -8883,14 +7696,6 @@
   "showHiddenFilesDesc": "Display dotfiles and system folders",
   "@showHiddenFilesDesc": {
     "description": "Toggle description for showing hidden files and folders"
-  },
-  "showNoMediaFilesLabel": "Show .nomedia files",
-  "@showNoMediaFilesLabel": {
-    "description": "Label for toggle option to display .nomedia files"
-  },
-  "showNoMediaFilesDesc": "Display .nomedia files in folder listings",
-  "@showNoMediaFilesDesc": {
-    "description": "Description explaining that .nomedia files will be shown in folder listings"
   },
   "dontAskAgain": "Don't ask again",
   "@dontAskAgain": {
@@ -8946,17 +7751,9 @@
   "@wizardNextButton": {
     "description": "Bottom navigation bar button in a creation wizard: advance to the next step"
   },
-  "wizardStepTypeTitle": "Type",
-  "@wizardStepTypeTitle": {
-    "description": "Short step title/progress-indicator label for a creation wizard's Category/Type Selection step"
-  },
   "wizardStepBasicInfoTitle": "Basic Info",
   "@wizardStepBasicInfoTitle": {
     "description": "Short step title/progress-indicator label for a creation wizard's Basic Configuration step"
-  },
-  "wizardStepAdvancedTitle": "Advanced",
-  "@wizardStepAdvancedTitle": {
-    "description": "Short step title/progress-indicator label for a creation wizard's Advanced/Optional Features step"
   },
   "wizardStepReviewTitle": "Review",
   "@wizardStepReviewTitle": {
@@ -8973,14 +7770,6 @@
   "wizardEncryptionDetailsRowTitle": "Encryption Details",
   "@wizardEncryptionDetailsRowTitle": {
     "description": "Row title for the tile that opens the Advanced Parameters / cipher settings modal bottom sheet on a creation wizard's Advanced step"
-  },
-  "wizardHiddenVolumeRowSubtitleConfigured": "Configured — tap to review",
-  "@wizardHiddenVolumeRowSubtitleConfigured": {
-    "description": "Subtitle shown under the hidden-volume details row once the toggle is on and its modal sheet has been opened"
-  },
-  "wizardHiddenVolumeRowSubtitleNeedsSetup": "Tap to set up",
-  "@wizardHiddenVolumeRowSubtitleNeedsSetup": {
-    "description": "Subtitle shown under the hidden-volume details row once the toggle is on but its modal sheet hasn't been opened yet"
   },
   "wizardSummaryTitle": "Summary",
   "@wizardSummaryTitle": {
@@ -9060,10 +7849,6 @@
   "@externalSubtitlesLabel": {
     "description": "Label for external subtitle files"
   },
-  "externalLabel": "External",
-  "@externalLabel": {
-    "description": "Short label indicating external subtitles are active"
-  },
   "subtitleSizeLabel": "Size",
   "@subtitleSizeLabel": {
     "description": "Label for subtitle font size selector"
@@ -9128,10 +7913,6 @@
   "@redactToolLabel": {
     "description": "Image editor toolbar button: blackout/redaction box tool, for hiding sensitive info"
   },
-  "rotateLeftTooltip": "Rotate left",
-  "@rotateLeftTooltip": {
-    "description": "Image editor tooltip: rotate the working image 90 degrees counter-clockwise"
-  },
   "rotateRightTooltip": "Rotate right",
   "@rotateRightTooltip": {
     "description": "Image editor tooltip: rotate the working image 90 degrees clockwise"
@@ -9147,22 +7928,6 @@
   "cropAspectOriginalLabel": "Original",
   "@cropAspectOriginalLabel": {
     "description": "Crop aspect-ratio preset: matches the current working image's own aspect ratio"
-  },
-  "applyCropTooltip": "Apply crop",
-  "@applyCropTooltip": {
-    "description": "Image editor tooltip: commit the current crop rectangle into the working image"
-  },
-  "annotationColorTooltip": "Color",
-  "@annotationColorTooltip": {
-    "description": "Image editor tooltip: choose the color for the current drawing/redaction tool"
-  },
-  "annotationStrokeWidthTooltip": "Stroke width",
-  "@annotationStrokeWidthTooltip": {
-    "description": "Image editor tooltip: choose the pen/redaction stroke width"
-  },
-  "clearAnnotationsTooltip": "Clear all annotations",
-  "@clearAnnotationsTooltip": {
-    "description": "Image editor tooltip: remove every pen stroke, text label, and redaction box added this session"
   },
   "resetImageTooltip": "Reset to original",
   "@resetImageTooltip": {
@@ -9183,10 +7948,6 @@
   "addTextAnnotationHint": "Type something…",
   "@addTextAnnotationHint": {
     "description": "Placeholder hint text in the add-text-annotation input field"
-  },
-  "textToolHint": "Tap the image to add text",
-  "@textToolHint": {
-    "description": "Hint shown above the toolbar in the image editor while the text tool is active"
   },
   "saveImageSheetTitle": "Save changes",
   "@saveImageSheetTitle": {
@@ -9587,25 +8348,13 @@
   "@automationSavePimButton": {
     "description": "Button label for saving automation PIM"
   },
-  "automationCameraSectionHeader": "Camera automation",
-  "@automationCameraSectionHeader": {
-    "description": "Section header for camera automation"
-  },
   "automationCameraDescription": "Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.",
   "@automationCameraDescription": {
     "description": "Description of the camera automation opt-in"
   },
-  "automationAllowCameraCapture": "Allow camera capture",
-  "@automationAllowCameraCapture": {
-    "description": "Switch label for allowing camera capture from automation"
-  },
   "automationOverlayPermissionTitle": "Display over other apps",
   "@automationOverlayPermissionTitle": {
     "description": "Dialog title requesting display over other apps permission for camera automation"
-  },
-  "automationOverlayPermissionMessage": "Background camera capture requires permission to display over other apps on Android 14+. Grant this permission to allow automated captures while the screen is locked or the app is in the background.",
-  "@automationOverlayPermissionMessage": {
-    "description": "Dialog message explaining why display over other apps permission is required for camera automation"
   },
   "automationPimSavedMessage": "PIM saved",
   "@automationPimSavedMessage": {
@@ -9726,14 +8475,6 @@
   "computingHashMessage": "Computing hash…",
   "@computingHashMessage": {
     "description": "Progress text shown while calculating file SHA-256 hash"
-  },
-  "tapCalculateToVerifyMessage": "Tap Calculate to verify",
-  "@tapCalculateToVerifyMessage": {
-    "description": "Helper text shown before hash computation is initiated"
-  },
-  "calculateButton": "Calculate",
-  "@calculateButton": {
-    "description": "Button label to trigger checksum hash calculation"
   },
   "copyDiagnosticsButton": "Copy Diagnostics",
   "@copyDiagnosticsButton": {
@@ -9858,10 +8599,6 @@
       }
     }
   },
-  "archivesTabLabel": "Archives",
-  "@archivesTabLabel": {
-    "description": "Bottom nav label for the archive-browsing tab"
-  },
   "filesTabLabel": "Files",
   "@filesTabLabel": {
     "description": "Bottom nav label for the local storage browsing tab"
@@ -9870,53 +8607,13 @@
   "@filesPermissionMessage": {
     "description": "Body text asking for storage permission in the local files tab"
   },
-  "filesEmptyTitle": "No files here",
-  "@filesEmptyTitle": {
-    "description": "Empty state title for an empty folder"
-  },
   "filesEmptyMessage": "This folder is empty.",
   "@filesEmptyMessage": {
     "description": "Empty state message for an empty folder"
   },
-  "filesNewFolderTooltip": "New folder",
-  "@filesNewFolderTooltip": {
-    "description": "Tooltip for the create-folder app bar action"
-  },
-  "filesNewFolderDialogTitle": "New folder",
-  "@filesNewFolderDialogTitle": {
-    "description": "Title of the create-folder dialog"
-  },
-  "filesNameHint": "Name",
-  "@filesNameHint": {
-    "description": "Text field hint used by the rename and new-folder dialogs"
-  },
-  "filesCreate": "Create",
-  "@filesCreate": {
-    "description": "Confirm button on the new-folder dialog"
-  },
-  "filesRename": "Rename",
-  "@filesRename": {
-    "description": "Rename dialog title/button and selection bar tooltip"
-  },
-  "filesDelete": "Delete",
-  "@filesDelete": {
-    "description": "Delete confirm button and selection bar tooltip"
-  },
-  "filesShare": "Share",
-  "@filesShare": {
-    "description": "Share selection bar tooltip/button"
-  },
   "filesCopy": "Copy",
   "@filesCopy": {
     "description": "Copy selection bar tooltip/button"
-  },
-  "filesMove": "Move",
-  "@filesMove": {
-    "description": "Move selection bar tooltip/button"
-  },
-  "filesDeleteConfirmTitle": "Delete permanently?",
-  "@filesDeleteConfirmTitle": {
-    "description": "Delete confirmation dialog title"
   },
   "filesChooseDestinationTitle": "Choose a folder",
   "@filesChooseDestinationTitle": {
@@ -9930,65 +8627,9 @@
   "@filesCopyHere": {
     "description": "Confirm button in the destination picker when copying"
   },
-  "filesSelectAllTooltip": "Select all",
-  "@filesSelectAllTooltip": {
-    "description": "Tooltip for the select-all action in selection mode"
-  },
-  "filesCloseSelectionTooltip": "Close",
-  "@filesCloseSelectionTooltip": {
-    "description": "Tooltip for exiting selection mode"
-  },
-  "filesFolderCreated": "Folder created",
-  "@filesFolderCreated": {
-    "description": "Snackbar after successfully creating a folder"
-  },
-  "filesCreateFolderFailed": "Couldn't create folder",
-  "@filesCreateFolderFailed": {
-    "description": "Snackbar after failing to create a folder"
-  },
-  "filesRenamed": "Renamed",
-  "@filesRenamed": {
-    "description": "Snackbar after a successful rename"
-  },
-  "filesRenameFailed": "Couldn't rename",
-  "@filesRenameFailed": {
-    "description": "Snackbar after a failed rename"
-  },
-  "filesNameAlreadyExists": "That name is already taken",
-  "@filesNameAlreadyExists": {
-    "description": "Snackbar when a rename target name collides"
-  },
-  "filesDeleted": "Deleted",
-  "@filesDeleted": {
-    "description": "Snackbar after a successful delete"
-  },
   "filesDeleteFailed": "Couldn't delete",
   "@filesDeleteFailed": {
     "description": "Snackbar after a failed delete"
-  },
-  "filesMoved": "Moved",
-  "@filesMoved": {
-    "description": "Snackbar after a successful move"
-  },
-  "filesMoveFailed": "Couldn't move",
-  "@filesMoveFailed": {
-    "description": "Snackbar after a failed move"
-  },
-  "filesCopied": "Copied",
-  "@filesCopied": {
-    "description": "Snackbar after a successful copy"
-  },
-  "filesCopyFailed": "Couldn't copy",
-  "@filesCopyFailed": {
-    "description": "Snackbar after a failed copy"
-  },
-  "filesOpenFailed": "Couldn't open this file",
-  "@filesOpenFailed": {
-    "description": "Snackbar when no app can open a tapped file"
-  },
-  "filesShareFailed": "Couldn't share this file",
-  "@filesShareFailed": {
-    "description": "Snackbar when sharing a file fails"
   },
   "filesFilterTooltip": "Filter",
   "@filesFilterTooltip": {
@@ -10186,10 +8827,6 @@
   "@compositePimFieldLabel": {
     "description": "Label for the PIM text input field"
   },
-  "compositePimFieldHelper": "Leave empty or 0 for standard default iterations",
-  "@compositePimFieldHelper": {
-    "description": "Helper text for the PIM text field"
-  },
   "compositeRememberContainerTitle": "Remember this container",
   "@compositeRememberContainerTitle": {
     "description": "Title for switch to remember composite container"
@@ -10264,10 +8901,6 @@
   "@compositeSingleCarrierWarningBanner": {
     "description": "Banner message when only 1 carrier of a composite container was picked"
   },
-  "compositeSelectAllCarriersButton": "Select All Carriers",
-  "@compositeSelectAllCarriersButton": {
-    "description": "Button to trigger picking all carrier files"
-  },
   "compositeCarriersMissingTitle": "Composite Carriers Missing",
   "@compositeCarriersMissingTitle": {
     "description": "Title shown when one or more carrier files can no longer be accessed"
@@ -10279,18 +8912,6 @@
   "compositeRelocateCarriersButton": "Relocate Carrier Files",
   "@compositeRelocateCarriersButton": {
     "description": "Button to relocate or reselect missing carrier files"
-  },
-  "passwordOptionalFieldLabel": "Password (optional)",
-  "@passwordOptionalFieldLabel": {
-    "description": "Password field label when password is optional"
-  },
-  "plainDiskImagePasswordHint": "No password needed — this disk image isn't encrypted",
-  "@plainDiskImagePasswordHint": {
-    "description": "Hint text in password field for unencrypted disk images"
-  },
-  "compositePasswordHint": "Enter composite container password",
-  "@compositePasswordHint": {
-    "description": "Hint text in password field for composite containers"
   },
   "generateStrongPasswordTooltip": "Generate strong password",
   "@generateStrongPasswordTooltip": {
@@ -10577,10 +9198,6 @@
   "@sectionDuressUnlock": {
     "description": "Section header for master lock screen duress settings"
   },
-  "duressMasterPasswordRequired": "A Master Password must be enabled in App Security before configuring duress unlock.",
-  "@duressMasterPasswordRequired": {
-    "description": "Notice shown when master password is not set"
-  },
   "duressPasswordTitle": "Duress Password",
   "@duressPasswordTitle": {
     "description": "List tile title for the duress password setup"
@@ -10807,10 +9424,6 @@
   "@longFileNameDisplayLabel": {
     "description": "Settings option label for choosing how long file names are displayed"
   },
-  "longFileNameDisplayDesc": "Choose how names are shortened when they exceed available space",
-  "@longFileNameDisplayDesc": {
-    "description": "Settings description for long file name display mode"
-  },
   "longFileNameEllipsizeStartLabel": "Ellipsize start",
   "@longFileNameEllipsizeStartLabel": {
     "description": "Option label: ellipsize the beginning of long file names"
@@ -10867,18 +9480,6 @@
   "@gridAspectPortraitLabel": {
     "description": "Grid aspect ratio option: 9:16 portrait"
   },
-  "fileFolderDisplaySectionHeader": "File & Folder Display",
-  "@fileFolderDisplaySectionHeader": {
-    "description": "Section header for general file visibility and naming options"
-  },
-  "navigationBarsSectionHeader": "Navigation & Bars",
-  "@navigationBarsSectionHeader": {
-    "description": "Section header for breadcrumb, stats, and bookmark bars"
-  },
-  "columnedListViewColumnsSectionHeader": "Columned List Columns",
-  "@columnedListViewColumnsSectionHeader": {
-    "description": "Section header for columned list view columns reordering"
-  },
   "autoHideAppBarLabel": "Auto-hide app bar on scroll",
   "@autoHideAppBarLabel": {
     "description": "Label for toggle option to auto-hide the top app bar when scrolling down"
@@ -10927,14 +9528,6 @@
   "@storageLocationsTitle": {
     "description": "Title for storage locations selector sheet"
   },
-  "storageLocationsSubtitle": "Internal storage, SD cards, and document providers",
-  "@storageLocationsSubtitle": {
-    "description": "Subtitle for storage locations management"
-  },
-  "storageLocationsSelectPrompt": "Select active storage",
-  "@storageLocationsSelectPrompt": {
-    "description": "Subtitle on the storage locations sheet in decoy mode"
-  },
   "addStorageLocationTitle": "Add Storage Location",
   "@addStorageLocationTitle": {
     "description": "Action to pick and add an external storage location"
@@ -10942,14 +9535,6 @@
   "addStorageLocationSubtitle": "Add an external SD card, USB drive, or folder",
   "@addStorageLocationSubtitle": {
     "description": "Subtitle for adding a storage location"
-  },
-  "documentProviderSafLabel": "Document Provider (SAF)",
-  "@documentProviderSafLabel": {
-    "description": "Badge/subtitle for SAF document providers"
-  },
-  "externalStorageLabel": "External Storage",
-  "@externalStorageLabel": {
-    "description": "Label for removable SD card or USB storage"
   },
   "renameStorageLocationTitle": "Rename Location",
   "@renameStorageLocationTitle": {
@@ -10967,10 +9552,6 @@
         "type": "String"
       }
     }
-  },
-  "storageLocationAddedSnack": "Storage location added",
-  "@storageLocationAddedSnack": {
-    "description": "Snackbar shown when an external storage location is successfully linked"
   },
   "storageLocationUnresolvedError": "Could not access that location directly. Make sure storage permissions are granted.",
   "@storageLocationUnresolvedError": {
@@ -11003,66 +9584,6 @@
   "mediaViewerCustomizeControls": "Customize Controls...",
   "@mediaViewerCustomizeControls": {
     "description": "Button to customize media viewer controls"
-  },
-  "mediaViewerControlsTitle": "Media Player Controls",
-  "@mediaViewerControlsTitle": {
-    "description": "Title for media player controls settings"
-  },
-  "mediaViewerControlsReset": "Media controls reset to defaults",
-  "@mediaViewerControlsReset": {
-    "description": "Message when controls are reset"
-  },
-  "mediaViewerTransportDisplay": "Transport & Display",
-  "@mediaViewerTransportDisplay": {
-    "description": "Settings section header"
-  },
-  "mediaViewerShowScrubberTitle": "Show Progress Bar (Scrubber)",
-  "@mediaViewerShowScrubberTitle": {
-    "description": "Settings toggle title"
-  },
-  "mediaViewerShowScrubberDesc": "Display position and duration timeline slider",
-  "@mediaViewerShowScrubberDesc": {
-    "description": "Settings toggle description"
-  },
-  "mediaViewerShowCenterTransportTitle": "Show Center Transport Controls",
-  "@mediaViewerShowCenterTransportTitle": {
-    "description": "Settings toggle title"
-  },
-  "mediaViewerShowCenterTransportDesc": "Display large circular play/pause in the center",
-  "@mediaViewerShowCenterTransportDesc": {
-    "description": "Settings toggle description"
-  },
-  "mediaViewerShowPrevNextTitle": "Show Next & Previous Buttons",
-  "@mediaViewerShowPrevNextTitle": {
-    "description": "Settings toggle title"
-  },
-  "mediaViewerShowPrevNextDesc": "Turn off to keep only the single play button",
-  "@mediaViewerShowPrevNextDesc": {
-    "description": "Settings toggle description"
-  },
-  "mediaViewerShowStatusBadgeTitle": "Show Status Badges",
-  "@mediaViewerShowStatusBadgeTitle": {
-    "description": "Settings toggle title"
-  },
-  "mediaViewerShowStatusBadgeDesc": "Display slideshow delay and static image indicators",
-  "@mediaViewerShowStatusBadgeDesc": {
-    "description": "Settings toggle description"
-  },
-  "mediaViewerTopBarSection": "Top Bar",
-  "@mediaViewerTopBarSection": {
-    "description": "Settings section header"
-  },
-  "mediaViewerBottomBarSection": "Bottom Bar",
-  "@mediaViewerBottomBarSection": {
-    "description": "Settings section header"
-  },
-  "mediaViewerUnpinnedSection": "Unpinned (Overflow)",
-  "@mediaViewerUnpinnedSection": {
-    "description": "Settings section header"
-  },
-  "mediaViewerAllControlsPinned": "All controls are already pinned.",
-  "@mediaViewerAllControlsPinned": {
-    "description": "Message when all actions are used"
   },
   "mediaPlayerControlsTitle": "Media Player Controls",
   "resumePlaybackTitle": "Resume playback",
@@ -11167,25 +9688,9 @@
   "@advancedSettingsActionsEmptyHint": {
     "description": "Hint shown when advanced settings actions list is empty"
   },
-  "dropHereAtEnd": "Drop here at end",
-  "@dropHereAtEnd": {
-    "description": "Text on drop target indicating dropping item at the end of the section"
-  },
-  "dragItemsHereToAdd": "+ Drag items here to add to this section",
-  "@dragItemsHereToAdd": {
-    "description": "Default empty state hint for drop target container"
-  },
   "moveToAdvancedSettingsTooltip": "Move to Advanced Settings",
   "@moveToAdvancedSettingsTooltip": {
     "description": "Tooltip for button moving an action to the advanced settings section"
-  },
-  "noVaultsMounted": "No vaults mounted",
-  "@noVaultsMounted": {
-    "description": "Subtitle in the drawer header when no vaults are currently mounted"
-  },
-  "vaultsMountedSummary": "vault(s) mounted",
-  "@vaultsMountedSummary": {
-    "description": "Suffix in the drawer header indicating count of mounted vaults"
   },
   "dashboardNavLabel": "Dashboard",
   "@dashboardNavLabel": {
@@ -11195,10 +9700,6 @@
   "@vaultsSectionTitle": {
     "description": "Section header in the drawer for the list of encrypted vaults"
   },
-  "vaultStatusMounted": "Mounted",
-  "@vaultStatusMounted": {
-    "description": "Status subtitle indicating a vault is unlocked and mounted"
-  },
   "lockVaultTooltip": "Lock vault",
   "@lockVaultTooltip": {
     "description": "Tooltip for the lock button on an active vault row in the drawer"
@@ -11206,22 +9707,6 @@
   "lockAllVaultsTitle": "Lock all",
   "@lockAllVaultsTitle": {
     "description": "Quick action in the drawer to lock all mounted vaults at once"
-  },
-  "safProviderLabel": "SAF Provider",
-  "@safProviderLabel": {
-    "description": "Subtitle for external storage locations mounted via Storage Access Framework"
-  },
-  "singleFileCryptoTitle": "Single-File Crypto",
-  "@singleFileCryptoTitle": {
-    "description": "Title for the tool to encrypt or decrypt standalone files outside of a vault"
-  },
-  "singleFileCryptoSubtitle": "Encrypt / decrypt outside vaults",
-  "@singleFileCryptoSubtitle": {
-    "description": "Subtitle describing single-file encryption tool"
-  },
-  "passwordGeneratorTitle": "Password Generator",
-  "@passwordGeneratorTitle": {
-    "description": "Title for the quick password generator tool"
   },
   "contentsLabel": "Contents",
   "@contentsLabel": {
@@ -11308,17 +9793,9 @@
   "@holdSpeedMultiplierTitle": {
     "description": "Title for hold-to-fast-forward playback speed multiplier"
   },
-  "holdSpeedMultiplierSubtitle": "Speed while press-and-holding the video",
-  "@holdSpeedMultiplierSubtitle": {
-    "description": "Description for hold-to-fast-forward speed setting"
-  },
   "defaultAspectRatioTitle": "Default Aspect Ratio",
   "@defaultAspectRatioTitle": {
     "description": "Title for default aspect ratio setting"
-  },
-  "defaultAspectRatioSubtitle": "Applied automatically when a video is opened",
-  "@defaultAspectRatioSubtitle": {
-    "description": "Description for default aspect ratio setting"
   },
   "aspectRatioModeLabel": "Aspect Ratio",
   "@aspectRatioModeLabel": {
@@ -11664,58 +10141,6 @@
       }
     }
   },
-  "cardSwipeActionsTitle": "Card Swipe Actions",
-  "@cardSwipeActionsTitle": {
-    "description": "Settings toggle title to enable or disable card swipe gestures on the dashboard"
-  },
-  "cardSwipeActionsSubtitle": "Swipe vault cards to quickly reveal edit and remove actions",
-  "@cardSwipeActionsSubtitle": {
-    "description": "Settings toggle subtitle explaining card swipe actions on the dashboard"
-  },
-  "cameraQualitySd": "480p (SD)",
-  "@cameraQualitySd": {
-    "description": "Resolution option label for Standard Definition (480p) video"
-  },
-  "cameraQualityHd": "720p (HD)",
-  "@cameraQualityHd": {
-    "description": "Resolution option label for High Definition (720p) video"
-  },
-  "cameraQualityFhd": "1080p (FHD)",
-  "@cameraQualityFhd": {
-    "description": "Resolution option label for Full HD (1080p) video"
-  },
-  "cameraQualityUhd": "4K (UHD)",
-  "@cameraQualityUhd": {
-    "description": "Resolution option label for Ultra HD / 4K video"
-  },
-  "cameraPhotoResMax": "Full (Max Res)",
-  "@cameraPhotoResMax": {
-    "description": "Photo resolution option for maximum sensor resolution"
-  },
-  "cameraPhotoResHigh": "5 MP (High)",
-  "@cameraPhotoResHigh": {
-    "description": "Photo resolution option for 5 megapixel capture"
-  },
-  "cameraPhotoResMedium": "2 MP (Medium)",
-  "@cameraPhotoResMedium": {
-    "description": "Photo resolution option for 2 megapixel capture"
-  },
-  "cameraPhotoResLow": "1.2 MP (Low)",
-  "@cameraPhotoResLow": {
-    "description": "Photo resolution option for 1.2 megapixel capture"
-  },
-  "cameraLensWide": "Wide",
-  "@cameraLensWide": {
-    "description": "Label for the ultra-wide camera lens"
-  },
-  "cameraLensInfrared": "IR",
-  "@cameraLensInfrared": {
-    "description": "Label for the infrared / night-vision camera lens"
-  },
-  "cameraLensFront": "Front",
-  "@cameraLensFront": {
-    "description": "Label for the front-facing camera lens"
-  },
   "appLockBehaviorTitle": "App Lock Behavior",
   "@appLockBehaviorTitle": {
     "description": "Settings section or option title for configuring how the app locks"
@@ -11779,10 +10204,6 @@
   "passwordInterchangeIncludeSubfolders": "Include subfolders",
   "@passwordInterchangeIncludeSubfolders": {
     "description": "Switch label: whether export should recurse into subfolders of the chosen vault folder"
-  },
-  "passwordInterchangeFormatHeader": "Format",
-  "@passwordInterchangeFormatHeader": {
-    "description": "Section header above the file-format picker"
   },
   "passwordInterchangeFormatLabel": "File format",
   "@passwordInterchangeFormatLabel": {
@@ -11903,14 +10324,6 @@
       }
     }
   },
-  "autoLockIndicatorLocksOnScreenOff": "Screen-off lock",
-  "@autoLockIndicatorLocksOnScreenOff": {
-    "description": "Concise auto-lock label when the vault locks as soon as the screen turns off"
-  },
-  "autoLockIndicatorNeverLocks": "Won't auto-lock",
-  "@autoLockIndicatorNeverLocks": {
-    "description": "Auto-lock feedback shown when a vault is configured to never auto-lock"
-  },
   "autoLockIndicatorLocksAfterTooltip": "Locks after {duration} of inactivity (resets while using the app)",
   "@autoLockIndicatorLocksAfterTooltip": {
     "description": "Tooltip explaining that the auto-lock timer resets on interaction; {duration} is a duration like '5 minutes'",
@@ -11944,39 +10357,6 @@
         "type": "String"
       }
     }
-  },
-  "cameraEditPhotoTooltip": "Edit photo",
-  "@cameraEditPhotoTooltip": {
-    "description": "Tooltip for the edit photo button in camera preview"
-  },
-  "cameraTrimVideoTooltip": "Trim video",
-  "@cameraTrimVideoTooltip": {
-    "description": "Tooltip for the trim video button in camera preview"
-  },
-  "cameraDiscardMediaTooltip": "Discard",
-  "@cameraDiscardMediaTooltip": {
-    "description": "Tooltip for discarding captured photo/video and returning to camera"
-  },
-  "cameraSaveMediaTooltip": "Save to vault",
-  "@cameraSaveMediaTooltip": {
-    "description": "Tooltip for saving captured photo/video into the vault"
-  },
-  "cameraContinueCaptureTooltip": "Take another photo",
-  "@cameraContinueCaptureTooltip": {
-    "description": "Tooltip for continuing sequential photo capture"
-  },
-  "cameraBatchCount": "{count, plural, =1{1 photo} other{{count} photos}}",
-  "@cameraBatchCount": {
-    "description": "Badge or label showing the number of captured photos in a batch",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "cameraReviewPhotosTooltip": "Review captured photos",
-  "@cameraReviewPhotosTooltip": {
-    "description": "Tooltip for opening review screen from the camera tray"
   },
   "vaultItemTypeAuthenticator": "Authenticator",
   "@vaultItemTypeAuthenticator": {
@@ -12121,14 +10501,6 @@
   "autoLockIndicatorLocksImmediately": "Immediate lock",
   "@autoLockIndicatorLocksImmediately": {
     "description": "Concise auto-lock label when this container is configured to lock as soon as the screen turns off or the app is backgrounded"
-  },
-  "quickActionLockModeTitle": "Lock after quick actions",
-  "@quickActionLockModeTitle": {
-    "description": "Title for lock behavior setting after quick capture or share sheet import"
-  },
-  "quickActionLockModeSubtitle": "Vault lock behavior when saving from Quick Capture or Share Sheet",
-  "@quickActionLockModeSubtitle": {
-    "description": "Subtitle for lock behavior setting after quick capture or share sheet import"
   },
   "quickActionLockModeLeaveAsFoundLabel": "Leave as you found it",
   "@quickActionLockModeLeaveAsFoundLabel": {
@@ -12298,10 +10670,6 @@
   "textEditorProjectFilesTitle": "Project Files",
   "@textEditorProjectFilesTitle": {
     "description": "Drawer title for project files"
-  },
-  "textEditorCloseTabTooltip": "Close tab",
-  "@textEditorCloseTabTooltip": {
-    "description": "Tooltip to close editor tab"
   },
   "textEditorResetToDefault": "Reset to defaults",
   "@textEditorResetToDefault": {
@@ -12672,18 +11040,6 @@
       }
     }
   },
-  "videoEditorSnapNote": "Lossless cut starts on a keyframe: {start} – {end}",
-  "@videoEditorSnapNote": {
-    "description": "Video editor note showing the real start and end of the selected clip after snapping to keyframes",
-    "placeholders": {
-      "start": {
-        "type": "String"
-      },
-      "end": {
-        "type": "String"
-      }
-    }
-  },
   "videoEditorBoundaryInvalid": "That would leave the segment too short.",
   "@videoEditorBoundaryInvalid": {
     "description": "Snackbar when setting a segment start or end would make the segment too short"
@@ -12803,34 +11159,13 @@
       }
     }
   },
-  "videoEditorExportSingle": "Save as new video",
-  "@videoEditorExportSingle": {
-    "description": "Export sheet option when there is a single clip"
-  },
-  "videoEditorExportSingleHint": "The original stays untouched.",
-  "@videoEditorExportSingleHint": {
-    "description": "Subtitle of the single-clip export option"
-  },
   "videoEditorExportMerge": "Merge into one video",
   "@videoEditorExportMerge": {
     "description": "Export sheet option that joins all clips into a single video"
   },
-  "videoEditorExportMergeHint": "Clips are joined in timeline order.",
-  "@videoEditorExportMergeHint": {
-    "description": "Subtitle of the merge export option"
-  },
   "videoEditorExportSeparate": "Save as separate videos",
   "@videoEditorExportSeparate": {
     "description": "Export sheet option that writes one file per clip"
-  },
-  "videoEditorExportSeparateHint": "{count, plural, =1{One new file} other{{count} new files}}",
-  "@videoEditorExportSeparateHint": {
-    "description": "Subtitle of the separate-files export option",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "videoEditorLosslessNote": "Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.",
   "@videoEditorLosslessNote": {
@@ -12996,10 +11331,6 @@
   "@fileSkinColorDefault": {
     "description": "Value shown, and button label, meaning a color option follows the theme instead of a chosen color"
   },
-  "fileSkinColorHexLabel": "Hex color",
-  "@fileSkinColorHexLabel": {
-    "description": "Label of the text field where a color is typed as a hex code"
-  },
   "fileSkinPresetClassic": "Classic",
   "@fileSkinPresetClassic": {
     "description": "Name of the built-in skin that matches the original look"
@@ -13082,27 +11413,6 @@
   "compositeArchiveCarrierRowWarning": "Unsupported archive — remove it from the selection.",
   "@compositeArchiveCarrierRowWarning": {
     "description": "Short warning shown beside an archive in the composite carrier list."
-  },
-  "videoEditorSelectedSegmentSummary": "Segment {current} of {total}: {start} – {end} ({duration})",
-  "@videoEditorSelectedSegmentSummary": {
-    "description": "Readout of the selected video segment number, time range, and duration.",
-    "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      },
-      "start": {
-        "type": "String"
-      },
-      "end": {
-        "type": "String"
-      },
-      "duration": {
-        "type": "String"
-      }
-    }
   },
   "videoEditorKeepModeDescription": "Export the selected segments and discard everything else.",
   "@videoEditorKeepModeDescription": {
@@ -13465,12 +11775,9 @@
   "skinAppBackgroundsCardsMenusAndForegroundText": "App backgrounds, cards, menus, and foreground text.",
   "skinBordersAndOverlays": "Borders and overlays",
   "skinOutlinesShadowsAndModalBackdrops": "Outlines, shadows, and modal backdrops.",
-  "skinTapAnyPreviewElement": "Tap any preview element",
-  "skinChooseAnAppFileOrEditorColorToSeeWhatItControls": "Choose an app, file, or editor color to see what it controls.",
   "skinCustomizeSkin": "Customize skin",
   "skinLight": "Light",
   "skinDark": "Dark",
-  "skinApp": "App",
   "skinEditor": "Editor",
   "skinSkinDetails": "Skin details",
   "skinNameYourSkinAndChooseWhichPaletteToEdit": "Name your skin and choose which palette to edit.",
@@ -13481,22 +11788,14 @@
   "skinPageAndActions": "Page and actions",
   "skinTheMainBackgroundTextAndActionColors": "The main background, text, and action colors.",
   "skinAppBar": "App bar",
-  "skinTheTopNavigationBarIsIndependentFromCardsAndPages": "The top navigation bar is independent from cards and pages.",
   "skinTopBarFillColor": "Top bar fill color.",
   "skinTitleAndIcons": "Title and icons",
   "skinTopBarTextAndIconColor": "Top bar text and icon color.",
   "skinFloatingActionButton": "Floating action button",
-  "skinItsFillAndIconColorAreSeparateFromSelectionColors": "Its fill and icon color are separate from selection colors.",
   "skinButtonFill": "Button fill",
   "skinBackgroundOfTheRoundButton": "Background of the round + button.",
   "skinButtonIcon": "Button icon",
   "skinIconColorOnTheRoundButton": "Icon color on the round + button.",
-  "skinDashboardVaultCards": "Dashboard vault cards",
-  "skinSetTheBackgroundForLockedAndMountedVaultCards": "Set the background for locked and mounted vault cards.",
-  "skinLockedVaultCard": "Locked vault card",
-  "skinNeutralVaultCardFill": "Neutral vault card fill.",
-  "skinMountedVaultCard": "Mounted vault card",
-  "skinSeparateFillForAnUnlockedMountedVault": "Separate fill for an unlocked, mounted vault.",
   "skinFineTuneAppColors": "Fine tune app colors",
   "skinAdvancedMaterialColorsForLessCommonElements": "Advanced Material colors for less common elements.",
   "skinStatusAndBookmarkColors": "Status and bookmark colors",
@@ -13504,108 +11803,24 @@
   "skinTheCustomSkinIsActive971ce3": "The custom skin is active immediately while File Manager and Editor are set to follow the app skin.",
   "skinCustomColorTapToChangeOrReset": "Custom color — tap to change or reset to default.",
   "skinTapTheColorCircleToChooseAColor": "Tap the color circle to choose a color.",
-  "skinAppBarBackground": "App bar background",
-  "skinTheDashboardAndOtherAppBarsUseThisIndependentColor": "The dashboard and other app bars use this independent color.",
-  "skinDashboardMenuIcon": "Dashboard menu icon",
-  "skinTheHamburgerButtonUsesTheAppBarIconColor": "The hamburger button uses the app bar icon color.",
-  "skinDashboardTitle": "Dashboard title",
-  "skinTheDashboardTitleUsesTheAppBarForegroundColor": "The dashboard title uses the app bar foreground color.",
-  "skinActionLabelAndIcon": "Action label and icon",
-  "skinTheActionAccentColorsLabelsb08a63": "The action accent colors labels such as Add a vault and their icons.",
-  "skinDashboardAddButton": "Dashboard add button",
-  "skinTheButtonFillAndPlusIconHaveSeparateSkinColors": "The button fill and plus icon have separate skin colors.",
-  "skinVaultCardAndIconBackground": "Vault card and icon background",
-  "skinTheIconTileUsesPrimary5c2f93": "The icon tile uses Primary container. The mounted vault card blends that color with the raised surface.",
-  "skinVaultFormatIconColor": "Vault format icon color",
-  "skinVaultFormatInitialsUseOnPrimaryContainer": "Vault format initials use On primary container.",
-  "skinVaultStorageDetails": "Vault storage details",
-  "skinFreeSpaceAndCapacityUseTheSupportingTextColor": "Free space and capacity use the supporting text color.",
-  "skin17GBFree5GB": "1.7 GB free / 5 GB",
-  "skinVaultStorageProgress": "Vault storage progress",
-  "skinTheProgressBarUsesTheba7c98": "The progress bar uses the app accent, then switches to tertiary and error colors as storage fills.",
-  "skinLockActionBackground": "Lock action background",
-  "skinTheMountedVaultLockButtonUsesPrimaryContainer": "The mounted-vault lock button uses Primary container.",
-  "skinVaultActionsIconColor": "Vault actions icon color",
-  "skinTheOverflowMenuUsesTheSupportingIconColor": "The overflow menu uses the supporting icon color.",
-  "skinMountedVaultCardBackground": "Mounted vault card background",
-  "skinThisIsTheBackgroundOfa8d0d3": "This is the background of the mounted vault card. Its icon tile still uses the main action color.",
-  "skinLockedVaultCardBackground": "Locked vault card background",
-  "skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard": "This color is independent from the app bar and mounted vault card.",
-  "skinLockedVaultFormatIcon": "Locked vault format icon",
-  "skinLockedVaultIconsUseTheSupportingTextAndIconColor": "Locked vault icons use the supporting text and icon color.",
-  "skinSharedArchive": "Shared archive",
-  "skinLockedVaultStatusText": "Locked vault status text",
-  "skinTheLockedStatusLabelUsesTheSupportingTextColor": "The locked status label uses the supporting text color.",
-  "skinLockedVaultActionsIcon": "Locked vault actions icon",
-  "skinVaultActionsMenuBackground": "Vault actions menu background",
-  "skinTheEditAndRemovePopupUsesTheMenuSurfaceColor": "The Edit and Remove popup uses the menu surface color.",
-  "skinEditMenuItem": "Edit menu item",
-  "skinTheEditActionUsesTheRegularForegroundColor": "The Edit action uses the regular foreground color.",
-  "skinRemoveMenuItem": "Remove menu item",
-  "skinDestructiveActionsUseTheErrorColor": "Destructive actions use the error color.",
-  "skinFileManagerAppBar": "File manager app bar",
-  "skinFileBrowserToolbarsUseTheSameAppBarBackground": "File browser toolbars use the same app bar background.",
-  "skinFileManagerBackButton": "File manager back button",
-  "skinToolbarNavigationIconsUseThisColor": "Toolbar navigation icons use this color.",
-  "skinFileManagerTitle": "File manager title",
-  "skinTheCurrentFolderNameUsesTheAppBarForeground": "The current folder name uses the app bar foreground.",
-  "skinFileManagerAppBarActions": "File manager app bar actions",
-  "skinToolbarActionsUseThisIconColor": "Toolbar actions use this icon color.",
-  "skinProjects": "Projects",
-  "skinFolder12Items": "Folder · 12 items",
-  "skinTextFile4KB": "Text file · 4 KB",
-  "skinCompressedFile28MB": "Compressed file · 28 MB",
-  "skin3Items": "3 items",
-  "skinFileManagerAddButton": "File manager add button",
-  "skinAddButtonIconColor": "Add button icon color",
-  "skinThePlusIconUsesTheButtonForegroundColor": "The plus icon uses the button foreground color.",
-  "skinEditorFileName": "Editor file name",
-  "skinTheEditorToolbarUsesTheAppForegroundColor": "The editor toolbar uses the app foreground color.",
-  "skinDartUTF8Ln3Col12": "Ln 3, Col 12",
-  "skinTheMainBackgroundBehindThisScreen": "The main background behind this screen.",
-  "skinFolderIconColor": "Folder icon color",
-  "skinFileIconColor": "File icon color",
-  "skinText": " : ",
-  "skinFolderNameColor": "Folder name color",
-  "skinFileNameColor": "File name color",
-  "skinFileDetailsColor": "File details color",
-  "skinTheSmallerDateSizeAndTypeLabelsUseThisColor": "The smaller date, size, and type labels use this color.",
-  "skinFileOverflowButton": "File overflow button",
-  "skinEachRowSThreeDotButtonUsesTheSupportingIconColor": "Each row’s three-dot button uses the supporting icon color.",
-  "skinSelectedFileRow": "Selected file row",
-  "skinSelectedRowsUseATranslucente0ff21": "Selected rows use a translucent primary-container highlight; the file list itself stays on the page background.",
-  "skinFileActionsMenuBackground": "File actions menu background",
-  "skinTheFileActionsPopupUsesTheMenuSurfaceColor": "The file actions popup uses the menu surface color.",
-  "skinOpenFileMenuItem": "Open file menu item",
-  "skinRegularFileActionsUseTheMainTextColor": "Regular file actions use the main text color.",
-  "skinOpen": "Open",
-  "skinDeleteFileMenuItem": "Delete file menu item",
   "skinEditorBackground": "Editor background",
   "skinTheCanvasColorBehindTheCode": "The canvas color behind the code.",
   "skinEditorLineNumbers": "Editor line numbers",
   "skinTheGutterAndLineNumbersBesideTheCode": "The gutter and line numbers beside the code.",
   "skinEditorTextColor": "Code text color",
-  "skinTheDefaultCodeAndEditorTextColor": "Default color for plain code; syntax-highlighted text uses its own colors.",
   "skinEditorCursor": "Editor cursor",
   "skinTheInsertionCaretColor": "The insertion caret color.",
   "skinEditorSelectionHighlight": "Editor selection highlight",
   "skinTheBackgroundUsedToHighlightSelectedCode": "The background used to highlight selected code.",
   "skinEditorKeywords": "Keywords",
-  "skinEditorKeywordsExplanation": "Language keywords such as class, void, return, and if.",
   "skinEditorTypes": "Types & classes",
-  "skinEditorTypesExplanation": "Class names, types, and interfaces.",
   "skinEditorStrings": "Strings",
-  "skinEditorStringsExplanation": "Quoted text and string literals.",
   "skinEditorNumbers": "Numbers & values",
-  "skinEditorNumbersExplanation": "Numeric literals, booleans, and constants.",
   "skinEditorFunctions": "Functions & methods",
-  "skinEditorFunctionsExplanation": "Function names, method calls, and built-ins.",
   "skinEditorComments": "Comments",
-  "skinEditorCommentsExplanation": "Code comments and documentation blocks.",
   "textEditorColorsSectionTitle": "Editor colors & font",
   "textEditorSyntaxColorsSectionTitle": "Syntax element colors",
   "textEditorColorsCustomized": "Custom colors active",
-  "textEditorResetColors": "Reset colors to default",
   "textEditorFollowAppSkinNotice": "Editor colors follow the active app skin.",
   "textEditorCustomizeColorsIndependently": "Customize colors independently",
   "textEditorDefaultFromTheme": "Default (from theme)",
@@ -13623,9 +11838,6 @@
   "skinUseTheAppSMainTextColor": "Use the app’s main text color",
   "skinTextEditor": "Text editor",
   "skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate": "Canvas, gutter, cursor, selection, background, and syntax template.",
-  "skinGutterAndLineNumbers": "Gutter and line numbers",
-  "skinCursor": "Cursor",
-  "skinSelection": "Selection",
   "skinEditorBackgroundTemplate": "Editor background template",
   "skinSyntaxTemplate": "Syntax template",
   "skinTapTheColorCircleToChooseAColor246981": "Tap the color circle to choose a color",
@@ -13647,8 +11859,6 @@
   "skinCleanWhite": "Clean white",
   "skinWarmSepia": "Warm sepia",
   "skinAutomaticMatchLightOrDarkMode": "Automatic (match light or dark mode)",
-  "skinSkinExported": "Skin exported.",
-  "skinSkinsExported": "Skins exported.",
   "skinRemoveSkin": "Remove skin?",
   "skinAppSkin": "App skin",
   "skinImportSkins": "Import skins",
@@ -13679,17 +11889,8 @@
   "skinImportFailed": "Could not import skin: {error}",
   "skinExportFailed": "Could not export skin: {error}",
   "skinRemoveConfirmation": "“{skin}” will be removed from your saved skins.",
-  "skinSelectPreviewElement": "Select {title}",
   "skinIconColorForItem": "{item} icon color",
   "skinNameColorForItem": "{item} name color",
-  "skinFileIconColorSettingDescription": "This color is controlled by the icon color setting in the file manager section.",
-  "@skinFileIconColorSettingDescription": {
-    "description": "Explanation that the file icon color is configured in the file manager settings."
-  },
-  "skinFileNameColorSettingDescription": "This color is controlled by the name color setting in the file manager section.",
-  "@skinFileNameColorSettingDescription": {
-    "description": "Explanation that the file name color is configured in the file manager settings."
-  },
   "skinExportedSingle": "Skin exported.",
   "@skinExportedSingle": {
     "description": "Confirmation shown after exporting a single skin."
@@ -13770,14 +11971,6 @@
       }
     }
   },
-  "@skinSelectPreviewElement": {
-    "description": "Tooltip inviting the user to select a preview element.",
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
   "@skinIconColorForItem": {
     "description": "Color picker title for a file manager item icon.",
     "placeholders": {
@@ -13794,93 +11987,9 @@
       }
     }
   },
-  "automationBatteryHintTitle": "Allow background start",
-  "@automationBatteryHintTitle": {
-    "description": "Title of the hint card on the automation settings screen asking the user to set battery usage to Unrestricted"
-  },
-  "automationBatteryHintMessage": "When VaultExplorer is fully closed, Android can block an automation from unlocking this vault. Set VaultExplorer's battery usage to Unrestricted so Tasker, MacroDroid and other apps can unlock it in the background.",
-  "@automationBatteryHintMessage": {
-    "description": "Body of the automation settings hint card explaining why battery usage should be Unrestricted"
-  },
-  "automationBatteryHintButton": "Open app settings",
-  "@automationBatteryHintButton": {
-    "description": "Button on the automation battery hint card that opens the app's system settings page"
-  },
   "automationBatterySettingsOpenFailedMessage": "Couldn't open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.",
   "@automationBatterySettingsOpenFailedMessage": {
     "description": "Snackbar shown when the system app settings page could not be opened from the automation battery hint card"
-  },
-  "skinPreviewMountedVaultName": "Personal vault",
-  "@skinPreviewMountedVaultName": {
-    "description": "Label for a mounted vault in the skin preview"
-  },
-  "skinPreviewVaultName": "Vault title",
-  "@skinPreviewVaultName": {
-    "description": "Label for a vault title in the skin preview"
-  },
-  "skinMainTextColorAlsoColorsRegularMenuItems": "Vault titles and regular menu actions share the app main text color.",
-  "@skinMainTextColorAlsoColorsRegularMenuItems": {
-    "description": "Text explaining that the main text color also affects regular menu actions in the skin preview"
-  },
-  "skinStatusBannerExamples": "Status banners",
-  "@skinStatusBannerExamples": {
-    "description": "Section heading for status banner examples in the skin preview"
-  },
-  "skinSuccessBanner": "Success banner",
-  "@skinSuccessBanner": {
-    "description": "Label for the success banner example in the skin preview"
-  },
-  "skinWarningBanner": "Warning banner",
-  "@skinWarningBanner": {
-    "description": "Label for the warning banner example in the skin preview"
-  },
-  "skinErrorBanner": "Error banner",
-  "@skinErrorBanner": {
-    "description": "Label for the error banner example in the skin preview"
-  },
-  "skinSuccessBannerUsesSuccessContainer": "The banner fill and message use success colors.",
-  "@skinSuccessBannerUsesSuccessContainer": {
-    "description": "Explanation that success banners use success container colors in the skin preview"
-  },
-  "skinWarningBannerUsesWarningContainer": "The banner fill and message use warning colors.",
-  "@skinWarningBannerUsesWarningContainer": {
-    "description": "Explanation that warning banners use warning container colors in the skin preview"
-  },
-  "skinErrorBannerUsesErrorContainer": "The banner fill and message use error colors.",
-  "@skinErrorBannerUsesErrorContainer": {
-    "description": "Explanation that error banners use error container colors in the skin preview"
-  },
-  "skinPreviewChangesSaved": "Changes saved",
-  "@skinPreviewChangesSaved": {
-    "description": "Status message shown in the skin preview after saving changes"
-  },
-  "skinPreviewStorageAlmostFull": "Storage is almost full",
-  "@skinPreviewStorageAlmostFull": {
-    "description": "Status message shown in the skin preview when storage is nearly full"
-  },
-  "skinPreviewCouldNotUnlockVault": "Could not unlock the vault",
-  "@skinPreviewCouldNotUnlockVault": {
-    "description": "Status message shown in the skin preview when a vault could not be unlocked"
-  },
-  "skinSurfaceAndBorderExamples": "Surfaces and borders",
-  "@skinSurfaceAndBorderExamples": {
-    "description": "Section heading for surfaces and borders examples in the skin preview"
-  },
-  "skinFileRowDetailsColor": "File row details color",
-  "@skinFileRowDetailsColor": {
-    "description": "Label for the file row details color in the skin preview"
-  },
-  "skinFileActionOverflowIconColor": "File row action icon color",
-  "@skinFileActionOverflowIconColor": {
-    "description": "Label for the file row action overflow icon color in the skin preview"
-  },
-  "skinMatchingElementsHighlightTogether": "Other preview elements with the same color are highlighted too.",
-  "@skinMatchingElementsHighlightTogether": {
-    "description": "Text explaining that matching preview elements are highlighted together in the skin preview"
-  },
-  "skinStatusBannerTextColor": "The banner text uses this color.",
-  "@skinStatusBannerTextColor": {
-    "description": "Text explaining that the banner text color is controlled by the selected color in the skin preview"
   },
   "apkOpenPackageInstaller": "Package installer",
   "@apkOpenPackageInstaller": {
@@ -14001,38 +12110,20 @@
   "@skinEditorKeywords": {
     "description": "Label for language keywords syntax element"
   },
-  "@skinEditorKeywordsExplanation": {
-    "description": "Explanation for language keywords syntax element"
-  },
   "@skinEditorTypes": {
     "description": "Label for types and classes syntax element"
-  },
-  "@skinEditorTypesExplanation": {
-    "description": "Explanation for types and classes syntax element"
   },
   "@skinEditorStrings": {
     "description": "Label for string literals syntax element"
   },
-  "@skinEditorStringsExplanation": {
-    "description": "Explanation for string literals syntax element"
-  },
   "@skinEditorNumbers": {
     "description": "Label for numeric literals and values syntax element"
-  },
-  "@skinEditorNumbersExplanation": {
-    "description": "Explanation for numeric literals and values syntax element"
   },
   "@skinEditorFunctions": {
     "description": "Label for functions and methods syntax element"
   },
-  "@skinEditorFunctionsExplanation": {
-    "description": "Explanation for functions and methods syntax element"
-  },
   "@skinEditorComments": {
     "description": "Label for comments syntax element"
-  },
-  "@skinEditorCommentsExplanation": {
-    "description": "Explanation for comments syntax element"
   },
   "@textEditorColorsSectionTitle": {
     "description": "Section title for editor colors and font settings"
@@ -14042,9 +12133,6 @@
   },
   "@textEditorColorsCustomized": {
     "description": "Indicator showing custom editor colors are currently active"
-  },
-  "@textEditorResetColors": {
-    "description": "Action to reset editor colors back to defaults"
   },
   "@textEditorFollowAppSkinNotice": {
     "description": "Notice explaining editor colors match the active app skin"
@@ -14079,10 +12167,6 @@
         "type": "String"
       }
     }
-  },
-  "abLoopEndTooCloseMessage": "B must come after A. Move forward and tap again.",
-  "@abLoopEndTooCloseMessage": {
-    "description": "Shown when the end (B) of an A-B repeat section is set at or before its start (A), or too close to it"
   },
   "abLoopClearedMessage": "A-B repeat off",
   "@abLoopClearedMessage": {
@@ -14323,67 +12407,12 @@
   "skinAreaToolsDescription": "The Tools tab and every tool opened from it.",
   "skinAreaSettingsDescription": "The Settings tab and its sub-pages.",
   "skinSharedPaletteTitle": "Shared palette",
-  "skinSharedPaletteShort": "Shared",
   "skinSharedPaletteDescription": "Colors every page inherits until it sets its own. Screens without a section of their own, such as unlock and camera, use these directly.",
   "skinSharedBarDescription": "The top bar of every page that does not set its own.",
   "skinSharedFabDescription": "The round add button of every page that does not set its own.",
   "skinPagesTitle": "Page colors",
   "skinPagesDescription": "Each page keeps its own colors. Changing one page never changes another.",
   "skinResetPageColors": "Reset page colors",
-  "skinTokenBackground": "Page background",
-  "skinTokenBackgroundHint": "The canvas behind everything on this page.",
-  "skinTokenText": "Main text",
-  "skinTokenTextHint": "Titles, names and body text on this page.",
-  "skinTokenTextSecondary": "Secondary text and icons",
-  "skinTokenTextSecondaryHint": "Subtitles, details, hints and quiet icons.",
-  "skinTokenAppBar": "Top bar",
-  "skinTokenAppBarHint": "Fill of the top bar on this page.",
-  "skinTokenOnAppBar": "Top bar text and icons",
-  "skinTokenOnAppBarHint": "Title and icon color on the top bar.",
-  "skinTokenCard": "Cards and rows",
-  "skinTokenCardHint": "Cards, list rows and grouped panels.",
-  "skinTokenCardActive": "Active card",
-  "skinTokenCardActiveHint": "The highlighted card, such as an unlocked vault.",
-  "skinTokenRaised": "Chips and controls",
-  "skinTokenRaisedHint": "Search fields, chips, thumbnails and icon tiles.",
-  "skinTokenOverlay": "Menus, dialogs and sheets",
-  "skinTokenOverlayHint": "Popup menus, dialogs and bottom sheets opened from this page.",
-  "skinTokenAccent": "Accent",
-  "skinTokenAccentHint": "Buttons, links, progress and active icons.",
-  "skinTokenOnAccent": "Text on accent",
-  "skinTokenOnAccentHint": "Labels and icons drawn on accent-filled buttons.",
-  "skinTokenSelection": "Selection",
-  "skinTokenSelectionHint": "Selected rows and highlighted icon tiles.",
-  "skinTokenOnSelection": "Text on selection",
-  "skinTokenOnSelectionHint": "Icons and text drawn on selected items.",
-  "skinTokenDivider": "Dividers",
-  "skinTokenDividerHint": "Thin separator lines and subtle borders.",
-  "skinTokenOutline": "Outlines",
-  "skinTokenOutlineHint": "Stronger borders on outlined buttons and fields.",
-  "skinTokenFab": "Round add button",
-  "skinTokenFabHint": "Fill of the round add button.",
-  "skinTokenOnFab": "Round add button icon",
-  "skinTokenOnFabHint": "The plus icon on the round add button.",
-  "skinPreviewConfirm": "Confirm",
-  "skinPreviewCancelButton": "Cancel",
-  "skinPreviewSaveButton": "Save",
-  "skinPreviewRunButton": "Run",
-  "skinPreviewPasteButton": "Paste here",
-  "skinPreviewUnlockButton": "Unlock",
-  "skinPreviewSortChip": "Sort: Name",
-  "skinPreviewSearchChip": "Search files",
-  "skinPreviewPinnedBadge": "Pinned",
-  "skinPreviewVaultsHeader": "VAULTS",
-  "skinPreviewToolsSection": "File cryptography",
-  "skinPreviewToolOne": "Keyfile and passphrase generator",
-  "skinPreviewToolOneHint": "Generate passwords and keyfiles",
-  "skinPreviewToolTwo": "Checksum and hash verifier",
-  "skinPreviewToolTwoHint": "Verify large files were not corrupted",
-  "skinPreviewSettingsSection": "Security",
-  "skinPreviewSettingOne": "App lock",
-  "skinPreviewSettingOneHint": "Biometrics and auto-lock",
-  "skinPreviewSettingTwo": "Storage",
-  "skinPreviewSettingTwoHint": "External storage and cloud bridges",
   "inPlaceEditDone": "Done",
   "@inPlaceEditDone": {
     "description": "Done button label for the in-place media viewer control layout editor"
@@ -14395,10 +12424,6 @@
   "inPlaceEditHint": "Drag actions between docks or tap to organize",
   "@inPlaceEditHint": {
     "description": "Hint explaining how to arrange actions in the in-place editor"
-  },
-  "inPlaceEditAvailable": "Available Actions",
-  "@inPlaceEditAvailable": {
-    "description": "Header for the unplaced actions picker panel in in-place editor"
   },
   "inPlaceEditTopDock": "Top Bar",
   "@inPlaceEditTopDock": {
@@ -14742,15 +12767,6 @@
       }
     }
   },
-  "thumbnailGlobalInContainerConfirmMessage": "{count, plural, =1{1 vault follows this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.} other{{count} vaults follow this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.}}",
-  "@thumbnailGlobalInContainerConfirmMessage": {
-    "description": "Confirmation shown before switching the app-wide thumbnail default to storing inside vaults; count is how many vaults follow the default",
-    "placeholders": {
-      "count": {
-        "type": "num"
-      }
-    }
-  },
   "scanAdjustCornersTitle": "Adjust corners",
   "@scanAdjustCornersTitle": {
     "description": "Title of the document scanner step where the user drags the four corners to fit the page"
@@ -14851,10 +12867,6 @@
       }
     }
   },
-  "createArchiveMediaRecommendation": "Pre-compressed media files detected. \"Store\" compression auto-selected to save CPU and battery.",
-  "@createArchiveMediaRecommendation": {
-    "description": "Banner informing user that Store compression was automatically selected for pre-compressed media files"
-  },
   "createArchiveNameLabel": "Archive Name",
   "@createArchiveNameLabel": {
     "description": "Label above the archive filename field in the create archive sheet"
@@ -14867,53 +12879,21 @@
   "@createArchiveSelectFormatTooltip": {
     "description": "Tooltip for the archive format dropdown pill"
   },
-  "createArchiveSecuritySection": "Security",
-  "@createArchiveSecuritySection": {
-    "description": "Header for the security/password section in the create archive sheet"
-  },
   "createArchivePasswordLabel": "Password (Optional)",
   "@createArchivePasswordLabel": {
     "description": "Label for optional password field when creating an archive"
-  },
-  "createArchivePasswordHintText": "Enter password",
-  "@createArchivePasswordHintText": {
-    "description": "Hint text for entering an archive password"
   },
   "createArchiveConfirmPasswordLabel": "Confirm Password",
   "@createArchiveConfirmPasswordLabel": {
     "description": "Label for the confirm password field when creating an archive"
   },
-  "createArchiveConfirmPasswordHint": "Repeat password",
-  "@createArchiveConfirmPasswordHint": {
-    "description": "Hint text for repeating the password"
-  },
   "passphraseStrengthFair": "Fair",
   "@passphraseStrengthFair": {
     "description": "Medium-low qualitative password strength rating"
   },
-  "createArchiveEncryptFilenamesNeedsPassword": "Requires password to preview files",
-  "@createArchiveEncryptFilenamesNeedsPassword": {
-    "description": "Subtitle for encrypt file names toggle when no password has been entered yet"
-  },
-  "createArchiveEncryptFilenamesActive": "Hides file list until unlocked",
-  "@createArchiveEncryptFilenamesActive": {
-    "description": "Subtitle for encrypt file names toggle when enabled"
-  },
-  "createArchiveAdvancedOptions": "Advanced Options",
-  "@createArchiveAdvancedOptions": {
-    "description": "Accordion header for advanced archive settings"
-  },
   "createArchiveCompressionLevel": "Compression Level",
   "@createArchiveCompressionLevel": {
     "description": "Label for the compression level dropdown"
-  },
-  "createArchiveSplitHintZip": "Saved as .z01, .z02 … plus a final .zip. Keep all parts together in one folder.",
-  "@createArchiveSplitHintZip": {
-    "description": "Hint shown when a ZIP archive will be split into parts"
-  },
-  "createArchiveSplitHintSevenZip": "Saved as .7z.001, .7z.002 … Keep all parts together in one folder.",
-  "@createArchiveSplitHintSevenZip": {
-    "description": "Hint shown when a 7z archive will be split into parts"
   },
   "createArchiveSplitVolumes": "Split into volumes",
   "@createArchiveSplitVolumes": {
@@ -14963,33 +12943,9 @@
   "@archiveCompressionUltraDesc": {
     "description": "Description for ultra archive compression preset"
   },
-  "officeViewerErrorTitle": "Can't preview this document",
-  "@officeViewerErrorTitle": {
-    "description": "Title of the error state in the document viewer (Word/Excel/PowerPoint/OpenDocument preview)"
-  },
-  "officeViewerEncrypted": "This document is password-protected, and encrypted Office files can't be previewed.",
-  "@officeViewerEncrypted": {
-    "description": "Document viewer error: the file is encrypted / password-protected"
-  },
-  "officeViewerUnsupported": "This file couldn't be read. It may be damaged, or use a format the viewer doesn't support.",
-  "@officeViewerUnsupported": {
-    "description": "Document viewer error: the file is corrupt or in an unsupported format"
-  },
-  "officeViewerTooLarge": "This document is too large to preview in the app.",
-  "@officeViewerTooLarge": {
-    "description": "Document viewer error: the file exceeds the preview size limit"
-  },
-  "officeViewerSpeakerNotes": "Speaker notes",
-  "@officeViewerSpeakerNotes": {
-    "description": "Label of the collapsible speaker-notes section under a slide in the document viewer"
-  },
   "fileAssocDocumentViewer": "In-app Document Viewer",
   "@fileAssocDocumentViewer": {
     "description": "File association label: files open in the built-in document viewer (Word, Excel, PowerPoint, OpenDocument)"
-  },
-  "viewOfficeDocumentsInApp": "Preview Word, Excel, PowerPoint and OpenDocument files in the app",
-  "@viewOfficeDocumentsInApp": {
-    "description": "Subtitle of the 'In-app Document Viewer' choice in the Open with dialog"
   },
   "archiveCompressionMethodLabel": "Compression method",
   "@archiveCompressionMethodLabel": {
@@ -15006,26 +12962,6 @@
   "archiveMethodDeflateDesc": "Fastest, with larger files and the widest support. Also used by ZIP and .tar.gz.",
   "@archiveMethodDeflateDesc": {
     "description": "Description of the Deflate method in the compression method dropdown. Deflate is a technical name and is not translated"
-  },
-  "archiveMethodFixedInfo": "{format} always compresses with {method}.",
-  "@archiveMethodFixedInfo": {
-    "description": "Note shown for archive formats that always use one compression method. format is the format name (e.g. ZIP), method the technical method name (e.g. Deflate)",
-    "placeholders": {
-      "format": {
-        "type": "String"
-      },
-      "method": {
-        "type": "String"
-      }
-    }
-  },
-  "archiveMethodMoreInSevenZip": "LZMA2 and LZMA are available in 7-Zip archives.",
-  "@archiveMethodMoreInSevenZip": {
-    "description": "Hint shown after the fixed-method note: LZMA2 and LZMA are only available when creating 7-Zip archives"
-  },
-  "archiveMethodStoreNote": "Store doesn't compress, so there is no method to choose.",
-  "@archiveMethodStoreNote": {
-    "description": "Note shown instead of the method dropdown when the compression level is Store (no compression)"
   },
   "browserTabsEnabledTitle": "Use file manager tabs",
   "@browserTabsEnabledTitle": {
@@ -15055,10 +12991,6 @@
   "@browserTabMoveToOtherPane": {
     "description": "File manager tab menu action that moves the tab to the other pane of the landscape dual-pane layout"
   },
-  "browserTabSwitchPrevious": "Switch to previous tab",
-  "@browserTabSwitchPrevious": {
-    "description": "Tooltip for the button that flips back to the previously used file manager tab"
-  },
   "browserTabOpenInNewTab": "Open in new tab",
   "@browserTabOpenInNewTab": {
     "description": "Item action that opens the selected folder in a new file manager tab"
@@ -15079,10 +13011,6 @@
   "browserTabCloseToRight": "Close tabs to the right",
   "@browserTabCloseToRight": {
     "description": "Action that closes file manager tabs to the right of the selected tab"
-  },
-  "browserTabCloseAll": "Close all",
-  "@browserTabCloseAll": {
-    "description": "Action in the file manager's tab menu that closes every tab (and with it the file manager)"
   },
   "dualPaneEnabledTitle": "Use dual pane",
   "@dualPaneEnabledTitle": {
@@ -15459,29 +13387,9 @@
   "@imageEditorAngle": {
     "description": "Image editor crop shelf label for rotation angle"
   },
-  "fontSizeSmall": "Small",
-  "@fontSizeSmall": {
-    "description": "Font size option: small"
-  },
-  "fontSizeMedium": "Medium",
-  "@fontSizeMedium": {
-    "description": "Font size option: medium"
-  },
-  "fontSizeLarge": "Large",
-  "@fontSizeLarge": {
-    "description": "Font size option: large"
-  },
-  "fontSizeExtraLarge": "Extra Large",
-  "@fontSizeExtraLarge": {
-    "description": "Font size option: extra large"
-  },
   "imageEditorTextPlaceholder": "DOUBLE TAP HERE TO CHANGE TEXT",
   "@imageEditorTextPlaceholder": {
     "description": "Default placeholder text shown on a newly added text annotation in the image editor"
-  },
-  "imageEditorFontSizePreview": "Sample preview ABC 123",
-  "@imageEditorFontSizePreview": {
-    "description": "Sample text shown in the font size picker to preview how the selected size looks"
   },
   "imageEditorPhotoLabel": "Photo {index}",
   "@imageEditorPhotoLabel": {
@@ -15523,10 +13431,6 @@
   "floatingPlayerAudioOnly": "Audio only",
   "@floatingPlayerAudioOnly": {
     "description": "Label of the button on the floating video window that stops showing the video and carries on with just the sound"
-  },
-  "floatingPlayerShowVideo": "Show video",
-  "@floatingPlayerShowVideo": {
-    "description": "Label of the small chip that replaces the floating video window while it is audio only; tapping it brings the video back"
   },
   "masterLockTitle": "Master Lock",
   "@masterLockTitle": {
@@ -16172,10 +14076,6 @@
   "@vaultSyncCurrentStorageBadge": {
     "description": "Badge marking the storage that is already in use in the Vault Sync storage chooser"
   },
-  "vaultSyncChangeStorageTooltip": "Change storage",
-  "@vaultSyncChangeStorageTooltip": {
-    "description": "Tooltip of the button that returns from the folder picker to the storage list"
-  },
   "vaultSyncPickFolderTitle": "Folder in {storage}",
   "@vaultSyncPickFolderTitle": {
     "description": "Title of the Vault Sync folder picker. {storage} is the storage name",
@@ -16212,10 +14112,6 @@
   "categoriesSectionTitle": "Categories",
   "@categoriesSectionTitle": {
     "description": "Navigation drawer section title for the Images / Videos / Audio / Documents shortcuts"
-  },
-  "manageCategoriesTooltip": "Manage categories",
-  "@manageCategoriesTooltip": {
-    "description": "Tooltip of the drawer button that opens the category shortcut settings"
   },
   "categoryShortcutsTitle": "Category shortcuts",
   "@categoryShortcutsTitle": {
@@ -16315,15 +14211,6 @@
   "lockAnywayButton": "Lock anyway",
   "@lockAnywayButton": {
     "description": "Destructive dialog button that locks a container even though the device refused the last changes, discarding them"
-  },
-  "vaultListingSymbolicLinkCount": "{count, plural, =0 {0 symbolic links} one {1 symbolic link} other {{count} symbolic links}}",
-  "@vaultListingSymbolicLinkCount": {
-    "description": "Count of symbolic links found in the current vault folder",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
   },
   "vaultListingHiddenEntryCount": "{count, plural, =0 {0 entries are not shown} one {1 entry is not shown} other {{count} entries are not shown}}",
   "@vaultListingHiddenEntryCount": {
@@ -16897,10 +14784,6 @@
   "@motionPhotoCopyNote": {
     "description": "Notice shown when an image with protected metadata is edited: only a still-image copy can be saved; the original file and embedded content are protected."
   },
-  "pimInputHint": "Empty or 0 for defaults",
-  "@pimInputHint": {
-    "description": "Hint shown in the PIM input before the user types a value; leaving it empty or entering 0 uses the default PIM."
-  },
   "galleryMetadataIndexStorageLabel": "Gallery metadata index storage",
   "@galleryMetadataIndexStorageLabel": {
     "description": "Label for the independent storage location of the gallery metadata index."
@@ -16917,7 +14800,6 @@
   "musicIndexAppStorageOption": "App storage",
   "musicIndexInVaultOption": "Inside vault",
   "musicIndexHiddenFolderOption": "Hidden folder",
-  "musicIndexHiddenFolderDesc": "Stored in an unencrypted hidden folder in Local Storage.",
   "libraryStorageHiddenFolder": "Index saved in an unencrypted hidden folder",
   "libraryStorageDisabled": "Saved music index is disabled; tracks are rescanned each time.",
   "galleryMetadataClearAction": "Clear saved gallery index",

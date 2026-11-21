@@ -23,7 +23,6 @@ constexpr uint32_t kDefaultSymlinkMode = 0xA1FF;                           // S_
 constexpr size_t kMaxSymlinkTarget = 32767;
 constexpr int kSliceBytes = 1 << 20;
 
-int64_t nowSec() { return (int64_t)::time(nullptr); }
 void nowTs(int64_t& sec, uint32_t& ns) {
     struct timespec ts;
     ::clock_gettime(CLOCK_REALTIME, &ts);

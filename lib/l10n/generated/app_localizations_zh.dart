@@ -62,9 +62,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pdfViewerNextMatch => '下一个匹配项';
 
   @override
-  String get pdfViewerCloseSearch => '关闭搜索';
-
-  @override
   String get pdfViewerPrintTooltip => '打印文档';
 
   @override
@@ -75,15 +72,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pdfViewerFailedToLoad => '加载PDF失败';
-
-  @override
-  String get pdfViewerEditTooltip => '编辑';
-
-  @override
-  String get pdfViewerDoneEditingTooltip => '完成编辑';
-
-  @override
-  String get pdfViewerSaveFailed => '无法保存对此PDF的更改';
 
   @override
   String get pdfViewerEditUnavailable => '此文档不支持编辑';
@@ -142,9 +130,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedParametersTitle => '高级参数';
 
   @override
-  String get pimFieldLabel => 'PIM（留空使用默认值）';
-
-  @override
   String get encryptionAlgorithmLabel => '加密算法';
 
   @override
@@ -190,16 +175,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dismiss => '关闭';
 
   @override
-  String byteProgressText(String transferred, String total, int pct) {
-    return '$transferred / $total（$pct%）';
-  }
-
-  @override
-  String countProgressText(int done, int total, int pct) {
-    return '$done / $total（$pct%）';
-  }
-
-  @override
   String multiOpLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -207,11 +182,6 @@ class AppLocalizationsZh extends AppLocalizations {
       other: '$count个传输任务',
     );
     return '$_temp0';
-  }
-
-  @override
-  String multiOpSublabel(String summary) {
-    return '$summary・点击查看全部';
   }
 
   @override
@@ -320,17 +290,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readOnlyContainerWarning => '此容器已以只读方式挂载。';
 
   @override
-  String get hiddenVolumeProtectionTriggeredWarning =>
-      '对此外部卷的写入本会损坏隐藏卷，因此已被阻止。此容器在本次会话的剩余时间内已切换为只读。';
-
-  @override
   String get protectHiddenVolumeToggleTitle => '保护隐藏卷';
 
   @override
   String get protectHiddenVolumeToggleSubtitle => '防止因写入外部卷而造成的损坏';
-
-  @override
-  String get protectHiddenVolumeCredentialsRequired => '需要隐藏卷的密码或密钥文件才能对其进行保护';
 
   @override
   String deleteItemsTitle(num count) {
@@ -625,9 +588,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get removeFromBookmarks => '从收藏中移除';
 
   @override
-  String get addToBookmarks => '添加到收藏';
-
-  @override
   String get edit => '编辑';
 
   @override
@@ -720,82 +680,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get archiveExplorerPermissionTitle => '需要存储访问权限';
 
   @override
-  String get archiveExplorerPermissionMessage =>
-      '允许访问您的文件，以便浏览和解压“下载”文件夹中的.zip压缩包。';
-
-  @override
   String get archiveExplorerGrantAccess => '授予访问权限';
-
-  @override
-  String get archiveExplorerEmptyTitle => '未找到压缩包';
-
-  @override
-  String get archiveExplorerEmptyMessage => '您下载的zip文件将显示在此处。';
-
-  @override
-  String get archiveExplorerRefreshTooltip => '刷新';
-
-  @override
-  String archiveExplorerEntryCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count个项目',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get archiveExplorerExtractAll => '全部解压';
-
-  @override
-  String get archiveExplorerExtracting => '正在解压…';
-
-  @override
-  String archiveExplorerExtractSuccess(int count, String name) {
-    return '已将$count个文件解压到Download/Extracted/$name';
-  }
-
-  @override
-  String get archiveExplorerExtractFailed => '无法解压该压缩包。';
-
-  @override
-  String get archiveExplorerOpenFailed => '无法打开该压缩包。';
-
-  @override
-  String get archiveExplorerOpenArchive => '打开压缩包…';
-
-  @override
-  String get archiveExplorerUnresolvedPath => '无法直接访问该文件。请尝试从“下载”中选择一个文件。';
-
-  @override
-  String get archiveExplorerExtractTo => '解压到…';
-
-  @override
-  String get archiveExplorerPreview => '预览';
-
-  @override
-  String get archiveExplorerChoosingDestination => '正在选择目标位置…';
-
-  @override
-  String get archiveExplorerNoDestinationChosen => '未选择目标位置。';
-
-  @override
-  String archiveExplorerExtractSuccessTo(int count, String path) {
-    return '已将$count个文件解压到$path';
-  }
-
-  @override
-  String get archiveBrowserEmptyTitle => '空文件夹';
-
-  @override
-  String get archiveBrowserEmptyMessage => '此文件夹不包含任何文件。';
-
-  @override
-  String get archiveBrowserRoot => '压缩包';
-
-  @override
-  String get archiveBrowserOpenFileFailed => '无法打开该文件。';
 
   @override
   String get fileAssocInAppTextEditor => '应用内文本编辑器';
@@ -830,9 +715,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get masterPasswordActiveSubtitle => '已启用——点击开关即可移除';
 
   @override
-  String get masterPasswordInactiveSubtitle => '打开应用时需要密码';
-
-  @override
   String get newPasswordLabel => '新密码';
 
   @override
@@ -849,15 +731,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get biometricUnlockTitle => '生物识别解锁';
-
-  @override
-  String get biometricUnlockSubtitle => '进行身份验证以安全挂载容器';
-
-  @override
-  String get changeMasterPasswordTitle => '更改主密码';
-
-  @override
-  String get changeMasterPasswordSubtitle => '更新主密码凭据';
 
   @override
   String get autoLockContainersTitle => '自动锁定容器';
@@ -976,25 +849,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get useMaterialYouSubtitle => '使应用颜色与壁纸相匹配（Android 12+）';
 
   @override
-  String get pureBlackThemeTitle => '纯黑（OLED）';
-
-  @override
-  String get pureBlackThemeSubtitle => '使用纯黑背景以节省电量并减少 OLED 屏幕眩光（仅限深色主题）';
-
-  @override
   String get sortContainersByLabel => '容器排序方式';
-
-  @override
-  String get swapCardSwipeActionsTitle => '交换卡片滑动操作';
-
-  @override
-  String get swapCardSwipeActionsSubtitle => '滑动卡片时，左侧显示编辑，右侧显示移除';
-
-  @override
-  String get swipeGestureHintTitle => '滑动手势提示';
-
-  @override
-  String get swipeGestureHintSubtitle => '在第一个容器上显示卡片预览动画';
 
   @override
   String get autoOpenOnUnlockTitle => '解锁后自动打开';
@@ -1032,9 +887,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localStorageCardTitle => '本地存储';
-
-  @override
-  String get localStorageCardSubtitle => '未加密 —— 用于与保险库快速传输';
 
   @override
   String get enableFastStorageAccessTitle => '启用快速存储访问';
@@ -1295,9 +1147,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unlock => '解锁';
 
   @override
-  String get useBiometric => '使用生物识别';
-
-  @override
   String get connectAtLeast4Dots => '至少连接4个点';
 
   @override
@@ -1331,15 +1180,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get enterUnlockPinTitle => '输入解锁PIN';
 
   @override
-  String get wrongPinTryAgain => 'PIN错误——请重试';
-
-  @override
-  String get enterYourPinSequence => '请输入您的PIN';
-
-  @override
-  String get enterPinToMount => '请输入PIN以挂载';
-
-  @override
   String get noPinConfiguredMessage => '尚未配置PIN。请手动输入密码。';
 
   @override
@@ -1369,60 +1209,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get incorrectPinError => 'PIN不正确';
 
   @override
-  String removedFromListSnack(String name) {
-    return '已从列表中移除“$name”';
-  }
-
-  @override
-  String get clearRecentHistoryTitle => '清除最近记录？';
-
-  @override
-  String get clearRecentHistoryMessage => '这将从您的列表中移除所有最近的文档。设备上的实际文件不会受到影响。';
-
-  @override
-  String get clearAll => '全部清除';
-
-  @override
-  String get recentHistoryClearedSnack => '最近记录已清除';
-
-  @override
   String get moreOptionsTooltip => '更多选项';
-
-  @override
-  String get clearHistoryMenuItem => '清除历史记录';
-
-  @override
-  String get openPdfFile => '打开PDF文件';
-
-  @override
-  String get noDocumentsYetTitle => '尚无文档';
-
-  @override
-  String get openPdfToStartMessage => '从您的设备打开一个PDF开始阅读。';
-
-  @override
-  String get removeFromListMenuItem => '从列表中移除';
-
-  @override
-  String get justNow => '刚刚';
-
-  @override
-  String minutesAgo(int count) {
-    return '$count分钟前';
-  }
-
-  @override
-  String hoursAgo(int count) {
-    return '$count小时前';
-  }
-
-  @override
-  String daysAgo(int count) {
-    return '$count天前';
-  }
-
-  @override
-  String get usbDriveDisconnectedLocked => 'USB驱动器已断开——容器已锁定';
 
   @override
   String get containerAlreadyMounted => '此容器已挂载。';
@@ -1445,35 +1232,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get selectContainerFirst => '请先选择一个容器';
-
-  @override
   String get passwordOrKeyfilesRequired => '需要密码或密钥文件';
-
-  @override
-  String get slowPerformanceWarningTitle => '性能缓慢警告';
-
-  @override
-  String get slowPerformanceWarningMessage =>
-      '快速存储访问当前已禁用。\n\nCryFS将文件分散存储在数千个小块中。通过Android SAF打开非空的CryFS保险库将非常缓慢。\n\n是否打开设置以授予“所有文件访问权限”以获得更快速度？';
-
-  @override
-  String get unlockAnyway => '仍然解锁';
-
-  @override
-  String get defaultVaultName => '保险库';
-
-  @override
-  String get defaultContainerName => '容器';
 
   @override
   String get incorrectPasswordOrInvalidVault => '密码错误或保险库无效';
 
   @override
   String get incorrectPasswordOrInvalidContainer => '密码错误或容器无效';
-
-  @override
-  String get genericUnknownError => '未知错误';
 
   @override
   String get decryptingLabel => '正在解密…';
@@ -1509,12 +1274,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mountContainerTitle => '挂载容器';
 
   @override
-  String get containerFileSegmentLabel => '容器文件';
-
-  @override
-  String get folderVaultSegmentLabel => '文件夹保险库';
-
-  @override
   String formatContainerLabel(String format) {
     return '$format容器';
   }
@@ -1522,11 +1281,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String formatVaultLabel(String format) {
     return '$format保险库';
-  }
-
-  @override
-  String formatDriveLabel(String format) {
-    return '$format驱动器';
   }
 
   @override
@@ -1542,9 +1296,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get containerMissingTitle => '容器缺失';
 
   @override
-  String get filePathCouldNotBeResolved => '无法解析文件路径';
-
-  @override
   String get containerMissingExplanation => '容器文件可能已被移动、删除，或其所在存储设备当前已断开连接。';
 
   @override
@@ -1554,43 +1305,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get locateFileButtonLabel => '定位文件';
 
   @override
-  String get authenticateToMountSubtitle => '进行身份验证以安全挂载容器';
-
-  @override
   String get usePasswordButtonLabel => '使用密码';
 
   @override
   String get authenticateButtonLabel => '进行身份验证';
 
   @override
-  String get drawUnlockPatternCardTitle => '绘制解锁图案';
-
-  @override
-  String get wrongPatternTryAgain => '图案错误——请重试';
-
-  @override
-  String get connectYourPatternSequence => '连接您的图案序列';
-
-  @override
   String get usePasswordInsteadButtonLabel => '改用密码';
-
-  @override
-  String get passwordHintFolderVault => '输入保险库密码';
-
-  @override
-  String get passwordHintBitlocker => '输入密码或恢复密钥';
-
-  @override
-  String get passwordHintContainer => '输入容器密码';
 
   @override
   String get usingSavedPasswordTooltip => '正在使用已保存的密码';
 
   @override
   String get luksKeyfileReplacesPasswordNote => '对于LUKS容器，密钥文件将取代密码。';
-
-  @override
-  String get readOnlyModeUsbSubtitle => '挂载时不允许更改此驱动器';
 
   @override
   String get readOnlyModeContainerSubtitle => '挂载时不允许更改此容器';
@@ -1615,9 +1342,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get decryptingDriveLabel => '正在解密驱动器…';
-
-  @override
-  String get usbDeviceAlreadyActiveMounted => '此USB设备已处于活动状态并已挂载。';
 
   @override
   String reconnectUsbDriveTitle(String label) {
@@ -1654,12 +1378,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mountExistingContainerSubtitle => '解锁您已有的文件容器';
-
-  @override
-  String get mountSplitContainerTitle => '挂载分割容器';
-
-  @override
-  String get mountSplitContainerSubtitle => '直接解锁分割容器，无需先合并';
 
   @override
   String get mountUsbDriveTitle => '挂载USB驱动器';
@@ -1706,9 +1424,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String pdfViewerFailedToInspectSize(String error) {
     return '检查PDF文件大小失败：$error';
   }
-
-  @override
-  String get pdfViewerErrorLoadingTitle => '加载PDF时出错';
 
   @override
   String get pdfViewerNoDocumentLoaded => '未加载PDF文档。';
@@ -1768,18 +1483,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String archiveFormatNotSupported(String ext) {
-    return '尚不支持.$ext压缩格式';
-  }
-
-  @override
   String get archivePasswordPromptTitle => '受密码保护';
 
   @override
   String get archivePasswordPromptMessage => '此压缩包受密码保护。请输入密码以查看其内容。';
-
-  @override
-  String get archiveSolidWarning => '这是一个固实压缩包 — 打开文件可能会较慢，尤其是在接近末尾时。';
 
   @override
   String get failedToReadFileFromArchive => '从压缩包读取文件失败';
@@ -1906,11 +1613,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String deletedWithFailures(int deleted, int failed) {
-    return '已删除$deleted个 · 失败$failed个';
-  }
-
-  @override
   String exportedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -1922,11 +1624,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get exportCancelledOrFailed => '导出已取消或失败';
-
-  @override
-  String exportError(String type) {
-    return '导出错误：$type';
-  }
 
   @override
   String get deleteOriginalTitle => '删除原始文件？';
@@ -1997,35 +1694,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get createArchiveTitle => '创建压缩包';
 
   @override
-  String get archiveNameHint => '压缩包.zip';
-
-  @override
-  String archivedCount(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '已压缩$count个文件',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String failedToArchiveGeneric(String type) {
     return '压缩失败：$type';
   }
 
   @override
-  String get createArchivePasswordHint => '可选密码（AES-256）';
-
-  @override
-  String get createArchivePasswordUnavailableForFormat =>
-      '密码保护仅适用于 ZIP 和 7-Zip 格式';
-
-  @override
   String get createArchiveEncryptFilenames => '加密文件名';
-
-  @override
-  String get createArchiveEncryptFilenamesHint => '需要设置密码。之后即使只是查看内容也需要输入密码。';
 
   @override
   String get closeSearchTooltip => '关闭搜索';
@@ -2096,9 +1770,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get formatFileSystemLabel => '格式化文件系统';
-
-  @override
-  String get standardVolumeHeader => '标准卷';
 
   @override
   String get containerFormatLabel => '容器格式';
@@ -2204,14 +1875,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unitGbShort => 'GB';
 
   @override
-  String failedToListUsbDevices(String error) {
-    return '列出USB设备失败：$error';
-  }
-
-  @override
-  String get usbPermissionDenied => 'USB权限被拒绝';
-
-  @override
   String get couldNotReadDriveCapacity => '无法读取驱动器容量——请手动输入大小。';
 
   @override
@@ -2236,9 +1899,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get usbContainerCreationFailed => 'USB容器创建失败。';
-
-  @override
-  String get usbStandardVolumeSectionHeader => 'USB驱动器与标准卷';
 
   @override
   String get formattingErasesEverythingWarning => '格式化将清除所选驱动器上当前的所有内容。';
@@ -2304,15 +1964,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playlistTransitionFlipLabel => '3D翻转';
 
   @override
-  String get unlockVaultTitle => '解锁保险库';
-
-  @override
-  String get openContainerTitle => '打开容器';
-
-  @override
-  String get selectContainerFileOrFolder => '选择文件或文件夹';
-
-  @override
   String get useBackupHeaderToggleTitle => '使用备份卷头';
 
   @override
@@ -2322,28 +1973,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keepCurrentOption => '保持当前';
 
   @override
-  String get toolExpandVolumeTitle => '扩展 VeraCrypt 卷';
-
-  @override
   String get toolExpandVolumeSubtitle => '增大标准卷的容量，类似于桌面版卷扩展器';
-
-  @override
-  String get toolExpandLuksVolumeTitle => '扩展 LUKS 容器';
-
-  @override
-  String get toolExpandLuksVolumeSubtitle =>
-      '扩大 LUKS1 和 LUKS2 容器，包括固定大小的 LUKS2 元数据';
 
   @override
   String get luksToolsExpandNote =>
       '请先备份容器。支持 LUKS1 和 LUKS2。NTFS 和 ext2/3/4 文件系统支持就地扩容（FAT 和 exFAT 不支持）。新增空间可使用加密零进行初始化。如果使用密钥文件，它将替代密码。';
-
-  @override
-  String get toolExpandBitLockerVolumeTitle => '扩展 BitLocker 容器';
-
-  @override
-  String get toolExpandBitLockerVolumeSubtitle =>
-      '扩大 BitLocker 卷文件或 VHD/VHDX 映像，并扩展其中的 NTFS 文件系统';
 
   @override
   String get bitlockerToolsExpandNote =>
@@ -2359,9 +1993,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolHiddenInExistingSubtitle => '在现有标准卷内创建隐藏卷';
 
   @override
-  String get vcToolsPickContainer => '选择容器';
-
-  @override
   String get vcToolsNoContainer => '未选择容器';
 
   @override
@@ -2369,9 +2000,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vcToolsPimLabel => 'PIM（可选）';
-
-  @override
-  String get vcToolsNewSizeLabel => '新容器大小 (MiB)';
 
   @override
   String get vcToolsInitFreeSpace => '初始化新空间';
@@ -2466,22 +2094,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readOnlyModeLabel => '只读模式';
 
   @override
-  String get readOnlyModeSubtitle => '阻止对保险库进行任何写入或修改操作';
-
-  @override
   String get alwaysOpenReadOnlyLabel => '始终只读';
 
   @override
   String get alwaysOpenReadOnlySubtitle => '新会话将以只读模式启动。';
-
-  @override
-  String get selectUsbDeviceLabel => '选择USB设备';
-
-  @override
-  String get noUsbDevicesFound => '未找到兼容的USB存储设备';
-
-  @override
-  String get containerConfigTitle => '保险库配置';
 
   @override
   String get changePasswordTitle => '更改密码';
@@ -2490,43 +2106,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get confirmNewPasswordLabel => '确认新密码';
 
   @override
-  String get cameraCaptureTitle => '保险库相机';
-
-  @override
-  String get takingPhoto => '正在拍照…';
-
-  @override
-  String get noVaultSelected => '未选择保险库';
-
-  @override
   String get mediaDiagnosticsTitle => '媒体诊断';
 
   @override
-  String get advancedViewerSettingsTitle => '查看器设置';
-
-  @override
-  String get textEditorSwitchToReadModeTooltip => '切换至只读模式';
-
-  @override
-  String get textEditorSwitchToEditModeTooltip => '切换至编辑模式';
-
-  @override
   String get textEditorReadOnlyIndicatorLabel => '只读';
-
-  @override
-  String get textEditorMoveCursorLeftTooltip => '光标向左移动';
-
-  @override
-  String get textEditorMoveCursorRightTooltip => '光标向右移动';
-
-  @override
-  String get textEditorSelectWordTooltip => '选择单词';
-
-  @override
-  String get textEditorSwitchToHorizontalScrollTooltip => '切换到水平滚动';
-
-  @override
-  String get textEditorSwitchToSoftWrapTooltip => '切换到自动换行';
 
   @override
   String get textEditorCaretScrubberLabel => '向左或向右拖动以移动光标';
@@ -2608,18 +2191,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get goToLineButton => '转到';
 
   @override
-  String get textEditorSaveConfirmTitle => '未保存的更改';
-
-  @override
-  String get textEditorSaveConfirmMessage => '关闭前是否要保存更改？';
-
-  @override
-  String get saveAndClose => '保存并关闭';
-
-  @override
-  String get discardChanges => '放弃更改';
-
-  @override
   String selectionBarSelectedCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2636,9 +2207,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deselectAll => '取消全选';
 
   @override
-  String get sortOptionsTitle => '文件排序';
-
-  @override
   String get layoutModeList => '列表视图';
 
   @override
@@ -2648,28 +2216,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get layoutModeMasonry => '瀑布流';
 
   @override
-  String get fileOperationsTitle => '文件操作';
-
-  @override
   String get conflictResolutionTitle => '文件冲突';
 
   @override
   String get replaceExistingFile => '替换现有文件';
-
-  @override
-  String get keepBothFiles => '保留两者（重命名新文件）';
-
-  @override
-  String get skipFile => '跳过此文件';
-
-  @override
-  String get noVaultsFoundTitle => '未找到保险库';
-
-  @override
-  String get noVaultsFoundSubtitle => '创建一个新的加密容器或添加一个现有保险库以开始使用。';
-
-  @override
-  String get addExistingVaultButton => '添加现有保险库';
 
   @override
   String get sortContainersModeManual => '手动（拖动以重新排序）';
@@ -2718,46 +2268,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unlockContainerTitle => '解锁容器';
 
   @override
-  String get containerFileSegment => '容器文件';
-
-  @override
-  String get folderVaultSegment => '文件夹保险库';
-
-  @override
   String get enableButtonLabel => '启用';
-
-  @override
-  String get retryButtonLabelShort => '重试';
-
-  @override
-  String get locateFileButton => '定位文件';
-
-  @override
-  String get authenticateButton => '进行身份验证';
-
-  @override
-  String get cancelUnlockButton => '取消解锁';
-
-  @override
-  String tryingKeyslotProgress(int attempted, int total) {
-    return '正在尝试密钥槽 $attempted/$total…';
-  }
-
-  @override
-  String get tryingKeyslotSingle => '正在尝试密钥槽…';
-
-  @override
-  String verifyingCredentialProgress(int attempted, int total) {
-    return '正在验证凭据 $attempted/$total…';
-  }
-
-  @override
-  String get verifyingCredentialSingle => '正在验证凭据…';
-
-  @override
-  String tryingAlgoSlot(String algo, String slotName) {
-    return '正在尝试$algo（$slotName）…';
-  }
 
   @override
   String get hiddenVolumeSlotName => '隐藏卷';
@@ -2766,34 +2277,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get standardVolumeSlotName => '标准卷';
 
   @override
-  String get containerMissingSubtitle => '无法解析文件路径';
-
-  @override
-  String get containerMissingBody => '容器文件可能已被移动、删除，或其所在存储设备当前已断开连接。';
-
-  @override
-  String get connectPatternSequence => '连接您的图案序列';
-
-  @override
   String get passwordLabel => '密码';
-
-  @override
-  String get enterVaultPasswordHint => '输入保险库密码';
-
-  @override
-  String get enterBitlockerPasswordHint => '输入密码或恢复密钥';
-
-  @override
-  String get enterContainerPasswordHint => '输入容器密码';
-
-  @override
-  String get readOnlyModeUsbSubtitleDrive => '挂载时不允许更改此驱动器';
-
-  @override
-  String get rememberDriveLabel => '记住驱动器';
-
-  @override
-  String get rememberDriveSubtitle => '将驱动器固定在仪表盘上以便快速访问';
 
   @override
   String get unlockVaultButtonLabel => '解锁保险库';
@@ -2810,48 +2294,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get requestingPermission => '正在请求权限…';
 
   @override
-  String get unlockAndMountButton => '解锁并挂载';
-
-  @override
   String get unlockDriveButton => '解锁驱动器';
 
   @override
-  String couldntFindDevice(String deviceName) {
-    return '找不到“$deviceName”';
-  }
-
-  @override
-  String get plugDriveBackInRetry => '请重新插入驱动器并点击重试，或者如果它以不同名称显示，请在下方选择它。';
-
-  @override
-  String get retryConnectionButton => '重试连接';
-
-  @override
-  String get refreshDevicesButton => '刷新设备';
-
-  @override
-  String get connectOtgDriveToMount => '连接OTG闪存驱动器以进行挂载';
-
-  @override
-  String get alreadyActive => '已处于活动状态';
-
-  @override
   String get active => '活动';
-
-  @override
-  String get readyToUnlock => '已准备好解锁';
-
-  @override
-  String get enterUsbPartitionPassword => '输入USB分区密码';
-
-  @override
-  String get biometricAuthenticationTitle => '生物识别验证';
-
-  @override
-  String get biometricAuthUsbSubtitle => '进行身份验证以解锁并挂载此USB设备';
-
-  @override
-  String get connectPatternSequenceToMount => '连接您的图案序列以进行挂载';
 
   @override
   String get selectAllAction => '全选';
@@ -2903,9 +2349,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get exposeAsDocumentProviderMenu => '公开为文档提供程序';
-
-  @override
-  String get moreOptionsTooltipShort => '更多选项';
 
   @override
   String get copyTooltip => '复制';
@@ -3086,11 +2529,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get enterFullscreenMenu => '进入全屏';
 
   @override
-  String failedToOpenExternalApp(String error) {
-    return '在外部应用中打开失败：$error';
-  }
-
-  @override
   String get thisFolderMenu => '此文件夹';
 
   @override
@@ -3104,21 +2542,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get playlistOptionsTooltip => '播放列表选项';
-
-  @override
-  String get enablePlaylistTooltip => '启用播放列表';
-
-  @override
-  String get moreActionsTooltip => '更多操作';
-
-  @override
-  String get forcePortraitMenu => '强制竖屏';
-
-  @override
-  String get forceLandscapeMenu => '强制横屏';
-
-  @override
-  String get autoRotateSensorMenu => '自动旋转（传感器）';
 
   @override
   String get screenOrientationMenu => '屏幕方向';
@@ -3148,52 +2571,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get diagnosticsCopiedToClipboard => '诊断信息已复制到剪贴板';
 
   @override
-  String get diagnosticsTitle => '诊断信息';
-
-  @override
-  String get copyDiagnosticsTooltip => '复制诊断信息';
-
-  @override
   String get closeTooltip => '关闭';
 
   @override
-  String get diagnosticsPlaybackSection => '播放';
-
-  @override
-  String get diagnosticsEngineSection => '引擎';
-
-  @override
-  String get diagnosticsStateLabel => '状态';
-
-  @override
-  String get diagnosticsResolutionLabel => '分辨率';
-
-  @override
-  String get diagnosticsAspectRatioLabel => '宽高比';
-
-  @override
-  String get diagnosticsPositionLabel => '播放位置';
-
-  @override
-  String get diagnosticsDurationLabel => '时长';
-
-  @override
   String get diagnosticsErrorLabel => '错误';
-
-  @override
-  String get diagnosticsPlayerLabel => '播放器';
-
-  @override
-  String get diagnosticsDecodingLabel => '解码方式';
-
-  @override
-  String get diagnosticsExoPlayerValue => 'ExoPlayer（Android）';
-
-  @override
-  String get diagnosticsHardwareAcceleratedValue => '硬件加速';
-
-  @override
-  String get diagnosticsUnknownValue => '未知';
 
   @override
   String get diagnosticsStateBuffering => '正在缓冲';
@@ -3203,9 +2584,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get diagnosticsStatePaused => '已暂停';
-
-  @override
-  String get diagnosticsDurationUnavailable => '--:--';
 
   @override
   String get rotate90Label => '旋转90°';
@@ -3221,9 +2599,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get subtitlesLabel => '字幕';
-
-  @override
-  String get imageSettingsTitle => '图片设置';
 
   @override
   String get playbackSettingsTitle => '播放设置';
@@ -3263,9 +2638,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsTooltipShort => '设置';
-
-  @override
   String get sourceCodeTooltip => '源代码';
 
   @override
@@ -3278,12 +2650,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resetToDefaultsTooltip => '重置为默认值';
 
   @override
-  String get usbUnlockContainerTitle => '解锁USB容器';
-
-  @override
-  String get usbMountContainerTitle => '挂载USB驱动器';
-
-  @override
   String get staticLabel => '静止';
 
   @override
@@ -3291,15 +2657,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get muteTooltip => '静音';
-
-  @override
-  String get playOnceDisabledTooltip => '仅播放一次（已禁用自动前进）';
-
-  @override
-  String get playAndAdvanceTooltip => '播放并前进到下一个';
-
-  @override
-  String get loopCurrentVideoTooltip => '循环播放当前视频';
 
   @override
   String get clearThumbnailCacheDialogTitle => '清除缩略图缓存？';
@@ -3353,10 +2710,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get patternSetupRequiredBeforeSaving => '保存前请先设置图案。';
-
-  @override
-  String get passwordKeystoreEncryptedHelperText =>
-      '密码使用Android Keystore加密。如果仅使用密钥文件，请留空。';
 
   @override
   String get changePatternButton => '更改图案';
@@ -3570,12 +2923,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get operationInProgressWaitMessage => '操作正在进行中。请在锁定前稍候。';
 
   @override
-  String get reconnectUsbTooltip => '重新连接USB';
-
-  @override
-  String get unlockContainerTooltip => '解锁容器';
-
-  @override
   String lockFailedMessage(String errorType) {
     return '锁定失败：$errorType';
   }
@@ -3697,9 +3044,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get filteredLabel => '已筛选';
 
   @override
-  String get statsStorageSectionHeader => '存储空间';
-
-  @override
   String statsFolderCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -3790,9 +3134,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fileOpsDismissTooltip => '关闭';
-
-  @override
-  String get fileOpsRootDestinationLabel => '根目录';
 
   @override
   String get fileOpsCancelledStatusLabel => '已取消';
@@ -3921,25 +3262,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showPlaylistCarouselDesc => '查看媒体播放列表时显示缩略图轮播按钮';
 
   @override
-  String get videoPlaybackSliderLabel => '视频播放位置滑块';
-
-  @override
-  String get longPressPlaybackDiagnosticsHint => '长按查看播放诊断信息';
-
-  @override
-  String get staticImageModeLabel => '静态图片模式';
-
-  @override
-  String slideshowModeActiveLabel(int seconds) {
-    return '幻灯片模式已启用，间隔$seconds秒';
-  }
-
-  @override
-  String videoPlaybackModeLabel(String mode) {
-    return '视频播放模式：$mode';
-  }
-
-  @override
   String get pauseLabel => '暂停';
 
   @override
@@ -3958,9 +3280,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String noResultsForQueryMessage(String query) {
     return '此文件夹中没有与“$query”匹配的内容。';
   }
-
-  @override
-  String get closeCarouselTooltip => '关闭轮播';
 
   @override
   String get playlistScrollModeMenu => '播放列表滚动模式';
@@ -4091,15 +3410,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get cameraCouldNotSwitchLensMessage => '无法切换镜头';
-
-  @override
-  String get cameraEncryptingPhotoLabel => '正在加密照片…';
-
-  @override
-  String get cameraEncryptingVideoLabel => '正在加密视频…';
-
-  @override
   String get aboutApplicationSectionHeader => '应用程序';
 
   @override
@@ -4219,14 +3529,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutFooterMadeWithLove => '为隐私而用❤打造。';
 
   @override
-  String get aboutVersionCopiedMessage => '版本信息已复制——便于错误报告';
-
-  @override
-  String aboutVersionClipboardText(String version) {
-    return 'VaultExplorer v$version (Android)';
-  }
-
-  @override
   String aboutShareText(String url) {
     return 'VaultExplorer——一款适用于Android的免费开源离线保险库应用。\n\n将密码、笔记和文件存储在加密容器（VeraCrypt、LUKS、BitLocker、Cryptomator、Gocryptfs、CryFS）中。\n\n$url';
   }
@@ -4333,11 +3635,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size像素 · $quality%质量';
-  }
-
-  @override
-  String holdToSpeedIndicatorLabel(String speed) {
-    return '$speed倍速';
   }
 
   @override
@@ -4669,14 +3966,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String vaultOccupiedSpaceSummary(String used) {
-    return '已用$used';
-  }
-
-  @override
-  String get incorrectPasswordOrKeyfilesDriveError => '密码/密钥文件不正确，或驱动器不受支持';
-
-  @override
   String driveUsableCapacity(int mb) {
     return '驱动器可用容量：$mb MB。不得超过此容量。';
   }
@@ -4937,9 +4226,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get reorderBookmarksTitle => '重新排列收藏项';
-
-  @override
-  String get reorderBookmarksDesc => '拖动项目以在收藏栏中重新排序';
 
   @override
   String get drawerBookmarksSectionTitle => '收藏';
@@ -5212,12 +4498,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierVaultConfirmWarning => '此保险库中的每个文件都将被读取。';
-
-  @override
-  String get hashVerifierVaultEmptyMessage => '此保险库没有可检查的文件';
-
-  @override
   String get hashVerifierVaultStartButton => '开始检查';
 
   @override
@@ -5292,9 +4572,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hashVerifierVaultActionVerifySubtitle => '将保险库中的每个文件与已加载的清单进行核对';
 
   @override
-  String get hashVerifierVaultChangeActionButton => '更改';
-
-  @override
   String get hashVerifierVaultVerifyButton => '验证整个保险库';
 
   @override
@@ -5324,9 +4601,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get duplicateFinderScanningStage3 => '第3阶段：正在验证完整字节哈希...';
-
-  @override
-  String get duplicateFinderScanComplete => '扫描完成';
 
   @override
   String get duplicateFinderNoDuplicatesTitle => '未找到重复文件';
@@ -5565,9 +4839,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get storageAnalyzerHeaviestFilesHeader => '最大文件';
-
-  @override
   String get storageAnalyzerBreakdownHeader => '按文件类型';
 
   @override
@@ -5657,16 +4928,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageAnalyzerEmptyFolder => '此文件夹为空。';
-
-  @override
-  String storageAnalyzerSmallerItems(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count 个较小项目',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get storageAnalyzerMapHint => '点击文件夹以打开，长按可进行选择。';
@@ -6108,9 +5369,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get vaultBrowserSwitchVaultTooltip => '切换保险库';
-
-  @override
   String get vaultBrowserRootFolderLabel => '根文件夹';
 
   @override
@@ -6185,25 +5443,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolVaultSyncSubtitle => '比较两个保险库并复制缺失或更新的内容';
 
   @override
-  String get vaultSyncNoVaultsTitle => '没有已挂载的保险库';
-
-  @override
-  String get vaultSyncNoVaultsMessage => '请至少挂载一个保险库以比较和同步其文件。';
-
-  @override
-  String get vaultSyncLeftLabel => '左侧';
-
-  @override
-  String get vaultSyncRightLabel => '右侧';
-
-  @override
   String get vaultSyncTapToSelect => '点击选择保险库和文件夹';
 
   @override
   String get vaultSyncSwapTooltip => '交换两个存储';
-
-  @override
-  String get vaultSyncSameLocationWarning => '这两个文件夹必须不同。';
 
   @override
   String get vaultSyncIntroTitle => '比较两个保险库';
@@ -6255,26 +5498,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeOnlyLeft(Object count) {
-    return '仅左侧有$count个';
-  }
-
-  @override
-  String vaultSyncBadgeOnlyRight(Object count) {
-    return '仅右侧有$count个';
-  }
-
-  @override
-  String vaultSyncBadgeLeftNewer(Object count) {
-    return '左侧较新$count个';
-  }
-
-  @override
-  String vaultSyncBadgeRightNewer(Object count) {
-    return '右侧较新$count个';
-  }
-
-  @override
   String vaultSyncBadgeConflicts(Object count) {
     return '需审核$count个';
   }
@@ -6289,67 +5512,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncDirectionTwoWaySubtitle => '将缺失文件和较新版本复制到另一侧。';
 
   @override
-  String get vaultSyncDirectionLeftToRight => '左侧 → 右侧（单向）';
-
-  @override
-  String get vaultSyncDirectionLeftToRightSubtitle =>
-      '将新增和更新的文件从左侧推送到右侧；绝不更改左侧';
-
-  @override
-  String get vaultSyncDirectionRightToLeft => '右侧 → 左侧（单向）';
-
-  @override
-  String get vaultSyncDirectionRightToLeftSubtitle =>
-      '将新增和更新的文件从右侧推送到左侧；绝不更改右侧';
-
-  @override
-  String get vaultSyncSearchHint => '搜索差异';
-
-  @override
-  String get vaultSyncStatusOnlyLeft => '仅左侧';
-
-  @override
-  String get vaultSyncStatusOnlyRight => '仅右侧';
-
-  @override
-  String get vaultSyncStatusLeftNewer => '左侧较新';
-
-  @override
-  String get vaultSyncStatusRightNewer => '右侧较新';
-
-  @override
   String get vaultSyncStatusConflict => '需审核';
 
   @override
   String get vaultSyncStatusTypeMismatch => '类型不匹配';
 
   @override
-  String get vaultSyncFolderOnlyLeftDetail => '文件夹——仅左侧';
-
-  @override
-  String get vaultSyncFolderOnlyRightDetail => '文件夹——仅右侧';
-
-  @override
-  String vaultSyncBothSidesDetail(
-    Object leftSize,
-    Object leftDate,
-    Object rightSize,
-    Object rightDate,
-  ) {
-    return '左：$leftSize · $leftDate  →  右：$rightSize · $rightDate';
-  }
-
-  @override
   String get vaultSyncTypeMismatchTooltip => '一侧是文件，另一侧是文件夹——请在文件浏览器中手动处理';
 
   @override
   String get vaultSyncChangeActionTooltip => '更改同步操作';
-
-  @override
-  String get vaultSyncActionCopyToRight => '复制 → 右侧';
-
-  @override
-  String get vaultSyncActionCopyToLeft => '复制 → 左侧';
 
   @override
   String get vaultSyncActionSkip => '跳过';
@@ -6371,11 +5543,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String vaultSyncStartedMessage(Object count) {
-    return '同步已开始——已排队$count个项目';
-  }
-
-  @override
   String vaultSyncPickLocationTitle(Object side) {
     return '选择$side保险库和文件夹';
   }
@@ -6389,9 +5556,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => '存储';
-
-  @override
   String get vaultSyncTargetKindVault => '加密保险库';
 
   @override
@@ -6399,9 +5563,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vaultSyncTargetKindProvider => '文档提供程序 · 未加密';
-
-  @override
-  String get vaultSyncAddStorageTooltip => '添加存储位置';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip => '启用本地存储访问';
@@ -6440,9 +5601,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get confirmRemoveMasterPasswordMessage => '请输入您当前的主密码以确认移除：';
 
   @override
-  String get authenticateToRemoveMasterPassword => '进行身份验证以移除主密码';
-
-  @override
   String get incorrectPassword => '密码错误';
 
   @override
@@ -6462,9 +5620,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get copyPathAction => '复制路径';
-
-  @override
-  String get automationSectionHeader => '自动化';
 
   @override
   String get automationTileTitle => '自动化';
@@ -6586,10 +5741,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationActionEmergencyPurgeLabel => '紧急清除';
 
   @override
-  String get automationDocCommentFootnote =>
-      '完整的附加参数和结果广播约定记录在VaultAutomationReceiver.kt中。';
-
-  @override
   String get automationTierOffLabel => '关闭';
 
   @override
@@ -6615,12 +5766,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get showHiddenFilesDesc => '显示点文件和系统文件夹';
-
-  @override
-  String get showNoMediaFilesLabel => '显示 .nomedia 文件';
-
-  @override
-  String get showNoMediaFilesDesc => '在文件夹列表中显示 .nomedia 文件';
 
   @override
   String get dontAskAgain => '不再询问';
@@ -6673,13 +5818,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get wizardNextButton => '下一步';
 
   @override
-  String get wizardStepTypeTitle => '类型';
-
-  @override
   String get wizardStepBasicInfoTitle => '基本信息';
-
-  @override
-  String get wizardStepAdvancedTitle => '高级';
 
   @override
   String get wizardStepReviewTitle => '回顾';
@@ -6692,12 +5831,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wizardEncryptionDetailsRowTitle => '加密详情';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleConfigured => '已配置——点按查看';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup => '点按进行设置';
 
   @override
   String get wizardSummaryTitle => '摘要';
@@ -6755,9 +5888,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get externalSubtitlesLabel => '外部字幕 (.srt/.vtt)';
 
   @override
-  String get externalLabel => '外部';
-
-  @override
   String get subtitleSizeLabel => '大小';
 
   @override
@@ -6806,9 +5936,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get redactToolLabel => '遮盖';
 
   @override
-  String get rotateLeftTooltip => '向左旋转';
-
-  @override
   String get rotateRightTooltip => '向右旋转';
 
   @override
@@ -6819,18 +5946,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cropAspectOriginalLabel => '原始比例';
-
-  @override
-  String get applyCropTooltip => '应用裁剪';
-
-  @override
-  String get annotationColorTooltip => '颜色';
-
-  @override
-  String get annotationStrokeWidthTooltip => '笔画粗细';
-
-  @override
-  String get clearAnnotationsTooltip => '清除所有注释';
 
   @override
   String get resetImageTooltip => '重置为原图';
@@ -6846,9 +5961,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get addTextAnnotationHint => '输入一些内容…';
-
-  @override
-  String get textToolHint => '点按图片以添加文字';
 
   @override
   String get saveImageSheetTitle => '保存更改';
@@ -7118,21 +6230,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationSavePimButton => '保存 PIM';
 
   @override
-  String get automationCameraSectionHeader => '相机自动化';
-
-  @override
   String get automationCameraDescription =>
       '允许自动化为此保险库触发 TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING。即使在完全访问权限下也默认关闭——与文件导入/导出不同，拍照完全不需要任何屏幕提示，因此这是一个单独的、需要明确开启的选项。';
 
   @override
-  String get automationAllowCameraCapture => '允许相机拍摄';
-
-  @override
   String get automationOverlayPermissionTitle => '在其他应用上层显示';
-
-  @override
-  String get automationOverlayPermissionMessage =>
-      'Android 14+ 上的后台相机拍摄需要“在其他应用上层显示”权限。请授予此权限，以便在屏幕锁定或应用处于后台时允许自动拍摄。';
 
   @override
   String get automationPimSavedMessage => 'PIM 已保存';
@@ -7223,12 +6325,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get computingHashMessage => '正在计算哈希值…';
-
-  @override
-  String get tapCalculateToVerifyMessage => '点按“计算”以验证';
-
-  @override
-  String get calculateButton => '计算';
 
   @override
   String get copyDiagnosticsButton => '复制诊断信息';
@@ -7323,49 +6419,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => '压缩包';
-
-  @override
   String get filesTabLabel => '文件';
 
   @override
   String get filesPermissionMessage => '允许访问以浏览您设备上的文件。';
 
   @override
-  String get filesEmptyTitle => '此处没有文件';
-
-  @override
   String get filesEmptyMessage => '此文件夹为空。';
 
   @override
-  String get filesNewFolderTooltip => '新建文件夹';
-
-  @override
-  String get filesNewFolderDialogTitle => '新建文件夹';
-
-  @override
-  String get filesNameHint => '名称';
-
-  @override
-  String get filesCreate => '创建';
-
-  @override
-  String get filesRename => '重命名';
-
-  @override
-  String get filesDelete => '删除';
-
-  @override
-  String get filesShare => '分享';
-
-  @override
   String get filesCopy => '复制';
-
-  @override
-  String get filesMove => '移动';
-
-  @override
-  String get filesDeleteConfirmTitle => '永久删除？';
 
   @override
   String get filesChooseDestinationTitle => '选择文件夹';
@@ -7377,49 +6440,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get filesCopyHere => '复制到此处';
 
   @override
-  String get filesSelectAllTooltip => '全选';
-
-  @override
-  String get filesCloseSelectionTooltip => '关闭';
-
-  @override
-  String get filesFolderCreated => '文件夹已创建';
-
-  @override
-  String get filesCreateFolderFailed => '无法创建文件夹';
-
-  @override
-  String get filesRenamed => '已重命名';
-
-  @override
-  String get filesRenameFailed => '无法重命名';
-
-  @override
-  String get filesNameAlreadyExists => '该名称已被占用';
-
-  @override
-  String get filesDeleted => '已删除';
-
-  @override
   String get filesDeleteFailed => '无法删除';
-
-  @override
-  String get filesMoved => '已移动';
-
-  @override
-  String get filesMoveFailed => '无法移动';
-
-  @override
-  String get filesCopied => '已复制';
-
-  @override
-  String get filesCopyFailed => '无法复制';
-
-  @override
-  String get filesOpenFailed => '无法打开此文件';
-
-  @override
-  String get filesShareFailed => '无法分享此文件';
 
   @override
   String get filesFilterTooltip => '筛选';
@@ -7562,9 +6583,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compositePimFieldLabel => 'PIM（个人迭代乘数）';
 
   @override
-  String get compositePimFieldHelper => '留空或填 0 以使用标准默认迭代次数';
-
-  @override
   String get compositeRememberContainerTitle => '记住此容器';
 
   @override
@@ -7619,9 +6637,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '检测到复合载体。复合容器需要其所有载体文件才能解锁。';
 
   @override
-  String get compositeSelectAllCarriersButton => '选择所有载体';
-
-  @override
   String get compositeCarriersMissingTitle => '缺少复合载体';
 
   @override
@@ -7629,15 +6644,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compositeRelocateCarriersButton => '重新定位载体文件';
-
-  @override
-  String get passwordOptionalFieldLabel => '密码（可选）';
-
-  @override
-  String get plainDiskImagePasswordHint => '无需密码 — 此磁盘镜像未加密';
-
-  @override
-  String get compositePasswordHint => '输入复合容器密码';
 
   @override
   String get generateStrongPasswordTooltip => '生成强密码';
@@ -7845,9 +6851,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sectionDuressUnlock => '主锁定胁迫解锁';
 
   @override
-  String get duressMasterPasswordRequired => '配置胁迫解锁前，必须在安全设置中启用主密码。';
-
-  @override
   String get duressPasswordTitle => '胁迫密码';
 
   @override
@@ -8021,9 +7024,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get longFileNameDisplayLabel => '长文件名显示';
 
   @override
-  String get longFileNameDisplayDesc => '选择超出空间时长文件名的缩略方式';
-
-  @override
   String get longFileNameEllipsizeStartLabel => '省略开头';
 
   @override
@@ -8066,15 +7066,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get gridAspectPortraitLabel => '9:16 (纵向)';
 
   @override
-  String get fileFolderDisplaySectionHeader => '文件与文件夹显示';
-
-  @override
-  String get navigationBarsSectionHeader => '导航与栏';
-
-  @override
-  String get columnedListViewColumnsSectionHeader => '分栏列表列项';
-
-  @override
   String get autoHideAppBarLabel => '滚动时自动隐藏应用栏';
 
   @override
@@ -8111,22 +7102,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageLocationsTitle => '存储位置';
 
   @override
-  String get storageLocationsSubtitle => '内部存储、SD卡和文档提供程序';
-
-  @override
-  String get storageLocationsSelectPrompt => '选择当前存储';
-
-  @override
   String get addStorageLocationTitle => '添加存储位置';
 
   @override
   String get addStorageLocationSubtitle => '添加外部SD卡、U盘或文件夹';
-
-  @override
-  String get documentProviderSafLabel => '文档提供程序 (SAF)';
-
-  @override
-  String get externalStorageLabel => '外部存储';
 
   @override
   String get renameStorageLocationTitle => '重命名位置';
@@ -8138,9 +7117,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return '是否从存储位置移除“$name”？原文件不会被删除。';
   }
-
-  @override
-  String get storageLocationAddedSnack => '已添加存储位置';
 
   @override
   String get storageLocationUnresolvedError => '无法直接访问该位置。请确认已授予存储权限。';
@@ -8166,51 +7142,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mediaViewerCustomizeControls => '自定义控制...';
-
-  @override
-  String get mediaViewerControlsTitle => '媒体播放器控制';
-
-  @override
-  String get mediaViewerControlsReset => '媒体控制已重置为默认值';
-
-  @override
-  String get mediaViewerTransportDisplay => '传输和显示';
-
-  @override
-  String get mediaViewerShowScrubberTitle => '显示进度条';
-
-  @override
-  String get mediaViewerShowScrubberDesc => '显示位置和持续时间时间轴滑块';
-
-  @override
-  String get mediaViewerShowCenterTransportTitle => '显示中央控制';
-
-  @override
-  String get mediaViewerShowCenterTransportDesc => '在中央显示大型播放/暂停按钮';
-
-  @override
-  String get mediaViewerShowPrevNextTitle => '显示上一个和下一个按钮';
-
-  @override
-  String get mediaViewerShowPrevNextDesc => '关闭以仅保留单个播放按钮';
-
-  @override
-  String get mediaViewerShowStatusBadgeTitle => '显示状态徽章';
-
-  @override
-  String get mediaViewerShowStatusBadgeDesc => '显示幻灯片延迟和静态图片指示器';
-
-  @override
-  String get mediaViewerTopBarSection => '顶部栏';
-
-  @override
-  String get mediaViewerBottomBarSection => '底部栏';
-
-  @override
-  String get mediaViewerUnpinnedSection => '未固定（折叠菜单）';
-
-  @override
-  String get mediaViewerAllControlsPinned => '所有控件均已固定。';
 
   @override
   String get mediaPlayerControlsTitle => '媒体播放器控制';
@@ -8326,19 +7257,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedSettingsActionsEmptyHint => '将操作拖动到此处以添加到高级设置面板';
 
   @override
-  String get dropHereAtEnd => '拖放到末尾';
-
-  @override
-  String get dragItemsHereToAdd => '+ 拖动项目到此处以添加到此区域';
-
-  @override
   String get moveToAdvancedSettingsTooltip => '移动到高级设置';
-
-  @override
-  String get noVaultsMounted => '未挂载任何保险库';
-
-  @override
-  String get vaultsMountedSummary => '个已挂载保险库';
 
   @override
   String get dashboardNavLabel => '仪表板';
@@ -8347,25 +7266,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultsSectionTitle => '保险库';
 
   @override
-  String get vaultStatusMounted => '已挂载';
-
-  @override
   String get lockVaultTooltip => '锁定保险库';
 
   @override
   String get lockAllVaultsTitle => '全部锁定';
-
-  @override
-  String get safProviderLabel => 'SAF 提供程序';
-
-  @override
-  String get singleFileCryptoTitle => '单文件加密';
-
-  @override
-  String get singleFileCryptoSubtitle => '在保险库外加密或解密';
-
-  @override
-  String get passwordGeneratorTitle => '密码生成器';
 
   @override
   String get contentsLabel => '内容';
@@ -8436,13 +7340,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get holdSpeedMultiplierTitle => '长按倍速快进';
 
   @override
-  String get holdSpeedMultiplierSubtitle => '长按视频播放画面时的快进速度';
-
-  @override
   String get defaultAspectRatioTitle => '默认画面比例';
-
-  @override
-  String get defaultAspectRatioSubtitle => '打开视频时自动应用';
 
   @override
   String get aspectRatioModeLabel => '画面比例';
@@ -8686,45 +7584,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get cardSwipeActionsTitle => '卡片滑动操作';
-
-  @override
-  String get cardSwipeActionsSubtitle => '滑动保险库卡片以快速显示编辑和移除操作';
-
-  @override
-  String get cameraQualitySd => '480p (标清)';
-
-  @override
-  String get cameraQualityHd => '720p (高清)';
-
-  @override
-  String get cameraQualityFhd => '1080p (全高清)';
-
-  @override
-  String get cameraQualityUhd => '4K (超高清)';
-
-  @override
-  String get cameraPhotoResMax => '完整 (最高分辨率)';
-
-  @override
-  String get cameraPhotoResHigh => '500 万像素 (高)';
-
-  @override
-  String get cameraPhotoResMedium => '200 万像素 (中)';
-
-  @override
-  String get cameraPhotoResLow => '120 万像素 (低)';
-
-  @override
-  String get cameraLensWide => '广角';
-
-  @override
-  String get cameraLensInfrared => '红外';
-
-  @override
-  String get cameraLensFront => '前置';
-
-  @override
   String get appLockBehaviorTitle => '应用锁定行为';
 
   @override
@@ -8772,9 +7631,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get passwordInterchangeIncludeSubfolders => '包含子文件夹';
-
-  @override
-  String get passwordInterchangeFormatHeader => '格式';
 
   @override
   String get passwordInterchangeFormatLabel => '文件格式';
@@ -8890,12 +7746,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get autoLockIndicatorLocksOnScreenOff => '屏幕熄灭锁定';
-
-  @override
-  String get autoLockIndicatorNeverLocks => '不会自动锁定';
-
-  @override
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return '闲置 $duration 后锁定（使用应用时重置）';
   }
@@ -8916,29 +7766,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return '存储位置“$name”不可用或已断开连接。';
   }
-
-  @override
-  String get cameraEditPhotoTooltip => '编辑照片';
-
-  @override
-  String get cameraTrimVideoTooltip => '裁剪视频';
-
-  @override
-  String get cameraDiscardMediaTooltip => '丢弃';
-
-  @override
-  String get cameraSaveMediaTooltip => '保存到保险库';
-
-  @override
-  String get cameraContinueCaptureTooltip => '再拍一张照片';
-
-  @override
-  String cameraBatchCount(int count) {
-    return '$count张照片';
-  }
-
-  @override
-  String get cameraReviewPhotosTooltip => '查看已拍摄照片';
 
   @override
   String get vaultItemTypeAuthenticator => '身份验证器';
@@ -9048,12 +7875,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get autoLockIndicatorLocksImmediately => '立即锁定';
-
-  @override
-  String get quickActionLockModeTitle => '快捷操作后锁定';
-
-  @override
-  String get quickActionLockModeSubtitle => '从快捷捕获或分享保存时的保险库锁定行为';
 
   @override
   String get quickActionLockModeLeaveAsFoundLabel => '保持原有状态';
@@ -9179,9 +8000,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get textEditorProjectFilesTitle => '项目文件';
-
-  @override
-  String get textEditorCloseTabTooltip => '关闭标签页';
 
   @override
   String get textEditorResetToDefault => '恢复默认设置';
@@ -9451,11 +8269,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String videoEditorSnapNote(String start, String end) {
-    return '无损剪切从关键帧开始：$start – $end';
-  }
-
-  @override
   String get videoEditorBoundaryInvalid => '这会导致片段过短。';
 
   @override
@@ -9542,29 +8355,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get videoEditorExportSingle => '保存为新视频';
-
-  @override
-  String get videoEditorExportSingleHint => '原始文件保持不变。';
-
-  @override
   String get videoEditorExportMerge => '合并为一个视频';
 
   @override
-  String get videoEditorExportMergeHint => '片段按时间线顺序拼接。';
-
-  @override
   String get videoEditorExportSeparate => '保存为单独的视频';
-
-  @override
-  String videoEditorExportSeparateHint(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count 个新文件',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get videoEditorLosslessNote =>
@@ -9691,9 +8485,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileSkinColorDefault => '默认';
 
   @override
-  String get fileSkinColorHexLabel => '十六进制颜色';
-
-  @override
   String get fileSkinPresetClassic => '经典';
 
   @override
@@ -9717,17 +8508,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compositeArchiveCarrierRowWarning => '不支持此压缩包，请将其从所选文件中移除。';
-
-  @override
-  String videoEditorSelectedSegmentSummary(
-    int current,
-    int total,
-    String start,
-    String end,
-    String duration,
-  ) {
-    return '片段 $current/$total：$start – $end ($duration)';
-  }
 
   @override
   String get videoEditorKeepModeDescription => '导出选中的片段并舍弃其余部分。';
@@ -10367,13 +9147,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinOutlinesShadowsAndModalBackdrops => '轮廓、阴影和模态遮罩。';
 
   @override
-  String get skinTapAnyPreviewElement => '点按任意预览元素';
-
-  @override
-  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls =>
-      '选择应用、文件或编辑器颜色以查看其控制的内容。';
-
-  @override
   String get skinCustomizeSkin => '自定义皮肤';
 
   @override
@@ -10381,9 +9154,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinDark => '深色';
-
-  @override
-  String get skinApp => '应用';
 
   @override
   String get skinEditor => '编辑器';
@@ -10416,10 +9186,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinAppBar => '应用栏';
 
   @override
-  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages =>
-      '顶部导航栏独立于卡片和页面。';
-
-  @override
   String get skinTopBarFillColor => '顶栏填充颜色。';
 
   @override
@@ -10432,10 +9198,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinFloatingActionButton => '悬浮操作按钮';
 
   @override
-  String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
-      '其填充和图标颜色独立于选择颜色。';
-
-  @override
   String get skinButtonFill => '按钮填充';
 
   @override
@@ -10446,25 +9208,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinIconColorOnTheRoundButton => '圆形“+”按钮上的图标颜色。';
-
-  @override
-  String get skinDashboardVaultCards => '仪表盘保管库卡片';
-
-  @override
-  String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
-      '设置锁定和挂载的保管库卡片的背景。';
-
-  @override
-  String get skinLockedVaultCard => '已锁定保管库卡片';
-
-  @override
-  String get skinNeutralVaultCardFill => '中性保管库卡片填充。';
-
-  @override
-  String get skinMountedVaultCard => '已挂载保管库卡片';
-
-  @override
-  String get skinSeparateFillForAnUnlockedMountedVault => '已解锁并挂载的保管库的独立填充。';
 
   @override
   String get skinFineTuneAppColors => '微调应用颜色';
@@ -10491,252 +9234,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinTapTheColorCircleToChooseAColor => '点按色圈以选择颜色。';
 
   @override
-  String get skinAppBarBackground => '应用栏背景';
-
-  @override
-  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
-      '仪表盘及其他应用栏使用此独立颜色。';
-
-  @override
-  String get skinDashboardMenuIcon => '仪表盘菜单图标';
-
-  @override
-  String get skinTheHamburgerButtonUsesTheAppBarIconColor => '汉堡菜单按钮使用应用栏图标颜色。';
-
-  @override
-  String get skinDashboardTitle => '仪表盘标题';
-
-  @override
-  String get skinTheDashboardTitleUsesTheAppBarForegroundColor =>
-      '仪表盘标题使用应用栏前景色。';
-
-  @override
-  String get skinActionLabelAndIcon => '操作标签和图标';
-
-  @override
-  String get skinTheActionAccentColorsLabelsb08a63 => '操作强调色用于“添加保管库”等标签及其图标。';
-
-  @override
-  String get skinDashboardAddButton => '仪表盘添加按钮';
-
-  @override
-  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
-      '按钮填充和加号图标具有单独的皮肤颜色。';
-
-  @override
-  String get skinVaultCardAndIconBackground => '保管库卡片和图标背景';
-
-  @override
-  String get skinTheIconTileUsesPrimary5c2f93 =>
-      '图标平铺使用 Primary container。挂载的保管库卡片将该颜色与凸起表面混合。';
-
-  @override
-  String get skinVaultFormatIconColor => '保管库格式图标颜色';
-
-  @override
-  String get skinVaultFormatInitialsUseOnPrimaryContainer =>
-      '保管库格式首字母使用 On primary container。';
-
-  @override
-  String get skinVaultStorageDetails => '保管库存储详情';
-
-  @override
-  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor =>
-      '可用空间和总容量使用辅助文本颜色。';
-
-  @override
-  String get skin17GBFree5GB => '剩余 1.7 GB / 5 GB';
-
-  @override
-  String get skinVaultStorageProgress => '保管库存储进度';
-
-  @override
-  String get skinTheProgressBarUsesTheba7c98 =>
-      '进度条使用应用强调色，并在存储空间变满时切换为第三级颜色和错误颜色。';
-
-  @override
-  String get skinLockActionBackground => '锁定操作背景';
-
-  @override
-  String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
-      '挂载保管库的锁定按钮使用 Primary container。';
-
-  @override
-  String get skinVaultActionsIconColor => '保管库操作图标颜色';
-
-  @override
-  String get skinTheOverflowMenuUsesTheSupportingIconColor => '溢出菜单使用辅助图标颜色。';
-
-  @override
-  String get skinMountedVaultCardBackground => '已挂载保管库卡片背景';
-
-  @override
-  String get skinThisIsTheBackgroundOfa8d0d3 => '这是挂载保管库卡片的背景。其图标平铺仍使用主操作颜色。';
-
-  @override
-  String get skinLockedVaultCardBackground => '已锁定保管库卡片背景';
-
-  @override
-  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
-      '此颜色独立于应用栏和挂载的保管库卡片。';
-
-  @override
-  String get skinLockedVaultFormatIcon => '锁定保管库格式图标';
-
-  @override
-  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor =>
-      '锁定保管库图标使用辅助文本和图标颜色。';
-
-  @override
-  String get skinSharedArchive => '共享存档';
-
-  @override
-  String get skinLockedVaultStatusText => '锁定保管库状态文本';
-
-  @override
-  String get skinTheLockedStatusLabelUsesTheSupportingTextColor =>
-      '锁定状态标签使用辅助文本颜色。';
-
-  @override
-  String get skinLockedVaultActionsIcon => '锁定保管库操作图标';
-
-  @override
-  String get skinVaultActionsMenuBackground => '保管库操作菜单背景';
-
-  @override
-  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
-      '“编辑”和“移除”弹出窗口使用菜单表面颜色。';
-
-  @override
-  String get skinEditMenuItem => '“编辑”菜单项';
-
-  @override
-  String get skinTheEditActionUsesTheRegularForegroundColor => '“编辑”操作使用常规前景色。';
-
-  @override
-  String get skinRemoveMenuItem => '“移除”菜单项';
-
-  @override
-  String get skinDestructiveActionsUseTheErrorColor => '破坏性操作使用错误颜色。';
-
-  @override
-  String get skinFileManagerAppBar => '文件管理器应用栏';
-
-  @override
-  String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
-      '文件浏览器工具栏使用相同的应用栏背景。';
-
-  @override
-  String get skinFileManagerBackButton => '文件管理器返回按钮';
-
-  @override
-  String get skinToolbarNavigationIconsUseThisColor => '工具栏导航图标使用此颜色。';
-
-  @override
-  String get skinFileManagerTitle => '文件管理器标题';
-
-  @override
-  String get skinTheCurrentFolderNameUsesTheAppBarForeground =>
-      '当前文件夹名称使用应用栏前景色。';
-
-  @override
-  String get skinFileManagerAppBarActions => '文件管理器应用栏操作';
-
-  @override
-  String get skinToolbarActionsUseThisIconColor => '工具栏操作使用此图标颜色。';
-
-  @override
-  String get skinProjects => '项目';
-
-  @override
-  String get skinFolder12Items => '文件夹 · 12 项';
-
-  @override
-  String get skinTextFile4KB => '文本文件 · 4 KB';
-
-  @override
-  String get skinCompressedFile28MB => '压缩文件 · 28 MB';
-
-  @override
-  String get skin3Items => '3 项';
-
-  @override
-  String get skinFileManagerAddButton => '文件管理器添加按钮';
-
-  @override
-  String get skinAddButtonIconColor => '添加按钮图标颜色';
-
-  @override
-  String get skinThePlusIconUsesTheButtonForegroundColor => '加号图标使用按钮前景色。';
-
-  @override
-  String get skinEditorFileName => '编辑器文件名';
-
-  @override
-  String get skinTheEditorToolbarUsesTheAppForegroundColor => '编辑器工具栏使用应用前景色。';
-
-  @override
-  String get skinDartUTF8Ln3Col12 => ' 第 3 行，第 12 列';
-
-  @override
-  String get skinTheMainBackgroundBehindThisScreen => '此屏幕背后的主要背景。';
-
-  @override
-  String get skinFolderIconColor => '文件夹图标颜色';
-
-  @override
-  String get skinFileIconColor => '文件图标颜色';
-
-  @override
-  String get skinText => ' : ';
-
-  @override
-  String get skinFolderNameColor => '文件夹名称颜色';
-
-  @override
-  String get skinFileNameColor => '文件名称颜色';
-
-  @override
-  String get skinFileDetailsColor => '文件详细信息颜色';
-
-  @override
-  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor =>
-      '较小的日期、大小和类型标签使用此颜色。';
-
-  @override
-  String get skinFileOverflowButton => '文件更多选项按钮';
-
-  @override
-  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor =>
-      '每行的三点按钮使用辅助图标颜色。';
-
-  @override
-  String get skinSelectedFileRow => '选定文件行';
-
-  @override
-  String get skinSelectedRowsUseATranslucente0ff21 =>
-      '选定行使用半透明的主容器高亮；文件列表本身保持在页面背景上。';
-
-  @override
-  String get skinFileActionsMenuBackground => '文件操作菜单背景';
-
-  @override
-  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
-      '文件操作弹出窗口使用菜单表面颜色。';
-
-  @override
-  String get skinOpenFileMenuItem => '“打开文件”菜单项';
-
-  @override
-  String get skinRegularFileActionsUseTheMainTextColor => '常规文件操作使用主文本颜色。';
-
-  @override
-  String get skinOpen => '打开';
-
-  @override
-  String get skinDeleteFileMenuItem => '“删除文件”菜单项';
-
-  @override
   String get skinEditorBackground => '编辑器背景';
 
   @override
@@ -10750,10 +9247,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinEditorTextColor => '代码文本颜色';
-
-  @override
-  String get skinTheDefaultCodeAndEditorTextColor =>
-      '普通代码的默认文本颜色；语法高亮文本使用各自的颜色。';
 
   @override
   String get skinEditorCursor => '编辑器光标';
@@ -10771,38 +9264,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinEditorKeywords => '关键字';
 
   @override
-  String get skinEditorKeywordsExplanation =>
-      '诸如 class、void、return 和 if 等语言关键字。';
-
-  @override
   String get skinEditorTypes => '类型与类';
-
-  @override
-  String get skinEditorTypesExplanation => '类名、类型和接口。';
 
   @override
   String get skinEditorStrings => '字符串';
 
   @override
-  String get skinEditorStringsExplanation => '带引号的文本和字符串字面量。';
-
-  @override
   String get skinEditorNumbers => '数字与值';
-
-  @override
-  String get skinEditorNumbersExplanation => '数值字面量、布尔值和常量。';
 
   @override
   String get skinEditorFunctions => '函数与方法';
 
   @override
-  String get skinEditorFunctionsExplanation => '函数名称、方法调用和内置函数。';
-
-  @override
   String get skinEditorComments => '注释';
-
-  @override
-  String get skinEditorCommentsExplanation => '代码注释和文档块。';
 
   @override
   String get textEditorColorsSectionTitle => '编辑器颜色与字体';
@@ -10812,9 +9286,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get textEditorColorsCustomized => '已启用自定义颜色';
-
-  @override
-  String get textEditorResetColors => '将颜色重置为默认值';
 
   @override
   String get textEditorFollowAppSkinNotice => '编辑器颜色遵循当前应用皮肤。';
@@ -10858,15 +9329,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
       '画布、边槽、光标、选中项、背景和语法模板。';
-
-  @override
-  String get skinGutterAndLineNumbers => '边槽与行号';
-
-  @override
-  String get skinCursor => '光标';
-
-  @override
-  String get skinSelection => '选中项';
 
   @override
   String get skinEditorBackgroundTemplate => '编辑器背景模板';
@@ -10930,12 +9392,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinAutomaticMatchLightOrDarkMode => '自动 (匹配浅色或深色模式)';
-
-  @override
-  String get skinSkinExported => '皮肤已导出。';
-
-  @override
-  String get skinSkinsExported => '皮肤已导出。';
 
   @override
   String get skinRemoveSkin => '移除皮肤？';
@@ -11045,11 +9501,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String skinSelectPreviewElement(String title) {
-    return '选择 $title';
-  }
-
-  @override
   String skinIconColorForItem(String item) {
     return '$item 图标颜色';
   }
@@ -11058,12 +9509,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String skinNameColorForItem(String item) {
     return '$item 名称颜色';
   }
-
-  @override
-  String get skinFileIconColorSettingDescription => '此颜色由文件管理器部分中的图标颜色设置控制。';
-
-  @override
-  String get skinFileNameColorSettingDescription => '此颜色由文件管理器部分中的名称颜色设置控制。';
 
   @override
   String get skinExportedSingle => '皮肤已导出。';
@@ -11104,73 +9549,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinInterfaceApplied => '界面设置已应用。';
 
   @override
-  String get automationBatteryHintTitle => '允许后台启动';
-
-  @override
-  String get automationBatteryHintMessage =>
-      '当 VaultExplorer 完全关闭时，Android 可能会阻止自动化解锁此保险库。请将 VaultExplorer 的电池用量设置为“无限制”，以便 Tasker、MacroDroid 和其他应用可以在后台解锁。';
-
-  @override
-  String get automationBatteryHintButton => '打开应用设置';
-
-  @override
   String get automationBatterySettingsOpenFailedMessage =>
       '无法打开应用设置。请前往 设置 > 应用 > VaultExplorer > 电池 并选择“无限制”。';
-
-  @override
-  String get skinPreviewMountedVaultName => '个人保险库';
-
-  @override
-  String get skinPreviewVaultName => '保险库标题';
-
-  @override
-  String get skinMainTextColorAlsoColorsRegularMenuItems =>
-      '保险库标题和常规菜单操作共享应用的主要文本颜色。';
-
-  @override
-  String get skinStatusBannerExamples => '状态横幅';
-
-  @override
-  String get skinSuccessBanner => '成功横幅';
-
-  @override
-  String get skinWarningBanner => '警告横幅';
-
-  @override
-  String get skinErrorBanner => '错误横幅';
-
-  @override
-  String get skinSuccessBannerUsesSuccessContainer => '横幅填充和消息使用成功颜色。';
-
-  @override
-  String get skinWarningBannerUsesWarningContainer => '横幅填充和消息使用警告颜色。';
-
-  @override
-  String get skinErrorBannerUsesErrorContainer => '横幅填充和消息使用错误颜色。';
-
-  @override
-  String get skinPreviewChangesSaved => '更改已保存';
-
-  @override
-  String get skinPreviewStorageAlmostFull => '存储空间几乎已满';
-
-  @override
-  String get skinPreviewCouldNotUnlockVault => '无法解锁保险库';
-
-  @override
-  String get skinSurfaceAndBorderExamples => '表面和边框';
-
-  @override
-  String get skinFileRowDetailsColor => '文件行详细信息颜色';
-
-  @override
-  String get skinFileActionOverflowIconColor => '文件行操作图标颜色';
-
-  @override
-  String get skinMatchingElementsHighlightTogether => '具有相同颜色的其他预览元素也会同时高亮显示。';
-
-  @override
-  String get skinStatusBannerTextColor => '横幅文本使用此颜色。';
 
   @override
   String get apkOpenPackageInstaller => '软件包安装程序';
@@ -11271,9 +9651,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String abLoopStartedMessage(String start, String end) {
     return '正在循环 $start – $end';
   }
-
-  @override
-  String get abLoopEndTooCloseMessage => 'B 点必须在 A 点之后。请快进后再次轻按。';
 
   @override
   String get abLoopClearedMessage => 'A-B 循环已关闭';
@@ -11486,9 +9863,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinSharedPaletteTitle => '共享调色板';
 
   @override
-  String get skinSharedPaletteShort => '共享';
-
-  @override
   String get skinSharedPaletteDescription =>
       '每个页面在未单独设置时继承的颜色。没有独立设置的屏幕（例如解锁和相机）直接使用这些颜色。';
 
@@ -11508,168 +9882,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skinResetPageColors => '重置页面颜色';
 
   @override
-  String get skinTokenBackground => '页面背景';
-
-  @override
-  String get skinTokenBackgroundHint => '此页面所有元素背后的画布。';
-
-  @override
-  String get skinTokenText => '主要文本';
-
-  @override
-  String get skinTokenTextHint => '此页面上的标题、名称和正文文本。';
-
-  @override
-  String get skinTokenTextSecondary => '次要文本和图标';
-
-  @override
-  String get skinTokenTextSecondaryHint => '副标题、详细信息、提示和低对比度图标。';
-
-  @override
-  String get skinTokenAppBar => '顶部栏';
-
-  @override
-  String get skinTokenAppBarHint => '此页面顶部栏的填充颜色。';
-
-  @override
-  String get skinTokenOnAppBar => '顶部栏文本和图标';
-
-  @override
-  String get skinTokenOnAppBarHint => '顶部栏标题和图标的颜色。';
-
-  @override
-  String get skinTokenCard => '卡片和行';
-
-  @override
-  String get skinTokenCardHint => '卡片、列表行和分组面板。';
-
-  @override
-  String get skinTokenCardActive => '活动卡片';
-
-  @override
-  String get skinTokenCardActiveHint => '高亮显示的卡片，例如已解锁的保险库。';
-
-  @override
-  String get skinTokenRaised => '标签和控件';
-
-  @override
-  String get skinTokenRaisedHint => '搜索框、标签、缩略图和图标图块。';
-
-  @override
-  String get skinTokenOverlay => '菜单、对话框和面板';
-
-  @override
-  String get skinTokenOverlayHint => '从此页面打开的弹出菜单、对话框和底部面板。';
-
-  @override
-  String get skinTokenAccent => '强调色';
-
-  @override
-  String get skinTokenAccentHint => '按钮、链接、进度条和活动图标。';
-
-  @override
-  String get skinTokenOnAccent => '强调色上的文本';
-
-  @override
-  String get skinTokenOnAccentHint => '强调色填充按钮上的标签和图标。';
-
-  @override
-  String get skinTokenSelection => '选中项';
-
-  @override
-  String get skinTokenSelectionHint => '选中的行和高亮的图标图块。';
-
-  @override
-  String get skinTokenOnSelection => '选中项上的文本';
-
-  @override
-  String get skinTokenOnSelectionHint => '选中项目上显示的图标和文本。';
-
-  @override
-  String get skinTokenDivider => '分隔线';
-
-  @override
-  String get skinTokenDividerHint => '细分割线和微弱边框。';
-
-  @override
-  String get skinTokenOutline => '轮廓';
-
-  @override
-  String get skinTokenOutlineHint => '轮廓按钮和输入框上更清晰的边框。';
-
-  @override
-  String get skinTokenFab => '圆形添加按钮';
-
-  @override
-  String get skinTokenFabHint => '圆形添加按钮的填充颜色。';
-
-  @override
-  String get skinTokenOnFab => '圆形添加按钮图标';
-
-  @override
-  String get skinTokenOnFabHint => '圆形添加按钮上的加号图标。';
-
-  @override
-  String get skinPreviewConfirm => '确认';
-
-  @override
-  String get skinPreviewCancelButton => '取消';
-
-  @override
-  String get skinPreviewSaveButton => '保存';
-
-  @override
-  String get skinPreviewRunButton => '运行';
-
-  @override
-  String get skinPreviewPasteButton => '粘贴到此处';
-
-  @override
-  String get skinPreviewUnlockButton => '解锁';
-
-  @override
-  String get skinPreviewSortChip => '排序：名称';
-
-  @override
-  String get skinPreviewSearchChip => '搜索文件';
-
-  @override
-  String get skinPreviewPinnedBadge => '已置顶';
-
-  @override
-  String get skinPreviewVaultsHeader => '保险库';
-
-  @override
-  String get skinPreviewToolsSection => '文件密码学';
-
-  @override
-  String get skinPreviewToolOne => '密钥文件与密码短语生成器';
-
-  @override
-  String get skinPreviewToolOneHint => '生成密码和密钥文件';
-
-  @override
-  String get skinPreviewToolTwo => '校验和与哈希验证器';
-
-  @override
-  String get skinPreviewToolTwoHint => '验证大文件是否损坏';
-
-  @override
-  String get skinPreviewSettingsSection => '安全';
-
-  @override
-  String get skinPreviewSettingOne => '应用锁';
-
-  @override
-  String get skinPreviewSettingOneHint => '生物识别与自动锁定';
-
-  @override
-  String get skinPreviewSettingTwo => '存储';
-
-  @override
-  String get skinPreviewSettingTwoHint => '外部存储与云桥接';
-
-  @override
   String get inPlaceEditDone => '完成';
 
   @override
@@ -11677,9 +9889,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get inPlaceEditHint => '在工具栏之间拖动操作或点击进行排列';
-
-  @override
-  String get inPlaceEditAvailable => '可用操作';
 
   @override
   String get inPlaceEditTopDock => '顶部栏';
@@ -11954,16 +10163,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String thumbnailGlobalInContainerConfirmMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count 个保险库遵循此默认值，并将开始把缩略图存储在保险库内。这样会更慢，且无法用于只读保险库。',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String get scanAdjustCornersTitle => '调整边角';
 
   @override
@@ -12031,10 +10230,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get createArchiveMediaRecommendation =>
-      '检测到已压缩的媒体文件。已自动选择“仅存储”以节省 CPU 和电量。';
-
-  @override
   String get createArchiveNameLabel => '压缩包名称';
 
   @override
@@ -12044,42 +10239,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get createArchiveSelectFormatTooltip => '选择格式';
 
   @override
-  String get createArchiveSecuritySection => '安全';
-
-  @override
   String get createArchivePasswordLabel => '密码（可选）';
-
-  @override
-  String get createArchivePasswordHintText => '输入密码';
 
   @override
   String get createArchiveConfirmPasswordLabel => '确认密码';
 
   @override
-  String get createArchiveConfirmPasswordHint => '重复输入密码';
-
-  @override
   String get passphraseStrengthFair => '一般';
 
   @override
-  String get createArchiveEncryptFilenamesNeedsPassword => '预览文件需要密码';
-
-  @override
-  String get createArchiveEncryptFilenamesActive => '在解锁之前隐藏文件列表';
-
-  @override
-  String get createArchiveAdvancedOptions => '高级选项';
-
-  @override
   String get createArchiveCompressionLevel => '压缩等级';
-
-  @override
-  String get createArchiveSplitHintZip =>
-      '将保存为 .z01、.z02 … 以及最后的 .zip。请将所有分卷放在同一文件夹中。';
-
-  @override
-  String get createArchiveSplitHintSevenZip =>
-      '将保存为 .7z.001、.7z.002 … 请将所有分卷放在同一文件夹中。';
 
   @override
   String get createArchiveSplitVolumes => '分卷压缩';
@@ -12118,26 +10287,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get archiveCompressionUltraDesc => '体积最小，压缩速度较慢';
 
   @override
-  String get officeViewerErrorTitle => '无法预览此文档';
-
-  @override
-  String get officeViewerEncrypted => '此文档受密码保护，无法预览已加密的 Office 文件。';
-
-  @override
-  String get officeViewerUnsupported => '无法读取此文件。文件可能已损坏，或使用了查看器不支持的格式。';
-
-  @override
-  String get officeViewerTooLarge => '此文档过大，无法在应用内预览。';
-
-  @override
-  String get officeViewerSpeakerNotes => '演讲者备注';
-
-  @override
   String get fileAssocDocumentViewer => '应用内文档查看器';
-
-  @override
-  String get viewOfficeDocumentsInApp =>
-      '在应用内预览 Word、Excel、PowerPoint 和 OpenDocument 文件';
 
   @override
   String get archiveCompressionMethodLabel => '压缩方法';
@@ -12151,17 +10301,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get archiveMethodDeflateDesc =>
       '速度最快，但文件较大，兼容性最广。ZIP 和 .tar.gz 也使用该方法。';
-
-  @override
-  String archiveMethodFixedInfo(String format, String method) {
-    return '$format 始终使用 $method 压缩。';
-  }
-
-  @override
-  String get archiveMethodMoreInSevenZip => '7-Zip 压缩包支持 LZMA2 和 LZMA。';
-
-  @override
-  String get archiveMethodStoreNote => '仅存储不进行压缩，因此无需选择压缩方法。';
 
   @override
   String get browserTabsEnabledTitle => '使用文件管理器标签页';
@@ -12185,9 +10324,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserTabMoveToOtherPane => '移到另一个窗格';
 
   @override
-  String get browserTabSwitchPrevious => '切换到上一个标签页';
-
-  @override
   String get browserTabOpenInNewTab => '在新标签页中打开';
 
   @override
@@ -12200,9 +10336,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserTabCloseToRight => '关闭右侧标签页';
-
-  @override
-  String get browserTabCloseAll => '关闭所有';
 
   @override
   String get dualPaneEnabledTitle => '使用双栏视图';
@@ -12488,22 +10621,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageEditorAngle => '角度';
 
   @override
-  String get fontSizeSmall => '小';
-
-  @override
-  String get fontSizeMedium => '中';
-
-  @override
-  String get fontSizeLarge => '大';
-
-  @override
-  String get fontSizeExtraLarge => '特大';
-
-  @override
   String get imageEditorTextPlaceholder => '双击此处更改文字';
-
-  @override
-  String get imageEditorFontSizePreview => '示例预览 ABC 123';
 
   @override
   String imageEditorPhotoLabel(int index) {
@@ -12534,9 +10652,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get floatingPlayerAudioOnly => '仅音频';
-
-  @override
-  String get floatingPlayerShowVideo => '显示视频';
 
   @override
   String get masterLockTitle => '主锁';
@@ -13264,9 +11379,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncCurrentStorageBadge => '当前';
 
   @override
-  String get vaultSyncChangeStorageTooltip => '更改存储';
-
-  @override
   String vaultSyncPickFolderTitle(String storage) {
     return '$storage中的文件夹';
   }
@@ -13291,9 +11403,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get categoriesSectionTitle => '分类';
-
-  @override
-  String get manageCategoriesTooltip => '管理分类';
 
   @override
   String get categoryShortcutsTitle => '分类快捷方式';
@@ -13374,17 +11483,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get lockAnywayButton => '仍然锁定';
-
-  @override
-  String vaultListingSymbolicLinkCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '# 个符号链接',
-      zero: '没有符号链接',
-    );
-    return '$_temp0';
-  }
 
   @override
   String vaultListingHiddenEntryCount(int count) {
@@ -13807,9 +11905,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get motionPhotoCopyNote => '编辑后的副本将是静态图片。原始文件、EXIF 信息和任何嵌入的视频都将保持不变。';
 
   @override
-  String get pimInputHint => '留空或输入 0 使用默认值';
-
-  @override
   String get galleryMetadataIndexStorageLabel =>
       'Gallery metadata index storage';
 
@@ -13852,10 +11947,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get musicIndexHiddenFolderOption => 'Hidden folder';
-
-  @override
-  String get musicIndexHiddenFolderDesc =>
-      'Stored in an unencrypted hidden folder in Local Storage.';
 
   @override
   String get libraryStorageHiddenFolder =>

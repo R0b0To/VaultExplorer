@@ -172,28 +172,6 @@ internal object NativeEngine {
         key: ByteArray, iv: ByteArray, aad: ByteArray?, ciphertextAndTag: ByteArray
     ): ByteArray?
 
-    @JvmStatic
-    external fun aesGcmEncryptFastNative(
-        key: ByteArray, nonceLen: Int, aad: ByteArray?, plaintext: ByteArray
-    ): ByteArray?
-
-    @JvmStatic
-    external fun aesGcmDecryptFastNative(
-        key: ByteArray, nonceLen: Int, aad: ByteArray?, ciphertextAndNonce: ByteArray
-    ): ByteArray?
-
-    @JvmStatic
-    external fun aesGcmEncryptStreamNative(
-        key: ByteArray, nonceLen: Int, cleartextChunkSize: Int,
-        fileIdOrHeaderNonce: ByteArray, startChunkNumber: Long, inputBuffer: ByteArray
-    ): ByteArray?
-
-    @JvmStatic
-    external fun aesGcmDecryptStreamNative(
-        key: ByteArray, nonceLen: Int, cleartextChunkSize: Int,
-        fileIdOrHeaderNonce: ByteArray, startChunkNumber: Long, inputBuffer: ByteArray
-    ): ByteArray?
-
     /**
      * Tears the volume down. Returns false -- and leaves it retryable, with any
      * unwritten USB data still pending -- when the device refused the final flush.
@@ -293,26 +271,6 @@ internal object NativeEngine {
     ): ByteArray?
 
     @JvmStatic
-    external fun gocryptfsEmeNative(
-        key: ByteArray, tweak: ByteArray, data: ByteArray, encrypt: Boolean
-    ): ByteArray?
-
-    @JvmStatic
-    external fun sivEncryptNative(
-        encKey: ByteArray, macKey: ByteArray, plaintext: ByteArray, adList: Array<ByteArray>?
-    ): ByteArray?
-
-    @JvmStatic
-    external fun sivDecryptNative(
-        encKey: ByteArray, macKey: ByteArray, ciphertext: ByteArray, adList: Array<ByteArray>?
-    ): ByteArray?
-
-    @JvmStatic
-    external fun xchacha20Poly1305SealNative(
-        key: ByteArray, nonce: ByteArray, aad: ByteArray?, plaintext: ByteArray
-    ): ByteArray?
-
-    @JvmStatic
     external fun xchacha20Poly1305OpenNative(
         key: ByteArray, nonce: ByteArray, aad: ByteArray?, ciphertextAndTag: ByteArray
     ): ByteArray?
@@ -339,13 +297,7 @@ internal object NativeEngine {
     @JvmStatic external fun readStream(streamPtr: Long, offset: Long, outBuffer: ByteArray, length: Int, volId: Int): Int
     @JvmStatic external fun closeStream(streamPtr: Long, volId: Int)
 
-    @JvmStatic external fun getCascadeFingerprint(cascadeId: Int): Int
-    @JvmStatic external fun getCascadeIdCount(): Int
-    @JvmStatic external fun getHashIdCount(): Int
-
-    @JvmStatic external fun cryfsCipherIdNative(cipherName: String): Int
     @JvmStatic external fun cryfsEncryptBlockNative(cipherId: Int, key: ByteArray, plaintext: ByteArray): ByteArray?
-    @JvmStatic external fun cryfsDecryptBlockNative(cipherId: Int, key: ByteArray, ciphertext: ByteArray): ByteArray?
 
     @JvmStatic
     external fun nativeDiagnoseContainerFile(fd: Int, opId: Int = -1): IntArray?

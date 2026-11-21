@@ -63,9 +63,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pdfViewerNextMatch => 'Next match';
 
   @override
-  String get pdfViewerCloseSearch => 'Close search';
-
-  @override
   String get pdfViewerPrintTooltip => 'Print document';
 
   @override
@@ -76,15 +73,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pdfViewerFailedToLoad => 'Failed to load PDF';
-
-  @override
-  String get pdfViewerEditTooltip => 'Edit';
-
-  @override
-  String get pdfViewerDoneEditingTooltip => 'Done editing';
-
-  @override
-  String get pdfViewerSaveFailed => 'Couldn\'t save changes to this PDF';
 
   @override
   String get pdfViewerEditUnavailable =>
@@ -146,9 +134,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedParametersTitle => 'Advanced Parameters';
 
   @override
-  String get pimFieldLabel => 'PIM  (leave blank for default)';
-
-  @override
   String get encryptionAlgorithmLabel => 'Encryption Algorithm';
 
   @override
@@ -195,16 +180,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dismiss => 'Dismiss';
 
   @override
-  String byteProgressText(String transferred, String total, int pct) {
-    return '$transferred / $total  ($pct%)';
-  }
-
-  @override
-  String countProgressText(int done, int total, int pct) {
-    return '$done / $total  ($pct%)';
-  }
-
-  @override
   String multiOpLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -213,11 +188,6 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '1 transfer',
     );
     return '$_temp0';
-  }
-
-  @override
-  String multiOpSublabel(String summary) {
-    return '$summary · tap to view all';
   }
 
   @override
@@ -326,19 +296,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readOnlyContainerWarning => 'This container is mounted read-only.';
 
   @override
-  String get hiddenVolumeProtectionTriggeredWarning =>
-      'A write to this outer volume would have damaged the hidden volume, so it was blocked. This container has been switched to read-only for the rest of this session.';
-
-  @override
   String get protectHiddenVolumeToggleTitle => 'Protect hidden volume';
 
   @override
   String get protectHiddenVolumeToggleSubtitle =>
       'Prevent damage caused by writing to the outer volume';
-
-  @override
-  String get protectHiddenVolumeCredentialsRequired =>
-      'A hidden volume password or keyfile is required to protect it';
 
   @override
   String deleteItemsTitle(num count) {
@@ -645,9 +607,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeFromBookmarks => 'Remove from bookmarks';
 
   @override
-  String get addToBookmarks => 'Add to bookmarks';
-
-  @override
   String get edit => 'Edit';
 
   @override
@@ -741,86 +700,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get archiveExplorerPermissionTitle => 'Storage access needed';
 
   @override
-  String get archiveExplorerPermissionMessage =>
-      'Allow access to your files to browse and extract .zip archives from Downloads.';
-
-  @override
   String get archiveExplorerGrantAccess => 'Grant Access';
-
-  @override
-  String get archiveExplorerEmptyTitle => 'No archives found';
-
-  @override
-  String get archiveExplorerEmptyMessage =>
-      'Zip files you download will show up here.';
-
-  @override
-  String get archiveExplorerRefreshTooltip => 'Refresh';
-
-  @override
-  String archiveExplorerEntryCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count items',
-      one: '1 item',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get archiveExplorerExtractAll => 'Extract All';
-
-  @override
-  String get archiveExplorerExtracting => 'Extracting…';
-
-  @override
-  String archiveExplorerExtractSuccess(int count, String name) {
-    return 'Extracted $count files to Download/Extracted/$name';
-  }
-
-  @override
-  String get archiveExplorerExtractFailed => 'Couldn\'t extract that archive.';
-
-  @override
-  String get archiveExplorerOpenFailed => 'Couldn\'t open that archive.';
-
-  @override
-  String get archiveExplorerOpenArchive => 'Open archive…';
-
-  @override
-  String get archiveExplorerUnresolvedPath =>
-      'Couldn\'t access that file directly. Try picking one from Downloads instead.';
-
-  @override
-  String get archiveExplorerExtractTo => 'Extract to…';
-
-  @override
-  String get archiveExplorerPreview => 'Preview';
-
-  @override
-  String get archiveExplorerChoosingDestination => 'Choosing destination…';
-
-  @override
-  String get archiveExplorerNoDestinationChosen => 'No destination chosen.';
-
-  @override
-  String archiveExplorerExtractSuccessTo(int count, String path) {
-    return 'Extracted $count files to $path';
-  }
-
-  @override
-  String get archiveBrowserEmptyTitle => 'Empty folder';
-
-  @override
-  String get archiveBrowserEmptyMessage =>
-      'This folder doesn\'t contain any files.';
-
-  @override
-  String get archiveBrowserRoot => 'Archive';
-
-  @override
-  String get archiveBrowserOpenFileFailed => 'Couldn\'t open that file.';
 
   @override
   String get fileAssocInAppTextEditor => 'In-app Text Editor';
@@ -855,10 +735,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get masterPasswordActiveSubtitle => 'Active — tap toggle to remove';
 
   @override
-  String get masterPasswordInactiveSubtitle =>
-      'Require a password to open the app';
-
-  @override
   String get newPasswordLabel => 'New Password';
 
   @override
@@ -875,17 +751,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get biometricUnlockTitle => 'Biometric Unlock';
-
-  @override
-  String get biometricUnlockSubtitle =>
-      'Authenticate to securely mount the container';
-
-  @override
-  String get changeMasterPasswordTitle => 'Change Master Password';
-
-  @override
-  String get changeMasterPasswordSubtitle =>
-      'Update master password credentials';
 
   @override
   String get autoLockContainersTitle => 'Auto-Lock Containers';
@@ -1016,28 +881,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Match app colors to your wallpaper (Android 12+)';
 
   @override
-  String get pureBlackThemeTitle => 'Pure Black (OLED)';
-
-  @override
-  String get pureBlackThemeSubtitle =>
-      'True black backgrounds to save battery and reduce glare on OLED screens (dark theme only)';
-
-  @override
   String get sortContainersByLabel => 'Sort Containers By';
-
-  @override
-  String get swapCardSwipeActionsTitle => 'Swap Card Swipe Actions';
-
-  @override
-  String get swapCardSwipeActionsSubtitle =>
-      'Reveal Edit on left and Remove on right when swiping cards';
-
-  @override
-  String get swipeGestureHintTitle => 'Swipe Gesture Hint';
-
-  @override
-  String get swipeGestureHintSubtitle =>
-      'Show card peek animation on first container';
 
   @override
   String get autoOpenOnUnlockTitle => 'Auto-Open on Unlock';
@@ -1079,10 +923,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localStorageCardTitle => 'Local Storage';
-
-  @override
-  String get localStorageCardSubtitle =>
-      'Not encrypted — for quick transfers with vaults';
 
   @override
   String get enableFastStorageAccessTitle => 'Enable Fast Storage Access';
@@ -1356,9 +1196,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unlock => 'Unlock';
 
   @override
-  String get useBiometric => 'Use Biometric';
-
-  @override
   String get connectAtLeast4Dots => 'Connect at least 4 dots';
 
   @override
@@ -1390,15 +1227,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enterUnlockPinTitle => 'Enter Unlock PIN';
-
-  @override
-  String get wrongPinTryAgain => 'Wrong PIN — try again';
-
-  @override
-  String get enterYourPinSequence => 'Enter your PIN';
-
-  @override
-  String get enterPinToMount => 'Enter your PIN to mount';
 
   @override
   String get noPinConfiguredMessage =>
@@ -1433,63 +1261,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get incorrectPinError => 'Incorrect PIN';
 
   @override
-  String removedFromListSnack(String name) {
-    return 'Removed \"$name\" from list';
-  }
-
-  @override
-  String get clearRecentHistoryTitle => 'Clear Recent History?';
-
-  @override
-  String get clearRecentHistoryMessage =>
-      'This will remove all recent documents from your list. The actual files on your device will not be affected.';
-
-  @override
-  String get clearAll => 'Clear All';
-
-  @override
-  String get recentHistoryClearedSnack => 'Recent history cleared';
-
-  @override
   String get moreOptionsTooltip => 'More options';
-
-  @override
-  String get clearHistoryMenuItem => 'Clear history';
-
-  @override
-  String get openPdfFile => 'Open PDF File';
-
-  @override
-  String get noDocumentsYetTitle => 'No documents yet';
-
-  @override
-  String get openPdfToStartMessage =>
-      'Open a PDF from your device to start reading.';
-
-  @override
-  String get removeFromListMenuItem => 'Remove from list';
-
-  @override
-  String get justNow => 'Just now';
-
-  @override
-  String minutesAgo(int count) {
-    return '${count}m ago';
-  }
-
-  @override
-  String hoursAgo(int count) {
-    return '${count}h ago';
-  }
-
-  @override
-  String daysAgo(int count) {
-    return '${count}d ago';
-  }
-
-  @override
-  String get usbDriveDisconnectedLocked =>
-      'USB drive disconnected — container locked';
 
   @override
   String get containerAlreadyMounted => 'This container is already mounted.';
@@ -1513,26 +1285,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get selectContainerFirst => 'Select a container first';
-
-  @override
   String get passwordOrKeyfilesRequired => 'Password or keyfiles required';
-
-  @override
-  String get slowPerformanceWarningTitle => 'Slow Performance Warning';
-
-  @override
-  String get slowPerformanceWarningMessage =>
-      'Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant \"All Files Access\" for fast speed?';
-
-  @override
-  String get unlockAnyway => 'Unlock Anyway';
-
-  @override
-  String get defaultVaultName => 'Vault';
-
-  @override
-  String get defaultContainerName => 'Container';
 
   @override
   String get incorrectPasswordOrInvalidVault =>
@@ -1541,9 +1294,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get incorrectPasswordOrInvalidContainer =>
       'Incorrect password or invalid container';
-
-  @override
-  String get genericUnknownError => 'Unknown error';
 
   @override
   String get decryptingLabel => 'Decrypting…';
@@ -1580,12 +1330,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mountContainerTitle => 'Mount Container';
 
   @override
-  String get containerFileSegmentLabel => 'Container File';
-
-  @override
-  String get folderVaultSegmentLabel => 'Folder Vault';
-
-  @override
   String formatContainerLabel(String format) {
     return '$format Container';
   }
@@ -1593,11 +1337,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String formatVaultLabel(String format) {
     return '$format Vault';
-  }
-
-  @override
-  String formatDriveLabel(String format) {
-    return '$format Drive';
   }
 
   @override
@@ -1613,9 +1352,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get containerMissingTitle => 'Container Missing';
 
   @override
-  String get filePathCouldNotBeResolved => 'File path could not be resolved';
-
-  @override
   String get containerMissingExplanation =>
       'The container file may have been moved, deleted, or its host storage is currently disconnected.';
 
@@ -1626,35 +1362,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get locateFileButtonLabel => 'Locate File';
 
   @override
-  String get authenticateToMountSubtitle =>
-      'Authenticate to securely mount the container';
-
-  @override
   String get usePasswordButtonLabel => 'Use Password';
 
   @override
   String get authenticateButtonLabel => 'Authenticate';
 
   @override
-  String get drawUnlockPatternCardTitle => 'Draw Unlock Pattern';
-
-  @override
-  String get wrongPatternTryAgain => 'Wrong pattern — try again';
-
-  @override
-  String get connectYourPatternSequence => 'Connect your pattern sequence';
-
-  @override
   String get usePasswordInsteadButtonLabel => 'Use Password instead';
-
-  @override
-  String get passwordHintFolderVault => 'Enter vault password';
-
-  @override
-  String get passwordHintBitlocker => 'Enter password or recovery key';
-
-  @override
-  String get passwordHintContainer => 'Enter container password';
 
   @override
   String get usingSavedPasswordTooltip => 'Using saved password';
@@ -1662,10 +1376,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get luksKeyfileReplacesPasswordNote =>
       'For LUKS containers the keyfile replaces the password.';
-
-  @override
-  String get readOnlyModeUsbSubtitle =>
-      'Mount without allowing changes to this drive';
 
   @override
   String get readOnlyModeContainerSubtitle =>
@@ -1693,10 +1403,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get decryptingDriveLabel => 'Decrypting drive…';
-
-  @override
-  String get usbDeviceAlreadyActiveMounted =>
-      'This USB device is already active and mounted.';
 
   @override
   String reconnectUsbDriveTitle(String label) {
@@ -1737,13 +1443,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mountExistingContainerSubtitle =>
       'Unlock a file container you already have';
-
-  @override
-  String get mountSplitContainerTitle => 'Mount split container';
-
-  @override
-  String get mountSplitContainerSubtitle =>
-      'Unlock a split container directly, without joining it first';
 
   @override
   String get mountUsbDriveTitle => 'Mount USB Drive';
@@ -1793,9 +1492,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String pdfViewerFailedToInspectSize(String error) {
     return 'Failed to inspect PDF file size: $error';
   }
-
-  @override
-  String get pdfViewerErrorLoadingTitle => 'Error loading PDF';
 
   @override
   String get pdfViewerNoDocumentLoaded => 'No PDF document loaded.';
@@ -1858,20 +1554,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String archiveFormatNotSupported(String ext) {
-    return 'Archive format .$ext is not yet supported';
-  }
-
-  @override
   String get archivePasswordPromptTitle => 'Password Protected';
 
   @override
   String get archivePasswordPromptMessage =>
       'This archive is password protected. Enter the password to view its contents.';
-
-  @override
-  String get archiveSolidWarning =>
-      'This is a solid archive — opening files may be slower, especially near the end.';
 
   @override
   String get failedToReadFileFromArchive => 'Failed to read file from archive';
@@ -2008,11 +1695,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String deletedWithFailures(int deleted, int failed) {
-    return '$deleted deleted · $failed failed';
-  }
-
-  @override
   String exportedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2025,11 +1707,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportCancelledOrFailed => 'Export cancelled or failed';
-
-  @override
-  String exportError(String type) {
-    return 'Export error: $type';
-  }
 
   @override
   String get deleteOriginalTitle => 'Delete original?';
@@ -2104,37 +1781,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createArchiveTitle => 'Create Archive';
 
   @override
-  String get archiveNameHint => 'archive.zip';
-
-  @override
-  String archivedCount(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Archived $count files',
-      one: 'Archived 1 file',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String failedToArchiveGeneric(String type) {
     return 'Failed to create archive: $type';
   }
 
   @override
-  String get createArchivePasswordHint => 'Optional password (AES-256)';
-
-  @override
-  String get createArchivePasswordUnavailableForFormat =>
-      'Password protection is only available for ZIP and 7-Zip';
-
-  @override
   String get createArchiveEncryptFilenames => 'Encrypt file names';
-
-  @override
-  String get createArchiveEncryptFilenamesHint =>
-      'Needs a password. The password is then required even to list the contents.';
 
   @override
   String get closeSearchTooltip => 'Close search';
@@ -2213,9 +1865,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get formatFileSystemLabel => 'Format File System';
-
-  @override
-  String get standardVolumeHeader => 'Standard Volume';
 
   @override
   String get containerFormatLabel => 'Container Format';
@@ -2327,14 +1976,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unitGbShort => 'GB';
 
   @override
-  String failedToListUsbDevices(String error) {
-    return 'Failed to list USB devices: $error';
-  }
-
-  @override
-  String get usbPermissionDenied => 'USB permission denied';
-
-  @override
   String get couldNotReadDriveCapacity =>
       'Could not read drive capacity — enter size manually.';
 
@@ -2363,9 +2004,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get usbContainerCreationFailed => 'USB container creation failed.';
-
-  @override
-  String get usbStandardVolumeSectionHeader => 'USB Drive & Standard Volume';
 
   @override
   String get formattingErasesEverythingWarning =>
@@ -2436,15 +2074,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlistTransitionFlipLabel => '3D Flip';
 
   @override
-  String get unlockVaultTitle => 'Unlock Vault';
-
-  @override
-  String get openContainerTitle => 'Open Container';
-
-  @override
-  String get selectContainerFileOrFolder => 'Select File or Folder';
-
-  @override
   String get useBackupHeaderToggleTitle => 'Use backup header';
 
   @override
@@ -2455,29 +2084,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keepCurrentOption => 'Keep current';
 
   @override
-  String get toolExpandVolumeTitle => 'Expand VeraCrypt volume';
-
-  @override
   String get toolExpandVolumeSubtitle =>
       'Make a standard volume larger, like the desktop Volume Expander';
 
   @override
-  String get toolExpandLuksVolumeTitle => 'Expand LUKS container';
-
-  @override
-  String get toolExpandLuksVolumeSubtitle =>
-      'Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata';
-
-  @override
   String get luksToolsExpandNote =>
       'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.';
-
-  @override
-  String get toolExpandBitLockerVolumeTitle => 'Expand BitLocker container';
-
-  @override
-  String get toolExpandBitLockerVolumeSubtitle =>
-      'Grow a BitLocker volume file or VHD/VHDX image and extend its NTFS file system';
 
   @override
   String get bitlockerToolsExpandNote =>
@@ -2494,9 +2106,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create a hidden volume inside an existing standard volume';
 
   @override
-  String get vcToolsPickContainer => 'Choose container';
-
-  @override
   String get vcToolsNoContainer => 'No container selected';
 
   @override
@@ -2504,9 +2113,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vcToolsPimLabel => 'PIM (optional)';
-
-  @override
-  String get vcToolsNewSizeLabel => 'New container size (MiB)';
 
   @override
   String get vcToolsInitFreeSpace => 'Initialize new space';
@@ -2608,23 +2214,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readOnlyModeLabel => 'Read-only mode';
 
   @override
-  String get readOnlyModeSubtitle =>
-      'Prevents any write or modify operations on the vault';
-
-  @override
   String get alwaysOpenReadOnlyLabel => 'Always read-only';
 
   @override
   String get alwaysOpenReadOnlySubtitle => 'New sessions start read-only.';
-
-  @override
-  String get selectUsbDeviceLabel => 'Select USB Device';
-
-  @override
-  String get noUsbDevicesFound => 'No compatible USB storage devices found';
-
-  @override
-  String get containerConfigTitle => 'Vault Configuration';
 
   @override
   String get changePasswordTitle => 'Change Password';
@@ -2633,44 +2226,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmNewPasswordLabel => 'Confirm New Password';
 
   @override
-  String get cameraCaptureTitle => 'Vault Camera';
-
-  @override
-  String get takingPhoto => 'Capturing photo…';
-
-  @override
-  String get noVaultSelected => 'No vault selected';
-
-  @override
   String get mediaDiagnosticsTitle => 'Media Diagnostics';
 
   @override
-  String get advancedViewerSettingsTitle => 'Viewer Settings';
-
-  @override
-  String get textEditorSwitchToReadModeTooltip => 'Switch to read-only mode';
-
-  @override
-  String get textEditorSwitchToEditModeTooltip => 'Switch to edit mode';
-
-  @override
   String get textEditorReadOnlyIndicatorLabel => 'Read-only';
-
-  @override
-  String get textEditorMoveCursorLeftTooltip => 'Move cursor left';
-
-  @override
-  String get textEditorMoveCursorRightTooltip => 'Move cursor right';
-
-  @override
-  String get textEditorSelectWordTooltip => 'Select word';
-
-  @override
-  String get textEditorSwitchToHorizontalScrollTooltip =>
-      'Switch to horizontal scroll';
-
-  @override
-  String get textEditorSwitchToSoftWrapTooltip => 'Switch to soft wrap';
 
   @override
   String get textEditorCaretScrubberLabel =>
@@ -2754,19 +2313,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get goToLineButton => 'Go';
 
   @override
-  String get textEditorSaveConfirmTitle => 'Unsaved Changes';
-
-  @override
-  String get textEditorSaveConfirmMessage =>
-      'Do you want to save your changes before closing?';
-
-  @override
-  String get saveAndClose => 'Save & Close';
-
-  @override
-  String get discardChanges => 'Discard Changes';
-
-  @override
   String selectionBarSelectedCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2784,9 +2330,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deselectAll => 'Deselect All';
 
   @override
-  String get sortOptionsTitle => 'Sort Files';
-
-  @override
   String get layoutModeList => 'List View';
 
   @override
@@ -2796,29 +2339,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get layoutModeMasonry => 'Masonry View';
 
   @override
-  String get fileOperationsTitle => 'File Operations';
-
-  @override
   String get conflictResolutionTitle => 'File Conflict';
 
   @override
   String get replaceExistingFile => 'Replace existing file';
-
-  @override
-  String get keepBothFiles => 'Keep both (rename new file)';
-
-  @override
-  String get skipFile => 'Skip this file';
-
-  @override
-  String get noVaultsFoundTitle => 'No Vaults Found';
-
-  @override
-  String get noVaultsFoundSubtitle =>
-      'Create a new encrypted container or add an existing vault to get started.';
-
-  @override
-  String get addExistingVaultButton => 'Add Existing Vault';
 
   @override
   String get sortContainersModeManual => 'Manual (drag to reorder)';
@@ -2870,46 +2394,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unlockContainerTitle => 'Unlock Container';
 
   @override
-  String get containerFileSegment => 'Container File';
-
-  @override
-  String get folderVaultSegment => 'Folder Vault';
-
-  @override
   String get enableButtonLabel => 'Enable';
-
-  @override
-  String get retryButtonLabelShort => 'Retry';
-
-  @override
-  String get locateFileButton => 'Locate File';
-
-  @override
-  String get authenticateButton => 'Authenticate';
-
-  @override
-  String get cancelUnlockButton => 'Cancel Unlock';
-
-  @override
-  String tryingKeyslotProgress(int attempted, int total) {
-    return 'Trying keyslot $attempted of $total…';
-  }
-
-  @override
-  String get tryingKeyslotSingle => 'Trying keyslot…';
-
-  @override
-  String verifyingCredentialProgress(int attempted, int total) {
-    return 'Verifying credential $attempted of $total…';
-  }
-
-  @override
-  String get verifyingCredentialSingle => 'Verifying credential…';
-
-  @override
-  String tryingAlgoSlot(String algo, String slotName) {
-    return 'Trying $algo ($slotName)…';
-  }
 
   @override
   String get hiddenVolumeSlotName => 'Hidden Volume';
@@ -2918,36 +2403,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get standardVolumeSlotName => 'Standard Volume';
 
   @override
-  String get containerMissingSubtitle => 'File path could not be resolved';
-
-  @override
-  String get containerMissingBody =>
-      'The container file may have been moved, deleted, or its host storage is currently disconnected.';
-
-  @override
-  String get connectPatternSequence => 'Connect your pattern sequence';
-
-  @override
   String get passwordLabel => 'Password';
-
-  @override
-  String get enterVaultPasswordHint => 'Enter vault password';
-
-  @override
-  String get enterBitlockerPasswordHint => 'Enter password or recovery key';
-
-  @override
-  String get enterContainerPasswordHint => 'Enter container password';
-
-  @override
-  String get readOnlyModeUsbSubtitleDrive =>
-      'Mount without allowing changes to this drive';
-
-  @override
-  String get rememberDriveLabel => 'Remember drive';
-
-  @override
-  String get rememberDriveSubtitle => 'Pin drive on dashboard for quick access';
 
   @override
   String get unlockVaultButtonLabel => 'Unlock Vault';
@@ -2964,51 +2420,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get requestingPermission => 'Requesting permission…';
 
   @override
-  String get unlockAndMountButton => 'Unlock & Mount';
-
-  @override
   String get unlockDriveButton => 'Unlock Drive';
 
   @override
-  String couldntFindDevice(String deviceName) {
-    return 'Couldn\'t find \"$deviceName\"';
-  }
-
-  @override
-  String get plugDriveBackInRetry =>
-      'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.';
-
-  @override
-  String get retryConnectionButton => 'Retry Connection';
-
-  @override
-  String get refreshDevicesButton => 'Refresh Devices';
-
-  @override
-  String get connectOtgDriveToMount => 'Connect an OTG flash drive to mount';
-
-  @override
-  String get alreadyActive => 'Already active';
-
-  @override
   String get active => 'Active';
-
-  @override
-  String get readyToUnlock => 'Ready to unlock';
-
-  @override
-  String get enterUsbPartitionPassword => 'Enter USB partition password';
-
-  @override
-  String get biometricAuthenticationTitle => 'Biometric Authentication';
-
-  @override
-  String get biometricAuthUsbSubtitle =>
-      'Authenticate to unlock and mount this USB device';
-
-  @override
-  String get connectPatternSequenceToMount =>
-      'Connect your pattern sequence to mount';
 
   @override
   String get selectAllAction => 'Select All';
@@ -3060,9 +2475,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exposeAsDocumentProviderMenu => 'Expose as Document Provider';
-
-  @override
-  String get moreOptionsTooltipShort => 'More options';
 
   @override
   String get copyTooltip => 'Copy';
@@ -3249,11 +2661,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enterFullscreenMenu => 'Enter Fullscreen';
 
   @override
-  String failedToOpenExternalApp(String error) {
-    return 'Failed to open in external app: $error';
-  }
-
-  @override
   String get thisFolderMenu => 'This Folder';
 
   @override
@@ -3267,21 +2674,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playlistOptionsTooltip => 'Playlist Options';
-
-  @override
-  String get enablePlaylistTooltip => 'Enable Playlist';
-
-  @override
-  String get moreActionsTooltip => 'More Actions';
-
-  @override
-  String get forcePortraitMenu => 'Force Portrait';
-
-  @override
-  String get forceLandscapeMenu => 'Force Landscape';
-
-  @override
-  String get autoRotateSensorMenu => 'Auto-Rotate (Sensor)';
 
   @override
   String get screenOrientationMenu => 'Screen Orientation';
@@ -3311,52 +2703,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diagnosticsCopiedToClipboard => 'Diagnostics copied to clipboard';
 
   @override
-  String get diagnosticsTitle => 'Diagnostics';
-
-  @override
-  String get copyDiagnosticsTooltip => 'Copy diagnostics';
-
-  @override
   String get closeTooltip => 'Close';
 
   @override
-  String get diagnosticsPlaybackSection => 'Playback';
-
-  @override
-  String get diagnosticsEngineSection => 'Engine';
-
-  @override
-  String get diagnosticsStateLabel => 'State';
-
-  @override
-  String get diagnosticsResolutionLabel => 'Resolution';
-
-  @override
-  String get diagnosticsAspectRatioLabel => 'Aspect Ratio';
-
-  @override
-  String get diagnosticsPositionLabel => 'Position';
-
-  @override
-  String get diagnosticsDurationLabel => 'Duration';
-
-  @override
   String get diagnosticsErrorLabel => 'Error';
-
-  @override
-  String get diagnosticsPlayerLabel => 'Player';
-
-  @override
-  String get diagnosticsDecodingLabel => 'Decoding';
-
-  @override
-  String get diagnosticsExoPlayerValue => 'ExoPlayer (Android)';
-
-  @override
-  String get diagnosticsHardwareAcceleratedValue => 'Hardware-accelerated';
-
-  @override
-  String get diagnosticsUnknownValue => 'Unknown';
 
   @override
   String get diagnosticsStateBuffering => 'Buffering';
@@ -3366,9 +2716,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get diagnosticsStatePaused => 'Paused';
-
-  @override
-  String get diagnosticsDurationUnavailable => '--:--';
 
   @override
   String get rotate90Label => 'Rotate 90°';
@@ -3384,9 +2731,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get subtitlesLabel => 'Subtitles';
-
-  @override
-  String get imageSettingsTitle => 'Image Settings';
 
   @override
   String get playbackSettingsTitle => 'Playback Settings';
@@ -3426,9 +2770,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsTooltipShort => 'Settings';
-
-  @override
   String get sourceCodeTooltip => 'Source Code';
 
   @override
@@ -3441,12 +2782,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetToDefaultsTooltip => 'Reset to defaults';
 
   @override
-  String get usbUnlockContainerTitle => 'Unlock USB Container';
-
-  @override
-  String get usbMountContainerTitle => 'Mount USB Drive';
-
-  @override
   String get staticLabel => 'Static';
 
   @override
@@ -3454,15 +2789,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get muteTooltip => 'Mute';
-
-  @override
-  String get playOnceDisabledTooltip => 'Play Once (Auto-Advance Disabled)';
-
-  @override
-  String get playAndAdvanceTooltip => 'Play & Advance to Next';
-
-  @override
-  String get loopCurrentVideoTooltip => 'Loop Current Video';
 
   @override
   String get clearThumbnailCacheDialogTitle => 'Clear Thumbnail Cache?';
@@ -3522,10 +2848,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get patternSetupRequiredBeforeSaving =>
       'Set up a pattern before saving.';
-
-  @override
-  String get passwordKeystoreEncryptedHelperText =>
-      'Password is encrypted using Android Keystore. Leave blank if using keyfiles only.';
 
   @override
   String get changePatternButton => 'Change Pattern';
@@ -3753,12 +3075,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'An operation is in progress. Please wait before locking.';
 
   @override
-  String get reconnectUsbTooltip => 'Reconnect USB';
-
-  @override
-  String get unlockContainerTooltip => 'Unlock container';
-
-  @override
   String lockFailedMessage(String errorType) {
     return 'Lock failed: $errorType';
   }
@@ -3886,9 +3202,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get filteredLabel => 'filtered';
 
   @override
-  String get statsStorageSectionHeader => 'STORAGE';
-
-  @override
   String statsFolderCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -3979,9 +3292,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileOpsDismissTooltip => 'Dismiss';
-
-  @override
-  String get fileOpsRootDestinationLabel => 'Root';
 
   @override
   String get fileOpsCancelledStatusLabel => 'Cancelled';
@@ -4120,26 +3430,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show thumbnail carousel button when viewing media playlists';
 
   @override
-  String get videoPlaybackSliderLabel => 'Video playback position slider';
-
-  @override
-  String get longPressPlaybackDiagnosticsHint =>
-      'Long press for playback diagnostics';
-
-  @override
-  String get staticImageModeLabel => 'Static image mode';
-
-  @override
-  String slideshowModeActiveLabel(int seconds) {
-    return 'Slideshow mode active with $seconds seconds delay';
-  }
-
-  @override
-  String videoPlaybackModeLabel(String mode) {
-    return 'Video playback mode: $mode';
-  }
-
-  @override
   String get pauseLabel => 'Pause';
 
   @override
@@ -4159,9 +3449,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String noResultsForQueryMessage(String query) {
     return 'Nothing in this folder matches \"$query\".';
   }
-
-  @override
-  String get closeCarouselTooltip => 'Close Carousel';
 
   @override
   String get playlistScrollModeMenu => 'Playlist Scroll Mode';
@@ -4300,15 +3587,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get cameraCouldNotSwitchLensMessage => 'Could not switch lens';
-
-  @override
-  String get cameraEncryptingPhotoLabel => 'Encrypting photo…';
-
-  @override
-  String get cameraEncryptingVideoLabel => 'Encrypting video…';
-
-  @override
   String get aboutApplicationSectionHeader => 'Application';
 
   @override
@@ -4436,15 +3714,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutFooterMadeWithLove => 'Made with ❤ for privacy.';
 
   @override
-  String get aboutVersionCopiedMessage =>
-      'Version info copied — handy for bug reports';
-
-  @override
-  String aboutVersionClipboardText(String version) {
-    return 'VaultExplorer v$version (Android)';
-  }
-
-  @override
   String aboutShareText(String url) {
     return 'VaultExplorer — a free, open-source, offline vault for Android.\n\nStore passwords, notes, and files inside an encrypted container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$url';
   }
@@ -4556,11 +3825,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String thumbnailQualitySummary(int size, int quality) {
     return '$size px · $quality% quality';
-  }
-
-  @override
-  String holdToSpeedIndicatorLabel(String speed) {
-    return '$speed× Speed';
   }
 
   @override
@@ -4896,15 +4160,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String vaultOccupiedSpaceSummary(String used) {
-    return '$used used';
-  }
-
-  @override
-  String get incorrectPasswordOrKeyfilesDriveError =>
-      'Incorrect password/keyfiles or unsupported drive';
-
-  @override
   String driveUsableCapacity(int mb) {
     return 'Drive usable capacity: $mb MB. Must not exceed this.';
   }
@@ -5177,10 +4432,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reorderBookmarksTitle => 'Rearrange Bookmarks';
-
-  @override
-  String get reorderBookmarksDesc =>
-      'Drag items to reorder them in the bookmark bar';
 
   @override
   String get drawerBookmarksSectionTitle => 'Bookmarks';
@@ -5474,14 +4725,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierVaultConfirmWarning =>
-      'Every file in this vault will be read.';
-
-  @override
-  String get hashVerifierVaultEmptyMessage =>
-      'This vault has no files to check';
-
-  @override
   String get hashVerifierVaultStartButton => 'Start Check';
 
   @override
@@ -5562,9 +4805,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Check every file in a vault against a loaded manifest';
 
   @override
-  String get hashVerifierVaultChangeActionButton => 'Change';
-
-  @override
   String get hashVerifierVaultVerifyButton => 'Verify Entire Vault';
 
   @override
@@ -5597,9 +4837,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get duplicateFinderScanningStage3 =>
       'Stage 3: Verifying full byte hashes...';
-
-  @override
-  String get duplicateFinderScanComplete => 'Scan Complete';
 
   @override
   String get duplicateFinderNoDuplicatesTitle => 'No Duplicate Files Found';
@@ -5850,9 +5087,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get storageAnalyzerHeaviestFilesHeader => 'Heaviest Files';
-
-  @override
   String get storageAnalyzerBreakdownHeader => 'By File Type';
 
   @override
@@ -5946,17 +5180,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageAnalyzerEmptyFolder => 'This folder is empty.';
-
-  @override
-  String storageAnalyzerSmallerItems(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count smaller items',
-      one: '1 smaller item',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get storageAnalyzerMapHint =>
@@ -6409,9 +5632,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get vaultBrowserSwitchVaultTooltip => 'Switch Vault';
-
-  @override
   String get vaultBrowserRootFolderLabel => 'Root Folder';
 
   @override
@@ -6492,27 +5712,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Compare two folders — in vaults, on this device or on a document provider — and copy over what\'s missing or newer';
 
   @override
-  String get vaultSyncNoVaultsTitle => 'No Vaults Mounted';
-
-  @override
-  String get vaultSyncNoVaultsMessage =>
-      'Mount at least one vault to compare and sync its files.';
-
-  @override
-  String get vaultSyncLeftLabel => 'Left';
-
-  @override
-  String get vaultSyncRightLabel => 'Right';
-
-  @override
   String get vaultSyncTapToSelect => 'Tap to select a storage & folder';
 
   @override
   String get vaultSyncSwapTooltip => 'Swap the two storages';
-
-  @override
-  String get vaultSyncSameLocationWarning =>
-      'The two folders must be different.';
 
   @override
   String get vaultSyncIntroTitle => 'Compare Two Folders';
@@ -6564,26 +5767,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeOnlyLeft(Object count) {
-    return '$count only on Left';
-  }
-
-  @override
-  String vaultSyncBadgeOnlyRight(Object count) {
-    return '$count only on Right';
-  }
-
-  @override
-  String vaultSyncBadgeLeftNewer(Object count) {
-    return '$count newer on Left';
-  }
-
-  @override
-  String vaultSyncBadgeRightNewer(Object count) {
-    return '$count newer on Right';
-  }
-
-  @override
   String vaultSyncBadgeConflicts(Object count) {
     return '$count need review';
   }
@@ -6599,55 +5782,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Copies missing files and newer versions to the other side.';
 
   @override
-  String get vaultSyncDirectionLeftToRight => 'Left → Right (one-way)';
-
-  @override
-  String get vaultSyncDirectionLeftToRightSubtitle =>
-      'Pushes new and updated files from Left to Right; never changes Left';
-
-  @override
-  String get vaultSyncDirectionRightToLeft => 'Right → Left (one-way)';
-
-  @override
-  String get vaultSyncDirectionRightToLeftSubtitle =>
-      'Pushes new and updated files from Right to Left; never changes Right';
-
-  @override
-  String get vaultSyncSearchHint => 'Search differences';
-
-  @override
-  String get vaultSyncStatusOnlyLeft => 'Only Left';
-
-  @override
-  String get vaultSyncStatusOnlyRight => 'Only Right';
-
-  @override
-  String get vaultSyncStatusLeftNewer => 'Left Newer';
-
-  @override
-  String get vaultSyncStatusRightNewer => 'Right Newer';
-
-  @override
   String get vaultSyncStatusConflict => 'Needs Review';
 
   @override
   String get vaultSyncStatusTypeMismatch => 'Type Mismatch';
-
-  @override
-  String get vaultSyncFolderOnlyLeftDetail => 'Folder — only on Left';
-
-  @override
-  String get vaultSyncFolderOnlyRightDetail => 'Folder — only on Right';
-
-  @override
-  String vaultSyncBothSidesDetail(
-    Object leftSize,
-    Object leftDate,
-    Object rightSize,
-    Object rightDate,
-  ) {
-    return 'L: $leftSize · $leftDate  →  R: $rightSize · $rightDate';
-  }
 
   @override
   String get vaultSyncTypeMismatchTooltip =>
@@ -6655,12 +5793,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultSyncChangeActionTooltip => 'Change sync action';
-
-  @override
-  String get vaultSyncActionCopyToRight => 'Copy → Right';
-
-  @override
-  String get vaultSyncActionCopyToLeft => 'Copy → Left';
 
   @override
   String get vaultSyncActionSkip => 'Skip';
@@ -6682,11 +5814,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String vaultSyncStartedMessage(Object count) {
-    return 'Sync started — $count items queued';
-  }
-
-  @override
   String vaultSyncPickLocationTitle(Object side) {
     return 'Select $side Folder';
   }
@@ -6701,9 +5828,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
-
-  @override
   String get vaultSyncTargetKindVault => 'Encrypted vault';
 
   @override
@@ -6711,9 +5835,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
-
-  @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip =>
@@ -6756,10 +5877,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter your current Master Password to confirm removal:';
 
   @override
-  String get authenticateToRemoveMasterPassword =>
-      'Authenticate to remove Master Password';
-
-  @override
   String get incorrectPassword => 'Incorrect password';
 
   @override
@@ -6781,9 +5898,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get copyPathAction => 'Copy path';
-
-  @override
-  String get automationSectionHeader => 'Automation';
 
   @override
   String get automationTileTitle => 'Automation';
@@ -6910,10 +6024,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get automationActionEmergencyPurgeLabel => 'Emergency purge';
 
   @override
-  String get automationDocCommentFootnote =>
-      'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
-
-  @override
   String get automationTierOffLabel => 'Off';
 
   @override
@@ -6943,13 +6053,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get showHiddenFilesDesc => 'Display dotfiles and system folders';
-
-  @override
-  String get showNoMediaFilesLabel => 'Show .nomedia files';
-
-  @override
-  String get showNoMediaFilesDesc =>
-      'Display .nomedia files in folder listings';
 
   @override
   String get dontAskAgain => 'Don\'t ask again';
@@ -7006,13 +6109,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wizardNextButton => 'Next';
 
   @override
-  String get wizardStepTypeTitle => 'Type';
-
-  @override
   String get wizardStepBasicInfoTitle => 'Basic Info';
-
-  @override
-  String get wizardStepAdvancedTitle => 'Advanced';
 
   @override
   String get wizardStepReviewTitle => 'Review';
@@ -7025,13 +6122,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wizardEncryptionDetailsRowTitle => 'Encryption Details';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Configured — tap to review';
-
-  @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Tap to set up';
 
   @override
   String get wizardSummaryTitle => 'Summary';
@@ -7089,9 +6179,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
-
-  @override
   String get subtitleSizeLabel => 'Size';
 
   @override
@@ -7141,9 +6228,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get redactToolLabel => 'Redact';
 
   @override
-  String get rotateLeftTooltip => 'Rotate left';
-
-  @override
   String get rotateRightTooltip => 'Rotate right';
 
   @override
@@ -7154,18 +6238,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cropAspectOriginalLabel => 'Original';
-
-  @override
-  String get applyCropTooltip => 'Apply crop';
-
-  @override
-  String get annotationColorTooltip => 'Color';
-
-  @override
-  String get annotationStrokeWidthTooltip => 'Stroke width';
-
-  @override
-  String get clearAnnotationsTooltip => 'Clear all annotations';
 
   @override
   String get resetImageTooltip => 'Reset to original';
@@ -7182,9 +6254,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addTextAnnotationHint => 'Type something…';
-
-  @override
-  String get textToolHint => 'Tap the image to add text';
 
   @override
   String get saveImageSheetTitle => 'Save changes';
@@ -7461,21 +6530,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get automationSavePimButton => 'Save PIM';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
-
-  @override
   String get automationCameraDescription =>
       'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING / START_AUDIO_RECORDING / STOP_AUDIO_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
-
-  @override
   String get automationOverlayPermissionTitle => 'Display over other apps';
-
-  @override
-  String get automationOverlayPermissionMessage =>
-      'Background camera capture requires permission to display over other apps on Android 14+. Grant this permission to allow automated captures while the screen is locked or the app is in the background.';
 
   @override
   String get automationPimSavedMessage => 'PIM saved';
@@ -7567,12 +6626,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get computingHashMessage => 'Computing hash…';
-
-  @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
-
-  @override
-  String get calculateButton => 'Calculate';
 
   @override
   String get copyDiagnosticsButton => 'Copy Diagnostics';
@@ -7668,9 +6721,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Archives';
-
-  @override
   String get filesTabLabel => 'Files';
 
   @override
@@ -7678,40 +6728,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Allow access to browse files on your device.';
 
   @override
-  String get filesEmptyTitle => 'No files here';
-
-  @override
   String get filesEmptyMessage => 'This folder is empty.';
 
   @override
-  String get filesNewFolderTooltip => 'New folder';
-
-  @override
-  String get filesNewFolderDialogTitle => 'New folder';
-
-  @override
-  String get filesNameHint => 'Name';
-
-  @override
-  String get filesCreate => 'Create';
-
-  @override
-  String get filesRename => 'Rename';
-
-  @override
-  String get filesDelete => 'Delete';
-
-  @override
-  String get filesShare => 'Share';
-
-  @override
   String get filesCopy => 'Copy';
-
-  @override
-  String get filesMove => 'Move';
-
-  @override
-  String get filesDeleteConfirmTitle => 'Delete permanently?';
 
   @override
   String get filesChooseDestinationTitle => 'Choose a folder';
@@ -7723,49 +6743,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get filesCopyHere => 'Copy here';
 
   @override
-  String get filesSelectAllTooltip => 'Select all';
-
-  @override
-  String get filesCloseSelectionTooltip => 'Close';
-
-  @override
-  String get filesFolderCreated => 'Folder created';
-
-  @override
-  String get filesCreateFolderFailed => 'Couldn\'t create folder';
-
-  @override
-  String get filesRenamed => 'Renamed';
-
-  @override
-  String get filesRenameFailed => 'Couldn\'t rename';
-
-  @override
-  String get filesNameAlreadyExists => 'That name is already taken';
-
-  @override
-  String get filesDeleted => 'Deleted';
-
-  @override
   String get filesDeleteFailed => 'Couldn\'t delete';
-
-  @override
-  String get filesMoved => 'Moved';
-
-  @override
-  String get filesMoveFailed => 'Couldn\'t move';
-
-  @override
-  String get filesCopied => 'Copied';
-
-  @override
-  String get filesCopyFailed => 'Couldn\'t copy';
-
-  @override
-  String get filesOpenFailed => 'Couldn\'t open this file';
-
-  @override
-  String get filesShareFailed => 'Couldn\'t share this file';
 
   @override
   String get filesFilterTooltip => 'Filter';
@@ -7914,10 +6892,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compositePimFieldLabel => 'PIM (Personal Iteration Multiplier)';
 
   @override
-  String get compositePimFieldHelper =>
-      'Leave empty or 0 for standard default iterations';
-
-  @override
   String get compositeRememberContainerTitle => 'Remember this container';
 
   @override
@@ -7976,9 +6950,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Composite carrier detected. A composite container requires all of its carrier files to unlock.';
 
   @override
-  String get compositeSelectAllCarriersButton => 'Select All Carriers';
-
-  @override
   String get compositeCarriersMissingTitle => 'Composite Carriers Missing';
 
   @override
@@ -7987,16 +6958,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compositeRelocateCarriersButton => 'Relocate Carrier Files';
-
-  @override
-  String get passwordOptionalFieldLabel => 'Password (optional)';
-
-  @override
-  String get plainDiskImagePasswordHint =>
-      'No password needed — this disk image isn\'t encrypted';
-
-  @override
-  String get compositePasswordHint => 'Enter composite container password';
 
   @override
   String get generateStrongPasswordTooltip => 'Generate strong password';
@@ -8230,10 +7191,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sectionDuressUnlock => 'Master Lock Duress';
 
   @override
-  String get duressMasterPasswordRequired =>
-      'A Master Password must be enabled in App Security before configuring duress unlock.';
-
-  @override
   String get duressPasswordTitle => 'Duress Password';
 
   @override
@@ -8440,10 +7397,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get longFileNameDisplayLabel => 'Long File Names';
 
   @override
-  String get longFileNameDisplayDesc =>
-      'Choose how names are shortened when they exceed available space';
-
-  @override
   String get longFileNameEllipsizeStartLabel => 'Ellipsize start';
 
   @override
@@ -8491,15 +7444,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gridAspectPortraitLabel => '9:16 (Portrait)';
 
   @override
-  String get fileFolderDisplaySectionHeader => 'File & Folder Display';
-
-  @override
-  String get navigationBarsSectionHeader => 'Navigation & Bars';
-
-  @override
-  String get columnedListViewColumnsSectionHeader => 'Columned List Columns';
-
-  @override
   String get autoHideAppBarLabel => 'Auto-hide app bar on scroll';
 
   @override
@@ -8541,24 +7485,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageLocationsTitle => 'Storage Locations';
 
   @override
-  String get storageLocationsSubtitle =>
-      'Internal storage, SD cards, and document providers';
-
-  @override
-  String get storageLocationsSelectPrompt => 'Select active storage';
-
-  @override
   String get addStorageLocationTitle => 'Add Storage Location';
 
   @override
   String get addStorageLocationSubtitle =>
       'Add an external SD card, USB drive, or folder';
-
-  @override
-  String get documentProviderSafLabel => 'Document Provider (SAF)';
-
-  @override
-  String get externalStorageLabel => 'External Storage';
 
   @override
   String get renameStorageLocationTitle => 'Rename Location';
@@ -8570,9 +7501,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return 'Remove \"$name\" from storage locations? Files on the storage will not be deleted.';
   }
-
-  @override
-  String get storageLocationAddedSnack => 'Storage location added';
 
   @override
   String get storageLocationUnresolvedError =>
@@ -8599,56 +7527,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaViewerCustomizeControls => 'Customize Controls...';
-
-  @override
-  String get mediaViewerControlsTitle => 'Media Player Controls';
-
-  @override
-  String get mediaViewerControlsReset => 'Media controls reset to defaults';
-
-  @override
-  String get mediaViewerTransportDisplay => 'Transport & Display';
-
-  @override
-  String get mediaViewerShowScrubberTitle => 'Show Progress Bar (Scrubber)';
-
-  @override
-  String get mediaViewerShowScrubberDesc =>
-      'Display position and duration timeline slider';
-
-  @override
-  String get mediaViewerShowCenterTransportTitle =>
-      'Show Center Transport Controls';
-
-  @override
-  String get mediaViewerShowCenterTransportDesc =>
-      'Display large circular play/pause in the center';
-
-  @override
-  String get mediaViewerShowPrevNextTitle => 'Show Next & Previous Buttons';
-
-  @override
-  String get mediaViewerShowPrevNextDesc =>
-      'Turn off to keep only the single play button';
-
-  @override
-  String get mediaViewerShowStatusBadgeTitle => 'Show Status Badges';
-
-  @override
-  String get mediaViewerShowStatusBadgeDesc =>
-      'Display slideshow delay and static image indicators';
-
-  @override
-  String get mediaViewerTopBarSection => 'Top Bar';
-
-  @override
-  String get mediaViewerBottomBarSection => 'Bottom Bar';
-
-  @override
-  String get mediaViewerUnpinnedSection => 'Unpinned (Overflow)';
-
-  @override
-  String get mediaViewerAllControlsPinned => 'All controls are already pinned.';
 
   @override
   String get mediaPlayerControlsTitle => 'Media Player Controls';
@@ -8774,19 +7652,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Drag actions here for Advanced Settings sheet';
 
   @override
-  String get dropHereAtEnd => 'Drop here at end';
-
-  @override
-  String get dragItemsHereToAdd => '+ Drag items here to add to this section';
-
-  @override
   String get moveToAdvancedSettingsTooltip => 'Move to Advanced Settings';
-
-  @override
-  String get noVaultsMounted => 'No vaults mounted';
-
-  @override
-  String get vaultsMountedSummary => 'vault(s) mounted';
 
   @override
   String get dashboardNavLabel => 'Dashboard';
@@ -8795,25 +7661,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultsSectionTitle => 'Vaults';
 
   @override
-  String get vaultStatusMounted => 'Mounted';
-
-  @override
   String get lockVaultTooltip => 'Lock vault';
 
   @override
   String get lockAllVaultsTitle => 'Lock all';
-
-  @override
-  String get safProviderLabel => 'SAF Provider';
-
-  @override
-  String get singleFileCryptoTitle => 'Single-File Crypto';
-
-  @override
-  String get singleFileCryptoSubtitle => 'Encrypt / decrypt outside vaults';
-
-  @override
-  String get passwordGeneratorTitle => 'Password Generator';
 
   @override
   String get contentsLabel => 'Contents';
@@ -8891,15 +7742,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get holdSpeedMultiplierTitle => 'Hold-to-Fast-Forward Speed';
 
   @override
-  String get holdSpeedMultiplierSubtitle =>
-      'Speed while press-and-holding the video';
-
-  @override
   String get defaultAspectRatioTitle => 'Default Aspect Ratio';
-
-  @override
-  String get defaultAspectRatioSubtitle =>
-      'Applied automatically when a video is opened';
 
   @override
   String get aspectRatioModeLabel => 'Aspect Ratio';
@@ -9165,46 +8008,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get cardSwipeActionsTitle => 'Card Swipe Actions';
-
-  @override
-  String get cardSwipeActionsSubtitle =>
-      'Swipe vault cards to quickly reveal edit and remove actions';
-
-  @override
-  String get cameraQualitySd => '480p (SD)';
-
-  @override
-  String get cameraQualityHd => '720p (HD)';
-
-  @override
-  String get cameraQualityFhd => '1080p (FHD)';
-
-  @override
-  String get cameraQualityUhd => '4K (UHD)';
-
-  @override
-  String get cameraPhotoResMax => 'Full (Max Res)';
-
-  @override
-  String get cameraPhotoResHigh => '5 MP (High)';
-
-  @override
-  String get cameraPhotoResMedium => '2 MP (Medium)';
-
-  @override
-  String get cameraPhotoResLow => '1.2 MP (Low)';
-
-  @override
-  String get cameraLensWide => 'Wide';
-
-  @override
-  String get cameraLensInfrared => 'IR';
-
-  @override
-  String get cameraLensFront => 'Front';
-
-  @override
   String get appLockBehaviorTitle => 'App Lock Behavior';
 
   @override
@@ -9258,9 +8061,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get passwordInterchangeIncludeSubfolders => 'Include subfolders';
-
-  @override
-  String get passwordInterchangeFormatHeader => 'Format';
 
   @override
   String get passwordInterchangeFormatLabel => 'File format';
@@ -9376,12 +8176,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get autoLockIndicatorLocksOnScreenOff => 'Screen-off lock';
-
-  @override
-  String get autoLockIndicatorNeverLocks => 'Won\'t auto-lock';
-
-  @override
   String autoLockIndicatorLocksAfterTooltip(String duration) {
     return 'Locks after $duration of inactivity (resets while using the app)';
   }
@@ -9404,35 +8198,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String storageLocationUnavailable(String name) {
     return 'Storage location \"$name\" is unavailable or disconnected.';
   }
-
-  @override
-  String get cameraEditPhotoTooltip => 'Edit photo';
-
-  @override
-  String get cameraTrimVideoTooltip => 'Trim video';
-
-  @override
-  String get cameraDiscardMediaTooltip => 'Discard';
-
-  @override
-  String get cameraSaveMediaTooltip => 'Save to vault';
-
-  @override
-  String get cameraContinueCaptureTooltip => 'Take another photo';
-
-  @override
-  String cameraBatchCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count photos',
-      one: '1 photo',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get cameraReviewPhotosTooltip => 'Review captured photos';
 
   @override
   String get vaultItemTypeAuthenticator => 'Authenticator';
@@ -9546,13 +8311,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoLockIndicatorLocksImmediately => 'Immediate lock';
-
-  @override
-  String get quickActionLockModeTitle => 'Lock after quick actions';
-
-  @override
-  String get quickActionLockModeSubtitle =>
-      'Vault lock behavior when saving from Quick Capture or Share Sheet';
 
   @override
   String get quickActionLockModeLeaveAsFoundLabel => 'Leave as you found it';
@@ -9687,9 +8445,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get textEditorProjectFilesTitle => 'Project Files';
-
-  @override
-  String get textEditorCloseTabTooltip => 'Close tab';
 
   @override
   String get textEditorResetToDefault => 'Reset to defaults';
@@ -9972,11 +8727,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String videoEditorSnapNote(String start, String end) {
-    return 'Lossless cut starts on a keyframe: $start – $end';
-  }
-
-  @override
   String get videoEditorBoundaryInvalid =>
       'That would leave the segment too short.';
 
@@ -10068,31 +8818,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get videoEditorExportSingle => 'Save as new video';
-
-  @override
-  String get videoEditorExportSingleHint => 'The original stays untouched.';
-
-  @override
   String get videoEditorExportMerge => 'Merge into one video';
 
   @override
-  String get videoEditorExportMergeHint =>
-      'Clips are joined in timeline order.';
-
-  @override
   String get videoEditorExportSeparate => 'Save as separate videos';
-
-  @override
-  String videoEditorExportSeparateHint(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count new files',
-      one: 'One new file',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get videoEditorLosslessNote =>
@@ -10223,9 +8952,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileSkinColorDefault => 'Default';
 
   @override
-  String get fileSkinColorHexLabel => 'Hex color';
-
-  @override
   String get fileSkinPresetClassic => 'Classic';
 
   @override
@@ -10250,17 +8976,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get compositeArchiveCarrierRowWarning =>
       'Unsupported archive — remove it from the selection.';
-
-  @override
-  String videoEditorSelectedSegmentSummary(
-    int current,
-    int total,
-    String start,
-    String end,
-    String duration,
-  ) {
-    return 'Segment $current of $total: $start – $end ($duration)';
-  }
 
   @override
   String get videoEditorKeepModeDescription =>
@@ -10971,13 +9686,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Outlines, shadows, and modal backdrops.';
 
   @override
-  String get skinTapAnyPreviewElement => 'Tap any preview element';
-
-  @override
-  String get skinChooseAnAppFileOrEditorColorToSeeWhatItControls =>
-      'Choose an app, file, or editor color to see what it controls.';
-
-  @override
   String get skinCustomizeSkin => 'Customize skin';
 
   @override
@@ -10985,9 +9693,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinDark => 'Dark';
-
-  @override
-  String get skinApp => 'App';
 
   @override
   String get skinEditor => 'Editor';
@@ -11022,10 +9727,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skinAppBar => 'App bar';
 
   @override
-  String get skinTheTopNavigationBarIsIndependentFromCardsAndPages =>
-      'The top navigation bar is independent from cards and pages.';
-
-  @override
   String get skinTopBarFillColor => 'Top bar fill color.';
 
   @override
@@ -11036,10 +9737,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinFloatingActionButton => 'Floating action button';
-
-  @override
-  String get skinItsFillAndIconColorAreSeparateFromSelectionColors =>
-      'Its fill and icon color are separate from selection colors.';
 
   @override
   String get skinButtonFill => 'Button fill';
@@ -11054,26 +9751,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get skinIconColorOnTheRoundButton =>
       'Icon color on the round + button.';
-
-  @override
-  String get skinDashboardVaultCards => 'Dashboard vault cards';
-
-  @override
-  String get skinSetTheBackgroundForLockedAndMountedVaultCards =>
-      'Set the background for locked and mounted vault cards.';
-
-  @override
-  String get skinLockedVaultCard => 'Locked vault card';
-
-  @override
-  String get skinNeutralVaultCardFill => 'Neutral vault card fill.';
-
-  @override
-  String get skinMountedVaultCard => 'Mounted vault card';
-
-  @override
-  String get skinSeparateFillForAnUnlockedMountedVault =>
-      'Separate fill for an unlocked, mounted vault.';
 
   @override
   String get skinFineTuneAppColors => 'Fine tune app colors';
@@ -11102,264 +9779,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap the color circle to choose a color.';
 
   @override
-  String get skinAppBarBackground => 'App bar background';
-
-  @override
-  String get skinTheDashboardAndOtherAppBarsUseThisIndependentColor =>
-      'The dashboard and other app bars use this independent color.';
-
-  @override
-  String get skinDashboardMenuIcon => 'Dashboard menu icon';
-
-  @override
-  String get skinTheHamburgerButtonUsesTheAppBarIconColor =>
-      'The hamburger button uses the app bar icon color.';
-
-  @override
-  String get skinDashboardTitle => 'Dashboard title';
-
-  @override
-  String get skinTheDashboardTitleUsesTheAppBarForegroundColor =>
-      'The dashboard title uses the app bar foreground color.';
-
-  @override
-  String get skinActionLabelAndIcon => 'Action label and icon';
-
-  @override
-  String get skinTheActionAccentColorsLabelsb08a63 =>
-      'The action accent colors labels such as Add a vault and their icons.';
-
-  @override
-  String get skinDashboardAddButton => 'Dashboard add button';
-
-  @override
-  String get skinTheButtonFillAndPlusIconHaveSeparateSkinColors =>
-      'The button fill and plus icon have separate skin colors.';
-
-  @override
-  String get skinVaultCardAndIconBackground => 'Vault card and icon background';
-
-  @override
-  String get skinTheIconTileUsesPrimary5c2f93 =>
-      'The icon tile uses Primary container. The mounted vault card blends that color with the raised surface.';
-
-  @override
-  String get skinVaultFormatIconColor => 'Vault format icon color';
-
-  @override
-  String get skinVaultFormatInitialsUseOnPrimaryContainer =>
-      'Vault format initials use On primary container.';
-
-  @override
-  String get skinVaultStorageDetails => 'Vault storage details';
-
-  @override
-  String get skinFreeSpaceAndCapacityUseTheSupportingTextColor =>
-      'Free space and capacity use the supporting text color.';
-
-  @override
-  String get skin17GBFree5GB => '1.7 GB free / 5 GB';
-
-  @override
-  String get skinVaultStorageProgress => 'Vault storage progress';
-
-  @override
-  String get skinTheProgressBarUsesTheba7c98 =>
-      'The progress bar uses the app accent, then switches to tertiary and error colors as storage fills.';
-
-  @override
-  String get skinLockActionBackground => 'Lock action background';
-
-  @override
-  String get skinTheMountedVaultLockButtonUsesPrimaryContainer =>
-      'The mounted-vault lock button uses Primary container.';
-
-  @override
-  String get skinVaultActionsIconColor => 'Vault actions icon color';
-
-  @override
-  String get skinTheOverflowMenuUsesTheSupportingIconColor =>
-      'The overflow menu uses the supporting icon color.';
-
-  @override
-  String get skinMountedVaultCardBackground => 'Mounted vault card background';
-
-  @override
-  String get skinThisIsTheBackgroundOfa8d0d3 =>
-      'This is the background of the mounted vault card. Its icon tile still uses the main action color.';
-
-  @override
-  String get skinLockedVaultCardBackground => 'Locked vault card background';
-
-  @override
-  String get skinThisColorIsIndependentFromTheAppBarAndMountedVaultCard =>
-      'This color is independent from the app bar and mounted vault card.';
-
-  @override
-  String get skinLockedVaultFormatIcon => 'Locked vault format icon';
-
-  @override
-  String get skinLockedVaultIconsUseTheSupportingTextAndIconColor =>
-      'Locked vault icons use the supporting text and icon color.';
-
-  @override
-  String get skinSharedArchive => 'Shared archive';
-
-  @override
-  String get skinLockedVaultStatusText => 'Locked vault status text';
-
-  @override
-  String get skinTheLockedStatusLabelUsesTheSupportingTextColor =>
-      'The locked status label uses the supporting text color.';
-
-  @override
-  String get skinLockedVaultActionsIcon => 'Locked vault actions icon';
-
-  @override
-  String get skinVaultActionsMenuBackground => 'Vault actions menu background';
-
-  @override
-  String get skinTheEditAndRemovePopupUsesTheMenuSurfaceColor =>
-      'The Edit and Remove popup uses the menu surface color.';
-
-  @override
-  String get skinEditMenuItem => 'Edit menu item';
-
-  @override
-  String get skinTheEditActionUsesTheRegularForegroundColor =>
-      'The Edit action uses the regular foreground color.';
-
-  @override
-  String get skinRemoveMenuItem => 'Remove menu item';
-
-  @override
-  String get skinDestructiveActionsUseTheErrorColor =>
-      'Destructive actions use the error color.';
-
-  @override
-  String get skinFileManagerAppBar => 'File manager app bar';
-
-  @override
-  String get skinFileBrowserToolbarsUseTheSameAppBarBackground =>
-      'File browser toolbars use the same app bar background.';
-
-  @override
-  String get skinFileManagerBackButton => 'File manager back button';
-
-  @override
-  String get skinToolbarNavigationIconsUseThisColor =>
-      'Toolbar navigation icons use this color.';
-
-  @override
-  String get skinFileManagerTitle => 'File manager title';
-
-  @override
-  String get skinTheCurrentFolderNameUsesTheAppBarForeground =>
-      'The current folder name uses the app bar foreground.';
-
-  @override
-  String get skinFileManagerAppBarActions => 'File manager app bar actions';
-
-  @override
-  String get skinToolbarActionsUseThisIconColor =>
-      'Toolbar actions use this icon color.';
-
-  @override
-  String get skinProjects => 'Projects';
-
-  @override
-  String get skinFolder12Items => 'Folder · 12 items';
-
-  @override
-  String get skinTextFile4KB => 'Text file · 4 KB';
-
-  @override
-  String get skinCompressedFile28MB => 'Compressed file · 28 MB';
-
-  @override
-  String get skin3Items => '3 items';
-
-  @override
-  String get skinFileManagerAddButton => 'File manager add button';
-
-  @override
-  String get skinAddButtonIconColor => 'Add button icon color';
-
-  @override
-  String get skinThePlusIconUsesTheButtonForegroundColor =>
-      'The plus icon uses the button foreground color.';
-
-  @override
-  String get skinEditorFileName => 'Editor file name';
-
-  @override
-  String get skinTheEditorToolbarUsesTheAppForegroundColor =>
-      'The editor toolbar uses the app foreground color.';
-
-  @override
-  String get skinDartUTF8Ln3Col12 => 'Ln 3, Col 12';
-
-  @override
-  String get skinTheMainBackgroundBehindThisScreen =>
-      'The main background behind this screen.';
-
-  @override
-  String get skinFolderIconColor => 'Folder icon color';
-
-  @override
-  String get skinFileIconColor => 'File icon color';
-
-  @override
-  String get skinText => ' : ';
-
-  @override
-  String get skinFolderNameColor => 'Folder name color';
-
-  @override
-  String get skinFileNameColor => 'File name color';
-
-  @override
-  String get skinFileDetailsColor => 'File details color';
-
-  @override
-  String get skinTheSmallerDateSizeAndTypeLabelsUseThisColor =>
-      'The smaller date, size, and type labels use this color.';
-
-  @override
-  String get skinFileOverflowButton => 'File overflow button';
-
-  @override
-  String get skinEachRowSThreeDotButtonUsesTheSupportingIconColor =>
-      'Each row’s three-dot button uses the supporting icon color.';
-
-  @override
-  String get skinSelectedFileRow => 'Selected file row';
-
-  @override
-  String get skinSelectedRowsUseATranslucente0ff21 =>
-      'Selected rows use a translucent primary-container highlight; the file list itself stays on the page background.';
-
-  @override
-  String get skinFileActionsMenuBackground => 'File actions menu background';
-
-  @override
-  String get skinTheFileActionsPopupUsesTheMenuSurfaceColor =>
-      'The file actions popup uses the menu surface color.';
-
-  @override
-  String get skinOpenFileMenuItem => 'Open file menu item';
-
-  @override
-  String get skinRegularFileActionsUseTheMainTextColor =>
-      'Regular file actions use the main text color.';
-
-  @override
-  String get skinOpen => 'Open';
-
-  @override
-  String get skinDeleteFileMenuItem => 'Delete file menu item';
-
-  @override
   String get skinEditorBackground => 'Editor background';
 
   @override
@@ -11375,10 +9794,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinEditorTextColor => 'Code text color';
-
-  @override
-  String get skinTheDefaultCodeAndEditorTextColor =>
-      'Default color for plain code; syntax-highlighted text uses its own colors.';
 
   @override
   String get skinEditorCursor => 'Editor cursor';
@@ -11397,42 +9812,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skinEditorKeywords => 'Keywords';
 
   @override
-  String get skinEditorKeywordsExplanation =>
-      'Language keywords such as class, void, return, and if.';
-
-  @override
   String get skinEditorTypes => 'Types & classes';
-
-  @override
-  String get skinEditorTypesExplanation =>
-      'Class names, types, and interfaces.';
 
   @override
   String get skinEditorStrings => 'Strings';
 
   @override
-  String get skinEditorStringsExplanation => 'Quoted text and string literals.';
-
-  @override
   String get skinEditorNumbers => 'Numbers & values';
-
-  @override
-  String get skinEditorNumbersExplanation =>
-      'Numeric literals, booleans, and constants.';
 
   @override
   String get skinEditorFunctions => 'Functions & methods';
 
   @override
-  String get skinEditorFunctionsExplanation =>
-      'Function names, method calls, and built-ins.';
-
-  @override
   String get skinEditorComments => 'Comments';
-
-  @override
-  String get skinEditorCommentsExplanation =>
-      'Code comments and documentation blocks.';
 
   @override
   String get textEditorColorsSectionTitle => 'Editor colors & font';
@@ -11442,9 +9834,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get textEditorColorsCustomized => 'Custom colors active';
-
-  @override
-  String get textEditorResetColors => 'Reset colors to default';
 
   @override
   String get textEditorFollowAppSkinNotice =>
@@ -11492,15 +9881,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get skinCanvasGutterCursorSelectionBackgroundAndSyntaxTemplate =>
       'Canvas, gutter, cursor, selection, background, and syntax template.';
-
-  @override
-  String get skinGutterAndLineNumbers => 'Gutter and line numbers';
-
-  @override
-  String get skinCursor => 'Cursor';
-
-  @override
-  String get skinSelection => 'Selection';
 
   @override
   String get skinEditorBackgroundTemplate => 'Editor background template';
@@ -11568,12 +9948,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get skinAutomaticMatchLightOrDarkMode =>
       'Automatic (match light or dark mode)';
-
-  @override
-  String get skinSkinExported => 'Skin exported.';
-
-  @override
-  String get skinSkinsExported => 'Skins exported.';
 
   @override
   String get skinRemoveSkin => 'Remove skin?';
@@ -11687,11 +10061,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String skinSelectPreviewElement(String title) {
-    return 'Select $title';
-  }
-
-  @override
   String skinIconColorForItem(String item) {
     return '$item icon color';
   }
@@ -11700,14 +10069,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String skinNameColorForItem(String item) {
     return '$item name color';
   }
-
-  @override
-  String get skinFileIconColorSettingDescription =>
-      'This color is controlled by the icon color setting in the file manager section.';
-
-  @override
-  String get skinFileNameColorSettingDescription =>
-      'This color is controlled by the name color setting in the file manager section.';
 
   @override
   String get skinExportedSingle => 'Skin exported.';
@@ -11749,77 +10110,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skinInterfaceApplied => 'Interface settings applied.';
 
   @override
-  String get automationBatteryHintTitle => 'Allow background start';
-
-  @override
-  String get automationBatteryHintMessage =>
-      'When VaultExplorer is fully closed, Android can block an automation from unlocking this vault. Set VaultExplorer\'s battery usage to Unrestricted so Tasker, MacroDroid and other apps can unlock it in the background.';
-
-  @override
-  String get automationBatteryHintButton => 'Open app settings';
-
-  @override
   String get automationBatterySettingsOpenFailedMessage =>
       'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.';
-
-  @override
-  String get skinPreviewMountedVaultName => 'Personal vault';
-
-  @override
-  String get skinPreviewVaultName => 'Vault title';
-
-  @override
-  String get skinMainTextColorAlsoColorsRegularMenuItems =>
-      'Vault titles and regular menu actions share the app main text color.';
-
-  @override
-  String get skinStatusBannerExamples => 'Status banners';
-
-  @override
-  String get skinSuccessBanner => 'Success banner';
-
-  @override
-  String get skinWarningBanner => 'Warning banner';
-
-  @override
-  String get skinErrorBanner => 'Error banner';
-
-  @override
-  String get skinSuccessBannerUsesSuccessContainer =>
-      'The banner fill and message use success colors.';
-
-  @override
-  String get skinWarningBannerUsesWarningContainer =>
-      'The banner fill and message use warning colors.';
-
-  @override
-  String get skinErrorBannerUsesErrorContainer =>
-      'The banner fill and message use error colors.';
-
-  @override
-  String get skinPreviewChangesSaved => 'Changes saved';
-
-  @override
-  String get skinPreviewStorageAlmostFull => 'Storage is almost full';
-
-  @override
-  String get skinPreviewCouldNotUnlockVault => 'Could not unlock the vault';
-
-  @override
-  String get skinSurfaceAndBorderExamples => 'Surfaces and borders';
-
-  @override
-  String get skinFileRowDetailsColor => 'File row details color';
-
-  @override
-  String get skinFileActionOverflowIconColor => 'File row action icon color';
-
-  @override
-  String get skinMatchingElementsHighlightTogether =>
-      'Other preview elements with the same color are highlighted too.';
-
-  @override
-  String get skinStatusBannerTextColor => 'The banner text uses this color.';
 
   @override
   String get apkOpenPackageInstaller => 'Package installer';
@@ -11925,10 +10217,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String abLoopStartedMessage(String start, String end) {
     return 'Repeating $start – $end';
   }
-
-  @override
-  String get abLoopEndTooCloseMessage =>
-      'B must come after A. Move forward and tap again.';
 
   @override
   String get abLoopClearedMessage => 'A-B repeat off';
@@ -12156,9 +10444,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skinSharedPaletteTitle => 'Shared palette';
 
   @override
-  String get skinSharedPaletteShort => 'Shared';
-
-  @override
   String get skinSharedPaletteDescription =>
       'Colors every page inherits until it sets its own. Screens without a section of their own, such as unlock and camera, use these directly.';
 
@@ -12181,178 +10466,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skinResetPageColors => 'Reset page colors';
 
   @override
-  String get skinTokenBackground => 'Page background';
-
-  @override
-  String get skinTokenBackgroundHint =>
-      'The canvas behind everything on this page.';
-
-  @override
-  String get skinTokenText => 'Main text';
-
-  @override
-  String get skinTokenTextHint => 'Titles, names and body text on this page.';
-
-  @override
-  String get skinTokenTextSecondary => 'Secondary text and icons';
-
-  @override
-  String get skinTokenTextSecondaryHint =>
-      'Subtitles, details, hints and quiet icons.';
-
-  @override
-  String get skinTokenAppBar => 'Top bar';
-
-  @override
-  String get skinTokenAppBarHint => 'Fill of the top bar on this page.';
-
-  @override
-  String get skinTokenOnAppBar => 'Top bar text and icons';
-
-  @override
-  String get skinTokenOnAppBarHint => 'Title and icon color on the top bar.';
-
-  @override
-  String get skinTokenCard => 'Cards and rows';
-
-  @override
-  String get skinTokenCardHint => 'Cards, list rows and grouped panels.';
-
-  @override
-  String get skinTokenCardActive => 'Active card';
-
-  @override
-  String get skinTokenCardActiveHint =>
-      'The highlighted card, such as an unlocked vault.';
-
-  @override
-  String get skinTokenRaised => 'Chips and controls';
-
-  @override
-  String get skinTokenRaisedHint =>
-      'Search fields, chips, thumbnails and icon tiles.';
-
-  @override
-  String get skinTokenOverlay => 'Menus, dialogs and sheets';
-
-  @override
-  String get skinTokenOverlayHint =>
-      'Popup menus, dialogs and bottom sheets opened from this page.';
-
-  @override
-  String get skinTokenAccent => 'Accent';
-
-  @override
-  String get skinTokenAccentHint =>
-      'Buttons, links, progress and active icons.';
-
-  @override
-  String get skinTokenOnAccent => 'Text on accent';
-
-  @override
-  String get skinTokenOnAccentHint =>
-      'Labels and icons drawn on accent-filled buttons.';
-
-  @override
-  String get skinTokenSelection => 'Selection';
-
-  @override
-  String get skinTokenSelectionHint =>
-      'Selected rows and highlighted icon tiles.';
-
-  @override
-  String get skinTokenOnSelection => 'Text on selection';
-
-  @override
-  String get skinTokenOnSelectionHint =>
-      'Icons and text drawn on selected items.';
-
-  @override
-  String get skinTokenDivider => 'Dividers';
-
-  @override
-  String get skinTokenDividerHint => 'Thin separator lines and subtle borders.';
-
-  @override
-  String get skinTokenOutline => 'Outlines';
-
-  @override
-  String get skinTokenOutlineHint =>
-      'Stronger borders on outlined buttons and fields.';
-
-  @override
-  String get skinTokenFab => 'Round add button';
-
-  @override
-  String get skinTokenFabHint => 'Fill of the round add button.';
-
-  @override
-  String get skinTokenOnFab => 'Round add button icon';
-
-  @override
-  String get skinTokenOnFabHint => 'The plus icon on the round add button.';
-
-  @override
-  String get skinPreviewConfirm => 'Confirm';
-
-  @override
-  String get skinPreviewCancelButton => 'Cancel';
-
-  @override
-  String get skinPreviewSaveButton => 'Save';
-
-  @override
-  String get skinPreviewRunButton => 'Run';
-
-  @override
-  String get skinPreviewPasteButton => 'Paste here';
-
-  @override
-  String get skinPreviewUnlockButton => 'Unlock';
-
-  @override
-  String get skinPreviewSortChip => 'Sort: Name';
-
-  @override
-  String get skinPreviewSearchChip => 'Search files';
-
-  @override
-  String get skinPreviewPinnedBadge => 'Pinned';
-
-  @override
-  String get skinPreviewVaultsHeader => 'VAULTS';
-
-  @override
-  String get skinPreviewToolsSection => 'File cryptography';
-
-  @override
-  String get skinPreviewToolOne => 'Keyfile and passphrase generator';
-
-  @override
-  String get skinPreviewToolOneHint => 'Generate passwords and keyfiles';
-
-  @override
-  String get skinPreviewToolTwo => 'Checksum and hash verifier';
-
-  @override
-  String get skinPreviewToolTwoHint => 'Verify large files were not corrupted';
-
-  @override
-  String get skinPreviewSettingsSection => 'Security';
-
-  @override
-  String get skinPreviewSettingOne => 'App lock';
-
-  @override
-  String get skinPreviewSettingOneHint => 'Biometrics and auto-lock';
-
-  @override
-  String get skinPreviewSettingTwo => 'Storage';
-
-  @override
-  String get skinPreviewSettingTwoHint => 'External storage and cloud bridges';
-
-  @override
   String get inPlaceEditDone => 'Done';
 
   @override
@@ -12360,9 +10473,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inPlaceEditHint => 'Drag actions between docks or tap to organize';
-
-  @override
-  String get inPlaceEditAvailable => 'Available Actions';
 
   @override
   String get inPlaceEditTopDock => 'Top Bar';
@@ -12658,19 +10768,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String thumbnailGlobalInContainerConfirmMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count vaults follow this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.',
-      one:
-          '1 vault follows this default and will start storing thumbnails inside the vault. That is slower and cannot be used on read-only vaults.',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String get scanAdjustCornersTitle => 'Adjust corners';
 
   @override
@@ -12741,10 +10838,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get createArchiveMediaRecommendation =>
-      'Pre-compressed media files detected. \"Store\" compression auto-selected to save CPU and battery.';
-
-  @override
   String get createArchiveNameLabel => 'Archive Name';
 
   @override
@@ -12754,44 +10847,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createArchiveSelectFormatTooltip => 'Select format';
 
   @override
-  String get createArchiveSecuritySection => 'Security';
-
-  @override
   String get createArchivePasswordLabel => 'Password (Optional)';
-
-  @override
-  String get createArchivePasswordHintText => 'Enter password';
 
   @override
   String get createArchiveConfirmPasswordLabel => 'Confirm Password';
 
   @override
-  String get createArchiveConfirmPasswordHint => 'Repeat password';
-
-  @override
   String get passphraseStrengthFair => 'Fair';
 
   @override
-  String get createArchiveEncryptFilenamesNeedsPassword =>
-      'Requires password to preview files';
-
-  @override
-  String get createArchiveEncryptFilenamesActive =>
-      'Hides file list until unlocked';
-
-  @override
-  String get createArchiveAdvancedOptions => 'Advanced Options';
-
-  @override
   String get createArchiveCompressionLevel => 'Compression Level';
-
-  @override
-  String get createArchiveSplitHintZip =>
-      'Saved as .z01, .z02 … plus a final .zip. Keep all parts together in one folder.';
-
-  @override
-  String get createArchiveSplitHintSevenZip =>
-      'Saved as .7z.001, .7z.002 … Keep all parts together in one folder.';
 
   @override
   String get createArchiveSplitVolumes => 'Split into volumes';
@@ -12832,29 +10897,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get archiveCompressionUltraDesc => 'Smallest size, slower compression';
 
   @override
-  String get officeViewerErrorTitle => 'Can\'t preview this document';
-
-  @override
-  String get officeViewerEncrypted =>
-      'This document is password-protected, and encrypted Office files can\'t be previewed.';
-
-  @override
-  String get officeViewerUnsupported =>
-      'This file couldn\'t be read. It may be damaged, or use a format the viewer doesn\'t support.';
-
-  @override
-  String get officeViewerTooLarge =>
-      'This document is too large to preview in the app.';
-
-  @override
-  String get officeViewerSpeakerNotes => 'Speaker notes';
-
-  @override
   String get fileAssocDocumentViewer => 'In-app Document Viewer';
-
-  @override
-  String get viewOfficeDocumentsInApp =>
-      'Preview Word, Excel, PowerPoint and OpenDocument files in the app';
 
   @override
   String get archiveCompressionMethodLabel => 'Compression method';
@@ -12870,19 +10913,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get archiveMethodDeflateDesc =>
       'Fastest, with larger files and the widest support. Also used by ZIP and .tar.gz.';
-
-  @override
-  String archiveMethodFixedInfo(String format, String method) {
-    return '$format always compresses with $method.';
-  }
-
-  @override
-  String get archiveMethodMoreInSevenZip =>
-      'LZMA2 and LZMA are available in 7-Zip archives.';
-
-  @override
-  String get archiveMethodStoreNote =>
-      'Store doesn\'t compress, so there is no method to choose.';
 
   @override
   String get browserTabsEnabledTitle => 'Use file manager tabs';
@@ -12907,9 +10937,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get browserTabMoveToOtherPane => 'Move to other pane';
 
   @override
-  String get browserTabSwitchPrevious => 'Switch to previous tab';
-
-  @override
   String get browserTabOpenInNewTab => 'Open in new tab';
 
   @override
@@ -12922,9 +10949,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserTabCloseToRight => 'Close tabs to the right';
-
-  @override
-  String get browserTabCloseAll => 'Close all';
 
   @override
   String get dualPaneEnabledTitle => 'Use dual pane';
@@ -13229,22 +11253,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imageEditorAngle => 'Angle';
 
   @override
-  String get fontSizeSmall => 'Small';
-
-  @override
-  String get fontSizeMedium => 'Medium';
-
-  @override
-  String get fontSizeLarge => 'Large';
-
-  @override
-  String get fontSizeExtraLarge => 'Extra Large';
-
-  @override
   String get imageEditorTextPlaceholder => 'DOUBLE TAP HERE TO CHANGE TEXT';
-
-  @override
-  String get imageEditorFontSizePreview => 'Sample preview ABC 123';
 
   @override
   String imageEditorPhotoLabel(int index) {
@@ -13276,9 +11285,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get floatingPlayerAudioOnly => 'Audio only';
-
-  @override
-  String get floatingPlayerShowVideo => 'Show video';
 
   @override
   String get masterLockTitle => 'Master Lock';
@@ -14054,9 +12060,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncCurrentStorageBadge => 'Current';
 
   @override
-  String get vaultSyncChangeStorageTooltip => 'Change storage';
-
-  @override
   String vaultSyncPickFolderTitle(String storage) {
     return 'Folder in $storage';
   }
@@ -14081,9 +12084,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get categoriesSectionTitle => 'Categories';
-
-  @override
-  String get manageCategoriesTooltip => 'Manage categories';
 
   @override
   String get categoryShortcutsTitle => 'Category shortcuts';
@@ -14170,18 +12170,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Lock anyway';
-
-  @override
-  String vaultListingSymbolicLinkCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count symbolic links',
-      one: '1 symbolic link',
-      zero: '0 symbolic links',
-    );
-    return '$_temp0';
-  }
 
   @override
   String vaultListingHiddenEntryCount(int count) {
@@ -14618,9 +12606,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.';
 
   @override
-  String get pimInputHint => 'Empty or 0 for defaults';
-
-  @override
   String get galleryMetadataIndexStorageLabel =>
       'Gallery metadata index storage';
 
@@ -14663,10 +12648,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get musicIndexHiddenFolderOption => 'Hidden folder';
-
-  @override
-  String get musicIndexHiddenFolderDesc =>
-      'Stored in an unencrypted hidden folder in Local Storage.';
 
   @override
   String get libraryStorageHiddenFolder =>

@@ -28,6 +28,7 @@ import 'desktop_crypto.dart';
 import 'desktop_external.dart';
 import 'desktop_hash.dart';
 import 'desktop_images.dart';
+import 'desktop_media_server.dart';
 import 'desktop_mounts.dart';
 import 'desktop_secure_store.dart';
 import 'desktop_split_join.dart';
@@ -85,6 +86,19 @@ class DesktopEngineHost {
   /// "Expose this folder" as a real directory in the OS (FUSE on Linux; see desktop_mounts.dart) -- the
   /// desktop counterpart of Android's DocumentsProvider.
   late final DesktopMounts _mounts = DesktopMounts(pool: pool);
+
+  DesktopMediaServer? _mediaServer;
+
+  /// Streams decrypted vault files to the desktop video player over loopback HTTP (see
+  /// desktop_media_server.dart). Created on first use; its socket only listens while a video is open.
+  /// Sessions of a vault end when it is locked, and all of them at shutdown.
+  DesktopMediaServer get mediaServer => _mediaServer ??= DesktopMediaServer(
+        sizeOf: (vol, path) async => await pool.call('fileSize', [vol, path]) as int,
+        readRange: (vol, path, offset, length) async {
+          final r = await pool.call('read', [vol, path, offset, length]) as List<Object?>;
+          return r[0] == veOk ? r[1] as Uint8List : null;
+        },
+      );
 
   final Map<String, int> _volByUri = {};
   final Map<int, String> _uriByVol = {};
@@ -1018,6 +1032,7 @@ class DesktopEngineHost {
   Future<bool> _lock(String uri) async {
     final vol = _volByUri[uri];
     if (vol == null) return true; // already locked
+    await _mediaServer?.closeVolume(vol); // stop streaming before the keys go
     await pool.call('lock', [vol]);
     _forget(vol);
     await _external.cleanupVolume(vol);
@@ -1027,6 +1042,7 @@ class DesktopEngineHost {
   // ── sessions ───────────────────────────────────────────────────────────
 
   void _forget(int vol) {
+    unawaited(_mediaServer?.closeVolume(vol));
     _mounts.forgetVolume(vol); // the engine unmounts a slot's mounts when it locks it
     final uri = _uriByVol.remove(vol);
     if (uri != null) _volByUri.remove(uri);
@@ -1323,6 +1339,7 @@ class DesktopEngineHost {
 
   Future<void> dispose() async {
     _pump?.cancel();
+    await _mediaServer?.closeAll();
     for (final vol in _uriByVol.keys.toList()) {
       await pool.call('lock', [vol]);
     }

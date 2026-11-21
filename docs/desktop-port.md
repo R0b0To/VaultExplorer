@@ -204,6 +204,44 @@ a link to a folder is listed as `LD|0|mtime|name`.
   (inside the vault and to/from a real VeraCrypt container), streams, exports/imports, mounts read-only, locks
   and re-unlocks, and changes the password, for all three formats.
 
+## Video playback (Linux and Windows)
+
+Status: written against the media_kit / libmpv sources and the engine's read path, the loopback server is
+tested (`test/core/engine/desktop/desktop_media_server_test.dart`), but the Flutter side has **not been compiled
+or run** (no Flutter SDK or desktop where it was written): run `flutter pub get && flutter analyze`, then play a
+few files.
+
+```
+media viewer -> NativeVideoController -> VideoPlaybackBackend
+                                           |- NativeMedia3Controller   (Android, unchanged)
+                                           '- DesktopVideoBackend      (Linux / Windows: libmpv via media_kit)
+                                                  |  http://127.0.0.1:<port>/<token>/video.<ext>
+                                                  v
+                                            DesktopMediaServer  --pool 'read'--> engine (decrypts)
+```
+
+- **Nothing decrypted touches storage.** The player reads a loopback HTTP URL, served by `DesktopMediaServer`
+  (`desktop_media_server.dart`) straight from the unlocked vault with `Range` support. The socket exists only
+  while a video is open, is bound to 127.0.0.1, and each session has its own random 128-bit token in the path;
+  `Host` must be 127.0.0.1/localhost with the right port. A session ends when the player closes it, when its
+  vault is locked (the host calls `closeVolume` before `ve_lock`) and at exit.
+- **mpv hardening** (`DesktopVideoBackend._lockDownPlayer`): media_kit turns on mpv's `cache-on-disk`, which
+  would spool the decrypted stream into a temp file -- it is switched off and playback is refused if mpv does not
+  confirm that. Only the `http` / `tcp` protocols are allowed (`file` for plain local-storage items), so a
+  container referencing other files or URLs cannot make mpv read them; sidecar subtitle / audio auto-loading is off.
+- **What maps over:** play / pause / seek / speed / loop / volume, A-B loop (mpv `ab-loop-a/b`), audio and
+  subtitle track selection (embedded text subtitles reach the viewer's own caption layer through
+  `captionText`), volume boost and the 10-band equalizer (an mpv `lavfi` filter chain, `audioFilterChain`),
+  decoder mode (`hwdec`: auto -> `auto-safe`, hardware -> `auto`, software / ffmpeg -> `no`), resume position
+  (`Media.start`), diagnostics (hwdec, codecs, dropped frames).
+- **Not on desktop:** scrub-preview frames (the viewer hides the preview), picture-in-picture, background
+  playback / media notification, graphical (PGS / VobSub) subtitles in the viewer's caption layer.
+- **Dependencies** (see NOTICE.md): `media_kit`, `media_kit_video`, `media_kit_libs_linux`,
+  `media_kit_libs_windows_video`. Linux: `sudo apt install libmpv-dev` to build, `libmpv2` at run time. Windows:
+  the libs package downloads libmpv while building (needs Developer Mode for symlinks, and 7-Zip/tar available).
+  Without libmpv the app still runs; opening a video shows an "install libmpv" error. `pubspec.lock` was not
+  regenerated.
+
 ## Not yet
 
 - Engine-channel coverage: of the 375 methods the Dart layer calls, the desktop host answers 107 and answers
@@ -219,8 +257,9 @@ a link to a folder is listed as `LD|0|mtime|name`.
   ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.
 - Windows: folder vaults (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
   MinGW, and re-running the engine smoke test after the rebase.
-- Archives, video thumbnails, media playback, PDF, camera, video/audio editing -- need their
-  desktop backends (they are platform code on Android).
+- Archives, video thumbnails, PDF, camera, video/audio editing -- need their
+  desktop backends (they are platform code on Android). Video **playback** is done (below); video
+  thumbnails, scrub-preview frames, picture-in-picture and background playback / media session are not.
 - Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification
   (the engine still rejects an illegal name when it writes it).
 - Share sheet; JPEG/WebP encoding for the image editor (PNG only for now).

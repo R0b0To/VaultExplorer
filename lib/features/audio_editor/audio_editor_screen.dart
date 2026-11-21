@@ -500,7 +500,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
 
     final nextMuted = !_isMuted;
     if (nextMuted) {
-      final currentVolume = player.media3Controller.currentVolume;
+      final currentVolume = player.currentVolume;
       if (currentVolume > 0) _volumeBeforeMute = currentVolume;
     }
     setState(() => _isMuted = nextMuted);

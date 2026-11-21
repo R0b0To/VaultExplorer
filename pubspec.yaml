@@ -16,6 +16,13 @@ dependencies:
   ffi: ^2.1.4            # dart:ffi helpers (desktop engine bindings)
   file_selector: ^1.0.3  # container picker on Linux/Windows
   flutter_secure_storage: ^9.2.4  # desktop secret store (OS keyring: libsecret on Linux)
+  # Desktop video playback (libmpv). media_kit / media_kit_video are plain Dart/FFI + a small texture plugin;
+  # the native libmpv comes from the two platform packages, which only build on their own platform (Linux needs
+  # libmpv-dev at build time and libmpv2 at run time; Windows downloads a libmpv build while building).
+  media_kit: ^1.1.10
+  media_kit_video: ">=1.2.3 <3.0.0"
+  media_kit_libs_linux: ^1.1.3
+  media_kit_libs_windows_video: ^1.0.9
   dynamic_color: ^2.1.0
   flutter_riverpod: ^3.4.2
   riverpod_annotation: ^4.0.6

@@ -7,10 +7,13 @@
 #include <cstring>
 #include <deque>
 #include <fcntl.h>
-#include <sys/stat.h>
+#if !defined(_WIN32)
+#include <sys/stat.h>   // (on MinGW it #defines stat to _stat64, which would rename Storage::stat)
 #include <unistd.h>
+#endif
 
 #include "fv_json.h"
+#include "fv_os.h"
 #include "fv_pool.h"
 #include "fv_util.h"
 
@@ -387,6 +390,9 @@ Bytes rebuildConfigKeepingKey(const Bytes& oldRaw, const Secret& combined, const
 
 static bool mkdirs(const std::string& path) {
     if (path.empty()) return false;
+#if defined(_WIN32)
+    return osMkdirs(path);   // drive / UNC roots, '\\' separators, UTF-16
+#else
     std::string cur;
     size_t i = 0;
     if (path[0] == '/') { cur = "/"; i = 1; }
@@ -402,25 +408,26 @@ static bool mkdirs(const std::string& path) {
         i = j + 1;
     }
     return true;
+#endif
 }
 
 static bool writeFileAtomic(const std::string& target, const std::string& data) {
     std::string tmp = target + ".tmp";
-    int fd = ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    int fd = osOpen(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
     if (fd < 0) return false;
     bool ok;
     {
         FdFile f(fd);
         ok = f.writeAll((const uint8_t*)data.data(), data.size()) && f.sync();
     }
-    if (!ok) { ::unlink(tmp.c_str()); return false; }
-    if (::rename(tmp.c_str(), target.c_str()) != 0) { ::unlink(target.c_str()); return ::rename(tmp.c_str(), target.c_str()) == 0; }
+    if (!ok) { osUnlink(tmp.c_str()); return false; }
+    if (osRename(tmp.c_str(), target.c_str()) != 0) { osUnlink(target.c_str()); return osRename(tmp.c_str(), target.c_str()) == 0; }
     return true;
 }
 
 static std::string slurpText(const std::string& path, bool& ok) {
     ok = false;
-    FILE* f = std::fopen(path.c_str(), "rb");
+    FILE* f = osFopen(path.c_str(), "rb");
     if (!f) return {};
     std::string s;
     char buf[8192];
@@ -479,7 +486,7 @@ std::unique_ptr<LocalIntegrityState> LocalIntegrityState::open(const std::string
             s->pendingLines_++;
         }
     }
-    s->log_ = std::fopen((s->dir_ + "/integritydata.log").c_str(), "ab");
+    s->log_ = osFopen((s->dir_ + "/integritydata.log").c_str(), "ab");
     if (!s->log_) throw Error(Err::Io, "cannot open CryFS integrity log");
     return s;
 }
@@ -504,7 +511,7 @@ void LocalIntegrityState::append(const std::string& key, uint64_t version, bool 
     std::string line = key + "=" + std::to_string(version) + "\n";
     std::fwrite(line.data(), 1, line.size(), log_);
     std::fflush(log_);
-    if (durable) ::fsync(::fileno(log_));
+    if (durable) osFsync(osFileno(log_));
     // Every record is flushed right away, so compaction is only about bounding the log. Rewriting the whole
     // snapshot every 200 records made first reads quadratic in the number of blocks; compacting once the log is as
     // long as the snapshot (never more often than every 200 records) is amortised O(1) per record.
@@ -517,9 +524,9 @@ void LocalIntegrityState::compact() {
     for (auto& kv : last_) snap.set("L:" + kv.first.hex(), json::Value::string(std::to_string(kv.second)));
     writeFileAtomic(dir_ + "/integritydata.snapshot", snap.dump(0));
     std::fclose(log_);
-    log_ = std::fopen((dir_ + "/integritydata.log").c_str(), "wb");   // truncate
-    if (log_) { std::fflush(log_); ::fsync(::fileno(log_)); std::fclose(log_); }
-    log_ = std::fopen((dir_ + "/integritydata.log").c_str(), "ab");
+    log_ = osFopen((dir_ + "/integritydata.log").c_str(), "wb");   // truncate
+    if (log_) { std::fflush(log_); osFsync(osFileno(log_)); std::fclose(log_); }
+    log_ = osFopen((dir_ + "/integritydata.log").c_str(), "ab");
     pendingLines_ = 0;
 }
 

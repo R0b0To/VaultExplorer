@@ -75,13 +75,14 @@ those lines back and they become the to-do list.
 Status: the engine builds as a self-contained `vaultexplorer_engine.dll` and **passes the full engine smoke
 test (300 checks: FAT / exFAT / NTFS / ext4, creation, hidden volumes, password change, crypto, digests,
 single-file tool) when run under Wine.** That is a strong signal, not a substitute for running it on real
-Windows: please run the test there once (below). The Flutter side (runner, bundling, file dialogs, secret
-store) has not been tried on Windows at all.
+Windows: please run the test there once (below). The Flutter runner has now launched on Windows with
+`VE_ENGINE_LIBRARY`; DLL bundling, file dialogs and the secret store still need a fuller check.
 
 Build the engine (either way produces the same DLL):
 
     scripts/build_desktop_engine_windows.sh                # from Linux, cross-compiling with MinGW-w64
-    # or, natively in an MSYS2 UCRT64 shell:
+    # or, natively in an MSYS2 UCRT64 shell (install these tools once):
+    pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc git
     cmake -S android/app/src/main/cpp -B build/desktop-engine-win -G Ninja -DVAULTEXPLORER_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release
     cmake --build build/desktop-engine-win --target vaultexplorer ve_smoke_test
 
@@ -98,6 +99,13 @@ Run the app on Windows:
 
    (or set `VE_ENGINE_LIBRARY` to the DLL's full path while developing).
 3. `flutter pub get && flutter run -d windows`
+
+For repeat builds from PowerShell, run `scripts/build_windows.ps1 -Run`. It prepares Flutter packages when
+`.dart_tool/package_config.json` is missing, rebuilds `vaultexplorer_engine.dll` with the MSYS2 UCRT64 toolchain,
+builds the Flutter Windows app, copies the DLL next to the runner, and optionally starts it. Add `-PubGet` to
+force a package refresh, `-Configuration Release` for a release build, or `-Msys2Root <path>` when MSYS2 is not
+installed at `C:\msys64`. The script stops if the app is open, so close it before rebuilding. It checks for the
+MSYS2 UCRT64 CMake, Ninja, GCC and G++ tools but does not install them; see the package command above.
 
 What the Windows port changed, and why (all behind the desktop/Windows switches, so Android is unchanged):
 
@@ -168,7 +176,7 @@ Closing the window runs a clean-up first (`AppLifecycleListener.onExitRequested`
 locked (its key material wiped in the engine) and any decrypted "open with" copies are deleted, rather than
 relying on the next start's purge. A crash or kill -9 still falls back to that purge.
 
-## Folder vaults (gocryptfs / Cryptomator / CryFS) -- Linux
+## Folder vaults (gocryptfs / Cryptomator / CryFS) -- Linux and Windows
 
 Main (v1.50) moved the three formats into a platform-neutral C++ core (`foldervault/`, linked as
 `foldervault_core`); the desktop engine reaches it through `ffi/ve_foldervault.cpp`, the desktop twin of
@@ -197,9 +205,16 @@ a link to a folder is listed as `LD|0|mtime|name`.
 - The CryFS derived key (Android's "remember" fast path) is not surfaced: there is no keystore on desktop.
 - The NFC filename normaliser hook (`fv::setNfcNormalizer`) is not installed, so only non-ASCII names that
   arrive in decomposed form are affected (see `foldervault/README.md`).
-- **Windows:** not available yet. `foldervault/fv_storage.cpp` is POSIX-only (`opendir`, `fstatat`, `statvfs`,
-  `utimensat`), so the core is not built there and `ve_fv_*` answer "not available" (`ve_fv_supported()==0`,
-  `VE_NO_FOLDERVAULT`). It needs a Win32 storage backend.
+- **Windows:** `foldervault/fv_storage_win.cpp` is the Win32 twin of the POSIX-only `fv_storage.cpp` (same
+  `fv::PosixStorage` interface; UTF-16 paths in the `\\?\` form, so no MAX_PATH limit and no DOS device names;
+  path segments with `\`, `:` or wildcards are refused; only real symlinks / junctions count as links, not OneDrive
+  placeholders). The few raw host-file calls in the CryFS code and in import/export go through `foldervault/fv_os.h`
+  (UTF-8 -> UTF-16, binary mode; plain POSIX calls elsewhere). CMake builds the core on Windows and no longer defines
+  `VE_NO_FOLDERVAULT`. Before this, every `ve_fv_*` call was a stub (`ve_fv_supported()==0`, probe "not a vault"),
+  which showed up as "no config file found" / "folder not empty". `foldervault_storage_test` (CMake target; also
+  runs on Linux) covers the empty-folder -> create -> detect -> unlock -> work -> unlock-again cycle for all three
+  formats plus Unicode and over-long paths: 310 checks on Linux, 321 on Windows **under Wine** (not real Windows --
+  no NTFS sharing rules, antivirus or OneDrive -- and not through the Flutter UI).
 - Tested: `ve_smoke_test fv` (also part of the default run) creates, unlocks, writes, lists, renames, copies
   (inside the vault and to/from a real VeraCrypt container), streams, exports/imports, mounts read-only, locks
   and re-unlocks, and changes the password, for all three formats.
@@ -255,7 +270,7 @@ media viewer -> NativeVideoController -> VideoPlaybackBackend
 - In-place growth (new in this main): `expandVeraCryptContainer`, `expandLuksContainer`, `growVeraCryptFileSystem`,
   `growLuksFileSystem`. The engine already has `fsGrowToFit` (NTFS and ext2/3/4; FAT/exFAT report unsupported); it only needs
   ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.
-- Windows: folder vaults (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
+- Windows: folder vaults on a real Windows machine (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
   MinGW, and re-running the engine smoke test after the rebase.
 - Archives, video thumbnails, PDF, camera, video/audio editing -- need their
   desktop backends (they are platform code on Android). Video **playback** is done (below); video

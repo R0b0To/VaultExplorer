@@ -127,8 +127,8 @@ directories (`ve_mount_test places`, and through the real-mount test).
   of `fusermount3 -u` failing with EBUSY, so it is decided from the open-handle count).
 * Overwrite arrives as `truncate(path, 0, fi)`, not `O_TRUNC`; create arrives as `create` with
   `O_CREAT|O_EXCL|O_RDWR`. Both are handled by `MountFs`.
-* Not available on Windows yet regardless of the mount: folder vaults (the POSIX storage backend is not
-  ported), so only FAT / exFAT / NTFS / ext containers can be mounted there.
+* Folder vaults on Windows use `foldervault/fv_storage_win.cpp` (see `docs/desktop-port.md`); only tested under Wine
+  so far. They mount through the same `MountFs` slot path as on Linux.
 * Unverified: everything that needs a running WinFsp (mount, Explorer behaviour, eject detection, lock while
   mounted). The code compiles against WinFsp's real headers with MinGW only.
 * This repo's own Windows cross-build did not complete on Ubuntu 24.04's MinGW (pre-existing, unrelated to
@@ -151,7 +151,7 @@ this process is both FUSE server and (through children) client, so a bug would o
 
 ## Known limits / follow-ups
 
-* Windows: see above (untested); folder vaults are not built on Windows at all yet.
+* Windows: see above (untested on real Windows; folder vaults only exercised under Wine).
 * macOS not covered.
 * Reads go through `ve_read_file_chunk` per request (open/seek/read/close inside the backend); the
   stream API would be cheaper for large sequential reads.

@@ -516,51 +516,61 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_S
 # foldervault/fv_vault.h). The shared primitives it builds on (scrypt, EME,
 # AES-SIV, XChaCha20, the CryFS block cipher) stay in crypto/ and are linked in
 # by the final target, so they are deliberately not listed here.
-# Windows desktop: fv_storage.cpp is POSIX-only (opendir/fstatat/statvfs/utimensat), so the core is not built there yet and
-# ffi/ve_foldervault.cpp compiles to "unsupported" stubs (VE_NO_FOLDERVAULT).
+# Windows: fv_storage.cpp is POSIX-only (opendir/fstatat/statvfs/utimensat), so Windows builds foldervault/fv_storage_win.cpp
+# instead -- the same Storage interface (PosixStorage) on the Win32 API, UTF-16 and \\?\ paths. The rest of the core
+# is platform-neutral.
 set(VE_FV_LIB "")
 set(VE_VOLMAN_LIB "")
-if(NOT (VAULTEXPLORER_DESKTOP AND WIN32))
-    add_library(foldervault_core STATIC
-            foldervault/fv_common.cpp
-            foldervault/fv_crypto.cpp
-            foldervault/fv_storage.cpp
-            foldervault/fv_engine.cpp
-            foldervault/fv_json.cpp
-            foldervault/fv_gocryptfs.cpp
-            foldervault/fv_gocryptfs_vault.cpp
-            foldervault/fv_cryptomator.cpp
-            foldervault/fv_cryptomator_vault.cpp
-            foldervault/fv_cryfs.cpp
-            foldervault/fv_cryfs_vault.cpp
-            foldervault/fv_check.cpp
-            foldervault/fv_formats.cpp
-            foldervault/fv_check_gocryptfs.cpp
-            foldervault/fv_check_cryptomator.cpp
-            foldervault/fv_check_cryfs.cpp)
-    set_target_properties(foldervault_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    target_compile_features(foldervault_core PUBLIC cxx_std_20)
-    target_compile_options(foldervault_core PRIVATE -Wall -Wextra)
-    # 32-bit ABIs (armeabi-v7a, x86) have a 32-bit off_t unless this is defined. Without it, files >= 2 GiB are
-    # invisible in directory listings (fstatat -> EOVERFLOW) and cannot be read. The vaultexplorer target already
-    # sets it, but this library is a separate target. No header exposes off_t, so PRIVATE is safe.
-    target_compile_definitions(foldervault_core PRIVATE _FILE_OFFSET_BITS=64)
-    target_include_directories(foldervault_core PUBLIC
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${mbedtls_SOURCE_DIR}/include)
-    target_link_libraries(foldervault_core PUBLIC mbedcrypto)
-    if(ANDROID)
-        # Bulk AEAD through BoringSSL's EVP (what the app used before the move to
-        # C++; ARMv8 AES+PMULL) and the user-entropy mixing for creation flows.
-        target_compile_definitions(foldervault_core PRIVATE FV_AEAD_EVP=1 FV_USE_USERENTROPY=1)
-        target_link_libraries(foldervault_core PUBLIC crypto)
-    endif()
-    if(VAULTEXPLORER_DESKTOP)
-        # Same key-generation entropy mixing as Android (crypto/user_entropy.cpp is part of the engine).
-        target_compile_definitions(foldervault_core PRIVATE FV_USE_USERENTROPY=1)
-    endif()
-    set(VE_FV_LIB foldervault_core)
+if(WIN32)
+    set(VE_FV_STORAGE_SOURCE foldervault/fv_storage_win.cpp)
+else()
+    set(VE_FV_STORAGE_SOURCE foldervault/fv_storage.cpp)
 endif()
+add_library(foldervault_core STATIC
+        foldervault/fv_common.cpp
+        foldervault/fv_crypto.cpp
+        ${VE_FV_STORAGE_SOURCE}
+        foldervault/fv_engine.cpp
+        foldervault/fv_json.cpp
+        foldervault/fv_gocryptfs.cpp
+        foldervault/fv_gocryptfs_vault.cpp
+        foldervault/fv_cryptomator.cpp
+        foldervault/fv_cryptomator_vault.cpp
+        foldervault/fv_cryfs.cpp
+        foldervault/fv_cryfs_vault.cpp
+        foldervault/fv_check.cpp
+        foldervault/fv_formats.cpp
+        foldervault/fv_check_gocryptfs.cpp
+        foldervault/fv_check_cryptomator.cpp
+        foldervault/fv_check_cryfs.cpp)
+set_target_properties(foldervault_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(foldervault_core PUBLIC cxx_std_20)
+target_compile_options(foldervault_core PRIVATE -Wall -Wextra)
+# 32-bit ABIs (armeabi-v7a, x86) have a 32-bit off_t unless this is defined. Without it, files >= 2 GiB are
+# invisible in directory listings (fstatat -> EOVERFLOW) and cannot be read. The vaultexplorer target already
+# sets it, but this library is a separate target. No header exposes off_t, so PRIVATE is safe.
+target_compile_definitions(foldervault_core PRIVATE _FILE_OFFSET_BITS=64)
+if(WIN32)
+    # windows.h must not define min()/max() (the code uses std::min/std::max); fv_crypto.cpp draws its random
+    # bytes from BCryptGenRandom.
+    target_compile_definitions(foldervault_core PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(foldervault_core PUBLIC bcrypt)
+endif()
+target_include_directories(foldervault_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${mbedtls_SOURCE_DIR}/include)
+target_link_libraries(foldervault_core PUBLIC mbedcrypto)
+if(ANDROID)
+    # Bulk AEAD through BoringSSL's EVP (what the app used before the move to
+    # C++; ARMv8 AES+PMULL) and the user-entropy mixing for creation flows.
+    target_compile_definitions(foldervault_core PRIVATE FV_AEAD_EVP=1 FV_USE_USERENTROPY=1)
+    target_link_libraries(foldervault_core PUBLIC crypto)
+endif()
+if(VAULTEXPLORER_DESKTOP)
+    # Same key-generation entropy mixing as Android (crypto/user_entropy.cpp is part of the engine).
+    target_compile_definitions(foldervault_core PRIVATE FV_USE_USERENTROPY=1)
+endif()
+set(VE_FV_LIB foldervault_core)
 
 # Transfer helpers: content hashing (MD5 / SHA-1 / SHA-256 / SHA-512, several in one pass)
 # and splitting / joining files into numbered parts, on abstract byte sources and sinks.
@@ -857,7 +867,9 @@ if(VAULTEXPLORER_DESKTOP)
         target_link_libraries(vaultexplorer ${CMAKE_DL_LIBS})
         target_sources(vaultexplorer PRIVATE ffi/ve_mount_places.cpp)  # sidebar entries (Dolphin / GTK bookmarks)
     endif()
-    if(WIN32)
+    # (Windows used to define VE_NO_FOLDERVAULT here -- the "unsupported" stubs in ffi/ve_foldervault.cpp. The core now builds
+    # there; only a build without foldervault_core would still need the stubs.)
+    if(NOT VE_FV_LIB)
         target_compile_definitions(vaultexplorer PRIVATE VE_NO_FOLDERVAULT=1)
     endif()
     if(WIN32)
@@ -1088,6 +1100,11 @@ if(NOT ANDROID)
     add_executable(fvcli foldervault/test/fvcli.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(fvcli foldervault_core mbedcrypto)
     list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_test)
+    # The same scenarios on any platform's directory storage (Windows: fv_storage_win.cpp): empty-folder listing,
+    # create / find the config / unlock / work / unlock again for all three formats, Unicode and over-long paths.
+    add_executable(foldervault_storage_test foldervault/test/fv_storage_test.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(foldervault_storage_test foldervault_core mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_storage_test)
 
     # Volume manager: slots, streams, copy and close semantics on an in-memory
     # volume, plus real gocryptfs / Cryptomator / CryFS vaults behind the same

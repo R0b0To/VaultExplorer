@@ -14,7 +14,7 @@
 #include <mbedtls/platform_util.h>
 
 #include "session_prepare.h"
-#include "session_guard.h"
+#include "session_guard_jni.h"
 #include "lock_policy.h"
 #include "volume_state.h"
 #include "container_format.h"

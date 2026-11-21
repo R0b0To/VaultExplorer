@@ -38,32 +38,7 @@ extern jclass g_containerSessionRegistryClass;
 extern jmethodID g_yieldWriteLockBrieflyMethod;
 extern jmethodID g_yieldCopyLocksBrieflyMethod;
 
-void reportUnlockProgress(int volId, int attempted, int total, int hashId,
-                          int cipherId, int format = 0, int slot = 0);
-void reportSplitJoinProgress(int opId, uint64_t bytesDone, uint64_t bytesTotal);
-bool isSplitJoinCancelled(int opId);
-void notifyHiddenVolumeProtectionTriggered(int volId);
-void reportRepairLog(int opId, const char* message);
-void reportCopyProgress(int opId, uint64_t bytesDelta);
-bool isCopyCancelled(int opId);
-void reportImportChunkProgress(int opId, uint64_t bytesDelta);
-bool isImportCancelled(int opId);
-bool isImportTracking(int opId);
-void reportExportChunkProgress(int opId, uint64_t bytesDelta);
-bool isExportCancelled(int opId);
-bool isExportTracking(int opId);
-
-// Unified writeBack / extract progress and cancellation dispatch:
-void reportWriteBackChunkProgress(int opId, uint64_t bytesWritten);
-bool isWriteBackCancelled(int opId);
-void reportExtractChunkProgress(int opId, uint64_t bytesWritten);
-bool isExtractCancelled(int opId);
-
-void yieldContainerWriteLock(int volId);
-void yieldContainerCopyLocks(int srcVolId, int destVolId);
-
-bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount,
-                    unsigned char* outBuf);
-bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount,
-                     const unsigned char* inBuf);
-bool usbSyncDevice(int volId);
+// The engine-facing callbacks (progress, cancellation, lock yielding, USB I/O) are declared in
+// platform/engine_hooks.h, which has no JNI types; this header keeps only the JVM globals that
+// jni_callbacks.cpp and the bridges use to implement them.
+#include "platform/engine_hooks.h"

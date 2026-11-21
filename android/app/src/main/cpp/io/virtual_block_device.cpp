@@ -10,7 +10,7 @@
 #include <vector>
 #include <cstdarg>
 #include <cstdio>
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include "ff.h"
 #include "diskio.h"
 #include "crypto/cascade.h"
@@ -28,13 +28,13 @@
 #include "filesystem_paths.h"
 #include "ntfs_backend.h"
 #include "volume_state.h"
-#include "jni_callbacks.h"
+#include "platform/engine_hooks.h"
 #include "block_io.h"
 #include "backing_flush.h"
 #include "filesystems/stream_handles.h"
 #include "virtual_block_device.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 
 extern "C" {
 #include "device.h"

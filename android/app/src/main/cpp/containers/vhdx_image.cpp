@@ -8,9 +8,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-#include <android/log.h>
+#include "platform/engine_log.h"
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_VHDX", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_VHDX", __VA_ARGS__)
 
 namespace {
 

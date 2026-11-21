@@ -17,7 +17,7 @@
 #include "filesystems/fs_ops.h"
 #define DIR FatFs_DIR
 #include "session/volume_state.h"
-#include "session/session_guard.h"
+#include "session_guard_jni.h"
 #undef DIR
 #include "virtual_block_device.h"
 #include "jni_bridge_common.h"

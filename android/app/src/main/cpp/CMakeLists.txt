@@ -558,6 +558,7 @@ add_library(
         filesystems/ntfs_backend.cpp
         filesystems/fs_ops.cpp
         session/session_guard.cpp
+        jni/session_guard_jni.cpp
         containers/container_header.cpp
         containers/container_utils.cpp
         containers/container_repair.cpp
@@ -718,9 +719,10 @@ if(NOT ANDROID)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
     add_executable(fd_write_buffer_test io/test/fd_write_buffer_test.cpp)
     # UsbBlockCache coherence (write ordering across the two streams, read-ahead
-    # invalidation, failed-flush retry). Header-only class; jni_callbacks.h only
-    # declares JNI globals, so the stub <jni.h> from the ext backend host test
-    # is enough and no JDK is needed.
+    # invalidation, failed-flush retry). Header-only class. Its host callbacks are
+    # declared in platform/engine_hooks.h (no JNI types), so no <jni.h> is needed
+    # at all; the stub include dirs below date from when it pulled in jni_callbacks.h
+    # and are no longer required.
     add_executable(usb_block_cache_test io/test/usb_block_cache_test.cpp)
     target_include_directories(usb_block_cache_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
@@ -734,7 +736,7 @@ if(NOT ANDROID)
     add_executable(vc_free_space_fill_test containers/test/vc_free_space_fill_test.cpp)
     target_include_directories(vc_free_space_fill_test BEFORE PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/containers/test/host_stubs)
-    # Lock ordering policy, driven with the real UsbBlockCache (stub <jni.h> as above).
+    # Lock ordering policy, driven with the real UsbBlockCache (no <jni.h> needed, as above).
     add_executable(lock_policy_test session/test/lock_policy_test.cpp)
     target_include_directories(lock_policy_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
@@ -876,6 +878,21 @@ if(NOT ANDROID)
     target_link_libraries(prims_test mbedcrypto)
     list(APPEND VAULTEXPLORER_HOST_TESTS prims_test)
 
+    # Logging shim of the portable engine (platform/engine_log.h), non-Android path: levels, tags,
+    # formatting, truncation, and installing a sink while other threads log.
+    add_executable(engine_log_test platform/test/engine_log_test.cpp)
+    target_include_directories(engine_log_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    list(APPEND VAULTEXPLORER_HOST_TESTS engine_log_test)
+
+    # Default (do-nothing) engine hooks for builds without a JVM (platform/engine_hooks_default.cpp):
+    # links on its own, defines every hook declared in platform/engine_hooks.h, and behaves as
+    # documented. Built with no <jni.h> and no <android/...> anywhere on the include path.
+    add_executable(engine_hooks_default_test
+            platform/test/engine_hooks_default_test.cpp
+            platform/engine_hooks_default.cpp)
+    target_include_directories(engine_hooks_default_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    list(APPEND VAULTEXPLORER_HOST_TESTS engine_hooks_default_test)
+
     # Transfer helpers: hashing against known answers (vectors from hashlib), part naming and
     # sequence resolution, split / join on in-memory streams (part boundaries, cancel, write /
     # close / read failures) and on real files (round trips, UTF-8 names, refusing to overwrite
@@ -965,6 +982,15 @@ if(NOT ANDROID)
     add_test(NAME volman_test COMMAND volman_test)
     add_test(NAME xfer_test COMMAND xfer_test)
     add_test(NAME prims_test COMMAND prims_test)
+    add_test(NAME engine_log_test COMMAND engine_log_test)
+    add_test(NAME engine_hooks_default_test COMMAND engine_hooks_default_test)
+    # The portable engine must not include JNI or Android headers (static check, no compiler needed).
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_FOUND)
+        add_test(NAME engine_portable
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../scripts/check_engine_portable.py)
+    endif()
     if(TARGET volman_block_test)
         add_test(NAME volman_block_test COMMAND volman_block_test)
     endif()

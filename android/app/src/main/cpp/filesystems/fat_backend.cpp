@@ -1,7 +1,7 @@
 #include "fat_backend.h"
 #include "dir_entry_wire.h"
 #include <algorithm>
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include <chrono>
 #include <cstring>
 #include <fcntl.h>
@@ -65,7 +65,7 @@ void noteFatError(int volumeId, FRESULT fr) {
 // layer reports as "disk full" whatever the real cause was. Logging the
 // FatFs result code (no file names) keeps a field report diagnosable.
 void logFatFailure(const char* op, int volumeId, FRESULT fr) {
-    __android_log_print(ANDROID_LOG_WARN, "VaultExplorer_FatIO",
+    ENGINE_LOG_WARN("VaultExplorer_FatIO",
                         "%s failed: vol=%d fr=%d", op, volumeId, static_cast<int>(fr));
     noteFatError(volumeId, fr);
 }
@@ -104,7 +104,7 @@ void recoverFatIfNeeded(int volumeId) {
         v.decryptedBlockCache.clear();
     }
     const FRESULT fr = f_mount(&v.fatfs, drivePaths[volumeId], 1);
-    __android_log_print(ANDROID_LOG_WARN, "VaultExplorer_FatIO",
+    ENGINE_LOG_WARN("VaultExplorer_FatIO",
                         "recovery remount: vol=%d fr=%d", volumeId, static_cast<int>(fr));
     if (fr == FR_OK) v.fatNeedsRemount = false;
 }
@@ -400,7 +400,7 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
 
     const auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - opStart).count();
-    __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_FatIO",
+    ENGINE_LOG_INFO("VaultExplorer_FatIO",
         "WRITE_BACK target=%s bytes=%llu chunks=%d totalMs=%lld readMs=%lld writeMs=%lld ok=%d",
         targetPath.c_str(), (unsigned long long)totalBytes, chunkCount,
         (long long)totalMs, (long long)(readNanos / 1000000), (long long)(writeNanos / 1000000),

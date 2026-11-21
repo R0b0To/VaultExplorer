@@ -8,7 +8,7 @@
 #include <vector>
 #include <sys/stat.h>
 #include <openssl/sha.h>
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include "block_io.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
@@ -27,7 +27,7 @@
 
 #undef min
 #undef max
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Composite", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_Composite", __VA_ARGS__)
 
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 

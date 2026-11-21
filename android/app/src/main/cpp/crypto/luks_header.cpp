@@ -18,7 +18,7 @@
 #include <thread>
 #include "thread_pool.h"
 #include <unistd.h>
-#include <android/log.h>
+#include "platform/engine_log.h"
 #include <cJSON.h>
 
 #include "mbedtls/md.h"
@@ -30,7 +30,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 
 const uint8_t LUKS_MAGIC[6] = {'L', 'U', 'K', 'S', 0xBA, 0xBE};
 static constexpr uint8_t LUKS2_SECONDARY_MAGIC[6] = {'S', 'K', 'U', 'L', 0xBA, 0xBE};

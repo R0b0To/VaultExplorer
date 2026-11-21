@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <vector>
 
-#include <android/log.h>
+#include "platform/engine_log.h"
 
 #include "container_format.h"
 #include "bitlocker_backend.h"
@@ -30,14 +30,14 @@
 #include "crypto/luks_header.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/xts_tweak.h"
-#include "jni_callbacks.h"
+#include "platform/engine_hooks.h"
 #include "volume_state.h"
 #include "block_io.h"
 
 #undef min
 #undef max
 
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define LOGI(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
 
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
 

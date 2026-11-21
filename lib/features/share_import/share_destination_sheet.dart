@@ -9,6 +9,7 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_page_route.dart';
 
 class ShareDestinationSheet extends ConsumerStatefulWidget {
   const ShareDestinationSheet({super.key});
@@ -79,7 +80,8 @@ class _ShareDestinationSheetState
       if (!mounted) return;
       await Navigator.push<void>(
         context,
-        MaterialPageRoute(
+        adaptivePageRoute(
+          context,
           builder: (_) => record.isUsbSource
               ? UsbUnlockSheet(
                   existingRecord: record,

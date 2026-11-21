@@ -20,6 +20,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_controll
 import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart'
     show FileThumbnailLeading;
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 class FileInfoSheet extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -39,7 +40,7 @@ class FileInfoSheet extends ConsumerStatefulWidget {
     required RawEntry entry,
     required String currentDirPath,
   }) {
-    return showModalBottomSheet(
+    return showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

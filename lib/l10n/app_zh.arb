@@ -3463,6 +3463,8 @@
   "predictiveBackAnimationsDesc": "返回上一页时显示交互式预览和动画。",
   "selectByIconLabel": "点按图标选择",
   "selectByIconDesc": "在列表视图中，点按文件或文件夹的图标即可将其选中。关闭后，点按图标不会有任何反应。",
+  "doubleClickToOpenLabel": "双击打开",
+  "doubleClickToOpenDesc": "单击选中项目，双击打开，与桌面文件管理器一致。关闭后，单次点按或单击即可打开。",
   "showFileExtensionsLabel": "显示文件扩展名",
   "showFileExtensionsDesc": "在文件名末尾显示扩展名。搜索时始终显示扩展名。",
   "itemActionsMenuTitle": "项目操作",

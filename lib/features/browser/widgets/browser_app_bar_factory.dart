@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 
@@ -40,7 +41,9 @@ class BrowserAppBarFallback extends StatelessWidget
         appBarTheme.foregroundColor ?? theme.colorScheme.onSurface;
     return AppBar(
       automaticallyImplyLeading: false,
-      leading: Builder(
+      leading: DockedSidebarScope.of(context)
+          ? null
+          : Builder(
         builder: (context) {
           if (drawer != null && !preferBackButton) {
             return IconButton(

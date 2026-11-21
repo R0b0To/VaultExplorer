@@ -15196,6 +15196,14 @@
   "@selectByIconDesc": {
     "description": "Explains the select-by-icon setting."
   },
+  "doubleClickToOpenLabel": "Double-click to open",
+  "@doubleClickToOpenLabel": {
+    "description": "Setting title for opening files and folders with a double-click instead of a single one."
+  },
+  "doubleClickToOpenDesc": "A click selects an item and a double-click opens it, as in a desktop file manager. When off, a single tap or click opens it.",
+  "@doubleClickToOpenDesc": {
+    "description": "Explains the double-click-to-open setting."
+  },
   "showFileExtensionsLabel": "Show file extensions",
   "@showFileExtensionsLabel": {
     "description": "Setting title for showing file extensions at the end of file names."

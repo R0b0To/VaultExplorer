@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 import 'report_issue_sheet.dart';
 import '../../app/vault_explorer_app.dart';
 
@@ -46,7 +47,7 @@ class AboutScreen extends ConsumerWidget {
   }
 
   void _showPrivacySheet(BuildContext context) {
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => const _PrivacySheet(),

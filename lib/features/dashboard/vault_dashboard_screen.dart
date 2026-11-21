@@ -39,6 +39,8 @@ import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_page_route.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 const _kLogTag = 'VaultDashboardScreen';
 
@@ -574,7 +576,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(
+        adaptivePageRoute(
+          context,
           builder: (_) => SkinAreaScope(
             area: SkinArea.dashboard,
             child: UnlockSheet(
@@ -647,7 +650,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(
+        adaptivePageRoute(
+          context,
           builder: (_) => SkinAreaScope(
             area: SkinArea.dashboard,
             child: UsbUnlockSheet(
@@ -774,7 +778,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
 
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       isScrollControlled: isLandscape,
       constraints: isLandscape

@@ -12290,6 +12290,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get selectByIconDesc => '在列表视图中，点按文件或文件夹的图标即可将其选中。关闭后，点按图标不会有任何反应。';
 
   @override
+  String get doubleClickToOpenLabel => '双击打开';
+
+  @override
+  String get doubleClickToOpenDesc => '单击选中项目，双击打开，与桌面文件管理器一致。关闭后，单次点按或单击即可打开。';
+
+  @override
   String get showFileExtensionsLabel => '显示文件扩展名';
 
   @override

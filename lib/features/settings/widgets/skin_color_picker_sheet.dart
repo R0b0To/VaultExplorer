@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 /// The result of [showSkinColorPicker].
 ///
@@ -67,7 +68,7 @@ Future<SkinColorPick?> showSkinColorPicker(
   Color? initial,
   bool allowDefault = true,
 }) {
-  return showModalBottomSheet<SkinColorPick>(
+  return showAdaptiveSheet<SkinColorPick>(
     context: context,
     isScrollControlled: true,
     builder: (_) => _SkinColorPickerSheet(

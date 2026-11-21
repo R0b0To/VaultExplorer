@@ -21997,6 +21997,18 @@ abstract class AppLocalizations {
   /// **'In list view, tapping the icon of a file or folder selects it. When off, tapping the icon does nothing.'**
   String get selectByIconDesc;
 
+  /// Setting title for opening files and folders with a double-click instead of a single one.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-click to open'**
+  String get doubleClickToOpenLabel;
+
+  /// Explains the double-click-to-open setting.
+  ///
+  /// In en, this message translates to:
+  /// **'A click selects an item and a double-click opens it, as in a desktop file manager. When off, a single tap or click opens it.'**
+  String get doubleClickToOpenDesc;
+
   /// Setting title for showing file extensions at the end of file names.
   ///
   /// In en, this message translates to:

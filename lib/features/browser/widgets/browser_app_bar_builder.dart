@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
@@ -114,9 +115,14 @@ PreferredSizeWidget buildBrowserAppBar(
 }) {
   final allItems = filteredItems;
   final cs = Theme.of(context).colorScheme;
-  final isLandscape =
-      MediaQuery.of(context).orientation == Orientation.landscape;
+  // Landscape phones, tablets and desktop windows all put the action bar in
+  // the top app bar; only a narrow portrait window keeps it at the bottom.
+  final isLandscape = context.screen.useLandscapeLayout;
   final showActionBar = !searchActive;
+  // Beside a docked sidebar the menu is always on screen, so the leading slot
+  // is only needed for "up one folder".
+  final docked = DockedSidebarScope.of(context);
+  final canGoUp = pathStack.length > 1 && onNavigateUp != null;
 
   if (isSelectionMode) {
     final selectedCount = selectedCountOverride ?? selectedItems.length;
@@ -712,7 +718,20 @@ PreferredSizeWidget buildBrowserAppBar(
   }
 
   return AppBar(
-    leading: Builder(
+    leading: docked
+        ? (canGoUp
+              ? IconButton(
+                  icon: Icon(
+                    Icons.arrow_back,
+                    color: Theme.of(context).appBarTheme.foregroundColor,
+                  ),
+                  tooltip: MaterialLocalizations.of(
+                    context,
+                  ).backButtonTooltip,
+                  onPressed: onNavigateUp,
+                )
+              : null)
+        : Builder(
       builder: (ctx) {
         final scaffold = Scaffold.maybeOf(ctx);
         final fullScreenDrawer = FullScreenDragDrawerScope.maybeOf(ctx);

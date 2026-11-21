@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
 import 'package:vaultexplorer/core/widgets/sheets/sheet_option_tile.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 /// The standard two-option "device or vault" action sheet used by every
 /// tool that lets the user choose between an on-device location and a
@@ -27,7 +28,7 @@ Future<bool?> showDeviceOrVaultChooserSheet({
   IconData deviceIcon = Icons.sd_storage_outlined,
   bool showVaultOption = true,
 }) {
-  return showModalBottomSheet<bool>(
+  return showAdaptiveSheet<bool>(
     context: context,
     builder: (ctx) => AppBottomSheet(
       child: Column(

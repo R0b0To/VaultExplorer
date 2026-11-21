@@ -13254,6 +13254,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'En la vista de lista, tocar el icono de un archivo o carpeta lo selecciona. Si está desactivado, tocar el icono no hace nada.';
 
   @override
+  String get doubleClickToOpenLabel => 'Doble clic para abrir';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'Un clic selecciona un elemento y un doble clic lo abre, como en un gestor de archivos de escritorio. Si está desactivado, un solo toque o clic lo abre.';
+
+  @override
   String get showFileExtensionsLabel => 'Mostrar extensiones de archivo';
 
   @override

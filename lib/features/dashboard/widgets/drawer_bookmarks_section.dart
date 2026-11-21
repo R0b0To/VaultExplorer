@@ -53,6 +53,10 @@ class DrawerBookmarksSection extends ConsumerStatefulWidget {
   /// Opens phone storage through its access and permission checks.
   final VoidCallback? onOpenLocalStorage;
 
+  /// True when the menu is a docked sidebar: there is no modal drawer to close
+  /// before navigating, and popping the route would leave the app shell.
+  final bool docked;
+
   const DrawerBookmarksSection({
     super.key,
     required this.vaults,
@@ -61,6 +65,7 @@ class DrawerBookmarksSection extends ConsumerStatefulWidget {
     this.onSelectContainer,
     this.onOpenInNewTab,
     this.onOpenLocalStorage,
+    this.docked = false,
   });
 
   @override
@@ -109,7 +114,7 @@ class _DrawerBookmarksSectionState
     required bool inNewTab,
   }) {
     final requests = ref.read(bookmarkNavigationRequestsProvider.notifier);
-    Navigator.pop(context); // close the drawer
+    if (!widget.docked) Navigator.pop(context); // close the drawer
     if (inNewTab && widget.onOpenInNewTab != null) {
       // Open the tab first: it becomes the active one, so a browser that is
       // already showing this container leaves the request for the new tab.
@@ -127,7 +132,7 @@ class _DrawerBookmarksSectionState
 
   void _manage(BuildContext context, MountedContainer vault) {
     final navigator = Navigator.of(context);
-    navigator.pop(); // close the drawer
+    if (!widget.docked) navigator.pop(); // close the drawer
     navigator.push(
       MaterialPageRoute<void>(
         builder: (_) => SkinAreaScope(

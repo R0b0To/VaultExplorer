@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -59,6 +60,8 @@ Widget buildBrowserBody(
   ArchiveContext? archiveContext,
   String? archiveRootPath,
   SortBy? sortBy,
+  bool sortAscending = true,
+  ValueChanged<SortBy>? onSortBy,
   GlobalKey<FileMasonryViewState>? masonryKey,
   GlobalKey<FileGridViewState>? gridKey,
   GlobalKey<FileListViewState>? listKey,
@@ -99,8 +102,7 @@ Widget buildBrowserBody(
       ),
     );
   }
-  final isLandscape =
-      MediaQuery.orientationOf(context) == Orientation.landscape;
+  final isLandscape = context.screen.useLandscapeLayout;
   final content = switch (layoutMode) {
     BrowserLayoutMode.grid => FileGridView(
       key: gridKey,
@@ -220,6 +222,8 @@ Widget buildBrowserBody(
       archiveContext: archiveContext,
       archiveRootPath: archiveRootPath,
       sortBy: sortBy,
+      sortAscending: sortAscending,
+      onSortBy: onSortBy,
     ),
   };
   final refreshable = RefreshIndicator(onRefresh: onRefresh, child: content);

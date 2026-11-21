@@ -3463,6 +3463,8 @@
   "predictiveBackAnimationsDesc": "Mostra visualizações interativas e animações ao navegar para trás.",
   "selectByIconLabel": "Selecionar tocando no ícone",
   "selectByIconDesc": "Na visualização em lista, tocar no ícone de um arquivo ou pasta o seleciona. Desativado, tocar no ícone não faz nada.",
+  "doubleClickToOpenLabel": "Clique duplo para abrir",
+  "doubleClickToOpenDesc": "Um clique seleciona um item e um clique duplo o abre, como em um gerenciador de arquivos de desktop. Se desativado, um único toque ou clique o abre.",
   "showFileExtensionsLabel": "Mostrar extensões de arquivo",
   "showFileExtensionsDesc": "Mostra a extensão no final dos nomes de arquivo. Durante a pesquisa, as extensões são sempre mostradas.",
   "itemActionsMenuTitle": "Ações do item",

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_automation_api.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_route_frame.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -778,7 +779,8 @@ class _AutomationSettingsScreenState
       ),
     ];
 
-    return Scaffold(
+    return AdaptiveRouteFrame(
+      child: Scaffold(
       appBar: AppBar(title: Text(l10n.automationScreenTitle)),
       body: state.loading
           ? const Center(child: CircularProgressIndicator())
@@ -830,7 +832,7 @@ class _AutomationSettingsScreenState
                 ),
               ),
             ),
-    );
+    ));
   }
 }
 

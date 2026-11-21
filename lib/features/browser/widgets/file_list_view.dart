@@ -16,6 +16,7 @@ import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_details_table.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
@@ -58,6 +59,13 @@ class FileListView extends StatefulWidget {
   final bool isDetailed;
   final Set<RawEntry> selectedItems;
   final List<FileDetailColumn> detailColumns;
+
+  /// The direction of the folder's sort ([sortBy] is the field), and how to
+  /// change it. When [onSortBy] is set and the compact layout has room (see
+  /// [FileDetailsTable.enabled]), the list draws as a details table: aligned
+  /// columns under a header whose labels sort.
+  final bool sortAscending;
+  final ValueChanged<SortBy>? onSortBy;
   final LongFileNameDisplayMode longFileNameMode;
   final bool showItemActionsMenu;
 
@@ -144,6 +152,8 @@ class FileListView extends StatefulWidget {
     this.groupBuilder,
     required this.selectedItems,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.sortAscending = true,
+    this.onSortBy,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.showItemActionsMenu = true,
     this.showFileExtensions = true,
@@ -561,6 +571,17 @@ class FileListViewState extends State<FileListView> {
     return false;
   }
 
+  /// Whether the list draws as a details table: aligned columns under a header
+  /// whose labels sort. See [FileDetailsTable.enabled].
+  bool _useTable(BuildContext context) =>
+      widget.onSortBy != null &&
+      widget.sortBy != null &&
+      FileDetailsTable.enabled(
+        context,
+        isCompact: widget.isCompact,
+        columns: widget.detailColumns,
+      );
+
   Widget _buildItemRow(BuildContext context, RawEntry entry, int index) {
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
@@ -577,6 +598,7 @@ class FileListViewState extends State<FileListView> {
         largeThumbnail: widget.largeThumbnail,
         zoomLevel: _zoomLevel,
         detailColumns: widget.detailColumns,
+        tableColumns: _useTable(context),
         longFileNameMode: widget.longFileNameMode,
         searchQuery: widget.searchQuery,
         isDocumentProviderMounted: widget.isFolderMounted?.call(entry) ?? false,
@@ -606,6 +628,7 @@ class FileListViewState extends State<FileListView> {
         largeThumbnail: widget.largeThumbnail,
         zoomLevel: _zoomLevel,
         detailColumns: widget.detailColumns,
+        tableColumns: _useTable(context),
         longFileNameMode: widget.longFileNameMode,
         searchQuery: widget.searchQuery,
         container: (widget.containerFor?.call(entry) ?? widget.container),
@@ -724,6 +747,7 @@ class FileListViewState extends State<FileListView> {
     final total = widget.items.length;
     final itemExtent = _computeItemExtent(_zoomLevel);
     final scrollPhysics = _ZoomScrollPhysics(isZooming: () => _isZooming);
+    final useTable = _useTable(context);
 
     return HoldRangeSelectContainer(
       items: widget.items,
@@ -738,6 +762,21 @@ class FileListViewState extends State<FileListView> {
       onScaleEnd: _handleScaleEnd,
       child: Column(
         children: [
+          if (useTable)
+            FileDetailsHeader(
+              columns: widget.detailColumns,
+              sortBy: widget.sortBy!,
+              sortAscending: widget.sortAscending,
+              onSortBy: widget.onSortBy!,
+              zoomLevel: _zoomLevel,
+              largeThumbnail: widget.largeThumbnail,
+              // The rows keep 36 px at their right edge for the item menu
+              // button or, while selecting, the selection indicator.
+              trailingSlotWidth:
+                  (widget.isSelectionMode || widget.showItemActionsMenu)
+                  ? 36
+                  : 0,
+            ),
           Expanded(
             child: MediaQuery(
               data: MediaQuery.of(context).copyWith(

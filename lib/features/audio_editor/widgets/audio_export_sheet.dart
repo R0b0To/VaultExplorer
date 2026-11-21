@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
 import 'package:vaultexplorer/features/audio_editor/models/audio_compression.dart';
 import 'package:vaultexplorer/features/video_editor/models/video_edit_math.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 /// What the user picked in [AudioExportSheet]: the same merge / replace
 /// original / name choices as the video editor's export sheet, plus whether to
@@ -70,7 +71,7 @@ class AudioExportSheet extends StatefulWidget {
     int? sourceChannels,
     int? sourceBitrate,
   }) {
-    return showModalBottomSheet<AudioExportChoice>(
+    return showAdaptiveSheet<AudioExportChoice>(
       context: context,
       isScrollControlled: true,
       builder: (_) => AudioExportSheet(

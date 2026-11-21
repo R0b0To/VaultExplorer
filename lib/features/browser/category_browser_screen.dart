@@ -56,6 +56,7 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 
 /// Asks the host to open [container] at the folder holding [path], as if the
 /// user had browsed there. Supplied by whoever opens the category browser
@@ -1732,7 +1733,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         ? location.dirPath
         : '';
     final landscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+        context.screen.useLandscapeLayout;
     final query = _searchActive && _query.trim().isNotEmpty
         ? _query.trim().toLowerCase()
         : null;

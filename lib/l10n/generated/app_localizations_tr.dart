@@ -13100,6 +13100,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'Liste görünümünde bir dosya veya klasörün simgesine dokunmak onu seçer. Kapalıyken simgeye dokunmak bir şey yapmaz.';
 
   @override
+  String get doubleClickToOpenLabel => 'Açmak için çift tıkla';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'Bir tıklama öğeyi seçer, çift tıklama açar; masaüstü dosya yöneticilerindeki gibi. Kapalıyken tek dokunuş veya tıklama öğeyi açar.';
+
+  @override
   String get showFileExtensionsLabel => 'Dosya uzantılarını göster';
 
   @override

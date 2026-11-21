@@ -131,9 +131,9 @@ try {
 
     Write-Host "Building the Flutter Windows app ($Configuration)..."
     if ($Configuration -eq 'Debug') {
-        & $flutter.Source build windows --debug
+        & $flutter.Source build windows --debug --no-pub
     } else {
-        & $flutter.Source build windows --release
+        & $flutter.Source build windows --release --no-pub
     }
     Assert-NativeSuccess 'Flutter Windows build'
 

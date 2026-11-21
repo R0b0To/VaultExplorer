@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 class StorageLocationsSheet extends ConsumerWidget {
   final int activeVolId;
@@ -27,7 +28,7 @@ class StorageLocationsSheet extends ConsumerWidget {
     required MountedContainer primaryLocalContainer,
     required ValueChanged<MountedContainer> onSelected,
   }) {
-    return showModalBottomSheet(
+    return showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(

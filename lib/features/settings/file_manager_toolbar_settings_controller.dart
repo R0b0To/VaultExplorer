@@ -222,6 +222,9 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setSelectByIcon(bool val) =>
       _updateConfig(state.config.copyWith(selectByIcon: val));
 
+  Future<void> setDoubleClickToOpen(bool val) =>
+      _updateConfig(state.config.copyWith(doubleClickToOpen: val));
+
   Future<void> setShowFileExtensions(bool val) =>
       _updateConfig(state.config.copyWith(showFileExtensions: val));
 

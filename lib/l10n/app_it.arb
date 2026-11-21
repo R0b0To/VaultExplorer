@@ -3463,6 +3463,8 @@
   "predictiveBackAnimationsDesc": "Mostra anteprime interattive e animazioni quando si torna indietro.",
   "selectByIconLabel": "Seleziona toccando l’icona",
   "selectByIconDesc": "Nella vista elenco, toccare l’icona di un file o di una cartella la seleziona. Se disattivato, toccare l’icona non fa nulla.",
+  "doubleClickToOpenLabel": "Doppio clic per aprire",
+  "doubleClickToOpenDesc": "Un clic seleziona un elemento e un doppio clic lo apre, come in un file manager desktop. Se disattivato, un singolo tocco o clic lo apre.",
   "showFileExtensionsLabel": "Mostra le estensioni dei file",
   "showFileExtensionsDesc": "Mostra l’estensione alla fine dei nomi dei file. Durante la ricerca le estensioni vengono sempre mostrate.",
   "itemActionsMenuTitle": "Azioni dell’elemento",

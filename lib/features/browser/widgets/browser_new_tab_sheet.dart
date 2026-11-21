@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 /// Where a new tab should open: a container and, optionally, a directory in
 /// it (null = the container root).
@@ -87,7 +88,7 @@ class BrowserNewTabSheet extends ConsumerWidget {
       }
     }
     if (!context.mounted) return null;
-    return showModalBottomSheet<BrowserNewTabChoice>(
+    return showAdaptiveSheet<BrowserNewTabChoice>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

@@ -54,6 +54,10 @@ void main() {
       await controller.setSelectByIcon(false);
       expect(container.read(provider).config.selectByIcon, isFalse);
 
+      expect(container.read(provider).config.doubleClickToOpen, isFalse);
+      await controller.setDoubleClickToOpen(true);
+      expect(container.read(provider).config.doubleClickToOpen, isTrue);
+
       expect(container.read(provider).config.showFileExtensions, isTrue);
       await controller.setShowFileExtensions(false);
       expect(container.read(provider).config.showFileExtensions, isFalse);

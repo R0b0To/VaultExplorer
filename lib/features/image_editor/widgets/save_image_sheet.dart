@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
 import 'package:vaultexplorer/core/widgets/sheets/sheet_option_tile.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 /// What the user chose in [SaveImageSheet].
 sealed class SaveImageChoice {
@@ -58,7 +59,7 @@ class SaveImageSheet extends StatefulWidget {
     bool allowOverwrite = true,
     String? notice,
   }) {
-    return showModalBottomSheet<SaveImageChoice>(
+    return showAdaptiveSheet<SaveImageChoice>(
       context: context,
       isScrollControlled: true,
       builder: (_) => SaveImageSheet(

@@ -2,6 +2,7 @@ import 'package:flutter/services.dart' show AutofillContextAction;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_route_frame.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -282,7 +283,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         ),
       ],
     );
-    return Scaffold(
+    return AdaptiveRouteFrame(
+      child: Scaffold(
       appBar: AppBar(
         title: Text(
           context.l10n.changePasswordTitle,
@@ -332,6 +334,6 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 }

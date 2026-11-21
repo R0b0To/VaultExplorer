@@ -3,6 +3,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_route_frame.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -490,7 +491,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     );
     final toolsSection = _buildToolsSection(context, cs, textTheme);
 
-    return Scaffold(
+    return AdaptiveRouteFrame(
+      child: Scaffold(
       appBar: AppBar(
         title: wideLayout
             ? Row(
@@ -674,7 +676,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         ),
       ),
       bottomNavigationBar: wideLayout ? null : _buildBottomSaveBar(state),
-    );
+    ));
   }
 
   Widget _buildGeneralSection(

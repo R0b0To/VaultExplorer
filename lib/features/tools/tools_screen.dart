@@ -42,13 +42,20 @@ class ToolsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLandscape = context.screen.useWideLayout;
 
+    // In the docked layout Tools is a page in the content area beside the
+    // sidebar, not a pushed route, so there is nothing to go back out of.
+    final docked = DockedSidebarScope.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
+        leading: docked
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
         title: Text(
           context.l10n.toolsScreenTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),

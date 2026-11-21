@@ -19,6 +19,7 @@ import 'package:vaultexplorer/features/tools/widgets/composite_container_control
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_page_route.dart';
 import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
 
 enum _CompositeWizStep { carriers, security, advanced, randomness, review }
@@ -135,7 +136,8 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
 
     MountedContainer? newlyMountedContainer;
     await Navigator.of(context).push(
-      MaterialPageRoute(
+      adaptivePageRoute(
+        context,
         builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: UnlockSheet(
           initialCompositeCarriers: picked,
           initialName: context.l10n.compositeDefaultContainerName(picked.length),

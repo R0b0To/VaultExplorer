@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 import '../models/video_edit_math.dart';
 
@@ -51,7 +52,7 @@ class VideoExportSheet extends StatefulWidget {
     bool isReadOnly = false,
     bool hasSubtitles = false,
   }) {
-    return showModalBottomSheet<VideoExportChoice>(
+    return showAdaptiveSheet<VideoExportChoice>(
       context: context,
       isScrollControlled: true,
       builder: (_) => VideoExportSheet(

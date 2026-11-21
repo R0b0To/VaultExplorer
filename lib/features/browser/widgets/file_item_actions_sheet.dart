@@ -22,6 +22,7 @@ import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 class FileItemActionsSheet extends ConsumerWidget {
   final RawEntry entry;
@@ -165,7 +166,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     Set<FileItemAction> hiddenActions = const {},
     Set<FileItemAction> quickActions = FileItemAction.defaultQuickActions,
   }) {
-    return showModalBottomSheet(
+    return showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

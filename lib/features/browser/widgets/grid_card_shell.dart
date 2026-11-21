@@ -373,6 +373,10 @@ class GridCardShell extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
+        // Right-click opens the same menu as the more button.
+        onSecondaryTap: isPlaceholder || isSelectionMode || !showMoreButton
+            ? null
+            : onMoreTap,
         child: body,
       ),
     );

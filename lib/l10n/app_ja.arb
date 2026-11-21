@@ -3463,6 +3463,8 @@
   "predictiveBackAnimationsDesc": "前の画面に戻るときに、インタラクティブなプレビューとアニメーションを表示します。",
   "selectByIconLabel": "アイコンのタップで選択",
   "selectByIconDesc": "リスト表示で、ファイルまたはフォルダのアイコンをタップすると選択されます。オフにすると、アイコンをタップしても何も起こりません。",
+  "doubleClickToOpenLabel": "ダブルクリックで開く",
+  "doubleClickToOpenDesc": "クリックで項目を選択し、ダブルクリックで開きます。デスクトップのファイルマネージャーと同じ動作です。オフの場合は、1回のタップまたはクリックで開きます。",
   "showFileExtensionsLabel": "ファイルの拡張子を表示",
   "showFileExtensionsDesc": "ファイル名の末尾に拡張子を表示します。検索中は常に拡張子が表示されます。",
   "itemActionsMenuTitle": "アイテムの操作",

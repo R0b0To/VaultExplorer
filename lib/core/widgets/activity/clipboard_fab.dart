@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 class ClipboardFab extends ConsumerWidget {
   final VoidCallback? onPaste;
@@ -70,7 +71,7 @@ class ClipboardFab extends ConsumerWidget {
             ? context.l10n.create
             : context.l10n.paste;
 
-    showModalBottomSheet(
+    showAdaptiveSheet(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) => AppBottomSheet(

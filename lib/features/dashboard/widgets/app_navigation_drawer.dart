@@ -73,6 +73,12 @@ class AppNavigationDrawer extends ConsumerWidget {
   final ValueChanged<FileCategory>? onOpenCategory;
   final bool keepBrowserTabsOnNavigate;
 
+  /// True when this menu is shown as a permanent sidebar beside the content
+  /// (tablet landscape / desktop) instead of inside a modal drawer. There is
+  /// then no drawer to close, Tools and Settings open in the content area
+  /// next to the sidebar, and the menu draws as a plain panel.
+  final bool docked;
+
   const AppNavigationDrawer({
     super.key,
     this.currentVolId,
@@ -90,12 +96,21 @@ class AppNavigationDrawer extends ConsumerWidget {
     this.onOpenInNewTab,
     this.onOpenCategory,
     this.keepBrowserTabsOnNavigate = false,
+    this.docked = false,
   });
 
+  /// Closes the modal drawer. A docked sidebar has nothing to close, and a
+  /// bare `Navigator.pop` there would pop the real route underneath it.
+  void _closeDrawer(BuildContext context) {
+    if (docked) return;
+    Navigator.pop(context);
+  }
+
   void _navigateToTab(BuildContext context, int tabIndex) {
-    Navigator.pop(context); // Close drawer
+    _closeDrawer(context); // Close drawer
     // If inside a vault/storage browser, pop it to return to MainShell
-    if (!keepBrowserTabsOnNavigate &&
+    if (!docked &&
+        !keepBrowserTabsOnNavigate &&
         currentVolId != null &&
         Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
@@ -275,7 +290,7 @@ class AppNavigationDrawer extends ConsumerWidget {
         .read(externalStorageLocationsProvider.notifier)
         .isAccessible(loc);
     if (!context.mounted) return;
-    Navigator.pop(context); // close the drawer
+    _closeDrawer(context); // close the drawer
     if (!accessible) {
       showAppSnackBar(
         context,
@@ -326,7 +341,7 @@ class AppNavigationDrawer extends ConsumerWidget {
       ],
     ).then((action) {
       if (action != 'new_tab' || !context.mounted) return;
-      Navigator.pop(context); // close the drawer
+      _closeDrawer(context); // close the drawer
       onOpenInNewTab?.call(container);
     });
   }
@@ -394,7 +409,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     final currentVaultGuardAcquired =
         willLeaveCurrentScreen && controller.acquireLockGuard(currentVolId!);
     if (currentVaultGuardAcquired) {
-      Navigator.pop(context);
+      _closeDrawer(context);
     }
     var currentVaultGuardHeld = currentVaultGuardAcquired;
     var skippedBusyVault = false;
@@ -559,7 +574,8 @@ class AppNavigationDrawer extends ConsumerWidget {
     final isTools = currentVolId == null && selectedTabIndex == 1;
     final isSettings = currentVolId == null && selectedTabIndex == 2;
 
-    return Drawer(
+    return _DrawerShell(
+      docked: docked,
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -669,7 +685,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                             item: item,
                             isCurrent: isCurrent,
                             onTap: () {
-                              Navigator.pop(context);
+                              _closeDrawer(context);
                               if (isCurrent) return;
                               if (item is MountedVaultItem) {
                                 onSelectContainer?.call(item.container);
@@ -677,7 +693,8 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 // A tabbed browser stays mounted behind
                                 // the unlock flow so its locations and
                                 // per-tab state survive the visit.
-                                if (currentVolId != null &&
+                                if (!docked &&
+                                    currentVolId != null &&
                                     onOpenInNewTab == null &&
                                     Navigator.of(context).canPop()) {
                                   Navigator.of(context).pop();
@@ -695,7 +712,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                             onOpenInNewTab:
                                 (isMounted && onOpenInNewTab != null)
                                 ? () {
-                                    Navigator.pop(context); // close the drawer
+                                    _closeDrawer(context); // close the drawer
                                     onOpenInNewTab!(
                                       (item as MountedVaultItem).container,
                                     );
@@ -706,7 +723,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                     final container =
                                         (item as MountedVaultItem).container;
                                     if (isCurrent) {
-                                      Navigator.pop(context);
+                                      _closeDrawer(context);
                                     }
                                     await _lockSingleVault(
                                       context,
@@ -716,11 +733,11 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   }
                                 : null,
                             onEdit: () {
-                              Navigator.pop(context);
+                              _closeDrawer(context);
                               _handleEditVault(context, ref, item);
                             },
                             onDelete: () {
-                              Navigator.pop(context);
+                              _closeDrawer(context);
                               _handleDeleteVault(context, ref, item);
                             },
                           ),
@@ -741,8 +758,9 @@ class AppNavigationDrawer extends ConsumerWidget {
                           ),
                         ),
                         onTap: () {
-                          Navigator.pop(context);
-                          if (currentVolId != null &&
+                          _closeDrawer(context);
+                          if (!docked &&
+                              currentVolId != null &&
                               Navigator.of(context).canPop()) {
                             Navigator.of(context).pop();
                           }
@@ -772,6 +790,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                     onSelectContainer: onSelectContainer,
                     onOpenInNewTab: onOpenInNewTab,
                     onOpenLocalStorage: onOpenLocalStorage,
+                    docked: docked,
                   ),
 
                   const Padding(
@@ -817,7 +836,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               }
                             : null,
                         onTap: () {
-                          Navigator.pop(context);
+                          _closeDrawer(context);
                           if (currentVolId == kDecoyLocalVolId) return;
                           if (onOpenLocalStorage != null) {
                             onOpenLocalStorage!();
@@ -881,7 +900,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               },
                               onTap: () async {
                                 if (currentVolId == loc.volId) {
-                                  Navigator.pop(context);
+                                  _closeDrawer(context);
                                   return;
                                 }
                                 final container = buildExternalStorageContainer(
@@ -896,7 +915,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 // reported as "unavailable" below.
                                 if (!loc.resolvedUri.startsWith('content://') &&
                                     onOpenExternalStorage != null) {
-                                  Navigator.pop(context);
+                                  _closeDrawer(context);
                                   onOpenExternalStorage!(container);
                                   return;
                                 }
@@ -907,7 +926,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                     .isAccessible(loc);
                                 if (!context.mounted) return;
                                 if (!isAccessible) {
-                                  Navigator.pop(context);
+                                  _closeDrawer(context);
                                   showAppSnackBar(
                                     context,
                                     message: context.l10n
@@ -918,7 +937,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   );
                                   return;
                                 }
-                                Navigator.pop(context);
+                                _closeDrawer(context);
                                 onSelectContainer?.call(container);
                               },
                             ),
@@ -962,7 +981,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                         }
                         if (!context.mounted) return;
                         if (loc != null) {
-                          Navigator.pop(context);
+                          _closeDrawer(context);
                           onSelectContainer?.call(
                             buildExternalStorageContainer(
                               rootPath: loc.resolvedUri,
@@ -987,6 +1006,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                     onOpenLocalStorage: onOpenLocalStorage,
                     onSelectContainer: onSelectContainer,
                     onOpenCategory: onOpenCategory,
+                    docked: docked,
                   ),
 
                   // 3b. Authenticator Destination (same screen as the
@@ -1007,7 +1027,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                         ),
                       ),
                       onTap: () {
-                        Navigator.pop(context);
+                        _closeDrawer(context);
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1037,7 +1057,13 @@ class AppNavigationDrawer extends ConsumerWidget {
                       ),
                     ),
                     onTap: () {
-                      Navigator.pop(context);
+                      if (docked && onSelectTab != null) {
+                        // Docked: Tools opens in the content area, so the
+                        // sidebar stays visible beside it.
+                        onSelectTab!(1);
+                        return;
+                      }
+                      _closeDrawer(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -1083,7 +1109,11 @@ class AppNavigationDrawer extends ConsumerWidget {
                       ),
                     ),
                     onTap: () {
-                      Navigator.pop(context);
+                      if (docked && onSelectTab != null) {
+                        onSelectTab!(2);
+                        return;
+                      }
+                      _closeDrawer(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -1101,6 +1131,27 @@ class AppNavigationDrawer extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The surface behind the menu: a modal [Drawer] normally, or a flat panel
+/// when the menu is docked beside the content (the shell draws the divider).
+class _DrawerShell extends StatelessWidget {
+  const _DrawerShell({required this.docked, required this.child});
+
+  final bool docked;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!docked) return Drawer(child: child);
+    final theme = Theme.of(context);
+    return Material(
+      color:
+          theme.drawerTheme.backgroundColor ??
+          theme.colorScheme.surfaceContainerLow,
+      child: child,
     );
   }
 }

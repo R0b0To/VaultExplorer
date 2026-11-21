@@ -740,4 +740,45 @@ void main() {
       expect(decoded.autoHideBreadcrumbBar, isFalse);
     });
   });
+
+  group('FileManagerToolbarConfig doubleClickToOpen', () {
+    test('is off by default, so one tap or click still opens an item', () {
+      expect(FileManagerToolbarConfig.defaults().doubleClickToOpen, isFalse);
+    });
+
+    test('copyWith turns it on and back off', () {
+      final on = FileManagerToolbarConfig.defaults().copyWith(
+        doubleClickToOpen: true,
+      );
+      expect(on.doubleClickToOpen, isTrue);
+      expect(on.copyWith(doubleClickToOpen: false).doubleClickToOpen, isFalse);
+      // An unrelated change keeps it.
+      expect(on.copyWith(selectByIcon: false).doubleClickToOpen, isTrue);
+    });
+
+    test('survives a JSON round trip', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        doubleClickToOpen: true,
+      );
+      final json = jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>;
+      expect(json['doubleClickToOpen'], isTrue);
+      expect(FileManagerToolbarConfig.fromJson(json).doubleClickToOpen, isTrue);
+    });
+
+    test('a config saved before the option existed reads as off', () {
+      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'showBreadcrumbBar': true,
+      });
+      expect(config.doubleClickToOpen, isFalse);
+    });
+
+    test('travels with the behavior half of an export, not the look half', () {
+      expect(FileManagerToolbarConfig.behaviorKeys, contains('doubleClickToOpen'));
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        doubleClickToOpen: true,
+      );
+      expect(config.behaviorToJson(), containsPair('doubleClickToOpen', true));
+      expect(config.interfaceToJson(), isNot(contains('doubleClickToOpen')));
+    });
+  });
 }

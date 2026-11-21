@@ -182,6 +182,11 @@ class FileManagerToolbarConfig {
   /// selecting then starts with a long press.
   final bool selectByIcon;
 
+  /// Whether items open on a double-click (or double-tap) instead of a single
+  /// one. On: a click selects an item and a second click on it opens it, as in
+  /// a desktop file manager. Off: one tap or click opens it.
+  final bool doubleClickToOpen;
+
   /// Whether file names are listed with their extension ("report.pdf") or
   /// without ("report"). Folders have no extension and are unaffected.
   final bool showFileExtensions;
@@ -264,6 +269,7 @@ class FileManagerToolbarConfig {
     this.showListThumbnails = true,
     this.showItemActionsMenu = true,
     this.selectByIcon = true,
+    this.doubleClickToOpen = false,
     this.showFileExtensions = true,
     this.longFileNameDisplayMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.listZoomLevel = 1.0,
@@ -326,6 +332,7 @@ class FileManagerToolbarConfig {
     showListThumbnails: true,
     showItemActionsMenu: true,
     selectByIcon: true,
+    doubleClickToOpen: false,
     showFileExtensions: true,
     longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
     listZoomLevel: 1.0,
@@ -553,6 +560,7 @@ class FileManagerToolbarConfig {
     bool? showListThumbnails,
     bool? showItemActionsMenu,
     bool? selectByIcon,
+    bool? doubleClickToOpen,
     bool? showFileExtensions,
     LongFileNameDisplayMode? longFileNameDisplayMode,
     double? listZoomLevel,
@@ -621,6 +629,7 @@ class FileManagerToolbarConfig {
     showListThumbnails: showListThumbnails ?? this.showListThumbnails,
     showItemActionsMenu: showItemActionsMenu ?? this.showItemActionsMenu,
     selectByIcon: selectByIcon ?? this.selectByIcon,
+    doubleClickToOpen: doubleClickToOpen ?? this.doubleClickToOpen,
     showFileExtensions: showFileExtensions ?? this.showFileExtensions,
     longFileNameDisplayMode:
         longFileNameDisplayMode ?? this.longFileNameDisplayMode,
@@ -705,6 +714,7 @@ class FileManagerToolbarConfig {
     'showHiddenFiles',
     'showNoMediaFolders',
     'selectByIcon',
+    'doubleClickToOpen',
     'autoStartPlaylistMode',
     'rememberPerFolderLayout',
     'resetSizeOnLayoutChange',
@@ -816,6 +826,7 @@ class FileManagerToolbarConfig {
     'showListThumbnails': showListThumbnails,
     'showItemActionsMenu': showItemActionsMenu,
     'selectByIcon': selectByIcon,
+        'doubleClickToOpen': doubleClickToOpen,
     'showFileExtensions': showFileExtensions,
     'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
     'listZoomLevel': listZoomLevel,
@@ -1068,6 +1079,7 @@ class FileManagerToolbarConfig {
       // Absent in configs saved before these options existed -> the original
       // behavior (icon taps select; names shown in full).
       selectByIcon: j['selectByIcon'] as bool? ?? true,
+      doubleClickToOpen: j['doubleClickToOpen'] as bool? ?? false,
       showFileExtensions: j['showFileExtensions'] as bool? ?? true,
       longFileNameDisplayMode: longFileNameDisplayMode,
       listZoomLevel: (j['listZoomLevel'] as num?)?.toDouble() ?? 1.0,

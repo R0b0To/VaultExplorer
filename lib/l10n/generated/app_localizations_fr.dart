@@ -13337,6 +13337,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Dans la vue en liste, toucher l’icône d’un fichier ou d’un dossier le sélectionne. Désactivé, toucher l’icône ne fait rien.';
 
   @override
+  String get doubleClickToOpenLabel => 'Double-clic pour ouvrir';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'Un clic sélectionne un élément et un double-clic l’ouvre, comme dans un gestionnaire de fichiers de bureau. Désactivé, un simple appui ou clic l’ouvre.';
+
+  @override
   String get showFileExtensionsLabel => 'Afficher les extensions de fichier';
 
   @override

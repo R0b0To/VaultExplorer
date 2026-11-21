@@ -700,6 +700,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['select', 'selection', 'icon', 'tap', 'checkbox', 'list view'],
   ),
   _e(
+    'file_manager.double_click_to_open',
+    SettingsDestination.fileManager,
+    (l) => l.doubleClickToOpenLabel,
+    section: (l) => l.listViewOptionsSectionHeader,
+    details: [(l) => l.doubleClickToOpenDesc],
+    keywords: ['double click', 'double tap', 'open', 'mouse', 'desktop', 'select'],
+  ),
+  _e(
     'file_manager.detail_columns',
     SettingsDestination.fileManager,
     (l) => l.detailedListViewColumnsSectionHeader,

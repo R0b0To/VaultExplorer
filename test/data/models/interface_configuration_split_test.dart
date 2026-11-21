@@ -188,6 +188,7 @@ FileManagerToolbarConfig _customToolbar() {
     showHiddenFiles: !d.showHiddenFiles,
     showNoMediaFolders: !d.showNoMediaFolders,
     selectByIcon: !d.selectByIcon,
+    doubleClickToOpen: !d.doubleClickToOpen,
     autoStartPlaylistMode: !d.autoStartPlaylistMode,
     rememberPerFolderLayout: !d.rememberPerFolderLayout,
     resetSizeOnLayoutChange: !d.resetSizeOnLayoutChange,

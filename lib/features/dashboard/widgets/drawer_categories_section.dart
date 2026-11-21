@@ -28,6 +28,7 @@ class DrawerCategoriesSection extends ConsumerWidget {
     required this.onSelectContainer,
     this.onOpenCategory,
     this.includeVaults = true,
+    this.docked = false,
   });
 
   final MountedContainer? primaryLocalContainer;
@@ -40,6 +41,10 @@ class DrawerCategoriesSection extends ConsumerWidget {
   /// screen can tell: the shortcuts then gather only from phone storage and
   /// storage locations, and nothing mentions vaults.
   final bool includeVaults;
+
+  /// True when the menu is a docked sidebar: there is no modal drawer to close
+  /// before navigating, and popping the route would leave the app shell.
+  final bool docked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -121,7 +126,7 @@ class DrawerCategoriesSection extends ConsumerWidget {
   void _open(BuildContext context, FileCategory category) {
     final onOpen = onOpenCategory;
     if (onOpen != null) {
-      Navigator.pop(context); // close the drawer
+      if (!docked) Navigator.pop(context); // close the drawer
       onOpen(category);
       return;
     }
@@ -129,7 +134,7 @@ class DrawerCategoriesSection extends ConsumerWidget {
     // The drawer closes before the screen opens, and its own `ref` stops
     // working with it, so keep what the "go to location" callback needs.
     final providers = ProviderScope.containerOf(context);
-    Navigator.pop(context); // close the drawer
+    if (!docked) Navigator.pop(context); // close the drawer
     Navigator.push(
       context,
       MaterialPageRoute<void>(

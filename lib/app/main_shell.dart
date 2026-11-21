@@ -14,6 +14,7 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -42,6 +43,7 @@ import 'package:vaultexplorer/features/tools/tools_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_page_route.dart';
 
 const _kLogTag = 'MainShell';
 
@@ -75,6 +77,12 @@ class _MainShellState extends ConsumerState<MainShell>
       GlobalKey<VaultDashboardState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _scaffoldDrawerOpen = false;
+
+  // Holds the app body (Home/browser tabs, Tools, Settings) so rotating a
+  // tablet or resizing a desktop window, which swaps the docked sidebar layout
+  // for the modal-drawer one, moves the live body instead of rebuilding it:
+  // open tabs, scroll positions and half-typed fields all survive.
+  final GlobalKey _appBodyKey = GlobalKey(debugLabel: 'main-shell-app-body');
   MountedContainer? _cachedLocalStorageContainer;
 
   MountedContainer? get _primaryLocalStorageContainer {
@@ -158,12 +166,81 @@ class _MainShellState extends ConsumerState<MainShell>
         : ref.read(browserTabsProvider(workspace).notifier);
   }
 
+  /// Keyboard shortcuts for tabs, for a tablet with a keyboard or a desktop
+  /// window: Ctrl+T (Cmd+T on macOS) opens Home in a tab, Ctrl+W (Cmd+W)
+  /// closes the tab in front, Ctrl+Tab / Ctrl+Shift+Tab cycle through tabs.
+  /// They call the same tab actions as the tab strip and do nothing unless
+  /// browser tabs are on and the tab pages (not Tools or Settings) are showing.
+  ///
+  /// This is a global key handler rather than a `Shortcuts` widget on purpose:
+  /// a widget only hears keys while something inside it has focus, and giving
+  /// the shell a focus node of its own would make it win the autofocus of
+  /// fields that open later (a search bar, say).
+  bool _handleTabShortcutKey(KeyEvent event) {
+    if (event is! KeyDownEvent || !mounted) return false;
+    // Only while this page is the one in front: not under a dialog, a sheet or
+    // another page, whose own fields keep their keys.
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+    final keyboard = HardwareKeyboard.instance;
+    final useMeta = Theme.of(context).platform == TargetPlatform.macOS;
+    final primary = useMeta
+        ? keyboard.isMetaPressed
+        : keyboard.isControlPressed;
+    final key = event.logicalKey;
+    if (primary && !keyboard.isAltPressed) {
+      if (key == LogicalKeyboardKey.keyT) {
+        _shortcutNewTab();
+        return true;
+      }
+      if (key == LogicalKeyboardKey.keyW) {
+        _shortcutCloseTab();
+        return true;
+      }
+    }
+    if (keyboard.isControlPressed && key == LogicalKeyboardKey.tab) {
+      _shortcutCycleTab(keyboard.isShiftPressed ? -1 : 1);
+      return true;
+    }
+    return false;
+  }
+
+  bool get _tabShortcutsActive =>
+      _index == 0 &&
+      ref.read(appSettingsControllerProvider).settings.useBrowserTabs;
+
+  void _shortcutNewTab() {
+    if (!_tabShortcutsActive) return;
+    _browserWorkspaceActions?.openNewDashboardTab();
+  }
+
+  void _shortcutCloseTab() {
+    if (!_tabShortcutsActive) return;
+    final state = _browserWorkspaceState;
+    final activeTabId = state?.activeTabId;
+    // The last tab stays: closing it would leave nothing to show.
+    if (state == null || activeTabId == null || state.tabs.length < 2) return;
+    _browserWorkspaceActions?.closeTab(activeTabId);
+  }
+
+  void _shortcutCycleTab(int step) {
+    if (!_tabShortcutsActive) return;
+    final state = _browserWorkspaceState;
+    if (state == null || state.tabs.length < 2 || state.activeIndex < 0) {
+      return;
+    }
+    final count = state.tabs.length;
+    _browserWorkspaceActions?.activateIndex(
+      (state.activeIndex + step + count) % count,
+    );
+  }
+
   bool get _isBrowserContentVisible => _index == 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    HardwareKeyboard.instance.addHandler(_handleTabShortcutKey);
     // Cached so asynchronous lock callbacks stay safe after this widget is
     // unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
@@ -462,6 +539,7 @@ class _MainShellState extends ConsumerState<MainShell>
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleTabShortcutKey);
     WidgetsBinding.instance.removeObserver(this);
     OpenDrawerBackGuard.setDrawerOpen(this, false);
     _exitArmTimer?.cancel();
@@ -700,7 +778,8 @@ class _MainShellState extends ConsumerState<MainShell>
       // another vault). Without this the unlock gave no visible feedback.
       if (record.isUsbSource) {
         await navigator.push<void>(
-          MaterialPageRoute<void>(
+          adaptivePageRoute<void>(
+            context,
             builder: (_) => SkinAreaScope(
               area: SkinArea.dashboard,
               child: UsbUnlockSheet(
@@ -730,7 +809,8 @@ class _MainShellState extends ConsumerState<MainShell>
         );
       } else {
         await navigator.push<void>(
-          MaterialPageRoute<void>(
+          adaptivePageRoute<void>(
+            context,
             builder: (_) => SkinAreaScope(
               area: SkinArea.dashboard,
               child: UnlockSheet(
@@ -906,6 +986,12 @@ class _MainShellState extends ConsumerState<MainShell>
 
     final isHidden = _hideDashboard || _handlingQuickCapture;
 
+    // Tablet landscape and desktop windows get the navigation menu as a
+    // permanent sidebar; everything else keeps the modal drawer.
+    final docked = AppBreakpoints.useDockedSidebarFor(
+      MediaQuery.sizeOf(context),
+    );
+
     Widget buildDashboardTab({
       bool backPreviewOnly = false,
       bool embedded = false,
@@ -929,7 +1015,7 @@ class _MainShellState extends ConsumerState<MainShell>
     );
 
     final body = IndexedStack(
-      index: _index == 0 ? 0 : _index - 1,
+      index: _index,
       children: [
         // The browser workspace owns the single Dashboard page. Keeping an
         // empty slot here preserves the app destination index without building
@@ -975,11 +1061,16 @@ class _MainShellState extends ConsumerState<MainShell>
       return localStorage?.volId == volId ? localStorage : null;
     }
 
-    Widget buildDrawer({int? currentVolId, BrowserTabsConfig? workspace}) {
+    Widget buildDrawer({
+      int? currentVolId,
+      BrowserTabsConfig? workspace,
+      bool docked = false,
+    }) {
       final workspaceActions = workspace == null
           ? null
           : ref.read(browserTabsProvider(workspace).notifier);
       return AppNavigationDrawer(
+        docked: docked,
         currentVolId: currentVolId,
         primaryLocalContainer: _primaryLocalStorageContainer,
         localStorageNotifier: _localStorageNotifier,
@@ -1037,8 +1128,12 @@ class _MainShellState extends ConsumerState<MainShell>
             mountedContainers: () =>
                 ref.read(vaultDashboardControllerProvider).mounted,
             primaryLocalContainer: () => _primaryLocalStorageContainer,
-            drawerBuilder: (workspace, volId) =>
-                buildDrawer(currentVolId: volId, workspace: workspace),
+            // A docked sidebar replaces the drawer, so the browser must not
+            // build (or offer to open) one of its own.
+            drawerBuilder: docked
+                ? null
+                : (workspace, volId) =>
+                      buildDrawer(currentVolId: volId, workspace: workspace),
             closeRouteWhenEmpty: false,
             includeDashboardTab: true,
             restoredWorkspace: _restoredBrowserWorkspace,
@@ -1061,13 +1156,51 @@ class _MainShellState extends ConsumerState<MainShell>
         ),
       ),
     );
-    final Widget appBody = Stack(
-      fit: StackFit.expand,
-      children: [
-        Offstage(offstage: _index == 0, child: body),
-        persistentBrowser,
-      ],
+    final Widget appBody = KeyedSubtree(
+      key: _appBodyKey,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Offstage(offstage: _index == 0, child: body),
+          persistentBrowser,
+        ],
+      ),
     );
+
+    Widget shellBody = appBody;
+    if (docked) {
+      // The sidebar highlights the vault whose tab is in front; Tools and
+      // Settings, which live in the content area, highlight themselves.
+      final activeTab = _index == 0 ? _browserWorkspaceState?.activeTab : null;
+      final dockedVolId = (activeTab == null || activeTab.isDashboard)
+          ? null
+          : activeTab.volId;
+      const sidebarWidth = AppBreakpoints.dockedSidebarWidth;
+      shellBody = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: sidebarWidth,
+            child: buildDrawer(
+              docked: true,
+              currentVolId: dockedVolId,
+              workspace: _browserWorkspace,
+            ),
+          ),
+          VerticalDivider(
+            width: 1,
+            thickness: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          Expanded(
+            child: _DockedContentFrame(
+              consumedWidth: sidebarWidth + 1,
+              child: appBody,
+            ),
+          ),
+        ],
+      );
+    }
 
     final Widget scaffold = Scaffold(
       key: _scaffoldKey,
@@ -1076,9 +1209,9 @@ class _MainShellState extends ConsumerState<MainShell>
       // Tools and Settings have no horizontal pager, so let a drawer drag
       // start anywhere in their content, too.
       drawerEdgeDragWidth: double.maxFinite,
-      drawerEnableOpenDragGesture: _index != 0,
-      drawer: isHidden ? null : buildDrawer(),
-      body: appBody,
+      drawerEnableOpenDragGesture: _index != 0 && !docked,
+      drawer: isHidden || docked ? null : buildDrawer(),
+      body: shellBody,
     );
 
     // Keep the app shell mounted during share and Quick Capture flows, then
@@ -1135,6 +1268,37 @@ class _MainShellState extends ConsumerState<MainShell>
         _onTabTap(0);
       },
       child: content,
+    );
+  }
+}
+
+/// Frames the content that sits beside the docked sidebar.
+///
+/// The content only has the width beside the sidebar. Telling it so keeps
+/// every width-based decision inside (dual pane, grid columns, two-column
+/// pages) honest instead of counting the sidebar's room as its own. The
+/// sidebar already consumed the left system inset. This is its own widget so
+/// that depending on the full `MediaQuery` (keyboard, insets) rebuilds only
+/// this thin frame, never the whole shell.
+class _DockedContentFrame extends StatelessWidget {
+  const _DockedContentFrame({
+    required this.consumedWidth,
+    required this.child,
+  });
+
+  final double consumedWidth;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return MediaQuery(
+      data: mq.copyWith(
+        size: Size(mq.size.width - consumedWidth, mq.size.height),
+        padding: mq.padding.copyWith(left: 0),
+        viewPadding: mq.viewPadding.copyWith(left: 0),
+      ),
+      child: DockedSidebarScope(child: child),
     );
   }
 }

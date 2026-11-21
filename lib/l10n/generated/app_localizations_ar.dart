@@ -13251,6 +13251,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'في عرض القائمة، يؤدي النقر على أيقونة ملف أو مجلد إلى تحديده. عند الإيقاف، لا يحدث شيء عند النقر على الأيقونة.';
 
   @override
+  String get doubleClickToOpenLabel => 'النقر المزدوج للفتح';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'النقر مرة واحدة يحدد العنصر والنقر المزدوج يفتحه، كما في مدير الملفات على سطح المكتب. عند الإيقاف، تفتحه نقرة أو لمسة واحدة.';
+
+  @override
   String get showFileExtensionsLabel => 'إظهار امتدادات الملفات';
 
   @override

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 enum FolderDocumentProviderAction { unmount }
 
@@ -23,7 +24,7 @@ class FolderDocumentProviderSheet extends StatefulWidget {
     required bool initialAutoMount,
     required ValueChanged<bool> onAutoMountChanged,
   }) {
-    return showModalBottomSheet<FolderDocumentProviderAction>(
+    return showAdaptiveSheet<FolderDocumentProviderAction>(
       context: context,
       isScrollControlled: true,
       builder: (_) => FolderDocumentProviderSheet(

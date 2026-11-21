@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 import '../../app/vault_explorer_app.dart';
 
 const _kGithubUrl = 'https://github.com/R0b0To/VaultExplorer';
@@ -50,7 +51,7 @@ Future<String> _resolveAndroidVersion(WidgetRef ref) async {
 }
 
 void showReportIssueSheet(BuildContext context) {
-  showModalBottomSheet(
+  showAdaptiveSheet(
     context: context,
     isScrollControlled: true,
     builder: (_) => const _ReportIssueSheet(),

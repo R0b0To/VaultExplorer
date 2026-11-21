@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/features/browser/metadata/metadata_edit_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -617,6 +618,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
 
+  // The last item clicked, for "double-click to open".
+  RawEntry? _lastClickEntry;
+  DateTime? _lastClickAt;
+
   /// Music mode for this tab. It is the tab's own: another tab on the same
   /// location keeps whatever mode it is in. While one of its library views is
   /// showing the file toolbar has nothing to act on, so it is hidden (see
@@ -972,6 +977,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleBrowserKey);
     if (widget.scrollController != null) {
       _browserScrollController = widget.scrollController!;
     }
@@ -1009,6 +1015,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   @override
   void dispose() {
     _disposed = true;
+    HardwareKeyboard.instance.removeHandler(_handleBrowserKey);
     _music.removeListener(_onMusicChanged);
     _workspaceSubscription?.close();
     _bookmarkRequestSub?.close();
@@ -1078,8 +1085,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   ) {
     final result = <int, ({double top, double height})>{};
     if (targets.isEmpty) return result;
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final isLandscape = context.screen.useLandscapeLayout;
 
     switch (_layoutMode) {
       case BrowserLayoutMode.list:
@@ -1123,7 +1129,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         }
 
         const minCols = 1;
-        final maxCols = isLandscape ? 7 : 4;
+        final maxCols = context.screen.maxGridColumns;
         final columns =
             (isLandscape
                     ? _toolbarConfig.gridColumnsLandscape
@@ -1154,7 +1160,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         }
 
         final minCols = isLandscape ? 2 : 1;
-        final maxCols = isLandscape ? 6 : 3;
+        final maxCols = context.screen.maxMasonryColumns;
         final columns =
             (isLandscape
                     ? _toolbarConfig.masonryColumnsLandscape
@@ -3001,7 +3007,285 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   int compareItems(RawEntry ea, RawEntry eb) =>
       ref.read(fileBrowserSortProvider(_stateKey)).compare(ea, eb);
 
+  /// Desktop-style clicks, for a mouse (or a keyboard on a tablet): Ctrl (Cmd
+  /// on macOS) + click toggles one item in or out of the selection, and
+  /// Shift + click selects everything from the last selected item to this
+  /// one. Returns true when the click was one of these and has been handled,
+  /// so the caller must not also open the item.
+  bool _handleModifierClick(RawEntry entry) {
+    final keyboard = HardwareKeyboard.instance;
+    final toggle = keyboard.isControlPressed || keyboard.isMetaPressed;
+    final range = keyboard.isShiftPressed;
+    if (!toggle && !range) return false;
+    _signalActivity();
+    final current = selectedItems;
+    if (range && current.isNotEmpty) {
+      final displayed = _displayedItemsForScroll();
+      final from = displayed.indexOf(current.last);
+      final to = displayed.indexOf(entry);
+      if (from >= 0 && to >= 0) {
+        final low = from < to ? from : to;
+        final high = from < to ? to : from;
+        setSelectedItems({...current, ...displayed.sublist(low, high + 1)});
+        if (selectedFolderCount > 0) {
+          fetchFolderSizes(widget.container, _currentDirPath);
+        }
+        return true;
+      }
+    }
+    // Starts selecting when nothing is selected yet, like a long-press does.
+    toggleSelectItem(entry);
+    return true;
+  }
+
+  // ── Keyboard (tablet with a keyboard, desktop) ────────────────────────────
+
+  /// True when a key press should act on this viewport: it is the focused
+  /// pane's active tab, on screen, under no dialog, sheet or other page, and
+  /// the user is not typing into a text field (whose own keys must win).
+  bool get _isKeyboardTarget {
+    if (!mounted || _disposed || !_isActiveTab) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+    // A hidden browser (Tools or Settings in front) stays mounted but must not
+    // react.
+    var hidden = false;
+    context.visitAncestorElements((element) {
+      final widget = element.widget;
+      if (widget is Offstage && widget.offstage) {
+        hidden = true;
+        return false;
+      }
+      return true;
+    });
+    if (hidden) return false;
+    final focused = FocusManager.instance.primaryFocus?.context;
+    return focused?.findAncestorWidgetOfExactType<EditableText>() == null;
+  }
+
+  bool get _usesGridKeys =>
+      _layoutMode == BrowserLayoutMode.grid ||
+      _layoutMode == BrowserLayoutMode.masonry;
+
+  /// Moves the selection to the next or previous item in the displayed order
+  /// ([delta] of 1 or -1), to the first or last item when [toEdge] is set, and
+  /// with [extend] grows the selection from where it started instead.
+  void _moveKeyboardSelection(
+    int delta, {
+    bool extend = false,
+    bool toEdge = false,
+  }) {
+    final displayed = _displayedItemsForScroll();
+    if (displayed.isEmpty) return;
+    _signalActivity();
+    final current = selectedItems;
+    final last = displayed.length - 1;
+    final int index;
+    if (toEdge) {
+      index = delta > 0 ? last : 0;
+    } else if (current.isEmpty) {
+      index = delta > 0 ? 0 : last;
+    } else {
+      final from = displayed.indexOf(current.last);
+      index = from < 0 ? 0 : (from + delta).clamp(0, last).toInt();
+    }
+    final target = displayed[index];
+    if (extend && current.isNotEmpty) {
+      final anchor = displayed.indexOf(current.first);
+      if (anchor >= 0) {
+        final low = anchor < index ? anchor : index;
+        final high = anchor < index ? index : anchor;
+        // Keeps the anchor first and the moving end last, so the next press
+        // continues from the end that is moving.
+        final range = displayed.sublist(low, high + 1);
+        final ordered = anchor <= index ? range : range.reversed.toList();
+        setSelectedItems(ordered.toSet());
+      } else {
+        setSelectedItems({target});
+      }
+    } else {
+      setSelectedItems({target});
+    }
+    if (selectedFolderCount > 0) {
+      fetchFolderSizes(widget.container, _currentDirPath);
+    }
+    _ensureTilesVisible(displayed, {index}, animate: false, center: false);
+  }
+
+  void _openSelectedWithKeyboard() {
+    final selected = selectedItems;
+    if (selected.length != 1) return;
+    final entry = selected.first;
+    exitSelectionMode();
+    // With "double-click to open" on, a lone call would only select the item
+    // again; Enter counts as the second click.
+    _lastClickEntry = entry;
+    _lastClickAt = DateTime.now();
+    if (entry.isDir) {
+      _handleDirTap(entry);
+    } else {
+      unawaited(_handleFileTap(entry));
+    }
+  }
+
+  void _renameSelectedWithKeyboard() {
+    final selected = selectedItems;
+    if (selected.length != 1 || _isReadOnly || _archiveContext != null) return;
+    unawaited(
+      BrowserDialogs.showRename(
+        context,
+        container: widget.container,
+        oldEntries: [selected.first],
+        existingEntries: _currentItems,
+        currentDirPath: _currentDirPath,
+        onSuccess: exitSelectionMode,
+        readOnly: _isReadOnly,
+      ),
+    );
+  }
+
+  /// File manager keys: arrows (and Home/End) move the selection, Enter opens
+  /// it, Backspace or Alt+Up/Left go up a folder, Ctrl/Cmd+A selects all,
+  /// Ctrl/Cmd+C/X/V copy, cut and paste, Delete deletes, F2 renames, Ctrl/Cmd+F
+  /// searches and Escape clears the selection. In the grid and masonry layouts
+  /// Left/Right step through the items; up and down are left alone there.
+  ///
+  /// A global handler gated on [_isKeyboardTarget] rather than a focus node,
+  /// so only the focused pane reacts and no widget has to hold keyboard focus.
+  bool _handleBrowserKey(KeyEvent event) {
+    final isRepeat = event is KeyRepeatEvent;
+    if (event is! KeyDownEvent && !isRepeat) return false;
+    if (!_isKeyboardTarget) return false;
+
+    final keyboard = HardwareKeyboard.instance;
+    final primary = keyboard.isControlPressed || keyboard.isMetaPressed;
+    final shift = keyboard.isShiftPressed;
+    final alt = keyboard.isAltPressed;
+    final key = event.logicalKey;
+    final hasSelection = selectedItems.isNotEmpty;
+
+    // Keys that may repeat while held.
+    if (!primary && !alt) {
+      final stepKey = _usesGridKeys
+          ? (key == LogicalKeyboardKey.arrowRight
+                ? 1
+                : key == LogicalKeyboardKey.arrowLeft
+                ? -1
+                : 0)
+          : (key == LogicalKeyboardKey.arrowDown
+                ? 1
+                : key == LogicalKeyboardKey.arrowUp
+                ? -1
+                : 0);
+      if (stepKey != 0) {
+        _moveKeyboardSelection(stepKey, extend: shift);
+        return true;
+      }
+    }
+    if (isRepeat) return false;
+
+    if (alt && !primary) {
+      if ((key == LogicalKeyboardKey.arrowLeft ||
+              key == LogicalKeyboardKey.arrowUp) &&
+          !_atRoot) {
+        _navigateUp();
+        return true;
+      }
+      return false;
+    }
+
+    if (primary && !alt) {
+      if (key == LogicalKeyboardKey.keyA) {
+        final displayed = _displayedItemsForScroll();
+        if (displayed.isEmpty) return false;
+        setSelectedItems(displayed.toSet());
+        if (selectedFolderCount > 0) {
+          fetchFolderSizes(widget.container, _currentDirPath);
+        }
+        return true;
+      }
+      if (key == LogicalKeyboardKey.keyC && hasSelection) {
+        _initClipboard(cut: false);
+        return true;
+      }
+      if (key == LogicalKeyboardKey.keyX && hasSelection && !_isReadOnly) {
+        _initClipboard(cut: true);
+        return true;
+      }
+      if (key == LogicalKeyboardKey.keyV && !_isReadOnly) {
+        unawaited(_paste());
+        return true;
+      }
+      if (key == LogicalKeyboardKey.keyF) {
+        _searchNotifier.toggleActive();
+        return true;
+      }
+      return false;
+    }
+
+    if (key == LogicalKeyboardKey.home) {
+      _moveKeyboardSelection(-1, extend: shift, toEdge: true);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.end) {
+      _moveKeyboardSelection(1, extend: shift, toEdge: true);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      if (selectedItems.length != 1) return false;
+      _openSelectedWithKeyboard();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.backspace && !_atRoot) {
+      _navigateUp();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.delete && hasSelection && !_isReadOnly) {
+      _batchDelete();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.f2 && selectedItems.length == 1) {
+      _renameSelectedWithKeyboard();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.escape && hasSelection) {
+      exitSelectionMode();
+      return true;
+    }
+    return false;
+  }
+
+  /// "Double-click to open": the first click on an item selects it (replacing
+  /// the selection), and a second click on the same item soon after opens it.
+  /// Returns true when the click was the first kind and has been handled; on a
+  /// second click it clears the selection and returns false so the caller opens
+  /// the item. Does nothing when the setting is off.
+  bool _handleDoubleClickGate(RawEntry entry) {
+    if (!_toolbarConfig.doubleClickToOpen) return false;
+    final now = DateTime.now();
+    final lastEntry = _lastClickEntry;
+    final lastAt = _lastClickAt;
+    final isSecondClick =
+        lastEntry == entry &&
+        lastAt != null &&
+        now.difference(lastAt) <= const Duration(milliseconds: 350);
+    _lastClickEntry = isSecondClick ? null : entry;
+    _lastClickAt = isSecondClick ? null : now;
+    _signalActivity();
+    if (isSecondClick) {
+      exitSelectionMode();
+      return false;
+    }
+    setSelectedItems({entry});
+    if (selectedFolderCount > 0) {
+      fetchFolderSizes(widget.container, _currentDirPath);
+    }
+    return true;
+  }
+
   void _handleDirTap(RawEntry entry) {
+    if (_handleModifierClick(entry)) return;
+    if (_handleDoubleClickGate(entry)) return;
     _signalActivity();
     if (isSelectionMode) {
       toggleSelectItem(entry);
@@ -3073,6 +3357,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   Future<void> _handleFileTap(RawEntry entry) async {
+    if (_handleModifierClick(entry)) return;
+    if (_handleDoubleClickGate(entry)) return;
     ThumbnailConcurrency.videoLimiter.cancelAll();
     _signalActivity();
     if (isSelectionMode) {
@@ -6341,8 +6627,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       previewDirPath,
       previewSort,
     );
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final isLandscape = context.screen.useLandscapeLayout;
     // True while another viewport owns a drag: this one is then only a drop
     // target. Selecting this watch by tab keeps the source viewport (and any
     // idle one) from rebuilding when a drag starts or ends.
@@ -7335,6 +7620,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                     archiveRootPath:
                                                         _archiveRootPathForSearch,
                                                     sortBy: sortBy,
+                                                    sortAscending: sortAscending,
+                                                    onSortBy: _onSortChanged,
                                                     masonryKey: _masonryKey,
                                                     gridKey: _gridKey,
                                                     listKey: _listKey,
@@ -7460,6 +7747,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                                         previewArchiveRootPath,
                                                                     sortBy: previewSort
                                                                         .sortBy,
+                                                                    sortAscending: previewSort
+                                                                        .sortAscending,
+                                                                    onSortBy: _onSortChanged,
                                                                   ),
                                                                 ],
                                                               );

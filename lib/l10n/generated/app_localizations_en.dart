@@ -13020,6 +13020,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'In list view, tapping the icon of a file or folder selects it. When off, tapping the icon does nothing.';
 
   @override
+  String get doubleClickToOpenLabel => 'Double-click to open';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'A click selects an item and a double-click opens it, as in a desktop file manager. When off, a single tap or click opens it.';
+
+  @override
   String get showFileExtensionsLabel => 'Show file extensions';
 
   @override

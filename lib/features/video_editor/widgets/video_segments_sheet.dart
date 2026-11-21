@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 import '../models/edit_segment.dart';
 import '../models/video_edit_math.dart';
@@ -29,7 +30,7 @@ class VideoSegmentsSheet extends StatelessWidget {
     required ValueChanged<int> onSeekTo,
     String? cutOutModeDescription,
   }) {
-    return showModalBottomSheet<void>(
+    return showAdaptiveSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (_) => VideoSegmentsSheet(

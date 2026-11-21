@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/widgets/layout/adaptive_route_frame.dart';
 import 'package:vaultexplorer/core/filesystem/file_size.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -56,7 +57,8 @@ class VaultInfoScreen extends ConsumerWidget {
 
     final wideLayout = context.screen.useWideLayout;
 
-    return Scaffold(
+    return AdaptiveRouteFrame(
+      child: Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +107,7 @@ class VaultInfoScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildBody(BuildContext context, WidgetRef ref) {

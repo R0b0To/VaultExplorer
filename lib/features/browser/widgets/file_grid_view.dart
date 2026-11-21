@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -298,7 +299,7 @@ class FileGridViewState extends State<FileGridView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final orientation = MediaQuery.orientationOf(context);
+    final orientation = context.screen.layoutOrientation;
     if (_lastOrientation != orientation) {
       _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
       _lastOrientation = orientation;
@@ -351,11 +352,7 @@ class FileGridViewState extends State<FileGridView>
 
   int get _minColumns => 1;
 
-  int get _maxColumns {
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
-    return isLandscape ? 7 : 4;
-  }
+  int get _maxColumns => context.screen.maxGridColumns;
 
   double _getViewportWidth(BuildContext context) {
     final width = _viewportWidth;

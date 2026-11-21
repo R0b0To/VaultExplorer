@@ -1065,6 +1065,35 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.doubleClickToOpen,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setDoubleClickToOpen(v),
+                            title: Text(
+                              context.l10n.doubleClickToOpenLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.doubleClickToOpenDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.mouse_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
                           ListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,

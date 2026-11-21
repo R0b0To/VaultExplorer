@@ -13309,6 +13309,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'У поданні списком дотик до значка файлу або папки вибирає його. Якщо вимкнено, дотик до значка нічого не робить.';
 
   @override
+  String get doubleClickToOpenLabel => 'Подвійний клік для відкриття';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'Клік вибирає елемент, а подвійний клік відкриває його, як у файловому менеджері на комп’ютері. Якщо вимкнено, елемент відкривається одним дотиком або кліком.';
+
+  @override
   String get showFileExtensionsLabel => 'Показувати розширення файлів';
 
   @override

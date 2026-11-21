@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 class ArchivePasteOptions {
   final bool extractIntoSubfolder;
@@ -43,7 +44,7 @@ class ArchivePasteOptionsSheet extends StatefulWidget {
     int itemCount = 1,
     ArchiveFormatType? format,
   }) {
-    return showModalBottomSheet<ArchivePasteOptions>(
+    return showAdaptiveSheet<ArchivePasteOptions>(
       context: context,
       isScrollControlled: true,
       builder: (_) => ArchivePasteOptionsSheet(

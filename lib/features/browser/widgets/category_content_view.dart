@@ -114,6 +114,7 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart'
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart'
     show kVaultMetaDir;
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 typedef CategoryShowInFolderCallback =
@@ -2739,7 +2740,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     }
     final location = _effectiveLocation;
     final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+        context.screen.useLandscapeLayout;
     final useFab = toolbarConfig.useFabForToolbar;
     final showActionBar = !_searchActive && !useFab;
 
@@ -2915,7 +2916,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       final pathStack = _buildPathStack(location, l10n);
 
       return AppBar(
-        leading: Builder(
+        // Beside a docked sidebar there is no drawer to open, so no menu button.
+        leading: DockedSidebarScope.of(context)
+            ? null
+            : Builder(
           builder: (ctx) {
             final fullScreenDrawer = FullScreenDragDrawerScope.maybeOf(ctx);
             final scaffold = Scaffold.maybeOf(ctx);
@@ -3601,7 +3605,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     // lookup so `currentDirPath + entry.name` resolves to the source path.
     final currentDirPath = !location.isTop ? location.dirPath : '';
     final landscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
+        context.screen.useLandscapeLayout;
     final query = _searchActive && _query.trim().isNotEmpty
         ? _query.trim().toLowerCase()
         : null;

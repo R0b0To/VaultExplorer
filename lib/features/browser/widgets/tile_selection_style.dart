@@ -7,6 +7,8 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_details_table.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_details_table.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 
 abstract final class TileSelectionStyle {
@@ -59,6 +61,11 @@ class FileRowShell extends StatelessWidget {
   final RawEntry entry;
   final List<FileDetailColumn> detailColumns;
 
+  /// Draws the [detailColumns] as a table: each at the fixed width from
+  /// [FileDetailsTable], so they line up from row to row and with the table's
+  /// header, instead of each row fitting its own text.
+  final bool tableColumns;
+
   /// How to shorten [displayName] when it doesn't fit on one line. See
   /// [FileNameLabel].
   final LongFileNameDisplayMode longFileNameMode;
@@ -68,6 +75,10 @@ class FileRowShell extends StatelessWidget {
   final bool isSelectionMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+
+  /// Right-click (secondary button) on the row. Null leaves it inert. Used to
+  /// open the item's action menu, as a desktop user expects.
+  final VoidCallback? onSecondaryTap;
 
   /// Tapping directly on the leading icon/thumbnail toggles this row's
   /// selection instead of triggering [onTap]. Null means the icon has no
@@ -92,6 +103,7 @@ class FileRowShell extends StatelessWidget {
     this.searchQuery,
     required this.entry,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.tableColumns = false,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.trailing,
     this.hasTrailingSlot = false,
@@ -99,6 +111,7 @@ class FileRowShell extends StatelessWidget {
     this.isSelectionMode = false,
     required this.onTap,
     required this.onLongPress,
+    this.onSecondaryTap,
     this.onIconTap,
     this.isCompact = false,
     this.isDetailed = false,
@@ -115,6 +128,9 @@ class FileRowShell extends StatelessWidget {
     FileDetailColumn.type => 50,
   };
 
+  double _baseWidth(FileDetailColumn col) =>
+      tableColumns ? FileDetailsTable.columnWidth(col) : _columnBaseWidth(col);
+
   String _columnText(FileDetailColumn col, BuildContext context) =>
       switch (col) {
         FileDetailColumn.date => formatEntryDate(entry.modifiedSecs, context),
@@ -124,8 +140,8 @@ class FileRowShell extends StatelessWidget {
 
   double _columnWidth(FileDetailColumn col, BuildContext context) {
     final textScaler = MediaQuery.textScalerOf(context);
-    final maxWidth = textScaler.scale(_columnBaseWidth(col));
-    if (col != FileDetailColumn.date) return maxWidth;
+    final maxWidth = textScaler.scale(_baseWidth(col));
+    if (tableColumns || col != FileDetailColumn.date) return maxWidth;
 
     final painter = TextPainter(
       text: TextSpan(
@@ -152,7 +168,9 @@ class FileRowShell extends StatelessWidget {
       width: effectiveWidth,
       child: Text(
         _columnText(col, context),
-        textAlign: TextAlign.right,
+        textAlign: tableColumns && !FileDetailsTable.alignsEnd(col)
+            ? TextAlign.left
+            : TextAlign.right,
         style: textTheme.bodySmall?.copyWith(
           color: FileManagerSkinScope.of(context).detailsColor ??
               cs.onSurfaceVariant,
@@ -288,6 +306,7 @@ class FileRowShell extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: entry.isPlaceholder ? null : onTap,
         onLongPress: entry.isPlaceholder ? null : onLongPress,
+        onSecondaryTap: entry.isPlaceholder ? null : onSecondaryTap,
         child: Ink(
           decoration: isSelected
               ? BoxDecoration(
@@ -323,7 +342,7 @@ class FileRowShell extends StatelessWidget {
               if (!isCompact && detailColumns.isNotEmpty) {
                 for (final col in detailColumns) {
                   columnsRequiredWidth +=
-                      textScaler.scale(_columnBaseWidth(col)) + 8.0; // 8.0 for SizedBox
+                      textScaler.scale(_baseWidth(col)) + 8.0; // 8.0 for SizedBox
                 }
               }
 

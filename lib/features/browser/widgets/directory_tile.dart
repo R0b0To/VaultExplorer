@@ -32,6 +32,9 @@ class DirectoryTile extends StatelessWidget {
   final bool largeThumbnail;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
+
+  /// Draw the detail columns as an aligned table; see [FileRowShell].
+  final bool tableColumns;
   final LongFileNameDisplayMode longFileNameMode;
   final bool isDocumentProviderMounted;
   final bool isPinned;
@@ -72,6 +75,7 @@ class DirectoryTile extends StatelessWidget {
     this.largeThumbnail = false,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.tableColumns = false,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.isDocumentProviderMounted = false,
     this.isPinned = false,
@@ -216,6 +220,7 @@ class DirectoryTile extends StatelessWidget {
       searchQuery: searchQuery,
       entry: entry,
       detailColumns: detailColumns,
+      tableColumns: tableColumns,
       longFileNameMode: longFileNameMode,
       trailing: trailingWidget,
       hasTrailingSlot: showItemActionsMenu && !entry.isPlaceholder,
@@ -223,6 +228,10 @@ class DirectoryTile extends StatelessWidget {
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
+      onSecondaryTap:
+          isSelectionMode || !showItemActionsMenu || onMoreTap == null
+          ? null
+          : () => onMoreTap!(entry),
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,

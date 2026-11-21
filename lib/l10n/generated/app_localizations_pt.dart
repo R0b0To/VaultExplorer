@@ -13220,6 +13220,13 @@ class AppLocalizationsPt extends AppLocalizations {
       'Na visualização em lista, tocar no ícone de um arquivo ou pasta o seleciona. Desativado, tocar no ícone não faz nada.';
 
   @override
+  String get doubleClickToOpenLabel => 'Clique duplo para abrir';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'Um clique seleciona um item e um clique duplo o abre, como em um gerenciador de arquivos de desktop. Se desativado, um único toque ou clique o abre.';
+
+  @override
   String get showFileExtensionsLabel => 'Mostrar extensões de arquivo';
 
   @override

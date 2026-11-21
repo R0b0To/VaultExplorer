@@ -3291,6 +3291,8 @@
   "predictiveBackAnimationsDesc": "Geri giderken etkileşimli önizlemeler ve animasyonlar göster.",
   "selectByIconLabel": "Simgeye dokunarak seç",
   "selectByIconDesc": "Liste görünümünde bir dosya veya klasörün simgesine dokunmak onu seçer. Kapalıyken simgeye dokunmak bir şey yapmaz.",
+  "doubleClickToOpenLabel": "Açmak için çift tıkla",
+  "doubleClickToOpenDesc": "Bir tıklama öğeyi seçer, çift tıklama açar; masaüstü dosya yöneticilerindeki gibi. Kapalıyken tek dokunuş veya tıklama öğeyi açar.",
   "showFileExtensionsLabel": "Dosya uzantılarını göster",
   "showFileExtensionsDesc": "Dosya adlarının sonunda uzantıyı göster. Arama sırasında uzantılar her zaman gösterilir.",
   "itemActionsMenuTitle": "Öğe eylemleri",

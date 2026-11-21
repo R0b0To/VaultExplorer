@@ -13223,6 +13223,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'In der Listenansicht wählt ein Tippen auf das Symbol einer Datei oder eines Ordners das Element aus. Ist die Option aus, passiert beim Tippen auf das Symbol nichts.';
 
   @override
+  String get doubleClickToOpenLabel => 'Doppelklick zum Öffnen';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'Ein Klick wählt ein Element aus, ein Doppelklick öffnet es – wie in einem Desktop-Dateimanager. Ist die Option aus, öffnet ein einzelnes Tippen oder Klicken das Element.';
+
+  @override
   String get showFileExtensionsLabel => 'Dateiendungen anzeigen';
 
   @override

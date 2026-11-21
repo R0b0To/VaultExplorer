@@ -69,6 +69,9 @@ class FileTile extends StatelessWidget {
   final bool showFileExtensions;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
+
+  /// Draw the detail columns as an aligned table; see [FileRowShell].
+  final bool tableColumns;
   final LongFileNameDisplayMode longFileNameMode;
   final MountedContainer? container;
   final String currentDirPath;
@@ -108,6 +111,7 @@ class FileTile extends StatelessWidget {
     this.showFileExtensions = true,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.tableColumns = false,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.container,
     this.currentDirPath = '',
@@ -321,6 +325,7 @@ class FileTile extends StatelessWidget {
       searchQuery: searchQuery,
       entry: entry,
       detailColumns: detailColumns,
+      tableColumns: tableColumns,
       longFileNameMode: longFileNameMode,
       trailing: trailingWidget,
       hasTrailingSlot: showItemActionsMenu && !entry.isPlaceholder,
@@ -328,6 +333,10 @@ class FileTile extends StatelessWidget {
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
+      onSecondaryTap:
+          isSelectionMode || !showItemActionsMenu || onLongMenu == null
+          ? null
+          : () => onLongMenu!(entry),
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,

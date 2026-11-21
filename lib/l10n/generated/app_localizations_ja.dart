@@ -12492,6 +12492,13 @@ class AppLocalizationsJa extends AppLocalizations {
       'リスト表示で、ファイルまたはフォルダのアイコンをタップすると選択されます。オフにすると、アイコンをタップしても何も起こりません。';
 
   @override
+  String get doubleClickToOpenLabel => 'ダブルクリックで開く';
+
+  @override
+  String get doubleClickToOpenDesc =>
+      'クリックで項目を選択し、ダブルクリックで開きます。デスクトップのファイルマネージャーと同じ動作です。オフの場合は、1回のタップまたはクリックで開きます。';
+
+  @override
   String get showFileExtensionsLabel => 'ファイルの拡張子を表示';
 
   @override

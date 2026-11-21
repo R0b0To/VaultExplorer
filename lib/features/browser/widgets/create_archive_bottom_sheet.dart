@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/inputs/password_visibility_toggle.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 extension ArchiveCompressionLevelL10n on ArchiveCompressionLevel {
   String localizedTitle(AppLocalizations l10n) => switch (this) {
@@ -85,7 +86,7 @@ class CreateArchiveBottomSheet extends ConsumerStatefulWidget {
       ArchiveCompressionMethod compressionMethod,
     ) onCreate,
   }) {
-    return showModalBottomSheet<void>(
+    return showAdaptiveSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,

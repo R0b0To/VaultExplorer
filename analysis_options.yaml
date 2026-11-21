@@ -7,6 +7,7 @@ analyzer:
     - build/**
     - android/**
     - linux/**
+    - windows/**
 
 plugins:
   riverpod_lint: ^3.1.8

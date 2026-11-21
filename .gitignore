@@ -5,6 +5,7 @@
 *.swp
 *~
 .DS_Store
+Thumbs.db
 .atom/
 .build/
 .buildlog/
@@ -43,6 +44,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/app/.externalNativeBuild/
+
+# Local Android signing credentials
+/android/key.properties
+/android/app/key.jks
 gitattributes
 
 # Ignore local i18n WIP folder
@@ -62,3 +72,4 @@ android/**/.cxx/
 **/android/app/*.keystore
 devtools_options.yaml
 .flutter
+copy/

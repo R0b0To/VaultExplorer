@@ -23,7 +23,7 @@
 
 namespace fv {
 
-// Owning wrapper around a POSIX file descriptor with the few operations the
+// Owning wrapper around a file descriptor (a CRT descriptor on Windows) with the few operations the
 // engines need. Handles descriptors that are not seekable (some
 // ContentProviders hand out pipes): reads then become forward-only.
 class FdFile {
@@ -148,6 +148,12 @@ public:
 
 private:
     bool abs(const std::string& rel, std::string& out) const;
+#if defined(_WIN32)
+    // Windows (fv_storage_win.cpp): the same tree through the Win32 API. [rootW_] is the root in extended-length
+    // UTF-16 form; absW() appends validated path segments to it.
+    bool absW(const std::string& rel, std::wstring& out) const;
+    std::wstring rootW_;
+#endif
     std::string root_;
 };
 

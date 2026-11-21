@@ -121,6 +121,8 @@ The app contains two specialized native Kotlin adapters written to bridge Media3
 | `isolate_manager` | MIT | Transitive dependency of `re_editor`; runs syntax highlighting off the UI isolate for large files. |
 | `kpasslib` | MIT | KeePass KDBX 3/4 reading and writing for Item Vault import/export (`kdbx_codec.dart`). Uses pure-Dart `archive` and `crypto` internally for KDBX block compression and key derivation. |
 | `csv` | MIT | CSV parsing/encoding for password import/export (`csv_codec.dart`). No dependencies. |
+| `media_kit`, `media_kit_video` | MIT | Desktop (Linux / Windows) video playback: Dart/FFI bindings to libmpv and the texture plugin that renders its frames (`desktop_video_backend.dart`). Not used on Android, which keeps Media3; `media_kit_video` still registers a tiny dependency-free Java plugin in the Android build but loads no native code there. |
+| `media_kit_libs_linux`, `media_kit_libs_windows_video` | MIT | Desktop-only packages that supply libmpv: the Linux one links the distribution's `libmpv` (GPL-2.0-or-later or LGPL-2.1-or-later depending on how the distribution built it); the Windows one downloads a prebuilt libmpv/FFmpeg build at build time (`mpv` GPL-2.0-or-later, FFmpeg LGPL-2.1-or-later / GPL-2.0-or-later) -- compatible with this project's GPLv3. Neither builds for Android. |
 
 `crypto` (BSD-3-Clause) was originally used for TOTP calculation and Bitwarden export
 decryption; both were migrated to native C++ (`VaultCryptoApi.hmac` / OpenSSL BoringSSL

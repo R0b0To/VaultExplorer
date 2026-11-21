@@ -29,8 +29,12 @@
 extern "C" {
 #endif
 
-#if !defined(__ANDROID__) && !defined(__linux__)
-#error "Common/Endian.h has only been written and verified for Android/Linux little-endian targets; port it deliberately before reusing it elsewhere."
+/* Deliberate port: Windows (x86-64 / arm64) is little-endian, which the compiler's own byte-order
+ * macros confirm here -- anything else that is not Android/Linux still refuses to compile. */
+#if !defined(__ANDROID__) && !defined(__linux__) && \
+    !(defined(_WIN32) && defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+      __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#error "Common/Endian.h has only been written and verified for Android/Linux and little-endian Windows targets; port it deliberately before reusing it elsewhere."
 #endif
 
 

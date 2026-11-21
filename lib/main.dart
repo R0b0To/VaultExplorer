@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/app_bootstrap.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -50,11 +51,18 @@ void scheduledSyncBackgroundEntrypoint() {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  if (isDesktopEngineTarget) {
+    // Linux/Windows: answer the engine channel in-process via dart:ffi (no Kotlin there).
+    DesktopEngineBinding.ensureInitialized();
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
 
   // Not awaited: the platform message is queued ahead of runApp either way,
   // and waiting for its reply only delayed the first frame.
-  unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+  if (!isDesktopEngineTarget) {
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+  }
 
   final appContainer = ProviderContainer();
   final vaultEngineEvents = appContainer.read(vaultEngineEventsProvider);

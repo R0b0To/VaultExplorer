@@ -4,10 +4,13 @@
 #include <fcntl.h>
 #include <mutex>
 #include <shared_mutex>
-#include <sys/stat.h>
+#if !defined(_WIN32)
+#include <sys/stat.h>   // (on MinGW it #defines stat to _stat64, which would rename Storage::stat)
 #include <unistd.h>
+#endif
 
 #include "fv_cryfs.h"
+#include "fv_os.h"
 #include "fv_util.h"
 
 namespace fv {
@@ -164,7 +167,7 @@ struct FdSource : ByteSource {
     explicit FdSource(int f) : fd(f) {}
     int64_t read(uint8_t* buf, size_t n) override {
         for (;;) {
-            ssize_t r = ::pread(fd, buf, n, (off_t)off);
+            int64_t r = osPread(fd, buf, n, off);
             if (r < 0 && errno == EINTR) continue;
             if (r > 0) off += r;
             return r;
@@ -470,7 +473,7 @@ public:
         if (readOnly_) return false;
         try {
             Lifecycle::Op op(life_);
-            int fd = ::open(src.c_str(), O_RDONLY | O_CLOEXEC);
+            int fd = osOpen(src.c_str(), O_RDONLY | O_CLOEXEC, 0);
             if (fd < 0) return false;
             FdFile f(fd);
             FdSource s(fd);
@@ -506,7 +509,7 @@ public:
                 if (node.isDir()) return false;
                 total = payloadSize(node.blob);
             }
-            FdFile out(::open(dest.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600));
+            FdFile out(osOpen(dest.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600));
             if (!out.valid()) return false;
             int64_t pos = 0;
             while (pos < total) {
@@ -583,7 +586,7 @@ private:
             std::lock_guard<std::mutex> g(mu_);
             size_t done = 0;
             while (done < n) {
-                ssize_t r = ::pwrite(f_.fd(), d + done, n - done, (off_t)(off + (int64_t)done));
+                int64_t r = osPwrite(f_.fd(), d + done, n - done, off + (int64_t)done);
                 if (r < 0) { if (errno == EINTR) continue; return false; }
                 done += (size_t)r;
             }
@@ -604,6 +607,11 @@ private:
     };
 
     std::shared_ptr<Scratch> makeScratch() {
+#if defined(_WIN32)
+        int fd = osMakeScratch(tempDir_);   // delete-on-close temp file (the system temp dir when unset)
+        if (fd < 0) throw Error(Err::Io, "cannot create scratch file");
+        return std::make_shared<Scratch>(FdFile(fd));
+#else
         std::string dir = tempDir_.empty() ? "/tmp" : tempDir_;
         std::string tmpl = dir + "/cryfs_write_XXXXXX";
         std::vector<char> buf(tmpl.begin(), tmpl.end());
@@ -612,6 +620,7 @@ private:
         if (fd < 0) throw Error(Err::Io, "cannot create scratch file");
         ::unlink(buf.data());
         return std::make_shared<Scratch>(FdFile(fd));
+#endif
     }
 
     static Bytes readScratch(Scratch& s, int64_t offset, int length) {

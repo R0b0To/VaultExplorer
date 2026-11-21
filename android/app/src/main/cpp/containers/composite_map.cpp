@@ -4,6 +4,7 @@
 #include <openssl/sha.h>
 #include <unistd.h>
 #include <vector>
+#include "io/host_file.h"
 
 #undef min
 #undef max
@@ -12,7 +13,7 @@ namespace {
 std::string computeCarrierHeaderDigest(int fd, const std::string& path) {
     bool closeFd = false;
     if (fd < 0 && !path.empty()) {
-        fd = ::open(path.c_str(), O_RDONLY);
+        fd = hostOpen(path.c_str(), O_RDONLY);
         closeFd = true;
     }
     if (fd < 0) return path;

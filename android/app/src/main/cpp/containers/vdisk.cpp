@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "crypto/os_random.h"
 #include "platform/engine_log.h"
 
 #include "vhd_image.h"
@@ -85,18 +86,7 @@ uint32_t crc32c(const unsigned char* data, size_t len) {
 }
 
 bool fillRandom(unsigned char* out, size_t len) {
-    const int fd = ::open("/dev/urandom", O_RDONLY);
-    if (fd < 0) return false;
-    size_t done = 0;
-    bool ok = true;
-    while (done < len) {
-        const ssize_t n = ::read(fd, out + done, len - done);
-        if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) { ok = false; break; }
-        done += size_t(n);
-    }
-    ::close(fd);
-    return ok;
+    return osRandomBytes(out, len);  // /dev/urandom off Windows, BCryptGenRandom on it
 }
 
 // ── legacy VHD ───────────────────────────────────────────────────────────

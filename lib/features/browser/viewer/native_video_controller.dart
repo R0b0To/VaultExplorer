@@ -3,8 +3,12 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart' show isDesktopEngineTarget;
+import 'package:vaultexplorer/features/browser/viewer/desktop_video_backend.dart';
+import 'package:vaultexplorer/features/browser/viewer/desktop_video_view.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_player_view.dart';
+import 'package:vaultexplorer/features/browser/viewer/video_playback_backend.dart';
 
 @immutable
 class NativeVideoValue {
@@ -70,14 +74,15 @@ class NativeVideoValue {
   }
 }
 
-/// Refactored controller backed by [NativeMedia3Controller] directly communicating
-/// with the Media3 ExoPlayer instance over native MethodChannels.
+/// The viewer's single entry point to video playback. It forwards to a [VideoPlaybackBackend]:
+/// [NativeMedia3Controller] (Media3 ExoPlayer over native MethodChannels) on Android, and
+/// [DesktopVideoBackend] (libmpv, streaming from the unlocked vault) on Linux / Windows.
 class NativeVideoController extends ValueNotifier<NativeVideoValue> {
   final int volId;
   final String filePath;
   final bool autoPlay;
   final bool isLocalStorage;
-  final NativeMedia3Controller _media3;
+  final VideoPlaybackBackend _backend;
 
   NativeVideoController({
     required this.volId,
@@ -92,22 +97,36 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     AudioEqualizerSettings? equalizer,
     int initialPositionMs = 0,
     bool mediaSession = false,
-  }) : _media3 = NativeMedia3Controller(
-         volId: volId,
-         filePath: filePath,
-         autoPlay: autoPlay,
-         isLocalStorage: isLocalStorage,
-         initialSpeed: initialSpeed,
-         videoDecoderMode: videoDecoderMode,
-         audioDecoderMode: audioDecoderMode,
-         volumeBoostEnabled: volumeBoostEnabled,
-         volumeBoostGainMb: volumeBoostGainMb,
-         equalizer: equalizer,
-         initialPositionMs: initialPositionMs,
-         mediaSession: mediaSession,
-       ),
+  }) : _backend = isDesktopEngineTarget
+           ? DesktopVideoBackend(
+               volId: volId,
+               filePath: filePath,
+               autoPlay: autoPlay,
+               isLocalStorage: isLocalStorage,
+               initialSpeed: initialSpeed,
+               videoDecoderMode: videoDecoderMode,
+               audioDecoderMode: audioDecoderMode,
+               volumeBoostEnabled: volumeBoostEnabled,
+               volumeBoostGainMb: volumeBoostGainMb,
+               equalizer: equalizer,
+               initialPositionMs: initialPositionMs,
+             )
+           : NativeMedia3Controller(
+               volId: volId,
+               filePath: filePath,
+               autoPlay: autoPlay,
+               isLocalStorage: isLocalStorage,
+               initialSpeed: initialSpeed,
+               videoDecoderMode: videoDecoderMode,
+               audioDecoderMode: audioDecoderMode,
+               volumeBoostEnabled: volumeBoostEnabled,
+               volumeBoostGainMb: volumeBoostGainMb,
+               equalizer: equalizer,
+               initialPositionMs: initialPositionMs,
+               mediaSession: mediaSession,
+             ),
        super(const NativeVideoValue()) {
-    _media3.addListener(_onMedia3StateChanged);
+    _backend.addListener(_onBackendStateChanged);
   }
 
   /// Auxiliary constructor for parsing content URI string:
@@ -154,117 +173,122 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     }
   }
 
-  int get initialPositionMs => _media3.initialPositionMs;
-  NativeMedia3Controller get media3Controller => _media3;
-  ValueNotifier<List<AudioTrackInfo>> get audioTracksNotifier =>
-      _media3.audioTracksNotifier;
-  ValueNotifier<List<SubtitleTrackInfo>> get subtitleTracksNotifier =>
-      _media3.subtitleTracksNotifier;
-  ValueNotifier<MediaDiagnosticsInfo> get diagnosticsNotifier =>
-      _media3.diagnosticsNotifier;
-  List<AudioTrackInfo> get audioTracks => _media3.audioTracks;
-  List<SubtitleTrackInfo> get subtitleTracks => _media3.subtitleTracks;
-  MediaDiagnosticsInfo get diagnostics => _media3.diagnostics;
-  Future<MediaDiagnosticsInfo> fetchDiagnostics() => _media3.fetchDiagnostics();
+  int get initialPositionMs => _backend.initialPositionMs;
 
-  void _onMedia3StateChanged() {
-    value = _media3.value;
+  /// What actually plays the video; the player view picks its rendering from this.
+  VideoPlaybackBackend get backend => _backend;
+
+  /// The last volume level (0-100) applied via [setVolume].
+  int get currentVolume => _backend.currentVolume;
+  ValueNotifier<List<AudioTrackInfo>> get audioTracksNotifier =>
+      _backend.audioTracksNotifier;
+  ValueNotifier<List<SubtitleTrackInfo>> get subtitleTracksNotifier =>
+      _backend.subtitleTracksNotifier;
+  ValueNotifier<MediaDiagnosticsInfo> get diagnosticsNotifier =>
+      _backend.diagnosticsNotifier;
+  List<AudioTrackInfo> get audioTracks => _backend.audioTracks;
+  List<SubtitleTrackInfo> get subtitleTracks => _backend.subtitleTracks;
+  MediaDiagnosticsInfo get diagnostics => _backend.diagnostics;
+  Future<MediaDiagnosticsInfo> fetchDiagnostics() => _backend.fetchDiagnostics();
+
+  void _onBackendStateChanged() {
+    value = _backend.value;
   }
 
   Future<void> initialize() async {
-    await _media3.initialize();
+    await _backend.initialize();
   }
 
   Future<void> play() async {
-    await _media3.play();
+    await _backend.play();
   }
 
   Future<void> pause() async {
-    await _media3.pause();
+    await _backend.pause();
   }
 
   Future<void> seekTo(Duration position) async {
-    await _media3.seekTo(position);
+    await _backend.seekTo(position);
   }
 
   Future<void> setVolume(int vol) async {
-    await _media3.setVolume(vol);
+    await _backend.setVolume(vol);
   }
 
   Future<void> setAudioOnly(bool enabled) async {
-    await _media3.setAudioOnly(enabled);
+    await _backend.setAudioOnly(enabled);
   }
 
   /// See [NativeMedia3Controller.pauseRequested].
-  bool get pauseRequested => _media3.pauseRequested;
+  bool get pauseRequested => _backend.pauseRequested;
 
   /// See [NativeMedia3Controller.playWhenReady].
-  Future<void> playWhenReady() => _media3.playWhenReady();
+  Future<void> playWhenReady() => _backend.playWhenReady();
 
   Future<void> setVolumeBoost(bool enabled, int gainMb) async {
-    await _media3.setVolumeBoost(enabled, gainMb);
+    await _backend.setVolumeBoost(enabled, gainMb);
   }
 
   Future<void> setEqualizer(AudioEqualizerSettings settings) async {
-    await _media3.setEqualizer(settings);
+    await _backend.setEqualizer(settings);
   }
 
   Future<void> setDecoderModes(
     MediaDecoderMode videoMode,
     MediaDecoderMode audioMode,
   ) async {
-    await _media3.setDecoderModes(videoMode, audioMode);
+    await _backend.setDecoderModes(videoMode, audioMode);
   }
 
   Future<void> setPlaybackSpeed(double speed) async {
-    await _media3.setPlaybackSpeed(speed);
+    await _backend.setPlaybackSpeed(speed);
   }
 
   Future<void> setLooping(bool loop) async {
-    await _media3.setLooping(loop);
+    await _backend.setLooping(loop);
   }
 
-  Future<Duration?> getExactPosition() => _media3.getExactPosition();
+  Future<Duration?> getExactPosition() => _backend.getExactPosition();
 
   Future<void> setAbLoop(Duration start, Duration end) =>
-      _media3.setAbLoop(start, end);
+      _backend.setAbLoop(start, end);
 
-  Future<void> setAbLoopStart(Duration start) => _media3.setAbLoopStart(start);
+  Future<void> setAbLoopStart(Duration start) => _backend.setAbLoopStart(start);
 
-  Future<void> clearAbLoop() => _media3.clearAbLoop();
+  Future<void> clearAbLoop() => _backend.clearAbLoop();
 
   Future<void> selectAudioTrack(int groupIndex, int trackIndex) async {
-    await _media3.selectAudioTrack(groupIndex, trackIndex);
+    await _backend.selectAudioTrack(groupIndex, trackIndex);
   }
 
   Future<void> selectSubtitleTrack(int groupIndex, int trackIndex) async {
-    await _media3.selectSubtitleTrack(groupIndex, trackIndex);
+    await _backend.selectSubtitleTrack(groupIndex, trackIndex);
   }
 
   Future<void> disableSubtitleTrack() async {
-    await _media3.disableSubtitleTrack();
+    await _backend.disableSubtitleTrack();
   }
 
-  Future<bool> startScrubPreview() => _media3.startScrubPreview();
+  Future<bool> startScrubPreview() => _backend.startScrubPreview();
 
   Future<Uint8List?> getScrubPreviewFrame(
     Duration position, {
     int maxSize = 200,
     int quality = 55,
-  }) => _media3.getScrubPreviewFrame(
+  }) => _backend.getScrubPreviewFrame(
     position,
     maxSize: maxSize,
     quality: quality,
   );
 
-  Future<void> endScrubPreview() => _media3.endScrubPreview();
+  Future<void> endScrubPreview() => _backend.endScrubPreview();
 
-  bool get isDisposed => _media3.isDisposed;
+  bool get isDisposed => _backend.isDisposed;
 
   @override
   Future<void> dispose() async {
-    _media3.removeListener(_onMedia3StateChanged);
-    await _media3.dispose();
+    _backend.removeListener(_onBackendStateChanged);
+    await _backend.dispose();
     super.dispose();
   }
 }
@@ -275,8 +299,12 @@ class NativeVideoPlayerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final backend = controller.backend;
+    if (backend is DesktopVideoBackend) {
+      return DesktopVideoView(backend: backend);
+    }
     return NativeMedia3PlayerView(
-      media3Controller: controller.media3Controller,
+      media3Controller: backend as NativeMedia3Controller,
     );
   }
 }

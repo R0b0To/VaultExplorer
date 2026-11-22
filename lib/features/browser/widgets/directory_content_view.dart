@@ -6670,6 +6670,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     );
     final desktopFileManager =
         PlatformFeatures.isDesktop && useBrowserTabs;
+    // One setting for every pane and tab, so folding the preview away stays
+    // folded when the tab changes and across restarts.
+    final previewPaneCollapsed = ref.watch(
+      appSettingsControllerProvider.select(
+        (settings) => settings.settings.desktopPreviewPaneCollapsed,
+      ),
+    );
     final isLandscape = context.screen.useLandscapeLayout;
     // True while another viewport owns a drag: this one is then only a drop
     // target. Selecting this watch by tab keeps the source viewport (and any
@@ -7596,6 +7603,35 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               : 220,
                                           collapseSecondOnResize:
                                               desktopFileManager,
+                                          // Folded, nothing of the preview stays
+                                          // but the divider; a tap on it (or a
+                                          // drag) brings the preview back.
+                                          collapsedSecondExtent: 0,
+                                          dividerExtent: desktopFileManager
+                                              ? 12
+                                              : 8,
+                                          toggleSecondOnHandleTap:
+                                              desktopFileManager,
+                                          secondCollapsed: desktopFileManager
+                                              ? previewPaneCollapsed
+                                              : null,
+                                          onSecondCollapsedChanged:
+                                              desktopFileManager
+                                              ? (collapsed) => unawaited(
+                                                  ref
+                                                      .read(
+                                                        appSettingsControllerProvider
+                                                            .notifier,
+                                                      )
+                                                      .updateSettings(
+                                                        (settings) =>
+                                                            settings.copyWith(
+                                                              desktopPreviewPaneCollapsed:
+                                                                  collapsed,
+                                                            ),
+                                                      ),
+                                                )
+                                              : null,
                                           collapsedSecondTooltip: context
                                               .l10n
                                               .markdownViewerPreviewTooltip,

@@ -22,6 +22,18 @@ class ResizableSplitPane extends StatefulWidget {
   final double collapseThreshold;
   final String collapsedSecondTooltip;
 
+  /// With [collapseSecondOnResize]: whether the second child is folded away.
+  /// When non-null the owner decides (every change the user makes is reported
+  /// through [onSecondCollapsedChanged], and a new value from the owner is
+  /// applied); when null the pane keeps this state itself.
+  final bool? secondCollapsed;
+  final ValueChanged<bool>? onSecondCollapsedChanged;
+
+  /// With [collapseSecondOnResize]: tapping the divider folds / unfolds the
+  /// second child (dragging it still resizes), and the divider draws a handle
+  /// with an arrow showing which way a tap moves it.
+  final bool toggleSecondOnHandleTap;
+
   const ResizableSplitPane({
     super.key,
     required this.axis,
@@ -38,6 +50,9 @@ class ResizableSplitPane extends StatefulWidget {
     this.collapsedSecondExtent = 28,
     this.collapseThreshold = 84,
     this.collapsedSecondTooltip = 'Expand pane',
+    this.secondCollapsed,
+    this.onSecondCollapsedChanged,
+    this.toggleSecondOnHandleTap = false,
   });
 
   @override
@@ -47,7 +62,8 @@ class ResizableSplitPane extends StatefulWidget {
 class _ResizableSplitPaneState extends State<ResizableSplitPane> {
   late double _fraction = widget.initialFraction.clamp(0.05, 0.95).toDouble();
   late double _lastExpandedFraction = _fraction;
-  bool _secondCollapsed = false;
+  late bool _secondCollapsed =
+      widget.collapseSecondOnResize && (widget.secondCollapsed ?? false);
 
   double _availableExtent(BoxConstraints constraints) {
     final extent = widget.axis == Axis.horizontal
@@ -94,6 +110,7 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
     final nextSecond = available - nextFirst;
     final shouldCollapse =
         widget.collapseSecondOnResize && nextSecond <= widget.collapseThreshold;
+    final wasCollapsed = _secondCollapsed;
     setState(() {
       if (shouldCollapse) {
         if (!_secondCollapsed) _lastExpandedFraction = _fraction;
@@ -107,6 +124,31 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
     });
     widget.onFirstExtentChanged?.call(available * _fraction);
     widget.onFractionChanged?.call(_fraction);
+    if (wasCollapsed != _secondCollapsed) {
+      widget.onSecondCollapsedChanged?.call(_secondCollapsed);
+    }
+  }
+
+  void _collapseSecond(double available) {
+    if (_secondCollapsed || !widget.collapseSecondOnResize || available <= 0) {
+      return;
+    }
+    setState(() {
+      _lastExpandedFraction = _firstExtent(available) / available;
+      _secondCollapsed = true;
+      _fraction = (available - widget.collapsedSecondExtent) / available;
+    });
+    widget.onFirstExtentChanged?.call(available * _fraction);
+    widget.onFractionChanged?.call(_fraction);
+    widget.onSecondCollapsedChanged?.call(true);
+  }
+
+  void _toggleSecond(double available) {
+    if (_secondCollapsed) {
+      _expandSecond(available);
+    } else {
+      _collapseSecond(available);
+    }
   }
 
   void _expandSecond(double available) {
@@ -126,6 +168,7 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
     });
     widget.onFirstExtentChanged?.call(available * _fraction);
     widget.onFractionChanged?.call(_fraction);
+    widget.onSecondCollapsedChanged?.call(false);
   }
 
   @override
@@ -135,6 +178,16 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
       _fraction = widget.initialFraction.clamp(0.05, 0.95).toDouble();
       _lastExpandedFraction = _fraction;
       _secondCollapsed = false;
+    }
+    // The owner folded or unfolded the second child (another pane, a restored
+    // setting): follow it without reporting it back.
+    final owned = widget.secondCollapsed;
+    if (owned != null &&
+        widget.collapseSecondOnResize &&
+        owned != _secondCollapsed) {
+      if (owned) _lastExpandedFraction = _fraction;
+      _secondCollapsed = owned;
+      if (!owned) _fraction = _lastExpandedFraction;
     }
   }
 
@@ -149,7 +202,13 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
         final available = _availableExtent(constraints);
         final firstExtent = _firstExtent(available);
         final horizontal = widget.axis == Axis.horizontal;
-        final secondChild = _secondCollapsed && widget.collapseSecondOnResize
+        final collapsed = _secondCollapsed && widget.collapseSecondOnResize;
+        final toggleOnTap =
+            widget.collapseSecondOnResize && widget.toggleSecondOnHandleTap;
+        final secondChild = collapsed && widget.collapsedSecondExtent <= 0
+            // Nothing is left of it but the divider, which unfolds it again.
+            ? const SizedBox.shrink()
+            : collapsed
             ? Tooltip(
                 message: widget.collapsedSecondTooltip,
                 child: Material(
@@ -171,30 +230,14 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
                 ),
               )
             : second;
-        final splitter = MouseRegion(
-          cursor: horizontal
-              ? SystemMouseCursors.resizeColumn
-              : SystemMouseCursors.resizeRow,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragUpdate: horizontal
-                ? (details) => _resize(details.delta.dx, available)
-                : null,
-            onVerticalDragUpdate: horizontal
-                ? null
-                : (details) => _resize(details.delta.dy, available),
-            child: SizedBox(
-              width: horizontal ? widget.dividerExtent : double.infinity,
-              height: horizontal ? double.infinity : widget.dividerExtent,
-              child: Center(
-                child: Container(
-                  width: horizontal ? 1 : 32,
-                  height: horizontal ? 32 : 1,
-                  color: cs.outlineVariant,
-                ),
-              ),
-            ),
-          ),
+        final splitter = _SplitHandle(
+          horizontal: horizontal,
+          extent: widget.dividerExtent,
+          showToggle: toggleOnTap,
+          collapsed: collapsed,
+          tooltip: widget.collapsedSecondTooltip,
+          onDelta: (delta) => _resize(delta, available),
+          onTap: toggleOnTap ? () => _toggleSecond(available) : null,
         );
 
         if (horizontal) {
@@ -216,6 +259,124 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
           ],
         );
       },
+    );
+  }
+}
+
+/// The draggable divider. It tints while the pointer is over it or it is being
+/// dragged. With [showToggle] it also draws a small handle with an arrow (the
+/// direction a tap moves the second child: away when it is shown, back when
+/// it is folded), and a tap reports through [onTap].
+class _SplitHandle extends StatefulWidget {
+  const _SplitHandle({
+    required this.horizontal,
+    required this.extent,
+    required this.showToggle,
+    required this.collapsed,
+    required this.tooltip,
+    required this.onDelta,
+    required this.onTap,
+  });
+
+  final bool horizontal;
+  final double extent;
+  final bool showToggle;
+  final bool collapsed;
+  final String tooltip;
+  final ValueChanged<double> onDelta;
+  final VoidCallback? onTap;
+
+  @override
+  State<_SplitHandle> createState() => _SplitHandleState();
+}
+
+class _SplitHandleState extends State<_SplitHandle> {
+  bool _hovering = false;
+  bool _dragging = false;
+
+  void _setDragging(bool value) {
+    if (_dragging == value) return;
+    setState(() => _dragging = value);
+  }
+
+  IconData get _arrow {
+    // The second child is below (vertical split) or to the right (horizontal
+    // split) of the divider: folding moves it that way.
+    if (widget.horizontal) {
+      return widget.collapsed
+          ? Icons.keyboard_arrow_left_rounded
+          : Icons.keyboard_arrow_right_rounded;
+    }
+    return widget.collapsed
+        ? Icons.keyboard_arrow_up_rounded
+        : Icons.keyboard_arrow_down_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final horizontal = widget.horizontal;
+    final active = _hovering || _dragging;
+
+    final Widget mark;
+    if (widget.showToggle) {
+      mark = Container(
+        width: horizontal ? 10 : 36,
+        height: horizontal ? 36 : 10,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active
+              ? cs.primary.withValues(alpha: 0.22)
+              : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(5),
+        ),
+        child: Icon(
+          _arrow,
+          size: 10,
+          color: active ? cs.primary : cs.onSurfaceVariant,
+        ),
+      );
+    } else {
+      mark = Container(
+        width: horizontal ? 1 : 32,
+        height: horizontal ? 32 : 1,
+        color: active ? cs.primary : cs.outlineVariant,
+      );
+    }
+
+    Widget handle = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onHorizontalDragStart: horizontal ? (_) => _setDragging(true) : null,
+      onHorizontalDragUpdate: horizontal
+          ? (details) => widget.onDelta(details.delta.dx)
+          : null,
+      onHorizontalDragEnd: horizontal ? (_) => _setDragging(false) : null,
+      onHorizontalDragCancel: horizontal ? () => _setDragging(false) : null,
+      onVerticalDragStart: horizontal ? null : (_) => _setDragging(true),
+      onVerticalDragUpdate: horizontal
+          ? null
+          : (details) => widget.onDelta(details.delta.dy),
+      onVerticalDragEnd: horizontal ? null : (_) => _setDragging(false),
+      onVerticalDragCancel: horizontal ? null : () => _setDragging(false),
+      child: Container(
+        width: horizontal ? widget.extent : double.infinity,
+        height: horizontal ? double.infinity : widget.extent,
+        color: active ? cs.primary.withValues(alpha: 0.08) : null,
+        alignment: Alignment.center,
+        child: mark,
+      ),
+    );
+    if (widget.showToggle) {
+      handle = Tooltip(message: widget.tooltip, child: handle);
+    }
+    return MouseRegion(
+      cursor: horizontal
+          ? SystemMouseCursors.resizeColumn
+          : SystemMouseCursors.resizeRow,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: handle,
     );
   }
 }

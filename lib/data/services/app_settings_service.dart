@@ -176,6 +176,10 @@ class AppSettings {
   BrowserLayoutMode defaultLayoutMode;
   bool useBrowserTabs;
   bool useDualPaneBrowsing;
+
+  /// Whether the desktop file manager's preview pane is folded away (to a thin
+  /// strip under or beside the folder view). Shared by every pane and tab.
+  bool desktopPreviewPaneCollapsed;
   TabSwipeGestures tabSwipeGestures;
   bool appBarAtBottom;
 
@@ -253,6 +257,7 @@ class AppSettings {
     this.defaultLayoutMode = BrowserLayoutMode.detailed,
     this.useBrowserTabs = true,
     this.useDualPaneBrowsing = false,
+    this.desktopPreviewPaneCollapsed = false,
     this.tabSwipeGestures = const TabSwipeGestures(),
     this.appBarAtBottom = false,
     this.predictiveBackAnimations = true,
@@ -392,6 +397,7 @@ class AppSettings {
     BrowserLayoutMode? defaultLayoutMode,
     bool? useBrowserTabs,
     bool? useDualPaneBrowsing,
+    bool? desktopPreviewPaneCollapsed,
     TabSwipeGestures? tabSwipeGestures,
     bool? appBarAtBottom,
     bool? predictiveBackAnimations,
@@ -460,6 +466,8 @@ class AppSettings {
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       useBrowserTabs: useBrowserTabs ?? this.useBrowserTabs,
       useDualPaneBrowsing: useDualPaneBrowsing ?? this.useDualPaneBrowsing,
+      desktopPreviewPaneCollapsed:
+          desktopPreviewPaneCollapsed ?? this.desktopPreviewPaneCollapsed,
       tabSwipeGestures: tabSwipeGestures ?? this.tabSwipeGestures,
       appBarAtBottom: appBarAtBottom ?? this.appBarAtBottom,
       predictiveBackAnimations:
@@ -569,6 +577,7 @@ class AppSettings {
     'extensionPreferences': extensionPreferences,
     'useBrowserTabs': useBrowserTabs,
     'useDualPaneBrowsing': useDualPaneBrowsing,
+    'desktopPreviewPaneCollapsed': desktopPreviewPaneCollapsed,
     'tabSwipeGestures': tabSwipeGestures.toJson(),
     'autoOpenOnUnlock': autoOpenOnUnlock,
     'htmlEnableJavaScript': htmlEnableJavaScript,
@@ -648,6 +657,7 @@ class AppSettings {
     extensionPreferences: other.extensionPreferences,
     useBrowserTabs: other.useBrowserTabs,
     useDualPaneBrowsing: other.useDualPaneBrowsing,
+    desktopPreviewPaneCollapsed: other.desktopPreviewPaneCollapsed,
     tabSwipeGestures: other.tabSwipeGestures,
     autoOpenOnUnlock: other.autoOpenOnUnlock,
     htmlEnableJavaScript: other.htmlEnableJavaScript,
@@ -746,6 +756,8 @@ class AppSettings {
         BrowserLayoutMode.detailed,
     useBrowserTabs: j['useBrowserTabs'] as bool? ?? true,
     useDualPaneBrowsing: j['useDualPaneBrowsing'] as bool? ?? false,
+    desktopPreviewPaneCollapsed:
+        j['desktopPreviewPaneCollapsed'] as bool? ?? false,
     // Older versions saved one `tabEdgeSwipe` mode; it still seeds the three
     // gestures until the new value has been saved.
     tabSwipeGestures: TabSwipeGestures.fromJson(

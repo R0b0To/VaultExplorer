@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/gestures.dart' show PointerMoveEvent;
+import 'package:flutter/gestures.dart'
+    show PointerMoveEvent, kMiddleMouseButton;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -433,6 +434,9 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     final pane = widget.pane;
     final tabs = _stripTabs(state);
     final shownTabId = _shownTabId(state);
+    // Side by side, only one pane is the active one (the pane of the active
+    // tab). The single strip always is.
+    final paneFocused = pane == null || state.focusedPane == pane;
     final actions = ref.read(
       browserTabsProvider(widget.workspaceConfig).notifier,
     );
@@ -443,10 +447,26 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 
     final stripBackground = cs.surfaceContainer;
     final activeBackground = cs.surfaceContainerHighest;
+    // The other pane's shown tab is still marked, only less strongly.
+    final shownBackground = paneFocused
+        ? activeBackground
+        : cs.surfaceContainerHigh;
 
     return Container(
       height: widget.height,
-      color: stripBackground,
+      decoration: BoxDecoration(
+        color: stripBackground,
+        // Marks the active pane (the one the keyboard, the toolbar and the
+        // close buttons belong to).
+        border: pane == null
+            ? null
+            : Border(
+                bottom: BorderSide(
+                  color: paneFocused ? cs.primary : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -641,7 +661,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                           child: _TabItem(
                                             tab: tab,
                                             active: isActive,
-                                            activeBackground: activeBackground,
+                                            activeBackground: shownBackground,
                                             onTap: () =>
                                                 _onTabTapped(tab, tabContext),
                                             onSecondaryTap:
@@ -660,6 +680,11 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                                     tab.tabId,
                                                   )
                                                 : null,
+                                            // Only the active pane draws the
+                                            // buttons; the other pane's tabs
+                                            // still close with a middle click
+                                            // or from their menu.
+                                            closeVisible: paneFocused,
                                           ),
                                         ),
                                   ),
@@ -701,7 +726,13 @@ class _TabItem extends ConsumerWidget {
   final Color activeBackground;
   final VoidCallback onTap;
   final VoidCallback? onSecondaryTap;
+
+  /// Null when the tab cannot be closed (it is the only one).
   final VoidCallback? onClose;
+
+  /// Whether the close button is drawn. Its slot at the tab's right edge is
+  /// kept either way, so the label does not shift when the pane changes focus.
+  final bool closeVisible;
 
   const _TabItem({
     required this.tab,
@@ -710,6 +741,7 @@ class _TabItem extends ConsumerWidget {
     required this.onTap,
     this.onSecondaryTap,
     this.onClose,
+    this.closeVisible = true,
   });
 
   @override
@@ -754,71 +786,79 @@ class _TabItem extends ConsumerWidget {
       child: Material(
         color: active ? activeBackground : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
-          onSecondaryTap: onSecondaryTap,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (selectedCount > 0)
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 1,
+        child: Listener(
+          // A middle click closes the tab, as in a browser.
+          onPointerDown: (event) {
+            if (event.buttons == kMiddleMouseButton) onClose?.call();
+          },
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: onTap,
+            onSecondaryTap: onSecondaryTap,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              padding: EdgeInsets.only(left: 8, right: onClose != null ? 4 : 8),
+              alignment: Alignment.center,
+              child: Row(
+                children: [
+                  if (selectedCount > 0)
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$selectedCount',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: cs.onPrimary,
+                        ),
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: cs.primary,
-                      borderRadius: BorderRadius.circular(10),
+                  if (tab.isCategory) ...[
+                    Icon(
+                      tab.category!.icon,
+                      size: 15,
+                      color: active ? cs.primary : fg,
                     ),
+                    const SizedBox(width: 5),
+                  ],
+                  Expanded(
                     child: Text(
-                      '$selectedCount',
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: cs.onPrimary,
+                        fontSize: 13,
+                        fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                        color: fg,
                       ),
                     ),
                   ),
-                if (tab.isCategory) ...[
-                  Icon(
-                    tab.category!.icon,
-                    size: 15,
-                    color: active ? cs.primary : fg,
-                  ),
-                  const SizedBox(width: 5),
+                  // Pinned to the tab's right edge.
+                  if (onClose != null)
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: closeVisible
+                          ? IconButton(
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              iconSize: 14,
+                              tooltip: context.l10n.browserTabClose,
+                              onPressed: onClose,
+                              icon: const Icon(Icons.close_rounded),
+                            )
+                          : null,
+                    ),
                 ],
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                      color: fg,
-                    ),
-                  ),
-                ),
-                if (onClose != null)
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 14,
-                      tooltip: context.l10n.browserTabClose,
-                      onPressed: onClose,
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
         ),

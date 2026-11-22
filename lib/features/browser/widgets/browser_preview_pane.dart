@@ -151,18 +151,69 @@ class BrowserPreviewPane extends StatelessWidget {
                       ),
                     );
 
+                    // The facts under the name: the side panel lists them below
+                    // the thumbnail, the bottom panel in a column of its own.
+                    final detailRows = <Widget>[
+                      _DetailRow(
+                        label: context.l10n.sortFieldType,
+                        value: entry.isDir
+                            ? context.l10n.nounFolderCapitalized
+                            : _fileType(entry.name),
+                      ),
+                      if (previewingCurrentFolder) ...[
+                        _DetailRow(
+                          label: context.l10n.contentsLabel,
+                          value: context.l10n.folderItemCount(
+                            currentItems.length,
+                          ),
+                        ),
+                        if (folderCount > 0)
+                          _DetailRow(
+                            label: context.l10n.nounFolderCapitalized,
+                            value: context.l10n.statsFolderCount(folderCount),
+                          ),
+                        if (fileCount > 0)
+                          _DetailRow(
+                            label: context.l10n.nounFileCapitalized,
+                            value: context.l10n.statsFileCount(fileCount),
+                          ),
+                        _DetailRow(
+                          label: context.l10n.totalSizeLabel,
+                          value: folderSize,
+                        ),
+                      ] else if (!entry.isDir)
+                        _DetailRow(
+                          label: context.l10n.sortFieldSize,
+                          value: formatBytes(entry.sizeBytes),
+                        ),
+                      _DetailRow(
+                        label: context.l10n.sortFieldDate,
+                        value: formatEntryDate(entry.modifiedSecs, context),
+                      ),
+                    ];
+
                     if (isBottom) {
+                      // A thumbnail sized to the panel's height rather than to
+                      // its width, so a wide panel does not stretch it.
+                      final maxThumbnailWidth = (constraints.maxWidth * 0.45)
+                          .clamp(96.0, 260.0)
+                          .toDouble();
+                      final thumbnailWidth = (previewHeight * 1.25)
+                          .clamp(96.0, maxThumbnailWidth)
+                          .toDouble();
+                      // Wide enough for the details to sit beside the name.
+                      final showDetails =
+                          constraints.maxWidth - thumbnailWidth - 32 >= 420;
                       return Row(
                         children: [
                           SizedBox(
-                            width: (constraints.maxWidth * 0.32)
-                                .clamp(96.0, 176.0)
-                                .toDouble(),
+                            width: thumbnailWidth,
                             height: previewHeight,
                             child: thumbnail,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
+                            flex: 2,
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,6 +240,20 @@ class BrowserPreviewPane extends StatelessWidget {
                               ],
                             ),
                           ),
+                          if (showDetails) ...[
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: 3,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: detailRows,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       );
                     }
@@ -206,44 +271,7 @@ class BrowserPreviewPane extends StatelessWidget {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 12),
-                          _DetailRow(
-                            label: context.l10n.sortFieldType,
-                            value: entry.isDir
-                                ? context.l10n.nounFolderCapitalized
-                                : _fileType(entry.name),
-                          ),
-                          if (previewingCurrentFolder) ...[
-                            _DetailRow(
-                              label: context.l10n.contentsLabel,
-                              value: context.l10n.folderItemCount(
-                                currentItems.length,
-                              ),
-                            ),
-                            if (folderCount > 0)
-                              _DetailRow(
-                                label: context.l10n.nounFolderCapitalized,
-                                value: context.l10n.statsFolderCount(
-                                  folderCount,
-                                ),
-                              ),
-                            if (fileCount > 0)
-                              _DetailRow(
-                                label: context.l10n.nounFileCapitalized,
-                                value: context.l10n.statsFileCount(fileCount),
-                              ),
-                            _DetailRow(
-                              label: context.l10n.totalSizeLabel,
-                              value: folderSize,
-                            ),
-                          ] else if (!entry.isDir)
-                            _DetailRow(
-                              label: context.l10n.sortFieldSize,
-                              value: formatBytes(entry.sizeBytes),
-                            ),
-                          _DetailRow(
-                            label: context.l10n.sortFieldDate,
-                            value: formatEntryDate(entry.modifiedSecs, context),
-                          ),
+                          ...detailRows,
                         ],
                       ),
                     );

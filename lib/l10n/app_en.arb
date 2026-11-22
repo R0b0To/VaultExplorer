@@ -14969,5 +14969,13 @@
         "type": "num"
       }
     }
+  },
+  "dropVaultOverlayLabel": "Drop a container or vault folder to add it",
+  "@dropVaultOverlayLabel": {
+    "description": "Desktop: text over the vault dashboard while a container file or vault folder is dragged in from the operating system's file manager"
+  },
+  "dropVaultUnsupported": "Drop container files, or a single vault folder.",
+  "@dropVaultUnsupported": {
+    "description": "Desktop: shown in the add-a-vault sheet when the dropped items are not one vault folder or a set of container files (several folders, or files and a folder together)"
   }
 }

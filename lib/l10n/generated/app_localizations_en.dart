@@ -12817,4 +12817,12 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Drop a container or vault folder to add it';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Drop container files, or a single vault folder.';
 }

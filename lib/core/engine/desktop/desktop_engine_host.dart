@@ -548,6 +548,8 @@ class DesktopEngineHost {
         }
 
       // ── folder vaults (gocryptfs / Cryptomator / CryFS) ──
+      case ChannelMethods.probeDroppedPaths:
+        return _probeDroppedPaths(args);
       case ChannelMethods.pickCryptomatorVault:
         return _pickFolderVault(veFvCryptomator);
       case ChannelMethods.pickGocryptfsVault:
@@ -664,6 +666,28 @@ class DesktopEngineHost {
       'looksLikeVault': detected == expected,
       'format': _fvWireNames[detected],
     };
+  }
+
+  /// Describes paths dropped on the dashboard for the "add a vault" flow: a file is a candidate container
+  /// (its real format is probed once it is selected), a folder is probed for a gocryptfs / Cryptomator /
+  /// CryFS vault (`format` null = a folder that is no vault). Paths that no longer exist are left out.
+  Future<Object?> _probeDroppedPaths(Map<Object?, Object?> args) async {
+    final out = <Map<String, Object?>>[];
+    for (final path in ((args['paths'] as List<Object?>?) ?? const []).whereType<String>()) {
+      final type = await FileSystemEntity.type(path);
+      if (type == FileSystemEntityType.file) {
+        out.add({'uri': path, 'displayName': p.basename(path), 'isDirectory': false, 'format': null});
+      } else if (type == FileSystemEntityType.directory) {
+        final detected = await pool.call('fvProbe', [path]) as int;
+        out.add({
+          'uri': path,
+          'displayName': p.basename(path),
+          'isDirectory': true,
+          'format': _fvWireNames[detected],
+        });
+      }
+    }
+    return out;
   }
 
   Future<bool> _isFolderVault(Object? uri, int format) async {

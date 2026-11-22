@@ -3574,5 +3574,7 @@
   "resetFileManagerSettingsMessage": "Bu ekrandaki tüm seçenekler varsayılan değerlerine döner; sekme, düzen, araç çubuğu, ızgara, küçük resim, görüntüleyici ve tema ayarları da buna dahildir. Dosyalarınız, yer imleriniz ve klasöre özel tercihleriniz değişmez.",
   "dropImportOverlayLabel": "Bu klasöre içe aktarmak için bırakın",
   "dropImportUnavailableHere": "Dosyalar yalnızca bir kasa klasörüne bırakılabilir.",
-  "dropImportSkippedItems": "{count, plural, =1{Bırakılan 1 öğe içe aktarılamıyor} other{Bırakılan {count} öğe içe aktarılamıyor}}"
+  "dropImportSkippedItems": "{count, plural, =1{Bırakılan 1 öğe içe aktarılamıyor} other{Bırakılan {count} öğe içe aktarılamıyor}}",
+  "dropVaultOverlayLabel": "Eklemek için bir kapsayıcı veya kasa klasörü bırakın",
+  "dropVaultUnsupported": "Kapsayıcı dosyalarını veya yalnızca tek bir kasa klasörünü bırakın."
 }

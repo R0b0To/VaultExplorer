@@ -12896,4 +12896,12 @@ class AppLocalizationsTr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Eklemek için bir kapsayıcı veya kasa klasörü bırakın';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Kapsayıcı dosyalarını veya yalnızca tek bir kasa klasörünü bırakın.';
 }

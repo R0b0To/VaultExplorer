@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/dropped_vault_selection.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/biometric_auth_utils.dart';
@@ -740,30 +741,11 @@ class UnlockController extends _$UnlockController {
       if (state.isFolderVault) {
         final result = await lifecycle.pickCryptomatorVault();
         if (result == null) return;
-        if (params.mountedUris.contains(result.uri)) {
-          state = state._copy(
-            error: l10n.containerAlreadyMounted,
-            clearSelectedUri: true,
-            clearSelectedName: true,
-          );
-          return;
-        }
-        final detectedFormat = result.format;
-        if (detectedFormat == null) {
-          state = state._copy(
-            error: l10n.noVaultFolderFormatDetected,
-            clearSelectedUri: true,
-            clearSelectedName: true,
-          );
-          return;
-        }
-        state = state._copy(
-          selectedUri: result.uri,
-          selectedName: result.displayName,
-          containerFormat: detectedFormat,
-          clearCompositeCarrierUris: true,
-          clearError: true,
-          isPlainDiskImage: false, // folder vaults always need a password
+        _selectFolderVault(
+          uri: result.uri,
+          displayName: result.displayName,
+          format: result.format,
+          l10n: l10n,
         );
         return;
       }
@@ -774,98 +756,41 @@ class UnlockController extends _$UnlockController {
       final picked =
           await lifecycle.pickCryptoFiles(requestSplitFolderAccess: true);
       if (picked.isEmpty) return;
-
-      if (picked.length > 1) {
-        // Multi-selection: user picked multiple carrier files directly!
-        setCompositeCarriers(picked);
-        return;
-      }
-
-      final single = picked.first;
-      if (params.mountedUris.contains(single.uri)) {
+      await _selectPickedFiles(picked, l10n);
+    } catch (e) {
+      if (ref.mounted) {
         state = state._copy(
-          error: l10n.containerAlreadyMounted,
-          clearSelectedUri: true,
-          clearSelectedName: true,
+          checkingContainer: false,
+          error: l10n.filePickerFailed(e.toString()),
         );
-        return;
       }
+    }
+  }
 
-      // Publish the selected file before probing it. Carrier profiling below
-      // can need to read from a remote SAF provider, and otherwise the page
-      // stays looking unchanged for the full download/check.
-      state = state._copy(
-        selectedUri: single.uri,
-        selectedName: single.displayName,
-        containerFormat: 'container',
-        clearCompositeCarrierUris: true,
-        clearError: true,
-        checkingContainer: true,
-        isPlainDiskImage: false,
-      );
-
-      try {
-        // Check if this carrier belongs to a known composite container record
-        final records = await ref.read(containerRepositoryProvider).loadAll();
-        if (!ref.mounted) return;
-        ContainerRecord? matchedCompositeRecord;
-        for (final r in records.values) {
-          if (r.isCompositeSource &&
-              r.compositeCarriers.any((c) => c['uri'] == single.uri)) {
-            matchedCompositeRecord = r;
-            break;
-          }
-        }
-
-        if (matchedCompositeRecord != null) {
-          final carriers = matchedCompositeRecord.compositeCarriers
-              .map((c) => (
-                    uri: c['uri'] ?? '',
-                    displayName: c['name'] ?? '',
-                  ))
-              .where((c) => c.uri.isNotEmpty)
-              .toList();
-          setCompositeCarriers(carriers, name: matchedCompositeRecord.label);
-          state = state._copy(
-            selectedUri: matchedCompositeRecord.uri,
-            selectedName: matchedCompositeRecord.label,
+  /// Desktop: container files or a vault folder dragged onto the dashboard.
+  /// Selects them exactly as [pickFile] would have, so everything after the
+  /// selection (composite detection, format probe, "already mounted", "no
+  /// vault found") behaves the same however the vault was chosen.
+  Future<void> selectDropped(List<String> paths, AppLocalizations l10n) async {
+    try {
+      final probed =
+          await ref.read(vaultLifecycleApiProvider).probeDroppedPaths(paths);
+      if (!ref.mounted) return;
+      switch (planDroppedSelection(probed)) {
+        case DroppedFiles(:final files):
+          await _selectPickedFiles(files, l10n);
+        case DroppedFolder(:final uri, :final displayName, :final format):
+          // A folder that is no vault still switches the sheet to folder
+          // mode, so the person can pick the right folder from there.
+          if (format == null) setSelectedVaultKind('directory_vault');
+          _selectFolderVault(
+            uri: uri,
+            displayName: displayName,
+            format: format,
+            l10n: l10n,
           );
-          await _initUnlockMethod(matchedCompositeRecord.uri);
-          return;
-        }
-
-        // Check if this single file is an unremembered composite carrier
-        final compositeApi = ref.read(vaultCompositeApiProvider);
-        final profile =
-            await compositeApi.profileCarriers(carrierUris: [single.uri]);
-        if (!ref.mounted) return;
-        final carrierBudget =
-            (profile != null && profile.carriers.isNotEmpty)
-                ? profile.carriers.first
-                : null;
-
-        if (carrierBudget != null &&
-            carrierBudget.detectedFormat == 'composite_carrier') {
-          setCompositeCarriers(
-            [single],
-            knownProfiles: {single.uri: carrierBudget},
-          );
-          return;
-        }
-
-        state = state._copy(
-          selectedUri: single.uri,
-          selectedName: single.displayName,
-          containerFormat: 'container',
-          clearCompositeCarrierUris: true,
-          clearError: true,
-          isPlainDiskImage:
-              false, // re-checked below; don't carry over a stale true
-        );
-        lifecycle.warmContainer(single.uri);
-        await _probeContainerFormat(single.uri);
-      } finally {
-        if (ref.mounted) state = state._copy(checkingContainer: false);
+        case DroppedUnsupported():
+          state = state._copy(error: l10n.dropVaultUnsupported);
       }
     } catch (e) {
       if (ref.mounted) {
@@ -874,6 +799,141 @@ class UnlockController extends _$UnlockController {
           error: l10n.filePickerFailed(e.toString()),
         );
       }
+    }
+  }
+
+  /// Selects a folder vault (picked or dropped). [format] is the detected
+  /// folder-vault format, `null` when the folder is not a vault.
+  void _selectFolderVault({
+    required String uri,
+    required String displayName,
+    required String? format,
+    required AppLocalizations l10n,
+  }) {
+    if (params.mountedUris.contains(uri)) {
+      state = state._copy(
+        error: l10n.containerAlreadyMounted,
+        clearSelectedUri: true,
+        clearSelectedName: true,
+      );
+      return;
+    }
+    if (format == null) {
+      state = state._copy(
+        error: l10n.noVaultFolderFormatDetected,
+        clearSelectedUri: true,
+        clearSelectedName: true,
+      );
+      return;
+    }
+    state = state._copy(
+      selectedUri: uri,
+      selectedName: displayName,
+      containerFormat: format,
+      clearCompositeCarrierUris: true,
+      clearError: true,
+      isPlainDiskImage: false, // folder vaults always need a password
+    );
+  }
+
+  /// Selects what a file picker or a drop produced: several files are the
+  /// carriers of one composite container, a single file is probed.
+  Future<void> _selectPickedFiles(
+    List<KeyfileRef> picked,
+    AppLocalizations l10n,
+  ) async {
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    if (picked.length > 1) {
+      // Multi-selection: user picked multiple carrier files directly!
+      setCompositeCarriers(picked);
+      return;
+    }
+
+    final single = picked.first;
+    if (params.mountedUris.contains(single.uri)) {
+      state = state._copy(
+        error: l10n.containerAlreadyMounted,
+        clearSelectedUri: true,
+        clearSelectedName: true,
+      );
+      return;
+    }
+
+    // Publish the selected file before probing it. Carrier profiling below
+    // can need to read from a remote SAF provider, and otherwise the page
+    // stays looking unchanged for the full download/check.
+    state = state._copy(
+      selectedUri: single.uri,
+      selectedName: single.displayName,
+      containerFormat: 'container',
+      clearCompositeCarrierUris: true,
+      clearError: true,
+      checkingContainer: true,
+      isPlainDiskImage: false,
+    );
+
+    try {
+      // Check if this carrier belongs to a known composite container record
+      final records = await ref.read(containerRepositoryProvider).loadAll();
+      if (!ref.mounted) return;
+      ContainerRecord? matchedCompositeRecord;
+      for (final r in records.values) {
+        if (r.isCompositeSource &&
+            r.compositeCarriers.any((c) => c['uri'] == single.uri)) {
+          matchedCompositeRecord = r;
+          break;
+        }
+      }
+
+      if (matchedCompositeRecord != null) {
+        final carriers = matchedCompositeRecord.compositeCarriers
+            .map((c) => (
+                  uri: c['uri'] ?? '',
+                  displayName: c['name'] ?? '',
+                ))
+            .where((c) => c.uri.isNotEmpty)
+            .toList();
+        setCompositeCarriers(carriers, name: matchedCompositeRecord.label);
+        state = state._copy(
+          selectedUri: matchedCompositeRecord.uri,
+          selectedName: matchedCompositeRecord.label,
+        );
+        await _initUnlockMethod(matchedCompositeRecord.uri);
+        return;
+      }
+
+      // Check if this single file is an unremembered composite carrier
+      final compositeApi = ref.read(vaultCompositeApiProvider);
+      final profile =
+          await compositeApi.profileCarriers(carrierUris: [single.uri]);
+      if (!ref.mounted) return;
+      final carrierBudget =
+          (profile != null && profile.carriers.isNotEmpty)
+              ? profile.carriers.first
+              : null;
+
+      if (carrierBudget != null &&
+          carrierBudget.detectedFormat == 'composite_carrier') {
+        setCompositeCarriers(
+          [single],
+          knownProfiles: {single.uri: carrierBudget},
+        );
+        return;
+      }
+
+      state = state._copy(
+        selectedUri: single.uri,
+        selectedName: single.displayName,
+        containerFormat: 'container',
+        clearCompositeCarrierUris: true,
+        clearError: true,
+        isPlainDiskImage:
+            false, // re-checked below; don't carry over a stale true
+      );
+      lifecycle.warmContainer(single.uri);
+      await _probeContainerFormat(single.uri);
+    } finally {
+      if (ref.mounted) state = state._copy(checkingContainer: false);
     }
   }
 

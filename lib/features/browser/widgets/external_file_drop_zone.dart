@@ -66,7 +66,14 @@ class ExternalFileDropZone extends StatefulWidget {
 class _ExternalFileDropZoneState extends State<ExternalFileDropZone> {
   bool _hovering = false;
 
-  bool get _active => widget.isActive?.call() ?? true;
+  /// The route this zone lives on. Read in [build] (where depending on it is
+  /// allowed) and consulted when a drag arrives: a viewer, dialog or sheet on
+  /// top of the pane must not take a drop meant for what it covers -- the
+  /// native drop event knows nothing about Flutter's route stack.
+  ModalRoute<Object?>? _route;
+
+  bool get _active =>
+      (_route?.isCurrent ?? true) && (widget.isActive?.call() ?? true);
 
   void _setHovering(bool value) {
     if (_hovering == value || !mounted) return;
@@ -91,6 +98,7 @@ class _ExternalFileDropZoneState extends State<ExternalFileDropZone> {
   @override
   Widget build(BuildContext context) {
     if (!PlatformFeatures.isDesktop) return widget.child;
+    _route = ModalRoute.of(context);
 
     final cs = Theme.of(context).colorScheme;
     final blocked = widget.blockedReason != null;

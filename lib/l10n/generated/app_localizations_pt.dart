@@ -13001,4 +13001,12 @@ class AppLocalizationsPt extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Solte um contêiner ou uma pasta de cofre para adicioná-lo';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Solte arquivos de contêiner ou apenas uma pasta de cofre.';
 }

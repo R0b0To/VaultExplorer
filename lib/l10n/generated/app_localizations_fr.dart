@@ -13098,4 +13098,12 @@ class AppLocalizationsFr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Déposez un conteneur ou un dossier de coffre pour l’ajouter';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Déposez des fichiers de conteneur ou un seul dossier de coffre.';
 }

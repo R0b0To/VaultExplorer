@@ -13000,4 +13000,12 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Container oder Tresorordner ablegen, um ihn hinzuzufügen';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Container-Dateien oder nur einen einzelnen Tresorordner ablegen.';
 }

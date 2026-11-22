@@ -3580,5 +3580,7 @@
   "resetFileManagerSettingsMessage": "Isso devolve todas as opções desta tela ao valor padrão, incluindo as configurações de abas, layout, barra de ferramentas, grade, miniaturas, visualizador e aparência. Seus arquivos, favoritos e escolhas por pasta não são alterados.",
   "dropImportOverlayLabel": "Solte para importar para esta pasta",
   "dropImportUnavailableHere": "Os arquivos só podem ser soltos em uma pasta de um cofre.",
-  "dropImportSkippedItems": "{count, plural, =1{1 item solto não pode ser importado} other{{count} itens soltos não podem ser importados}}"
+  "dropImportSkippedItems": "{count, plural, =1{1 item solto não pode ser importado} other{{count} itens soltos não podem ser importados}}",
+  "dropVaultOverlayLabel": "Solte um contêiner ou uma pasta de cofre para adicioná-lo",
+  "dropVaultUnsupported": "Solte arquivos de contêiner ou apenas uma pasta de cofre."
 }

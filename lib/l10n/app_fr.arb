@@ -3580,5 +3580,7 @@
   "resetFileManagerSettingsMessage": "Toutes les options de cet écran reviendront à leur valeur par défaut, y compris les paramètres des onglets, de la disposition, de la barre d’outils, de la grille, des miniatures, de la visionneuse et du thème. Vos fichiers, favoris et choix par dossier ne sont pas modifiés.",
   "dropImportOverlayLabel": "Déposez pour importer dans ce dossier",
   "dropImportUnavailableHere": "Les fichiers ne peuvent être déposés que dans un dossier d’un coffre.",
-  "dropImportSkippedItems": "{count, plural, =1{1 élément déposé ne peut pas être importé} other{{count} éléments déposés ne peuvent pas être importés}}"
+  "dropImportSkippedItems": "{count, plural, =1{1 élément déposé ne peut pas être importé} other{{count} éléments déposés ne peuvent pas être importés}}",
+  "dropVaultOverlayLabel": "Déposez un conteneur ou un dossier de coffre pour l’ajouter",
+  "dropVaultUnsupported": "Déposez des fichiers de conteneur ou un seul dossier de coffre."
 }

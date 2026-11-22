@@ -3580,5 +3580,7 @@
   "resetFileManagerSettingsMessage": "この画面のすべての項目が初期値に戻ります。タブ、レイアウト、ツールバー、グリッド、サムネイル、ビューア、スキンの設定も含まれます。ファイル、ブックマーク、フォルダごとの設定は変更されません。",
   "dropImportOverlayLabel": "ドロップしてこのフォルダにインポート",
   "dropImportUnavailableHere": "ファイルは保管庫内のフォルダにのみドロップできます。",
-  "dropImportSkippedItems": "{count, plural, other{ドロップされた{count}件の項目はインポートできません}}"
+  "dropImportSkippedItems": "{count, plural, other{ドロップされた{count}件の項目はインポートできません}}",
+  "dropVaultOverlayLabel": "コンテナまたは保管庫フォルダをドロップして追加",
+  "dropVaultUnsupported": "コンテナファイル、または保管庫フォルダ1つだけをドロップしてください。"
 }

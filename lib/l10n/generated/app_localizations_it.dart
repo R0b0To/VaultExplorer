@@ -13020,4 +13020,12 @@ class AppLocalizationsIt extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Rilascia un contenitore o una cartella vault per aggiungerlo';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Rilascia file contenitore o una sola cartella vault.';
 }

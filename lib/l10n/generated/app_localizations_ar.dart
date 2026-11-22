@@ -13073,4 +13073,11 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel => 'أفلت حاوية أو مجلد خزنة لإضافتها';
+
+  @override
+  String get dropVaultUnsupported =>
+      'أفلت ملفات حاويات، أو مجلد خزنة واحدًا فقط.';
 }

@@ -12298,4 +12298,10 @@ class AppLocalizationsKo extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel => '컨테이너 또는 볼트 폴더를 놓아 추가하기';
+
+  @override
+  String get dropVaultUnsupported => '컨테이너 파일 또는 볼트 폴더 하나만 놓아 주세요.';
 }

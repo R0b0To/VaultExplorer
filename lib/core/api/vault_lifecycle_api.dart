@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
 import 'package:vaultexplorer/features/sync/services/sync_lock_barrier.dart';
 
+import 'dropped_vault_selection.dart';
 import 'vault_engine_events.dart';
 import 'vault_engine_types.dart';
 
@@ -639,6 +640,33 @@ class VaultLifecycleApi {
           ),
         )
         .toList();
+  }
+
+  /// Desktop drag-and-drop counterpart of [pickCryptoFiles] / [pickCryptomatorVault]: describes the
+  /// dropped [paths] (see [DroppedPathInfo]). Paths that no longer exist are left out, and a failure
+  /// yields an empty list.
+  Future<List<DroppedPathInfo>> probeDroppedPaths(List<String> paths) async {
+    try {
+      final raw = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.probeDroppedPaths,
+        {'paths': paths},
+      );
+      if (raw == null) return const [];
+      return raw
+          .cast<Map<Object?, Object?>>()
+          .map(
+            (m) => (
+              uri: m['uri'] as String,
+              displayName: m['displayName'] as String,
+              isDirectory: m['isDirectory'] == true,
+              format: m['format'] as String?,
+            ),
+          )
+          .toList();
+    } catch (e) {
+      logSwallowed('probeDroppedPaths', e);
+      return const [];
+    }
   }
 
   Future<

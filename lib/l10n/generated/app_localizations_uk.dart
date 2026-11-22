@@ -13105,4 +13105,12 @@ class AppLocalizationsUk extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Відпустіть контейнер або папку сховища, щоб додати';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Перетягніть файли контейнерів або лише одну папку сховища.';
 }

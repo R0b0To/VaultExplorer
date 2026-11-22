@@ -70,6 +70,8 @@ abstract final class ChannelMethods {
   static const pickImportFolder = 'pickImportFolder';
   // Desktop only: the OS file manager already told us which paths were dropped, so there is no picker.
   static const prepareDropImport = 'prepareDropImport';
+  // Desktop only: describes paths dropped on the dashboard (container file? folder vault of which format?).
+  static const probeDroppedPaths = 'probeDroppedPaths';
   static const cancelPickedImport = 'cancelPickedImport';
   static const exportAppSettingsFile = 'exportAppSettingsFile';
   static const importAppSettingsFile = 'importAppSettingsFile';

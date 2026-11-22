@@ -3580,5 +3580,7 @@
   "resetFileManagerSettingsMessage": "此屏幕上的所有选项都将恢复为默认值，包括标签页、布局、工具栏、网格、缩略图、查看器和皮肤设置。您的文件、书签和各文件夹的单独设置不会更改。",
   "dropImportOverlayLabel": "松开以导入到此文件夹",
   "dropImportUnavailableHere": "只能将文件拖放到保险库文件夹中。",
-  "dropImportSkippedItems": "{count, plural, other{有 {count} 个拖入的项目无法导入}}"
+  "dropImportSkippedItems": "{count, plural, other{有 {count} 个拖入的项目无法导入}}",
+  "dropVaultOverlayLabel": "松开以添加容器或保险库文件夹",
+  "dropVaultUnsupported": "请拖入容器文件，或仅拖入一个保险库文件夹。"
 }

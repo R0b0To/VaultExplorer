@@ -13029,4 +13029,12 @@ class AppLocalizationsEs extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel =>
+      'Suelta un contenedor o una carpeta de bóveda para añadirlo';
+
+  @override
+  String get dropVaultUnsupported =>
+      'Suelta archivos de contenedor o una sola carpeta de bóveda.';
 }

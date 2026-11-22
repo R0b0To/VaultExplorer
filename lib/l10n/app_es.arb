@@ -3580,5 +3580,7 @@
   "resetFileManagerSettingsMessage": "Esto devuelve cada opción de esta pantalla a su valor predeterminado, incluidos los ajustes de pestañas, diseño, barra de herramientas, cuadrícula, miniaturas, visor y apariencia. Tus archivos, marcadores y opciones por carpeta no se modifican.",
   "dropImportOverlayLabel": "Suelta para importar en esta carpeta",
   "dropImportUnavailableHere": "Los archivos solo se pueden soltar en una carpeta de una bóveda.",
-  "dropImportSkippedItems": "{count, plural, =1{No se puede importar 1 elemento soltado} other{No se pueden importar {count} elementos soltados}}"
+  "dropImportSkippedItems": "{count, plural, =1{No se puede importar 1 elemento soltado} other{No se pueden importar {count} elementos soltados}}",
+  "dropVaultOverlayLabel": "Suelta un contenedor o una carpeta de bóveda para añadirlo",
+  "dropVaultUnsupported": "Suelta archivos de contenedor o una sola carpeta de bóveda."
 }

@@ -12108,4 +12108,10 @@ class AppLocalizationsZh extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel => '松开以添加容器或保险库文件夹';
+
+  @override
+  String get dropVaultUnsupported => '请拖入容器文件，或仅拖入一个保险库文件夹。';
 }

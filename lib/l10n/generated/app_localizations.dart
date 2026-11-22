@@ -21601,6 +21601,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 dropped item can’t be imported} other{{count} dropped items can’t be imported}}'**
   String dropImportSkippedItems(num count);
+
+  /// Desktop: text over the vault dashboard while a container file or vault folder is dragged in from the operating system's file manager
+  ///
+  /// In en, this message translates to:
+  /// **'Drop a container or vault folder to add it'**
+  String get dropVaultOverlayLabel;
+
+  /// Desktop: shown in the add-a-vault sheet when the dropped items are not one vault folder or a set of container files (several folders, or files and a folder together)
+  ///
+  /// In en, this message translates to:
+  /// **'Drop container files, or a single vault folder.'**
+  String get dropVaultUnsupported;
 }
 
 class _AppLocalizationsDelegate

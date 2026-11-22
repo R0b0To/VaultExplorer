@@ -493,7 +493,9 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                             horizontal: _stripPadding,
                             vertical: 3,
                           ),
-                          itemCount: tabs.length + 1,
+                          // On desktop the + sits right after the last tab; on a
+                          // phone it is pinned to the right edge instead (below).
+                          itemCount: tabs.length + (PlatformFeatures.isDesktop ? 1 : 0),
                           onReorderStart: (index) {
                             HapticFeedback.mediumImpact();
                             _draggingTabId = index >= 0 && index < tabs.length
@@ -530,7 +532,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                             );
                           },
                           itemBuilder: (context, index) {
-                            if (index == tabs.length) {
+                            if (PlatformFeatures.isDesktop && index == tabs.length) {
                               return SizedBox(
                                 key: ValueKey<String>(
                                   'new-tab-${pane?.name ?? 'all'}',
@@ -714,6 +716,21 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
               },
             ),
           ),
+          // Fixed at the right edge, so it does not move as tabs come and go.
+          if (!PlatformFeatures.isDesktop)
+            SizedBox(
+              width: 48,
+              child: IconButton(
+                icon: const Icon(Icons.add_rounded, size: 20),
+                visualDensity: VisualDensity.compact,
+                tooltip: context.l10n.browserTabNew,
+                onPressed: () {
+                  // The new tab joins the pane whose + was pressed.
+                  if (pane != null) actions.focusPane(pane);
+                  widget.onNewTab();
+                },
+              ),
+            ),
         ],
       ),
     );

@@ -12296,4 +12296,10 @@ class AppLocalizationsJa extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get dropVaultOverlayLabel => 'コンテナまたは保管庫フォルダをドロップして追加';
+
+  @override
+  String get dropVaultUnsupported => 'コンテナファイル、または保管庫フォルダ1つだけをドロップしてください。';
 }

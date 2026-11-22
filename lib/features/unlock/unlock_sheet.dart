@@ -29,6 +29,10 @@ class UnlockSheet extends ConsumerStatefulWidget {
   final List<String> mountedUris;
   final List<KeyfileRef>? initialCompositeCarriers;
 
+  /// Desktop: paths dragged onto the dashboard. Selected as soon as the sheet is up, as if they had been
+  /// chosen with the file picker (see [UnlockController.selectDropped]).
+  final List<String>? droppedPaths;
+
   const UnlockSheet({
     super.key,
     required this.onMounted,
@@ -40,6 +44,7 @@ class UnlockSheet extends ConsumerStatefulWidget {
     this.autoMountFolders = const [],
     this.mountedUris = const [],
     this.initialCompositeCarriers,
+    this.droppedPaths,
   });
 
   @override
@@ -114,6 +119,15 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
+    final dropped = widget.droppedPaths;
+    if (dropped != null && dropped.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref
+            .read(unlockControllerProvider(_params).notifier)
+            .selectDropped(dropped, context.l10n);
+      });
+    }
   }
 
   @override

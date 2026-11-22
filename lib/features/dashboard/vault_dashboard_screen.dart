@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -23,6 +24,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
+import 'package:vaultexplorer/features/browser/widgets/external_file_drop_zone.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
@@ -536,7 +538,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     }
   }
 
-  Future<void> _showUnlockSheet({String? uri, String? name}) async {
+  Future<void> _showUnlockSheet({
+    String? uri,
+    String? name,
+    List<String>? droppedPaths,
+  }) async {
     final dashboardController = _container.read(
       vaultDashboardControllerProvider.notifier,
     );
@@ -600,6 +606,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
                   : null,
               initialUri: uri,
               initialName: name,
+              droppedPaths: droppedPaths,
               prefillPassword: rememberedPassword,
               documentProvider: docProvider,
               autoMountFolders: autoMountFolders,
@@ -620,6 +627,28 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       // release the guard even if the dashboard itself has been disposed.
       dashboardController.setActionInFlight(false);
     }
+  }
+
+  /// Desktop: container files or a vault folder dragged in from the OS file
+  /// manager and dropped on the dashboard. One that is already on the
+  /// dashboard behaves like tapping its card (opened if it is unlocked, else
+  /// the unlock sheet with its saved settings); anything else opens the
+  /// add-a-vault sheet with the drop already selected.
+  Future<void> _handleExternalVaultDrop(List<String> paths) async {
+    if (!mounted || paths.isEmpty) return;
+    final controller = ref.read(vaultDashboardControllerProvider.notifier);
+    if (ref.read(vaultDashboardControllerProvider).actionInFlight) return;
+    if (paths.length == 1) {
+      final known = controller
+          .getDisplayItems()
+          .where((item) => p.equals(item.uri, paths.single))
+          .firstOrNull;
+      if (known != null) {
+        openItem(known);
+        return;
+      }
+    }
+    await _showUnlockSheet(droppedPaths: paths);
   }
 
   Future<void> _showUsbUnlockSheet({ContainerRecord? existingRecord}) async {
@@ -979,7 +1008,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         !widget.embedded && toolbarSettings.config.autoHideAppBar;
     const dashboardAppBar = DashboardAppBar();
 
-    final dashboardContent = NotificationListener<ScrollNotification>(
+    final dashboardScrollContent = NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         _handleDashboardScrollNotification(
           notification,
@@ -1003,6 +1032,16 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           Expanded(child: _buildBody(displayItems, state, appSettings)),
         ],
       ),
+    );
+    // Desktop: container files / vault folders dragged in from the OS file
+    // manager. Off while a vault is being added or unlocked, and only on the
+    // Home tab that is actually showing.
+    final dashboardContent = ExternalFileDropZone(
+      label: context.l10n.dropVaultOverlayLabel,
+      enabled: !state.actionInFlight,
+      isActive: () => mounted && dashboardIsActive,
+      onDropped: (paths) => unawaited(_handleExternalVaultDrop(paths)),
+      child: dashboardScrollContent,
     );
 
     final dashboardFloatingAction = AnimatedSlide(

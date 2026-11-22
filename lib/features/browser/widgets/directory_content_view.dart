@@ -1924,6 +1924,28 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (mounted) _navNotifier.clearStatus();
   }
 
+  /// Lists the current folder again (the toolbar's refresh button and F5).
+  void _refreshListing() {
+    _signalActivity();
+    unawaited(_loadDirectoryContents(_currentDirPath, refresh: true));
+  }
+
+  /// The toolbar's paste button: enabled while the clipboard holds items.
+  Widget _buildPasteToolbarButton() {
+    return Consumer(
+      builder: (context, ref, _) {
+        final hasItems = ref.watch(
+          crossContainerClipboardProvider.select((clip) => clip.hasItems),
+        );
+        return IconButton(
+          icon: const Icon(Icons.content_paste_rounded),
+          tooltip: context.l10n.actionPaste,
+          onPressed: hasItems && !_isReadOnly ? () => unawaited(_paste()) : null,
+        );
+      },
+    );
+  }
+
   Future<void> _loadDirectoryContents(
     String path, {
     bool refresh = false,
@@ -3283,6 +3305,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     if (key == LogicalKeyboardKey.delete && hasSelection && !_isReadOnly) {
       _batchDelete();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.f5 && !isRepeat) {
+      _refreshListing();
       return true;
     }
     if (key == LogicalKeyboardKey.f2 && selectedItems.length == 1) {
@@ -6992,7 +7018,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final baseBottomOffset =
         16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
 
+    // The desktop toolbar has its own paste button.
     final bool hasClipboardFab =
+        !desktopFileManager &&
         _isActiveTab &&
         !selectionBarVisible &&
         !_searchActive &&
@@ -7087,6 +7115,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             : appBarToolbarConfig,
         selectionToolbarHeight: desktopFileManager ? 40 : kToolbarHeight,
         desktopCompactSelection: desktopFileManager && selectionMode,
+        pasteAction: desktopFileManager && selectionMode
+            ? _buildPasteToolbarButton()
+            : null,
+        selectionActive: selectionBarVisible,
         actionBuilders: actionBuilders,
         isFolderMounted: appBarIsFolderMounted,
         isPinned: appBarIsPinned,
@@ -7534,6 +7566,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                               ? null
                                                               : () => _navigateForward(0),
                                                         ),
+                                                        IconButton(
+                                                          icon: const Icon(Icons.refresh_rounded),
+                                                          tooltip: context.l10n.refreshListButton,
+                                                          onPressed: _refreshListing,
+                                                        ),
                                                         if (toolbarActionWidth > 0)
                                                           SizedBox(
                                                             width: toolbarActionWidth,
@@ -7554,19 +7591,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                           ),
                                                         const VerticalDivider(width: 1, indent: 8, endIndent: 8),
                                                         Expanded(
-                                                          child: IgnorePointer(
-                                                            ignoring: !selectionBarVisible,
-                                                            child: Opacity(
-                                                              opacity: selectionBarVisible ? 1 : 0.42,
-                                                              child: MediaQuery.removePadding(
-                                                                context: toolbarContext,
-                                                                removeTop: true,
-                                                                removeBottom: true,
-                                                                child: buildAppBar(
-                                                                  toolbarContext,
-                                                                  selectionMode: true,
-                                                                ),
-                                                              ),
+                                                          // The bar dims its own selection buttons
+                                                          // while nothing is selected; paste stays
+                                                          // usable.
+                                                          child: MediaQuery.removePadding(
+                                                            context: toolbarContext,
+                                                            removeTop: true,
+                                                            removeBottom: true,
+                                                            child: buildAppBar(
+                                                              toolbarContext,
+                                                              selectionMode: true,
                                                             ),
                                                           ),
                                                         ),

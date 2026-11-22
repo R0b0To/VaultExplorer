@@ -46,6 +46,14 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onCopy;
   final VoidCallback onCut;
 
+  /// Desktop compact bar only: a paste button drawn right after copy. It
+  /// handles its own enabled state (it works with nothing selected).
+  final Widget? pasteAction;
+
+  /// Desktop compact bar only: whether anything is selected. The selection
+  /// buttons dim and ignore taps while it is false; [pasteAction] does not.
+  final bool selectionActive;
+
   /// Set only for a single selected folder while the file manager is in tabs.
   final VoidCallback? onOpenInNewTab;
   final VoidCallback onExport;
@@ -111,6 +119,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.allowRenameAction = true,
     required this.onCopy,
     required this.onCut,
+    this.pasteAction,
+    this.selectionActive = true,
     this.onOpenInNewTab,
     required this.onExport,
     this.allowExportAction = true,
@@ -173,50 +183,84 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
       quickActions: quickItemActions,
     );
 
-    Widget buildActionButton(FileItemAction action) => switch (action) {
+    Widget buildActionButton(FileItemAction action, {bool enabled = true}) =>
+        switch (action) {
       FileItemAction.extract => IconButton(
         icon: const Icon(Icons.unarchive_outlined),
         tooltip: context.l10n.extract,
-        onPressed: onExtractSelectedArchive,
+        onPressed: enabled ? onExtractSelectedArchive : null,
       ),
       FileItemAction.share => IconButton(
         icon: const Icon(Icons.share_rounded),
         tooltip: context.l10n.shareAction,
-        onPressed: onShare,
+        onPressed: enabled ? onShare : null,
       ),
       FileItemAction.copy => IconButton(
         icon: const Icon(Icons.copy_rounded),
         tooltip: context.l10n.copyTooltip,
-        onPressed: onCopy,
+        onPressed: enabled ? onCopy : null,
       ),
       FileItemAction.move => IconButton(
         icon: Icon(
           Icons.cut_rounded,
-          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+          color: enabled && readOnly
+              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+              : null,
         ),
         tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
-        onPressed: onCut,
+        onPressed: enabled ? onCut : null,
       ),
       FileItemAction.rename => IconButton(
         icon: Icon(
           Icons.drive_file_rename_outline_rounded,
-          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+          color: enabled && readOnly
+              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+              : null,
         ),
         tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
-        onPressed: onRename,
+        onPressed: enabled ? onRename : null,
       ),
       FileItemAction.delete => IconButton(
         icon: Icon(
           Icons.delete_outline_rounded,
-          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
+          color: !enabled
+              ? null
+              : readOnly
+              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+              : cs.error,
         ),
         tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
-        onPressed: onDelete,
+        onPressed: enabled ? onDelete : null,
       ),
       _ => throw StateError('Unexpected selection-bar action: $action'),
     };
 
     if (desktopCompact) {
+      // The desktop bar never adds or removes buttons as the selection
+      // changes: every action stays in place and the ones that do not apply
+      // right now are greyed out.
+      final compactOrder = orderFileItemActions(
+        [
+          if (shown(FileItemAction.extract)) FileItemAction.extract,
+          if (shown(FileItemAction.share)) FileItemAction.share,
+          if (shown(FileItemAction.copy)) FileItemAction.copy,
+          if (shown(FileItemAction.move)) FileItemAction.move,
+          if (shown(FileItemAction.rename)) FileItemAction.rename,
+          if (shown(FileItemAction.delete)) FileItemAction.delete,
+        ],
+        order: itemActionOrder,
+        quickActions: quickItemActions,
+      );
+      bool compactEnabled(FileItemAction action) => switch (action) {
+        FileItemAction.extract =>
+          selectionActive &&
+              allowExtractAction &&
+              (singleArchiveSelected || isInsideArchive),
+        FileItemAction.share => selectionActive && showShareOption,
+        FileItemAction.rename =>
+          selectionActive && !isInsideArchive && allowRenameAction,
+        _ => selectionActive && !isInsideArchive,
+      };
       return Material(
         color: cs.surfaceContainer,
         child: SizedBox(
@@ -225,7 +269,16 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             scrollDirection: Axis.horizontal,
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: visibleActionOrder.map(buildActionButton).toList(),
+              children: [
+                if (pasteAction != null &&
+                    !compactOrder.contains(FileItemAction.copy))
+                  pasteAction!,
+                for (final action in compactOrder) ...[
+                  buildActionButton(action, enabled: compactEnabled(action)),
+                  if (action == FileItemAction.copy && pasteAction != null)
+                    pasteAction!,
+                ],
+              ],
             ),
           ),
         ),

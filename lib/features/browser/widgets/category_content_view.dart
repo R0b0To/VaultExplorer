@@ -45,6 +45,7 @@ import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
@@ -3398,6 +3399,17 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             !_canGoUp &&
             (!_scoped || galleryRootMayLeave));
 
+    // On desktop the shell shows no app bar slot (the file manager's toolbar
+    // lives inside its folder view), so a scoped category such as gallery mode
+    // draws its own toolbar. Without it there was no button to leave gallery
+    // mode again.
+    final PreferredSizeWidget? inlineToolbar =
+        _scoped && PlatformFeatures.isDesktop
+        ? (isSelecting && !toolbarConfig.bottomSelectionBar
+              ? selectionAppBarFactory(context)
+              : regularAppBarFactory(context))
+        : null;
+
     return PopScope(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
@@ -3422,6 +3434,15 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           Positioned.fill(
             child: Column(
               children: [
+                if (inlineToolbar != null)
+                  MediaQuery.removePadding(
+                    context: context,
+                    removeTop: true,
+                    child: SizedBox(
+                      height: inlineToolbar.preferredSize.height,
+                      child: inlineToolbar,
+                    ),
+                  ),
                 if (_scanning) const LinearProgressIndicator(minHeight: 2),
                 if (_snapshot.limitReached && !_scanning)
                   Container(

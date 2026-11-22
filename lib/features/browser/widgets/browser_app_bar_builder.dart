@@ -112,6 +112,8 @@ PreferredSizeWidget buildBrowserAppBar(
   bool showBackButton = true,
   double selectionToolbarHeight = kToolbarHeight,
   bool desktopCompactSelection = false,
+  Widget? pasteAction,
+  bool selectionActive = true,
   Widget Function(Widget title)? wrapTitle,
   VoidCallback? onOpenStorageSwitcher,
 }) {
@@ -397,6 +399,8 @@ PreferredSizeWidget buildBrowserAppBar(
     return SelectionAppBarWide(
       toolbarHeight: selectionToolbarHeight,
       desktopCompact: desktopCompactSelection,
+      pasteAction: pasteAction,
+      selectionActive: selectionActive,
       selectedCount: selectedCount,
       selectionLabel: sizeLabel,
       singleFileSelected: singleFile,

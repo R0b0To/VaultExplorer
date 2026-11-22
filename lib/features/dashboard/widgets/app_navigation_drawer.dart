@@ -576,6 +576,9 @@ class AppNavigationDrawer extends ConsumerWidget {
     final isDashboard = currentVolId == null && selectedTabIndex == 0;
     final isTools = currentVolId == null && selectedTabIndex == 1;
     final isSettings = currentVolId == null && selectedTabIndex == 2;
+    // Docked beside the content, Tools and Settings are a compact strip of
+    // icons along the bottom of the sidebar instead of two full-width rows.
+    final useStrip = docked && onSelectTab != null;
 
     return _DrawerShell(
       docked: docked,
@@ -1060,6 +1063,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                     ),
 
                   // 4. Tools Destination
+                  if (!useStrip) ...[
                   ListTile(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(28),
@@ -1147,12 +1151,82 @@ class AppNavigationDrawer extends ConsumerWidget {
                       );
                     },
                   ),
+                  ],
                 ],
               ),
             ),
+            if (useStrip)
+              _DockedToolsStrip(
+                toolsSelected: isTools,
+                settingsSelected: isSettings,
+                onTools: () => onSelectTab!(1),
+                onSettings: () => onSelectTab!(2),
+              ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Tools and Settings as two icon buttons along the bottom of the docked
+/// sidebar, under a divider.
+class _DockedToolsStrip extends StatelessWidget {
+  const _DockedToolsStrip({
+    required this.toolsSelected,
+    required this.settingsSelected,
+    required this.onTools,
+    required this.onSettings,
+  });
+
+  final bool toolsSelected;
+  final bool settingsSelected;
+  final VoidCallback onTools;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Widget button(IconData icon, String tooltip, bool selected, VoidCallback onTap) {
+      return IconButton(
+        icon: Icon(icon, size: 22),
+        tooltip: tooltip,
+        onPressed: onTap,
+        isSelected: selected,
+        style: IconButton.styleFrom(
+          foregroundColor: selected ? cs.primary : cs.onSurfaceVariant,
+          backgroundColor: selected
+              ? cs.secondaryContainer.withValues(alpha: 0.5)
+              : null,
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            children: [
+              button(
+                Icons.build_rounded,
+                context.l10n.navBarToolsLabel,
+                toolsSelected,
+                onTools,
+              ),
+              const SizedBox(width: 4),
+              button(
+                Icons.settings,
+                context.l10n.settingsMenuItem,
+                settingsSelected,
+                onSettings,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/utils/last_pointer.dart';
 import 'package:vaultexplorer/app/app_bootstrap.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
@@ -57,6 +58,8 @@ void main() async {
   } else {
     WidgetsFlutterBinding.ensureInitialized();
   }
+  // Lets context menus open where the click or long-press happened.
+  LastPointer.ensureInstalled();
 
   // Not awaited: the platform message is queued ahead of runApp either way,
   // and waiting for its reply only delayed the first frame.

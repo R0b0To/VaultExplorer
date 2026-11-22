@@ -7,6 +7,8 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/last_pointer.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -22,7 +24,6 @@ import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
-import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 class FileItemActionsSheet extends ConsumerWidget {
   final RawEntry entry;
@@ -166,14 +167,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     Set<FileItemAction> hiddenActions = const {},
     Set<FileItemAction> quickActions = FileItemAction.defaultQuickActions,
   }) {
-    return showAdaptiveSheet(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => FileItemActionsSheet(
+    final sheet = FileItemActionsSheet(
         entry: entry,
         container: container,
         currentDirPath: currentDirPath,
@@ -212,8 +206,95 @@ class FileItemActionsSheet extends ConsumerWidget {
         actionOrder: actionOrder,
         hiddenActions: hiddenActions,
         quickActions: quickActions,
+      );
+    return sheet._showAsMenu(context);
+  }
+
+  /// Opens the item's actions as a popup menu at the pointer (a right click
+  /// on desktop, a long-press on a phone), the way a desktop file manager's
+  /// context menu looks, in place of the dialog or bottom sheet.
+  Future<void> _showAsMenu(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final itemHeight = PlatformFeatures.isDesktop ? 34.0 : 44.0;
+
+    final items = <PopupMenuEntry<VoidCallback>>[];
+    int? previousGroup;
+    for (final action in actionOrder) {
+      if (hiddenActions.contains(action)) continue;
+      final spec = _specFor(context, cs, action);
+      if (spec == null) continue;
+      if (previousGroup != null && previousGroup != action.group) {
+        items.add(const PopupMenuDivider(height: 8));
+      }
+      previousGroup = action.group;
+      final color = spec.enabled
+          ? (spec.color ?? cs.onSurface)
+          : cs.onSurfaceVariant.withValues(alpha: 0.38);
+      items.add(
+        PopupMenuItem<VoidCallback>(
+          value: spec.onTap,
+          enabled: spec.enabled,
+          height: itemHeight,
+          child: Row(
+            children: [
+              Icon(spec.icon, size: 18, color: color),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  spec.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: color),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (archiveContext == null) {
+      if (items.isNotEmpty) items.add(const PopupMenuDivider(height: 8));
+      items.add(
+        PopupMenuItem<VoidCallback>(
+          value: onInfo,
+          height: itemHeight,
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 18,
+                color: cs.onSurface,
+              ),
+              const SizedBox(width: 12),
+              Text(context.l10n.fileInfoAction),
+            ],
+          ),
+        ),
+      );
+    }
+    if (items.isEmpty) return;
+
+    // Where the click or press happened; the middle of the item's own box
+    // when it came from the keyboard or somewhere untracked.
+    var anchor = LastPointer.position;
+    if (anchor == null) {
+      final box = context.findRenderObject() as RenderBox?;
+      anchor = box != null && box.hasSize
+          ? box.localToGlobal(box.size.center(Offset.zero))
+          : overlay.size.center(Offset.zero);
+    }
+    final local = overlay.globalToLocal(anchor);
+
+    final chosen = await showMenu<VoidCallback>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(local.dx, local.dy, 0, 0),
+        Offset.zero & overlay.size,
       ),
+      items: items,
     );
+    chosen?.call();
   }
 
   Widget _buildLeading(

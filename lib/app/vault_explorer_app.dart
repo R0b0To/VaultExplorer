@@ -18,6 +18,7 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
+import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
@@ -104,6 +105,19 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
       fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
       editorFollowsAppSkin: editorFollowsAppSkin,
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // The mouse's back and forward buttons (desktop only).
+    MouseNavDispatcher.instance.install();
+  }
+
+  @override
+  void dispose() {
+    MouseNavDispatcher.instance.uninstall();
+    super.dispose();
   }
 
   @override

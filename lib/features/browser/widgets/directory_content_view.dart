@@ -22,6 +22,7 @@ import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
+import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -992,6 +993,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleBrowserKey);
+    MouseNavDispatcher.instance.register(_handleMouseNav);
     if (widget.scrollController != null) {
       _browserScrollController = widget.scrollController!;
     }
@@ -1030,6 +1032,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void dispose() {
     _disposed = true;
     HardwareKeyboard.instance.removeHandler(_handleBrowserKey);
+    MouseNavDispatcher.instance.unregister(_handleMouseNav);
     _music.removeListener(_onMusicChanged);
     _workspaceSubscription?.close();
     _bookmarkRequestSub?.close();
@@ -2764,6 +2767,37 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         _armExit();
       case BrowserBackAction.stay:
         break;
+    }
+  }
+
+  /// The mouse's back and forward buttons, like the toolbar arrows: back
+  /// closes a selection or search first, then goes up a folder; forward steps
+  /// into the folder back just left. Gated like the keyboard shortcuts, so
+  /// only the focused pane answers.
+  bool _handleMouseNav(MouseNavButton button) {
+    if (!_isKeyboardTarget) return false;
+    switch (button) {
+      case MouseNavButton.forward:
+        if (_forwardStack.isEmpty || isSelectionMode) return false;
+        _navigateForward(0);
+        return true;
+      case MouseNavButton.back:
+        // Scoped category views own their back behavior (see _onSystemBack).
+        if (_hasScopedCategoryFilter) return false;
+        switch (_resolveBack()) {
+          case BrowserBackAction.leave:
+          case BrowserBackAction.stay:
+            // Nothing to go back to; "press again to exit" is for the
+            // system back button, not a mouse click.
+            return false;
+          case BrowserBackAction.exitSelection:
+          case BrowserBackAction.clearSearch:
+          case BrowserBackAction.navigateUp:
+          case BrowserBackAction.returnHome:
+          case BrowserBackAction.popRoute:
+            _onSystemBack();
+            return true;
+        }
     }
   }
 

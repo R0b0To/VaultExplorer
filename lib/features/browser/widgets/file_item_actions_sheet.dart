@@ -219,12 +219,28 @@ class FileItemActionsSheet extends ConsumerWidget {
     if (overlay == null) return;
     final itemHeight = PlatformFeatures.isDesktop ? 34.0 : 44.0;
 
+    // The user's quick actions lead as a horizontal row of icon-over-label
+    // buttons (like the top of the Windows 11 context menu); every other
+    // action is a list row below it.
+    final quick = <_QuickSpec>[];
     final items = <PopupMenuEntry<VoidCallback>>[];
     int? previousGroup;
     for (final action in actionOrder) {
       if (hiddenActions.contains(action)) continue;
       final spec = _specFor(context, cs, action);
       if (spec == null) continue;
+      if (quickActions.contains(action)) {
+        quick.add(
+          _QuickSpec(
+            icon: spec.icon,
+            label: spec.label,
+            color: spec.color,
+            enabled: spec.enabled,
+            onTap: spec.onTap,
+          ),
+        );
+        continue;
+      }
       if (previousGroup != null && previousGroup != action.group) {
         items.add(const PopupMenuDivider(height: 8));
       }
@@ -272,6 +288,12 @@ class FileItemActionsSheet extends ConsumerWidget {
           ),
         ),
       );
+    }
+    if (quick.isNotEmpty) {
+      items.insert(0, _QuickRowEntry(actions: quick));
+      if (items.length > 1) {
+        items.insert(1, const PopupMenuDivider(height: 8));
+      }
     }
     if (items.isEmpty) return;
 
@@ -1198,6 +1220,101 @@ class _QuickActionButton extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One button of the context menu's quick row.
+class _QuickSpec {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool enabled;
+  final Color? color;
+
+  const _QuickSpec({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+    this.color,
+  });
+}
+
+/// A menu entry holding a horizontal row of icon-over-label buttons, the
+/// quick actions at the top of the context menu. Choosing one closes the menu
+/// with that action as the result, exactly like a list row would.
+class _QuickRowEntry extends PopupMenuEntry<VoidCallback> {
+  const _QuickRowEntry({required this.actions});
+
+  final List<_QuickSpec> actions;
+
+  @override
+  double get height => 62;
+
+  @override
+  bool represents(VoidCallback? value) => false;
+
+  @override
+  State<_QuickRowEntry> createState() => _QuickRowEntryState();
+}
+
+class _QuickRowEntryState extends State<_QuickRowEntry> {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Row(
+        children: [
+          for (final action in widget.actions)
+            Expanded(
+              child: _MenuQuickButton(
+                spec: action,
+                onTap: () => Navigator.pop<VoidCallback>(context, action.onTap),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuQuickButton extends StatelessWidget {
+  const _MenuQuickButton({required this.spec, required this.onTap});
+
+  final _QuickSpec spec;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = spec.enabled
+        ? (spec.color ?? cs.onSurface)
+        : cs.onSurfaceVariant.withValues(alpha: 0.38);
+    return InkWell(
+      onTap: spec.enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(spec.icon, size: 20, color: color),
+            const SizedBox(height: 4),
+            Text(
+              spec.label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );

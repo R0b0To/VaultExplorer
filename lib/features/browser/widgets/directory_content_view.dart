@@ -7799,6 +7799,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                             onTap: _jumpTo,
                                             forwardStack: _forwardStack,
                                             onForwardTap: _navigateForward,
+                                            // On desktop this is the navigation row
+                                            // the selected tab flows into.
+                                            backgroundColor: desktopFileManager
+                                                ? Theme.of(context)
+                                                      .colorScheme
+                                                      .surfaceContainer
+                                                : null,
                                           ),
                                         )
                                       : null,

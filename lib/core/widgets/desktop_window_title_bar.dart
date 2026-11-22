@@ -9,6 +9,22 @@ const double kDesktopTitleBarDragWidth = 24;
 const double kDesktopTitleBarTrailingWidth =
     kDesktopTitleBarCaptionWidth + kDesktopTitleBarDragWidth;
 
+/// Background of a tab strip: a shade darker than [base], the colour of the
+/// bar right under it, so the selected tab (drawn in [base]) reads as part of
+/// that bar.
+Color tabStripColorOver(ColorScheme cs, Color base) => Color.alphaBlend(
+  (cs.brightness == Brightness.dark ? Colors.black : cs.onSurface).withValues(
+    alpha: cs.brightness == Brightness.dark ? 0.28 : 0.07,
+  ),
+  base,
+);
+
+/// Background of the desktop tab strip and the title bar it lives in. The bar
+/// right under the strip (the breadcrumb / navigation row, the dashboard
+/// header) is `surfaceContainer`, and so is the selected tab.
+Color desktopTabStripColor(ColorScheme cs) =>
+    tabStripColorOver(cs, cs.surfaceContainer);
+
 class DesktopWindowTitleBarScope extends InheritedWidget {
   final VoidCallback onDragStart;
   final VoidCallback onDoubleTap;
@@ -183,7 +199,7 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Material(
-      color: cs.surfaceContainer,
+      color: desktopTabStripColor(cs),
       child: SizedBox(
         height: widget.height,
         child: Row(

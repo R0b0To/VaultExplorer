@@ -1,7 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/gestures.dart'
-    show PointerMoveEvent, kMiddleMouseButton;
+    show
+        GestureBinding,
+        PointerMoveEvent,
+        PointerScrollEvent,
+        PointerSignalEvent,
+        kMiddleMouseButton;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,6 +81,14 @@ const double kBrowserTabItemWidth = 148;
 /// lists only the pane's own tabs, switching a tab changes only that pane, the
 /// new-tab button opens a tab in it, and its bottom edge marks whether the pane
 /// has focus. Without one it is the single strip over all tabs.
+///
+/// The selected tab is drawn in the colour of the bar under the strip, with
+/// flared feet, so it reads as part of that bar.
+///
+/// On desktop the mouse wheel scrolls the tabs sideways once they no longer
+/// fit, a slim scrollbar appears along the top edge while the pointer is
+/// over the strip, and a tab's close button is drawn only for the active tab
+/// or the tab under the pointer.
 class BrowserTabStrip extends ConsumerStatefulWidget {
   final BrowserTabsConfig workspaceConfig;
   final VoidCallback onNewTab;
@@ -120,6 +133,9 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   Timer? _fileDropHoverTimer;
   TabId? _fileDropHoverTabId;
 
+  /// Whether the pointer is over the strip; keeps the slim scrollbar visible.
+  final ValueNotifier<bool> _stripHovered = ValueNotifier<bool>(false);
+
   @override
   void initState() {
     super.initState();
@@ -143,6 +159,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     _fileDropHoverTimer?.cancel();
     _scrollController.removeListener(_rememberScrollOffset);
     _scrollController.dispose();
+    _stripHovered.dispose();
     super.dispose();
   }
 
@@ -174,6 +191,27 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _scrollController.position.pixels,
           pane: widget.pane ?? TabPane.primary,
         );
+  }
+
+  /// Turns the mouse wheel into sideways scrolling of the tabs. The list's own
+  /// scrollable only reacts to horizontal deltas (or shift + wheel), so the
+  /// plain vertical wheel is translated here. Registering with the resolver
+  /// keeps it from also scrolling anything behind the strip.
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_scrollController.hasClients) return;
+    final delta = event.scrollDelta;
+    // Horizontal gestures (trackpads, tilt wheels) are handled by the list.
+    if (delta.dy == 0 || delta.dx.abs() > delta.dy.abs()) return;
+    final position = _scrollController.position;
+    if (position.maxScrollExtent <= position.minScrollExtent) return;
+    final target = (position.pixels + delta.dy)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() < 0.5) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.jumpTo(target);
+    });
   }
 
   /// Follows the finger of a tab drag. The reorder list only moves the tab
@@ -281,7 +319,8 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   }
 
   /// Horizontal padding of the tab list (see the list's `padding`).
-  static const double _stripPadding = 3;
+  /// Room at both ends for the flared foot of the selected tab.
+  double get _stripPadding => _kTabFlare;
 
   void _onTabTapped(BrowserTabState tab, BuildContext tabContext) {
     final state = ref.read(browserTabsProvider(widget.workspaceConfig));
@@ -445,12 +484,17 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     _scrollActiveIntoView();
     final windowTitleBar = DesktopWindowTitleBarScope.maybeOf(context);
 
-    final stripBackground = cs.surfaceContainer;
-    final activeBackground = cs.surfaceContainerHighest;
-    // The other pane's shown tab is still marked, only less strongly.
-    final shownBackground = paneFocused
-        ? activeBackground
-        : cs.surfaceContainerHigh;
+    // The strip is a shade darker than the bar under it, and the selected tab
+    // is drawn in that bar's colour, flowing into it. Under the strip sit the
+    // navigation row (desktop, `surfaceContainer`) or breadcrumb bar / page
+    // (phones and tablets, `surface`).
+    const connected = true;
+    final barColor = PlatformFeatures.isDesktop
+        ? cs.surfaceContainer
+        : cs.surface;
+    final stripBackground = tabStripColorOver(cs, barColor);
+    final activeBackground = barColor;
+    final shownBackground = barColor;
 
     return Container(
       height: widget.height,
@@ -458,7 +502,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
         color: stripBackground,
         // Marks the active pane (the one the keyboard, the toolbar and the
         // close buttons belong to).
-        border: pane == null
+        border: pane == null || connected
             ? null
             : Border(
                 bottom: BorderSide(
@@ -472,16 +516,56 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final trailingBlankStart =
-                    _stripPadding * 2 + tabs.length * kBrowserTabItemWidth + 48;
+                // On desktop the + sits right after the last tab while they
+                // fit; once they overflow the list stops short of it and the +
+                // stays fixed at the right edge, always visible.
+                final tabsWidth =
+                    _stripPadding * 2 + tabs.length * kBrowserTabItemWidth;
+                final listWidth = PlatformFeatures.isDesktop
+                    ? tabsWidth
+                          .clamp(0.0, (constraints.maxWidth - 48).clamp(0.0, double.infinity))
+                          .toDouble()
+                    : constraints.maxWidth;
+                final trailingBlankStart = listWidth + 48;
                 return Stack(
                   fit: StackFit.expand,
                   children: [
-                    Positioned.fill(
-                      child: Listener(
-                        behavior: HitTestBehavior.translucent,
-                        onPointerMove: _trackDrag,
-                        child: ReorderableListView.builder(
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: listWidth,
+                      child: MouseRegion(
+                        onEnter: (_) => _stripHovered.value = true,
+                        onExit: (_) => _stripHovered.value = false,
+                        child: Listener(
+                          behavior: HitTestBehavior.translucent,
+                          onPointerMove: _trackDrag,
+                          onPointerSignal: _onPointerSignal,
+                          // A slim scrollbar along the top edge, shown while
+                          // the pointer is over the strip (only when the tabs
+                          // overflow). The platform's default scrollbar is
+                          // switched off below so there is only this one.
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: _stripHovered,
+                            builder: (context, hovered, list) => RawScrollbar(
+                              controller: _scrollController,
+                              thumbVisibility: PlatformFeatures.isDesktop &&
+                                  hovered,
+                              interactive: PlatformFeatures.isDesktop,
+                              scrollbarOrientation: ScrollbarOrientation.top,
+                              thickness: 3,
+                              radius: const Radius.circular(2),
+                              crossAxisMargin: 0,
+                              minThumbLength: 24,
+                              thumbColor: cs.onSurface.withValues(alpha: 0.32),
+                              child: list!,
+                            ),
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(
+                                context,
+                              ).copyWith(scrollbars: false),
+                              child: ReorderableListView.builder(
                           key: PageStorageKey<String>(
                             '${widget.storageKey}-${pane?.name ?? 'all'}',
                           ),
@@ -489,13 +573,14 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                           scrollDirection: Axis.horizontal,
                           clipBehavior: Clip.hardEdge,
                           buildDefaultDragHandles: false,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: _stripPadding,
-                            vertical: 3,
-                          ),
-                          // On desktop the + sits right after the last tab; on a
-                          // phone it is pinned to the right edge instead (below).
-                          itemCount: tabs.length + (PlatformFeatures.isDesktop ? 1 : 0),
+                          padding: connected
+                              ? EdgeInsets.fromLTRB(_stripPadding, 4, _stripPadding, 0)
+                              : EdgeInsets.symmetric(
+                                  horizontal: _stripPadding,
+                                  vertical: 3,
+                                ),
+                          // The + button is not a list item: see below.
+                          itemCount: tabs.length,
                           onReorderStart: (index) {
                             HapticFeedback.mediumImpact();
                             _draggingTabId = index >= 0 && index < tabs.length
@@ -532,42 +617,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                             );
                           },
                           itemBuilder: (context, index) {
-                            if (PlatformFeatures.isDesktop && index == tabs.length) {
-                              return SizedBox(
-                                key: ValueKey<String>(
-                                  'new-tab-${pane?.name ?? 'all'}',
-                                ),
-                                width: 48,
-                                child: IconButton(
-                                  icon: const Icon(Icons.add_rounded, size: 20),
-                                  style: PlatformFeatures.isDesktop
-                                      ? IconButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: Size(
-                                            widget.height - 6,
-                                            widget.height - 6,
-                                          ),
-                                          maximumSize: Size(
-                                            widget.height - 6,
-                                            widget.height - 6,
-                                          ),
-                                          tapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                          visualDensity: VisualDensity.compact,
-                                        )
-                                      : null,
-                                  visualDensity: PlatformFeatures.isDesktop
-                                      ? null
-                                      : VisualDensity.compact,
-                                  tooltip: context.l10n.browserTabNew,
-                                  onPressed: () {
-                                    // The new tab joins the pane whose + was pressed.
-                                    if (pane != null) actions.focusPane(pane);
-                                    widget.onNewTab();
-                                  },
-                                ),
-                              );
-                            }
                             final tab = tabs[index];
                             final itemKey = _tabItemKeys.putIfAbsent(
                               tab.tabId,
@@ -664,6 +713,10 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                             tab: tab,
                                             active: isActive,
                                             activeBackground: shownBackground,
+                                            connected: connected,
+                                            // Side by side, the focused pane's
+                                            // selected tab carries an accent line.
+                                            accent: pane != null && paneFocused,
                                             onTap: () =>
                                                 _onTabTapped(tab, tabContext),
                                             onSecondaryTap:
@@ -695,8 +748,40 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                             );
                           },
                         ),
+                        ),
+                        ),
+                        ),
                       ),
                     ),
+                    if (PlatformFeatures.isDesktop)
+                      Positioned(
+                        left: listWidth,
+                        top: 0,
+                        bottom: 0,
+                        width: 48,
+                        child: IconButton(
+                          icon: const Icon(Icons.add_rounded, size: 20),
+                          style: IconButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size(
+                              widget.height - 6,
+                              widget.height - 6,
+                            ),
+                            maximumSize: Size(
+                              widget.height - 6,
+                              widget.height - 6,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          tooltip: context.l10n.browserTabNew,
+                          onPressed: () {
+                            // The new tab joins the pane whose + was pressed.
+                            if (pane != null) actions.focusPane(pane);
+                            widget.onNewTab();
+                          },
+                        ),
+                      ),
                     if (windowTitleBar != null &&
                         trailingBlankStart < constraints.maxWidth)
                       Positioned(
@@ -737,24 +822,35 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   }
 }
 
-class _TabItem extends ConsumerWidget {
+class _TabItem extends ConsumerStatefulWidget {
   final BrowserTabState tab;
   final bool active;
   final Color activeBackground;
+
+  /// Desktop style: the selected tab is a rounded-top tab that continues into
+  /// the toolbar below it (flared feet, no gap underneath).
+  final bool connected;
+
+  /// Draws a primary-coloured line on top of the selected tab.
+  final bool accent;
   final VoidCallback onTap;
   final VoidCallback? onSecondaryTap;
 
   /// Null when the tab cannot be closed (it is the only one).
   final VoidCallback? onClose;
 
-  /// Whether the close button is drawn. Its slot at the tab's right edge is
-  /// kept either way, so the label does not shift when the pane changes focus.
+  /// Whether the active tab draws its close button (false in the pane that is
+  /// not focused). Any tab also draws it while the pointer is over it. The
+  /// button's slot at the tab's right edge is kept either way, so the label
+  /// does not shift as it comes and goes.
   final bool closeVisible;
 
   const _TabItem({
     required this.tab,
     required this.active,
     required this.activeBackground,
+    this.connected = false,
+    this.accent = false,
     required this.onTap,
     this.onSecondaryTap,
     this.onClose,
@@ -762,8 +858,28 @@ class _TabItem extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TabItem> createState() => _TabItemState();
+}
+
+class _TabItemState extends ConsumerState<_TabItem> {
+  bool _hovered = false;
+
+  void _setHovered(bool value) {
+    if (_hovered == value || !mounted) return;
+    setState(() => _hovered = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tab = widget.tab;
+    final active = widget.active;
+    final onClose = widget.onClose;
     final cs = Theme.of(context).colorScheme;
+    // The close button shows on the active tab and on the hovered one.
+    final showClose = _hovered || (active && widget.closeVisible);
+    final shape = widget.connected
+        ? const BorderRadius.vertical(top: Radius.circular(8))
+        : BorderRadius.circular(8);
 
     // Folder name once the tab has navigated into a directory, otherwise the
     // vault / storage name. Watching only this derived string keeps the tab
@@ -800,18 +916,25 @@ class _TabItem extends ConsumerWidget {
       // tab. Letting Tooltip use its default long-press trigger consumes the
       // gesture and shows the label instead of starting a drag.
       triggerMode: TooltipTriggerMode.manual,
-      child: Material(
-        color: active ? activeBackground : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+      child: MouseRegion(
+        onEnter: (_) => _setHovered(true),
+        onExit: (_) => _setHovered(false),
+        child: Stack(
+          clipBehavior: Clip.none,
+          fit: StackFit.passthrough,
+          children: [
+        Material(
+        color: active ? widget.activeBackground : Colors.transparent,
+        borderRadius: shape,
         child: Listener(
           // A middle click closes the tab, as in a browser.
           onPointerDown: (event) {
             if (event.buttons == kMiddleMouseButton) onClose?.call();
           },
           child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: onTap,
-            onSecondaryTap: onSecondaryTap,
+            borderRadius: shape,
+            onTap: widget.onTap,
+            onSecondaryTap: widget.onSecondaryTap,
             child: Container(
               constraints: const BoxConstraints(maxWidth: 200),
               padding: EdgeInsets.only(left: 8, right: onClose != null ? 4 : 8),
@@ -863,7 +986,7 @@ class _TabItem extends ConsumerWidget {
                     SizedBox(
                       width: 20,
                       height: 20,
-                      child: closeVisible
+                      child: showClose
                           ? IconButton(
                               padding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
@@ -879,7 +1002,88 @@ class _TabItem extends ConsumerWidget {
             ),
           ),
         ),
+        ),
+        // Concave feet that blend the selected tab into the toolbar.
+        if (widget.connected && active) ...[
+          Positioned(
+            left: -_kTabFlare,
+            bottom: 0,
+            width: _kTabFlare,
+            height: _kTabFlare,
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _TabFootPainter(widget.activeBackground, left: true),
+              ),
+            ),
+          ),
+          Positioned(
+            right: -_kTabFlare,
+            bottom: 0,
+            width: _kTabFlare,
+            height: _kTabFlare,
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _TabFootPainter(widget.activeBackground, left: false),
+              ),
+            ),
+          ),
+        ],
+        if (widget.accent && active)
+          Positioned(
+            left: 8,
+            right: 8,
+            top: 0,
+            height: 2,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: cs.primary,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ),
+          ),
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Radius of the concave feet of the selected desktop tab.
+const double _kTabFlare = 8;
+
+/// One concave foot: the square between the tab's side and a quarter circle,
+/// so the tab's colour sweeps outwards into the toolbar below it.
+class _TabFootPainter extends CustomPainter {
+  final Color color;
+  final bool left;
+
+  const _TabFootPainter(this.color, {required this.left});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.width;
+    final path = Path();
+    if (left) {
+      path
+        ..moveTo(r, 0)
+        ..lineTo(r, r)
+        ..lineTo(0, r)
+        ..arcToPoint(Offset(r, 0), radius: Radius.circular(r), clockwise: false)
+        ..close();
+    } else {
+      path
+        ..moveTo(0, 0)
+        ..lineTo(0, r)
+        ..lineTo(r, r)
+        ..arcToPoint(Offset(0, 0), radius: Radius.circular(r))
+        ..close();
+    }
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_TabFootPainter old) =>
+      old.color != color || old.left != left;
 }

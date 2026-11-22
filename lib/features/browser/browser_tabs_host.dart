@@ -550,8 +550,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
   Widget _buildDesktopDashboardChrome(BuildContext context) => Column(
     children: [
+      // `surfaceContainer`, like the breadcrumb row: the selected tab above
+      // flows into it.
       Material(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         child: SizedBox(
           height: 36,
           child: Padding(

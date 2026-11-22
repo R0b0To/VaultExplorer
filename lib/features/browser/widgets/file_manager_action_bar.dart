@@ -20,12 +20,14 @@ class FileManagerActionBar extends StatelessWidget {
   final Axis axis;
   final List<FileManagerAction> actions;
   final Map<FileManagerAction, WidgetBuilder> builders;
+  final double height;
 
   const FileManagerActionBar({
     super.key,
     required this.axis,
     required this.actions,
     required this.builders,
+    this.height = 56,
   });
 
   @override
@@ -45,7 +47,7 @@ class FileManagerActionBar extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 56,
+            height: height,
             child: LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
                 scrollDirection: Axis.horizontal,

@@ -84,6 +84,7 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
   /// owner can show where it would land.
   final ValueChanged<TabPane?>? onDragOverPane;
   final String storageKey;
+  final double height;
 
   const BrowserTabStrip({
     super.key,
@@ -94,6 +95,7 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
     this.paneBounds,
     this.onDragOverPane,
     this.storageKey = 'browser-tab-strip-scroll-position',
+    this.height = kBrowserTabStripHeight,
   });
 
   @override
@@ -277,6 +279,12 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 
   void _onTabTapped(BrowserTabState tab, BuildContext tabContext) {
     final state = ref.read(browserTabsProvider(widget.workspaceConfig));
+    if (PlatformFeatures.isDesktop) {
+      ref
+          .read(browserTabsProvider(widget.workspaceConfig).notifier)
+          .activate(tab.tabId);
+      return;
+    }
     if (state.activeTabId == tab.tabId) {
       unawaited(_showTabMenu(tab, tabContext));
       return;
@@ -431,7 +439,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     final activeBackground = cs.surfaceContainerHighest;
 
     return Container(
-      height: kBrowserTabStripHeight,
+      height: widget.height,
       color: stripBackground,
       child: Row(
         children: [
@@ -488,7 +496,24 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                       width: 48,
                       child: IconButton(
                         icon: const Icon(Icons.add_rounded, size: 20),
-                        visualDensity: VisualDensity.compact,
+                        style: PlatformFeatures.isDesktop
+                            ? IconButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size(
+                                  widget.height - 6,
+                                  widget.height - 6,
+                                ),
+                                maximumSize: Size(
+                                  widget.height - 6,
+                                  widget.height - 6,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              )
+                            : null,
+                        visualDensity: PlatformFeatures.isDesktop
+                            ? null
+                            : VisualDensity.compact,
                         tooltip: context.l10n.browserTabNew,
                         onPressed: () {
                           // The new tab joins the pane whose + was pressed.
@@ -580,6 +605,16 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                   active: isActive,
                                   activeBackground: activeBackground,
                                   onTap: () => _onTabTapped(tab, tabContext),
+                                  onSecondaryTap: PlatformFeatures.isDesktop
+                                      ? () => unawaited(
+                                          _showTabMenu(tab, tabContext),
+                                        )
+                                      : null,
+                                  onClose:
+                                      PlatformFeatures.isDesktop &&
+                                          state.tabs.length > 1
+                                      ? () => actions.closeTab(tab.tabId)
+                                      : null,
                                 ),
                               ),
                         ),
@@ -601,12 +636,16 @@ class _TabItem extends ConsumerWidget {
   final bool active;
   final Color activeBackground;
   final VoidCallback onTap;
+  final VoidCallback? onSecondaryTap;
+  final VoidCallback? onClose;
 
   const _TabItem({
     required this.tab,
     required this.active,
     required this.activeBackground,
     required this.onTap,
+    this.onSecondaryTap,
+    this.onClose,
   });
 
   @override
@@ -654,6 +693,7 @@ class _TabItem extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: onTap,
+          onSecondaryTap: onSecondaryTap,
           child: Container(
             constraints: const BoxConstraints(maxWidth: 200),
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -701,6 +741,19 @@ class _TabItem extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (onClose != null)
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 14,
+                      tooltip: context.l10n.browserTabClose,
+                      onPressed: onClose,
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
               ],
             ),
           ),

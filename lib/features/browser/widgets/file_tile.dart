@@ -333,10 +333,7 @@ class FileTile extends StatelessWidget {
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
-      onSecondaryTap:
-          isSelectionMode || !showItemActionsMenu || onLongMenu == null
-          ? null
-          : () => onLongMenu!(entry),
+      onSecondaryTap: onLongMenu == null ? null : () => onLongMenu!(entry),
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,

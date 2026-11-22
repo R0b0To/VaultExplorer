@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart'
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
@@ -1453,6 +1454,7 @@ void _hydrateFromIndex() {
           widget.onSelectionChanged?.call(newSelection),
       onLongPressSelect: (entry) => widget.onItemLongPress(entry),
       enableHoldDrag: widget.enableFileDrag && widget.archiveContext == null,
+      enableMouseMarquee: PlatformFeatures.isDesktop,
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       onScaleEnd: _handleScaleEnd,

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
@@ -757,6 +758,7 @@ class FileListViewState extends State<FileListView> {
           widget.onSelectionChanged?.call(newSelection),
       onLongPressSelect: (entry) => widget.onItemLongPress(entry),
       enableHoldDrag: widget.enableFileDrag && widget.archiveContext == null,
+      enableMouseMarquee: PlatformFeatures.isDesktop,
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       onScaleEnd: _handleScaleEnd,
@@ -773,7 +775,8 @@ class FileListViewState extends State<FileListView> {
               // The rows keep 36 px at their right edge for the item menu
               // button or, while selecting, the selection indicator.
               trailingSlotWidth:
-                  (widget.isSelectionMode || widget.showItemActionsMenu)
+                  ((widget.isSelectionMode && !PlatformFeatures.isDesktop) ||
+                          widget.showItemActionsMenu)
                   ? 36
                   : 0,
             ),

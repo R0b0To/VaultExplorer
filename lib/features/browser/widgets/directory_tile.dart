@@ -228,10 +228,7 @@ class DirectoryTile extends StatelessWidget {
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
-      onSecondaryTap:
-          isSelectionMode || !showItemActionsMenu || onMoreTap == null
-          ? null
-          : () => onMoreTap!(entry),
+      onSecondaryTap: onMoreTap == null ? null : () => onMoreTap!(entry),
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,

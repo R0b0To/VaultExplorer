@@ -27,6 +27,40 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  window_channel_ = std::make_unique<
+      flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "vaultexplorer/window",
+      &flutter::StandardMethodCodec::GetInstance());
+  window_channel_->SetMethodCallHandler(
+      [this](const auto& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        const HWND hwnd = GetHandle();
+        if (!hwnd) {
+          result->Error("window_unavailable", "The window is unavailable.");
+          return;
+        }
+        const auto& method = call.method_name();
+        if (method == "isMaximized") {
+          result->Success(flutter::EncodableValue(IsZoomed(hwnd) != FALSE));
+        } else if (method == "minimize") {
+          ShowWindow(hwnd, SW_MINIMIZE);
+          result->Success(flutter::EncodableValue());
+        } else if (method == "toggleMaximize") {
+          ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+          result->Success(flutter::EncodableValue(IsZoomed(hwnd) != FALSE));
+        } else if (method == "close") {
+          PostMessage(hwnd, WM_CLOSE, 0, 0);
+          result->Success(flutter::EncodableValue());
+        } else if (method == "startDragging") {
+          ReleaseCapture();
+          SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+          result->Success(flutter::EncodableValue());
+        } else {
+          result->NotImplemented();
+        }
+      });
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -40,6 +74,10 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (window_channel_) {
+    window_channel_->SetMethodCallHandler(nullptr);
+  }
+  window_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

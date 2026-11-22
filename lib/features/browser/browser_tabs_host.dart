@@ -13,8 +13,13 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -144,6 +149,10 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
   /// When the workspace's state is gone by the time it is read, the provider
   /// rebuilds it from the config's initial data, i.e. a fresh session.
   final BrowserTabsConfig? restoredWorkspace;
+  /// The main desktop shell draws tabs in its window-title row, outside this
+  /// viewport so they align with a docked sidebar.
+  final bool externallyHostedTabStrip;
+  final ValueChanged<double>? onDualPaneSplitFractionChanged;
 
   const BrowserTabsShell({
     super.key,
@@ -163,6 +172,8 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
     this.viewportOptions = const BrowserViewportOptions(),
     this.appRoot = false,
     this.restoredWorkspace,
+    this.externallyHostedTabStrip = false,
+    this.onDualPaneSplitFractionChanged,
   });
 
   @override
@@ -226,6 +237,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   bool _restoreToolbarScheduled = false;
   bool _newTabPromptScheduled = false;
   bool _loopScheduled = false;
+  double _dualPaneSplitFraction = 0.5;
 
   /// True while a fast-scroll handle is held. The handle scrolls with a stream
   /// of `jumpTo` calls that read as scroll direction; with the app bar at the
@@ -536,18 +548,81 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     if (navigator.canPop()) navigator.pop();
   }
 
-  Widget _buildTabContent(BrowserTabState tab, {required bool isActive}) {
+  Widget _buildDesktopDashboardChrome(BuildContext context) => Column(
+    children: [
+      Material(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: SizedBox(
+          height: 36,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.home_rounded,
+                  size: 17,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  context.l10n.dashboardNavLabel,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      Material(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        child: SizedBox(
+          height: 40,
+          child: IconButtonTheme(
+            data: const IconButtonThemeData(
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                minimumSize: WidgetStatePropertyAll(Size(36, 36)),
+              ),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                AppBarAuthenticatorButton(),
+                AppBarTransferButton(),
+                SizedBox(width: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _buildTabContent(
+    BrowserTabState tab, {
+    required bool isActive,
+    bool isDualPane = false,
+  }) {
     if (tab.isDashboard) {
+      final dashboard =
+          widget.homeBuilder?.call(
+            workspace: _workspace,
+            onFloatingActionChanged: (action) =>
+                _chrome.setFloatingAction(tab.tabId, action),
+            onBottomBarChanged: (bar) => _chrome.setBottomBar(tab.tabId, bar),
+          ) ??
+          const SizedBox.expand();
       return KeyedSubtree(
         key: _dashboardViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
-        child:
-            widget.homeBuilder?.call(
-              workspace: _workspace,
-              onFloatingActionChanged: (action) =>
-                  _chrome.setFloatingAction(tab.tabId, action),
-              onBottomBarChanged: (bar) => _chrome.setBottomBar(tab.tabId, bar),
-            ) ??
-            const SizedBox.expand(),
+        child: isDualPane && PlatformFeatures.isDesktop
+            ? Column(
+                children: [
+                  _buildDesktopDashboardChrome(context),
+                  Expanded(child: dashboard),
+                ],
+              )
+            : dashboard,
       );
     }
     if (tab.isCategory) {
@@ -619,6 +694,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         container: tab.container!,
         tabId: tab.tabId,
         workspaceConfig: _workspace,
+        isDualPane: isDualPane,
         initialPath: tab.initialPath,
         resolveContainer: widget.resolveContainer,
         thumbnailCacheMode: widget.viewportOptions.thumbnailCacheMode,
@@ -649,8 +725,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     bool dividerAfter = false,
   }) {
     final isActive = shownTabId == activeTabId;
-    return Expanded(
-      child: Stack(
+    return Stack(
         key: _paneKeys[pane],
         fit: StackFit.expand,
         children: [
@@ -715,6 +790,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                             pageBuilder: (tab) => _buildTabContent(
                               tab,
                               isActive: tab.tabId == activeTabId,
+                              isDualPane: true,
                             ),
                             gate: _swipeGate,
                             swipeEnabled: swipeEnabled,
@@ -757,8 +833,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   /// Where [pane] is on screen, for dropping a dragged tab on it.
@@ -1423,6 +1498,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final appBarAtBottom = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.appBarAtBottom),
     );
+    final desktopFileManagerChrome =
+        PlatformFeatures.isDesktop &&
+        tabsEnabled &&
+        activeTab != null &&
+        !activeTab.isCategory;
+    final desktopDashboardChrome =
+        desktopFileManagerChrome && activeTab.isDashboard;
     final orientation = MediaQuery.orientationOf(context);
     final minDualPaneWidth = orientation == Orientation.landscape
         ? 640.0
@@ -1512,21 +1594,32 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     /// Bottom edge of the chrome stacked at the top of the screen: the status
     /// bar, app bar and tab strip.
     double browserChromeBottom() {
-      final visibleTabStripHeight = tabsEnabled && tabs.isNotEmpty
+      final visibleTabStripHeight =
+          PlatformFeatures.isWindows || widget.externallyHostedTabStrip
+          ? 32.0
+          : tabsEnabled && tabs.isNotEmpty
           ? tabStripVisibleHeight()
           : 0.0;
-      final visibleTopBarHeight = appBarAtBottom ? 0.0 : visibleAppBarHeight();
+      final visibleTopBarHeight =
+          appBarAtBottom || desktopFileManagerChrome
+          ? 0.0
+          : visibleAppBarHeight();
       final regularChromeHeight = visibleTopBarHeight + visibleTabStripHeight;
       final hasTopSelectionOverlay =
           !appBarAtBottom &&
+          !desktopFileManagerChrome &&
           selectionHasItems &&
           _chrome.selectionAppBar.value != null;
       final topChromeHeight =
           hasTopSelectionOverlay && regularChromeHeight < kToolbarHeight
           ? kToolbarHeight
           : regularChromeHeight;
+      final totalTopChromeHeight =
+          topChromeHeight + (desktopFileManagerChrome ? 76.0 : 0.0);
       return MediaQuery.paddingOf(context).top +
-          (appBarAtBottom ? visibleTabStripHeight : topChromeHeight);
+          (appBarAtBottom && !desktopFileManagerChrome
+              ? visibleTabStripHeight
+              : totalTopChromeHeight);
     }
 
     /// Whether a drag that begins at [position] may pull the drawer out. The
@@ -1541,7 +1634,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         final primary = _paneBounds(TabPane.primary);
         if (primary != null && position.dx >= primary.right) return false;
       }
-      if (!appBarAtBottom) return true;
+      if (!appBarAtBottom || desktopFileManagerChrome) return true;
       // Read, don't subscribe: this runs from a pointer handler, and
       // MediaQuery.of here would make the whole shell rebuild for every
       // MediaQuery change (the keyboard animating, say) from then on.
@@ -1590,6 +1683,42 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       ),
     );
     final Widget tabStripSlot = stripSlotFor(strip);
+    final windowsTitleBar = PlatformFeatures.isWindows &&
+            !widget.externallyHostedTabStrip
+        ? DesktopWindowTitleBar(
+            height: 32,
+            tabs: dualPaneForTabStrip
+                ? LayoutBuilder(
+                    builder: (context, constraints) {
+                      final pageWidth =
+                          constraints.maxWidth +
+                          kDesktopTitleBarTrailingWidth;
+                      final firstExtent =
+                          (_dualPaneSplitFraction * (pageWidth - 8))
+                              .clamp(0.0, constraints.maxWidth - 1)
+                              .toDouble();
+                      return Row(
+                        children: [
+                          SizedBox(
+                            width: firstExtent,
+                            child: paneStrip(TabPane.primary),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                          Expanded(child: paneStrip(TabPane.secondary)),
+                        ],
+                      );
+                    },
+                  )
+                : strip,
+          )
+        : null;
+    final windowsTabsAreInTitleBar =
+        PlatformFeatures.isWindows || widget.externallyHostedTabStrip;
+    final dashboardChrome = desktopDashboardChrome;
 
     final Widget shellBody = Stack(
         fit: StackFit.expand,
@@ -1598,9 +1727,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             bottom: false,
             child: Column(
               children: [
-                if (!appBarAtBottom) appBarSlot,
+                if (windowsTitleBar != null) windowsTitleBar,
+                if (!appBarAtBottom && !desktopFileManagerChrome)
+                  appBarSlot,
+                if (dashboardChrome && !dualPaneForTabStrip)
+                  _buildDesktopDashboardChrome(context),
                 // Side by side, each pane carries its own strip instead.
-                if (tabsEnabled && tabs.isNotEmpty && !dualPaneForTabStrip)
+                if (tabsEnabled &&
+                    tabs.isNotEmpty &&
+                    !dualPaneForTabStrip &&
+                    !windowsTabsAreInTitleBar)
                   tabStripSlot,
                 Expanded(
                   child: NotificationListener<FastScrollbarDragNotification>(
@@ -1644,41 +1780,67 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                               tabSwipe.swipeBetweenTabs &&
                               !_drawerOpenOrDragging &&
                               !_edgeDrawerGestureActive;
+                          final firstPane = _buildDualPaneViewport(
+                            TabPane.primary,
+                            groupTabs: tabs
+                                .where((tab) => tab.pane == TabPane.primary)
+                                .toList(),
+                            shownTabId: firstTab.tabId,
+                            activeTabId: activeTabId,
+                            stripSlot: windowsTabsAreInTitleBar
+                                ? const SizedBox.shrink()
+                                : stripSlotFor(paneStrip(TabPane.primary)),
+                            swipeEnabled: swipeEnabled,
+                            autoHideAppBar: autoHideAppBar,
+                            autoHideTabBar: autoHideTabBar,
+                            autoHideToolbar: autoHideToolbar,
+                          );
+                          final secondPane = _buildDualPaneViewport(
+                            TabPane.secondary,
+                            groupTabs: tabs
+                                .where((tab) => tab.pane == TabPane.secondary)
+                                .toList(),
+                            shownTabId: secondTab.tabId,
+                            activeTabId: activeTabId,
+                            stripSlot: windowsTabsAreInTitleBar
+                                ? const SizedBox.shrink()
+                                : stripSlotFor(
+                                    paneStrip(TabPane.secondary),
+                                  ),
+                            swipeEnabled: swipeEnabled,
+                            autoHideAppBar: autoHideAppBar,
+                            autoHideTabBar: autoHideTabBar,
+                            autoHideToolbar: autoHideToolbar,
+                          );
+                          if (PlatformFeatures.isDesktop) {
+                            return ResizableSplitPane(
+                              axis: Axis.horizontal,
+                              initialFraction: _dualPaneSplitFraction,
+                              minFirstExtent: 240,
+                              minSecondExtent: 240,
+                              onFractionChanged: (fraction) {
+                                _dualPaneSplitFraction = fraction;
+                                widget.onDualPaneSplitFractionChanged?.call(
+                                  fraction,
+                                );
+                                if (!widget.externallyHostedTabStrip &&
+                                    mounted) {
+                                  setState(() {});
+                                }
+                              },
+                              first: firstPane,
+                              second: secondPane,
+                            );
+                          }
                           return Row(
                             children: [
-                              _buildDualPaneViewport(
-                                TabPane.primary,
-                                groupTabs: tabs
-                                    .where((tab) => tab.pane == TabPane.primary)
-                                    .toList(),
-                                shownTabId: firstTab.tabId,
-                                activeTabId: activeTabId,
-                                stripSlot: stripSlotFor(
-                                  paneStrip(TabPane.primary),
-                                ),
-                                swipeEnabled: swipeEnabled,
-                                autoHideAppBar: autoHideAppBar,
-                                autoHideTabBar: autoHideTabBar,
-                                autoHideToolbar: autoHideToolbar,
-                                dividerAfter: true,
+                              Expanded(child: firstPane),
+                              VerticalDivider(
+                                width: 0.5,
+                                thickness: 0.5,
+                                color: Theme.of(context).dividerColor,
                               ),
-                              _buildDualPaneViewport(
-                                TabPane.secondary,
-                                groupTabs: tabs
-                                    .where(
-                                      (tab) => tab.pane == TabPane.secondary,
-                                    )
-                                    .toList(),
-                                shownTabId: secondTab.tabId,
-                                activeTabId: activeTabId,
-                                stripSlot: stripSlotFor(
-                                  paneStrip(TabPane.secondary),
-                                ),
-                                swipeEnabled: swipeEnabled,
-                                autoHideAppBar: autoHideAppBar,
-                                autoHideTabBar: autoHideTabBar,
-                                autoHideToolbar: autoHideToolbar,
-                              ),
+                              Expanded(child: secondPane),
                             ],
                           );
                         }
@@ -1770,7 +1932,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               ],
             ),
           ),
-          if (!appBarAtBottom)
+          if (!appBarAtBottom && !desktopFileManagerChrome)
             Positioned(
               top: 0,
               left: 0,
@@ -1810,7 +1972,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         valueListenable: _chrome.floatingAction,
         builder: (context, action, _) => action ?? const SizedBox.shrink(),
       ),
-       bottomNavigationBar: appBarAtBottom
+       bottomNavigationBar: appBarAtBottom && !desktopFileManagerChrome
           ? Builder(
               builder: (bottomContext) => Padding(
                 // Scaffold lets the keyboard cover its bottom bar, and the app

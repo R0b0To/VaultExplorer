@@ -11,10 +11,13 @@ import 'package:vaultexplorer/core/providers/external_storage_locations_provider
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -31,6 +34,7 @@ import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
@@ -77,6 +81,8 @@ class _MainShellState extends ConsumerState<MainShell>
       GlobalKey<VaultDashboardState>();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _scaffoldDrawerOpen = false;
+  double _dockedSidebarWidth = AppBreakpoints.dockedSidebarWidth;
+  final ValueNotifier<double> _dualPaneSplitFraction = ValueNotifier(0.5);
 
   // Holds the app body (Home/browser tabs, Tools, Settings) so rotating a
   // tablet or resizing a desktop window, which swaps the docked sidebar layout
@@ -545,6 +551,7 @@ class _MainShellState extends ConsumerState<MainShell>
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
     _localStorageNotifier.dispose();
+    _dualPaneSplitFraction.dispose();
     _vaultEngineEvents.removeIncomingShareRequestListener(
       _onIncomingShareRequest,
     );
@@ -1136,6 +1143,10 @@ class _MainShellState extends ConsumerState<MainShell>
                       buildDrawer(currentVolId: volId, workspace: workspace),
             closeRouteWhenEmpty: false,
             includeDashboardTab: true,
+            externallyHostedTabStrip: PlatformFeatures.isWindows,
+            onDualPaneSplitFractionChanged: PlatformFeatures.isWindows
+                ? (fraction) => _dualPaneSplitFraction.value = fraction
+                : null,
             restoredWorkspace: _restoredBrowserWorkspace,
             homeBuilder:
                 ({
@@ -1175,33 +1186,125 @@ class _MainShellState extends ConsumerState<MainShell>
       final dockedVolId = (activeTab == null || activeTab.isDashboard)
           ? null
           : activeTab.volId;
-      const sidebarWidth = AppBreakpoints.dockedSidebarWidth;
-      shellBody = Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: sidebarWidth,
-            child: buildDrawer(
+      shellBody = LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = (constraints.maxWidth - 8)
+              .clamp(1.0, double.infinity)
+              .toDouble();
+          return ResizableSplitPane(
+            axis: Axis.horizontal,
+            initialFraction: _dockedSidebarWidth / availableWidth,
+            minFirstExtent: 220,
+            minSecondExtent: 480,
+            maxFirstExtent: 460,
+            dividerExtent: 8,
+            onFirstExtentChanged: (extent) {
+              if (!mounted || (_dockedSidebarWidth - extent).abs() < 0.5) {
+                return;
+              }
+              setState(() => _dockedSidebarWidth = extent);
+            },
+            first: buildDrawer(
               docked: true,
               currentVolId: dockedVolId,
               workspace: _browserWorkspace,
             ),
-          ),
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
-          Expanded(
-            child: _DockedContentFrame(
-              consumedWidth: sidebarWidth + 1,
+            second: _DockedContentFrame(
+              consumedWidth: _dockedSidebarWidth + 8,
               child: appBody,
             ),
-          ),
-        ],
+          );
+        },
       );
     }
 
+    final browserTabsState = workspace == null
+        ? null
+        : ref.watch(browserTabsProvider(workspace));
+    Widget buildShellTabStrip({TabPane? pane}) => BrowserTabStrip(
+      workspaceConfig: workspace!,
+      onNewTab: _openNewBrowserTab,
+      onDuplicate: _duplicateBrowserTab,
+      pane: pane,
+      height: 32,
+    );
+    final showWorkspaceTabs = browserContentVisible &&
+        tabsEnabled &&
+        workspace != null &&
+        browserTabsState != null;
+    final titleBarLeadingWidth = docked ? _dockedSidebarWidth + 8 : 48.0;
+    final Widget shellTitleTabs = !showWorkspaceTabs
+        ? const SizedBox.shrink()
+        : browserTabsState.isSplit
+        ? LayoutBuilder(
+            builder: (context, constraints) => ValueListenableBuilder<double>(
+              valueListenable: _dualPaneSplitFraction,
+              builder: (context, fraction, _) {
+                final paneSplitInset = docked ? 0.0 : 48.0;
+                final pageWidth =
+                    constraints.maxWidth +
+                    kDesktopTitleBarTrailingWidth +
+                    paneSplitInset;
+                final firstExtent = (fraction * (pageWidth - 8) -
+                        paneSplitInset)
+                    .clamp(0.0, constraints.maxWidth - 1)
+                    .toDouble();
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: firstExtent,
+                      child: buildShellTabStrip(pane: TabPane.primary),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 22,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    Expanded(
+                      child: buildShellTabStrip(pane: TabPane.secondary),
+                    ),
+                  ],
+                );
+              },
+            ),
+          )
+        : buildShellTabStrip();
+    final Widget? windowsTitleBar = PlatformFeatures.isWindows
+        ? DesktopWindowTitleBar(
+            height: 32,
+            tabs: shellTitleTabs,
+            leadingWidth: titleBarLeadingWidth,
+            leadingDraggable: docked,
+            leading: docked
+                ? SizedBox(width: _dockedSidebarWidth + 8)
+                : SizedBox(
+                    width: 48,
+                    child: Builder(
+                      builder: (buttonContext) => IconButton(
+                        icon: const Icon(Icons.menu_rounded, size: 18),
+                        tooltip: buttonContext.l10n.storageLocationsTitle,
+                        onPressed: () => Scaffold.of(buttonContext).openDrawer(),
+                        style: IconButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(32, 32),
+                          maximumSize: const Size(32, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                  ),
+          )
+        : null;
+
+    final Widget scaffoldBody = windowsTitleBar == null
+        ? shellBody
+        : Column(
+            children: [
+              windowsTitleBar,
+              Expanded(child: shellBody),
+            ],
+          );
     final Widget scaffold = Scaffold(
       key: _scaffoldKey,
       onDrawerChanged: _onScaffoldDrawerChanged,
@@ -1211,7 +1314,7 @@ class _MainShellState extends ConsumerState<MainShell>
       drawerEdgeDragWidth: double.maxFinite,
       drawerEnableOpenDragGesture: _index != 0 && !docked,
       drawer: isHidden || docked ? null : buildDrawer(),
-      body: shellBody,
+      body: scaffoldBody,
     );
 
     // Keep the app shell mounted during share and Quick Capture flows, then

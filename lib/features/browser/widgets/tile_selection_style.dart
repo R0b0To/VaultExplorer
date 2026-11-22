@@ -3,6 +3,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -324,6 +325,7 @@ class FileRowShell extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final availableWidth = constraints.maxWidth;
+              final showSelectionIndicator = !PlatformFeatures.isDesktop;
               // When there is no overflow button, a selection indicator can
               // use the last detail column's space instead of adding a new
               // trailing slot and pushing every column to the left.
@@ -332,7 +334,9 @@ class FileRowShell extends StatelessWidget {
               final trailingWidth =
                   (hasTrailingSlot ||
                       effectiveTrailing != null ||
-                      (isSelectionMode && !canUseLastColumnForSelection))
+                      (isSelectionMode &&
+                          showSelectionIndicator &&
+                          !canUseLastColumnForSelection))
                   ? 36.0
                   : 0.0;
               const leadingSpacing = 10.0;
@@ -363,6 +367,7 @@ class FileRowShell extends StatelessWidget {
                   (!isCompact && !canFitColumns && detailColumns.isNotEmpty);
               final selectionInLastColumn =
                   isSelectionMode &&
+                  showSelectionIndicator &&
                   !hasTrailingSlot &&
                   !isCompact &&
                   !effectiveDetailed &&
@@ -468,7 +473,9 @@ class FileRowShell extends StatelessWidget {
                         _buildColumnWidget(detailColumns[i], context),
                     ],
                   ],
-                  if (isSelectionMode && !selectionInLastColumn) ...[
+                  if (isSelectionMode &&
+                      showSelectionIndicator &&
+                      !selectionInLastColumn) ...[
                     const SizedBox(width: 4),
                     SizedBox(
                       width: 32,

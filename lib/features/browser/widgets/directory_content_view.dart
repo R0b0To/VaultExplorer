@@ -20,13 +20,17 @@ import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
@@ -99,6 +103,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/auto_hide_scroll_host.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_preview_pane.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
@@ -221,6 +226,7 @@ class DirectoryContentView extends ConsumerStatefulWidget {
   /// a folder). Only read when the screen is first created.
   final String? initialPath;
   final ScrollController? scrollController;
+  final bool isDualPane;
 
   const DirectoryContentView({
     super.key,
@@ -236,6 +242,7 @@ class DirectoryContentView extends ConsumerStatefulWidget {
     required this.workspaceConfig,
     this.initialPath,
     this.scrollController,
+    this.isDualPane = false,
   });
 
   @override
@@ -693,6 +700,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   Widget? _lastBuiltFloatingAction;
   List<RawEntry>? _canPlayMediaItemsSource;
   bool _cachedCanPlayMedia = false;
+  int _folderStatsGeneration = 0;
+  String? _folderStatsPath;
+  int? _folderTotalBytes;
+  bool _folderStatsLoading = false;
 
   bool _canPlayMediaIn(List<RawEntry> items) {
     if (identical(items, _canPlayMediaItemsSource)) return _cachedCanPlayMedia;
@@ -1353,6 +1364,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   void _showItemActionsSheet(RawEntry entry) {
+    if (PlatformFeatures.isDesktop && !selectedItems.contains(entry)) {
+      _selectOnly(entry);
+    }
     _signalActivity();
     HapticFeedback.selectionClick();
     final fullPath = _fullPathOf(entry);
@@ -1922,6 +1936,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         layoutMode: _getLayoutModeForFolder(path),
         onActivity: _signalActivity,
       );
+      if (mounted) unawaited(_loadFolderTotalSize(path));
     } catch (e) {
       if (mounted) {
         _setStatus(
@@ -1929,6 +1944,32 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           error: true,
         );
       }
+    }
+  }
+
+  Future<void> _loadFolderTotalSize(String path) async {
+    if (!PlatformFeatures.isDesktop || _archiveContext != null) return;
+    final generation = ++_folderStatsGeneration;
+    setState(() {
+      _folderStatsPath = path;
+      _folderTotalBytes = null;
+      _folderStatsLoading = true;
+    });
+    try {
+      final totalBytes = await ref
+          .read(vaultFileIoApiProvider)
+          .getFolderSize(widget.container, path);
+      if (!mounted || generation != _folderStatsGeneration) return;
+      setState(() {
+        _folderTotalBytes = totalBytes;
+        _folderStatsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _folderStatsGeneration) return;
+      setState(() {
+        _folderTotalBytes = null;
+        _folderStatsLoading = false;
+      });
     }
   }
 
@@ -6627,6 +6668,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       previewDirPath,
       previewSort,
     );
+    final desktopFileManager =
+        PlatformFeatures.isDesktop && useBrowserTabs;
     final isLandscape = context.screen.useLandscapeLayout;
     // True while another viewport owns a drag: this one is then only a drop
     // target. Selecting this watch by tab keeps the source viewport (and any
@@ -6641,8 +6684,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         (_) => _applyPendingReveal(),
       );
     }
-    final useFab = _toolbarConfig.useFabForToolbar;
-    final showActionBar = !_searchActive && !useFab && !_musicOwnsToolbar;
+    final useFab =
+        !desktopFileManager && _toolbarConfig.useFabForToolbar;
+    final showActionBar =
+        !_searchActive && (!useFab || desktopFileManager) && !_musicOwnsToolbar;
     final workspace = widget.workspaceConfig;
     final appBarNavigation = _nav;
     final appBarSearch = _search;
@@ -6672,6 +6717,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     final localSelection = ref.read(fileBrowserSelectionProvider(_stateKey));
     final localSelectionIsNonEmpty = localSelection.items.isNotEmpty;
+    final localSelectionStats = localSelection.summaryStats;
+    final listedFolderBytes = _currentItems.fold<int>(
+      0,
+      (total, item) => total + (item.isDir ? 0 : item.sizeBytes),
+    );
+    final currentFolderStatsLoading =
+        _archiveContext == null &&
+        (_folderStatsPath != _currentDirPath || _folderStatsLoading);
+    final currentFolderTotalBytes =
+        _folderStatsPath == _currentDirPath && _archiveContext == null
+        ? _folderTotalBytes ?? listedFolderBytes
+        : listedFolderBytes;
     final aggregateSelection = _isActiveTab
         ? ref.watch(aggregatedTabsSelectionProvider(workspace))
         : localSelectionIsNonEmpty
@@ -6920,7 +6977,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ),
     );
 
-    final hasBottomNavBar = !isLandscape && showActionBar;
+    final hasBottomNavBar =
+        !desktopFileManager && !isLandscape && showActionBar;
     final bottomSystemInset = hasBottomNavBar
         ? 0.0
         : MediaQuery.paddingOf(context).bottom;
@@ -7009,11 +7067,19 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ? aggregateSelection?.hasPendingFolderSizes ??
                   appBarHasPendingFolderSizes
             : false,
-        toolbarConfig: useFab
+        toolbarConfig: useFab || (desktopFileManager && selectionMode)
             ? appBarToolbarConfig.copyWith(
-                hidden: FileManagerAction.values.toSet(),
+                hidden: useFab
+                    ? FileManagerAction.values.toSet()
+                    : appBarToolbarConfig.hidden,
+                bottomSelectionBar:
+                    desktopFileManager && selectionMode
+                        ? true
+                        : appBarToolbarConfig.bottomSelectionBar,
               )
             : appBarToolbarConfig,
+        selectionToolbarHeight: desktopFileManager ? 40 : kToolbarHeight,
+        desktopCompactSelection: desktopFileManager && selectionMode,
         actionBuilders: actionBuilders,
         isFolderMounted: appBarIsFolderMounted,
         isPinned: appBarIsPinned,
@@ -7211,7 +7277,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             _resolveBack() == BrowserBackAction.leave &&
             _exitArmed);
     final systemOverlayStyle = AppSystemUI.forTheme(Theme.of(context));
-    final Widget? browserBottomBar = (!isLandscape && showActionBar)
+    final Widget? browserBottomBar =
+        (!desktopFileManager && !isLandscape && showActionBar)
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -7223,7 +7290,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ],
           )
         : null;
-    final selectionBottomBar = selectionInBottomBar
+    final selectionBottomBar = !desktopFileManager && selectionInBottomBar
         // The shell's bottom slot sits at the screen's edge, under the
         // keyboard. Lifting the bar by the keyboard's height keeps the
         // selection actions visible and tappable while a search is still open
@@ -7414,12 +7481,204 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                       : null,
                                   child: Column(
                                     children: [
+                                      if (desktopFileManager)
+                                        Builder(
+                                          builder: (toolbarContext) => LayoutBuilder(
+                                            builder: (context, constraints) {
+                                              final desktopBackAction = _atRoot
+                                                  ? (!useBrowserTabs
+                                                        ? _handleBackAtRoot
+                                                        : null)
+                                                  : _navigateUp;
+                                              final toolbarActionWidth = showActionBar
+                                                  ? (_visibleActions.length * 48.0)
+                                                        .clamp(
+                                                          0.0,
+                                                          constraints.maxWidth *
+                                                              0.42,
+                                                        )
+                                                        .toDouble()
+                                                  : 0.0;
+                                              return Material(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.surfaceContainer,
+                                                child: SizedBox(
+                                                  height: 40,
+                                                  child: IconButtonTheme(
+                                                    data: const IconButtonThemeData(
+                                                      style: ButtonStyle(
+                                                        visualDensity: VisualDensity.compact,
+                                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        minimumSize: WidgetStatePropertyAll(Size(36, 36)),
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        IconButton(
+                                                          icon: const Icon(Icons.arrow_back_rounded),
+                                                          tooltip: context.l10n.backTooltip,
+                                                          onPressed: desktopBackAction,
+                                                        ),
+                                                        IconButton(
+                                                          icon: const Icon(Icons.arrow_forward_rounded),
+                                                          tooltip: context.l10n.forwardTooltip,
+                                                          onPressed: _forwardStack.isEmpty
+                                                              ? null
+                                                              : () => _navigateForward(0),
+                                                        ),
+                                                        if (toolbarActionWidth > 0)
+                                                          SizedBox(
+                                                            width: toolbarActionWidth,
+                                                            height: 40,
+                                                            child: ClipRect(
+                                                              child: SingleChildScrollView(
+                                                                scrollDirection: Axis.horizontal,
+                                                                child: Row(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    for (final action in _visibleActions)
+                                                                      if (showActionBar)
+                                                                        actionBuilders[action]!(toolbarContext),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        const VerticalDivider(width: 1, indent: 8, endIndent: 8),
+                                                        Expanded(
+                                                          child: IgnorePointer(
+                                                            ignoring: !selectionBarVisible,
+                                                            child: Opacity(
+                                                              opacity: selectionBarVisible ? 1 : 0.42,
+                                                              child: MediaQuery.removePadding(
+                                                                context: toolbarContext,
+                                                                removeTop: true,
+                                                                removeBottom: true,
+                                                                child: buildAppBar(
+                                                                  toolbarContext,
+                                                                  selectionMode: true,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 48,
+                                                          child: AppBarTransferButton(),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
                                       if (!widget.container.isLocalStorage &&
                                           _archiveContext == null)
                                         const SyncStatusBanner(),
 
                                       Expanded(
-                                        child: Stack(
+                                        child: ResizableSplitPane(
+                                          axis: widget.isDualPane
+                                              ? Axis.vertical
+                                              : Axis.horizontal,
+                                          initialFraction: widget.isDualPane
+                                              ? 0.70
+                                              : 0.72,
+                                          minFirstExtent: widget.isDualPane
+                                              ? 180
+                                              : 340,
+                                          minSecondExtent: widget.isDualPane
+                                              ? 150
+                                              : 220,
+                                          collapseSecondOnResize:
+                                              desktopFileManager,
+                                          collapsedSecondTooltip: context
+                                              .l10n
+                                              .markdownViewerPreviewTooltip,
+                                          first: Column(
+                                            children: [
+                                              if (desktopFileManager)
+                                                Material(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.surfaceContainerLow,
+                                                  child: SizedBox(
+                                                    height: 28,
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                      ),
+                                                      child: Row(
+                                                        children: [
+                                                          Text(
+                                                            context.l10n.folderItemCount(
+                                                              dirCount + fileCount,
+                                                            ),
+                                                            style: Theme.of(context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  color: Theme.of(
+                                                                    context,
+                                                                  ).colorScheme.onSurfaceVariant,
+                                                                ),
+                                                          ),
+                                                          if (localSelection.items
+                                                              .isNotEmpty) ...[
+                                                            const SizedBox(width: 14),
+                                                            Text(
+                                                              context.l10n.selectionBarSelectedCount(
+                                                                localSelection.items.length,
+                                                              ),
+                                                              style: Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodySmall,
+                                                            ),
+                                                          ],
+                                                          const Spacer(),
+                                                          if (localSelection.items
+                                                              .isNotEmpty) ...[
+                                                            Text(
+                                                              '${context.l10n.sortFieldSize}: ${localSelectionStats.hasPendingFolderSizes ? context.l10n.sizeCalculatingLabel : formatBytes(localSelectionStats.totalBytes)}',
+                                                              overflow:
+                                                                  TextOverflow.ellipsis,
+                                                              style: Theme.of(
+                                                                context,
+                                                              ).textTheme.bodySmall?.copyWith(
+                                                                color: Theme.of(
+                                                                  context,
+                                                                ).colorScheme.onSurfaceVariant,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(width: 16),
+                                                          ],
+                                                          Flexible(
+                                                            child: Text(
+                                                              '${context.l10n.totalSizeLabel}: ${currentFolderStatsLoading ? context.l10n.sizeCalculatingLabel : formatBytes(currentFolderTotalBytes)}',
+                                                              overflow:
+                                                                  TextOverflow.ellipsis,
+                                                              textAlign: TextAlign.end,
+                                                              style: Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodySmall
+                                                                  ?.copyWith(
+                                                                    color: Theme.of(
+                                                                      context,
+                                                                    ).colorScheme.onSurfaceVariant,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              Expanded(
+                                                child: Stack(
                                           children: [
                                             KeyedSubtree(
                                               key: ValueKey(_currentDirPath),
@@ -7783,6 +8042,40 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                 ),
                                               ),
                                           ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          second:
+                                              desktopFileManager
+                                              ? BrowserPreviewPane(
+                                                  container: widget.container,
+                                                  selectedItems: selectedItems,
+                                                  currentItems: _currentItems,
+                                                  folderName: _currentDirPath.isEmpty
+                                                      ? widget.container.displayName
+                                                      : _pathStack.last.label,
+                                                  folderTotalBytes:
+                                                      _folderStatsPath ==
+                                                              _currentDirPath &&
+                                                          _archiveContext == null
+                                                      ? _folderTotalBytes
+                                                      : null,
+                                                  folderStatsLoading:
+                                                      currentFolderStatsLoading,
+                                                  currentDirPath:
+                                                      _currentDirPath,
+                                                  cacheMode:
+                                                      _resolvedThumbnailCacheMode,
+                                                  quality:
+                                                      _resolvedThumbnailQuality,
+                                                  isBottom: widget.isDualPane,
+                                                  archiveContext:
+                                                      _archiveContext,
+                                                  archiveRootPath:
+                                                      _archiveRootPathForSearch,
+                                                )
+                                              : null,
                                         ),
                                       ),
                                     ],

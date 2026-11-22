@@ -6,6 +6,8 @@ import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/features/browser/widgets/item_action_menu_config.dart';
 
 class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget {
+  final double toolbarHeight;
+  final bool desktopCompact;
   final int selectedCount;
   final String selectionLabel;
   final bool singleFileSelected;
@@ -79,6 +81,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
 
   const SelectionAppBarWide({
     super.key,
+    this.toolbarHeight = kToolbarHeight,
+    this.desktopCompact = false,
     required this.selectedCount,
     required this.selectionLabel,
     required this.singleFileSelected,
@@ -138,7 +142,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => Size.fromHeight(toolbarHeight);
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +216,24 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
       _ => throw StateError('Unexpected selection-bar action: $action'),
     };
 
+    if (desktopCompact) {
+      return Material(
+        color: cs.surfaceContainer,
+        child: SizedBox(
+          height: toolbarHeight,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: visibleActionOrder.map(buildActionButton).toList(),
+            ),
+          ),
+        ),
+      );
+    }
+
     return AppBar(
+      toolbarHeight: toolbarHeight,
       leading: IconButton(
         icon: const Icon(Icons.close_rounded),
         tooltip: context.l10n.clearSelectionTooltip,

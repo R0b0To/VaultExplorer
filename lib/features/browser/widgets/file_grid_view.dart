@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart'
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
@@ -737,6 +738,7 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
           onLongPressSelect: (entry) => widget.onItemLongPress(entry),
           enableHoldDrag:
               widget.enableFileDrag && widget.archiveContext == null,
+          enableMouseMarquee: PlatformFeatures.isDesktop,
           onScaleStart: _handleScaleStart,
           onScaleUpdate: _handleScaleUpdate,
           onScaleEnd: _handleScaleEnd,

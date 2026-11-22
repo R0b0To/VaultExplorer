@@ -34,6 +34,9 @@ abstract final class PlatformFeatures {
 
   static bool get isAndroid => !isDesktop;
 
+  /// Windows can host custom caption controls alongside the browser tabs.
+  static bool get isWindows => !kIsWeb && Platform.isWindows;
+
   /// Icon for the device's own storage ("Local storage"): a phone on Android,
   /// a computer on desktop.
   static IconData get localStorageIcon =>

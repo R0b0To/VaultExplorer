@@ -158,6 +158,7 @@ class HoldRangeSelectContainer extends StatefulWidget {
   final ValueChanged<Set<RawEntry>> onSelectionChanged;
   final void Function(RawEntry entry)? onLongPressSelect;
   final bool enableHoldDrag;
+  final bool enableMouseMarquee;
   final GestureScaleStartCallback? onScaleStart;
   final GestureScaleUpdateCallback? onScaleUpdate;
   final GestureScaleEndCallback? onScaleEnd;
@@ -172,6 +173,7 @@ class HoldRangeSelectContainer extends StatefulWidget {
     required this.onSelectionChanged,
     this.onLongPressSelect,
     this.enableHoldDrag = false,
+    this.enableMouseMarquee = false,
     this.onScaleStart,
     this.onScaleUpdate,
     this.onScaleEnd,
@@ -198,6 +200,13 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   bool _scrollEndPending = false;
   bool _scrollEndResetScheduled = false;
   int? _rangeHoldPointer;
+  int? _mouseMarqueePointer;
+  Offset? _mouseMarqueeStart;
+  Offset? _mouseMarqueeCurrent;
+  bool _mouseMarqueeMoved = false;
+  bool _mouseMarqueeAdditive = false;
+  bool _mouseMarqueeBlocksDrawer = false;
+  Set<RawEntry> _mouseMarqueeBaseSelection = const {};
   ValueChanged<bool>? _setDrawerDragBlocked;
 
   int? get _effectiveAnchorIndex {
@@ -242,6 +251,10 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     if (_rangeHoldPointer != null) {
       _setDrawerDragBlocked?.call(false);
       _rangeHoldPointer = null;
+    }
+    if (_mouseMarqueeBlocksDrawer) {
+      _setDrawerDragBlocked?.call(false);
+      _mouseMarqueeBlocksDrawer = false;
     }
     super.dispose();
   }
@@ -346,6 +359,25 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     _hasMoved = false;
     _pointerDownPosition = event.position;
     _pointerDownItem = _findItemAt(event.position);
+    if (widget.enableMouseMarquee &&
+        event.kind == PointerDeviceKind.mouse &&
+        (event.buttons & kPrimaryButton) != 0 &&
+        _pointerDownItem == null &&
+        !_isFrozen()) {
+      _mouseMarqueePointer = event.pointer;
+      _mouseMarqueeStart = event.position;
+      _mouseMarqueeCurrent = event.position;
+      _mouseMarqueeMoved = false;
+      _mouseMarqueeAdditive =
+          HardwareKeyboard.instance.isControlPressed ||
+          HardwareKeyboard.instance.isMetaPressed ||
+          HardwareKeyboard.instance.isShiftPressed;
+      _mouseMarqueeBaseSelection = _mouseMarqueeAdditive
+          ? Set<RawEntry>.from(widget.selectedItems)
+          : const {};
+      _mouseMarqueeBlocksDrawer = true;
+      _setDrawerDragBlocked?.call(true);
+    }
   }
 
   /// Called by the hold recognizer once the finger has rested on the item for
@@ -393,6 +425,17 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   void _handlePointerMove(PointerMoveEvent event) {
     if (_downPointers.length != 1) return;
 
+    if (_mouseMarqueePointer == event.pointer) {
+      _mouseMarqueeCurrent = event.position;
+      final start = _mouseMarqueeStart;
+      if (start != null && (event.position - start).distance > 4.0) {
+        _mouseMarqueeMoved = true;
+        _updateMouseMarqueeSelection();
+        setState(() {});
+      }
+      return;
+    }
+
     final startPos = _pointerDownPosition;
     if (startPos != null && (event.position - startPos).distance > 12.0) {
       _hasMoved = true;
@@ -400,6 +443,7 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   }
 
   void _handlePointerUp(PointerUpEvent event) {
+    _finishMouseMarquee(event.pointer);
     _downPointers.remove(event.pointer);
     if (_rangeHoldPointer == event.pointer) {
       _rangeHoldPointer = null;
@@ -417,6 +461,7 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
+    _finishMouseMarquee(event.pointer, cancelled: true);
     _downPointers.remove(event.pointer);
     if (_rangeHoldPointer == event.pointer) {
       _rangeHoldPointer = null;
@@ -427,6 +472,72 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     _pointerDownItem = null;
     _hasMoved = false;
     _checkScaleFinished();
+  }
+
+  void _finishMouseMarquee(int pointer, {bool cancelled = false}) {
+    if (_mouseMarqueePointer != pointer) return;
+    if (!cancelled && !_mouseMarqueeMoved && !_mouseMarqueeAdditive) {
+      widget.onSelectionChanged(const <RawEntry>{});
+    }
+    if (_mouseMarqueeBlocksDrawer) {
+      _setDrawerDragBlocked?.call(false);
+    }
+    _mouseMarqueePointer = null;
+    _mouseMarqueeStart = null;
+    _mouseMarqueeCurrent = null;
+    _mouseMarqueeMoved = false;
+    _mouseMarqueeAdditive = false;
+    _mouseMarqueeBlocksDrawer = false;
+    _mouseMarqueeBaseSelection = const {};
+    if (mounted) setState(() {});
+  }
+
+  void _updateMouseMarqueeSelection() {
+    final start = _mouseMarqueeStart;
+    final current = _mouseMarqueeCurrent;
+    if (start == null || current == null) return;
+    final selectionRect = Rect.fromPoints(start, current);
+    final nextSelection = Set<RawEntry>.from(_mouseMarqueeBaseSelection);
+    final root = _containerKey.currentContext?.findRenderObject();
+    if (root == null || !root.attached) return;
+
+    void visit(RenderObject child) {
+      if (child is RenderMetaData &&
+          child.metaData is HoldSelectMetadata &&
+          child.attached &&
+          child.hasSize) {
+        final item = child.metaData as HoldSelectMetadata;
+        final itemRect = child.localToGlobal(Offset.zero) & child.size;
+        if (!item.entry.isPlaceholder && selectionRect.overlaps(itemRect)) {
+          nextSelection.add(item.entry);
+        }
+      }
+      child.visitChildren(visit);
+    }
+
+    root.visitChildren(visit);
+    if (nextSelection.length == widget.selectedItems.length &&
+        nextSelection.containsAll(widget.selectedItems)) {
+      return;
+    }
+    widget.onSelectionChanged(nextSelection);
+  }
+
+  Rect? _localMouseMarqueeRect() {
+    final start = _mouseMarqueeStart;
+    final current = _mouseMarqueeCurrent;
+    final box = _containerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (start == null ||
+        current == null ||
+        box == null ||
+        !box.attached ||
+        !box.hasSize) {
+      return null;
+    }
+    return Rect.fromPoints(
+      box.globalToLocal(start),
+      box.globalToLocal(current),
+    );
   }
 
   void _checkScaleFinished() {
@@ -515,9 +626,53 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
         },
         child: NotificationListener<ScrollNotification>(
           onNotification: _handleScrollNotification,
-          child: widget.child,
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              widget.child,
+              if (_mouseMarqueeMoved)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _MouseMarqueePainter(
+                        rect: _localMouseMarqueeRect(),
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _MouseMarqueePainter extends CustomPainter {
+  final Rect? rect;
+  final Color color;
+
+  const _MouseMarqueePainter({required this.rect, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final selectionRect = rect;
+    if (selectionRect == null) return;
+    canvas.drawRect(
+      selectionRect,
+      Paint()..color = color.withValues(alpha: 0.14),
+    );
+    canvas.drawRect(
+      selectionRect,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MouseMarqueePainter oldDelegate) =>
+      oldDelegate.rect != rect || oldDelegate.color != color;
 }

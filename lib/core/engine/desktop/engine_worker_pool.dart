@@ -483,6 +483,37 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         final (rc, vals) = n.spaceInfo(a[0] as int);
         return [rc, vals];
       }
+    // archives (ABI 10) -> [resultCode, result record bytes?]; an in-memory entry adds its bytes as a third item
+    case 'archiveScan':
+      {
+        final (rc, record) = n.archiveScan(a[0] as int, a[1] as String, a[2] as String?);
+        return [rc, record];
+      }
+    case 'archiveExtractEntry':
+      {
+        final r = n.archiveExtractEntry(
+          srcVol: a[0] as int,
+          srcPath: a[1] as String,
+          index: a[2] as int,
+          passphrase: a[3] as String?,
+          destVol: a[4] as int,
+          destPath: a[5] as String?,
+        );
+        return [r.rc, r.record, r.data];
+      }
+    case 'archiveExtractAll':
+      {
+        final (rc, record) = n.archiveExtractAll(
+          srcVol: a[0] as int,
+          srcPath: a[1] as String,
+          passphrase: a[2] as String?,
+          subPath: a[3] as String?,
+          destVol: a[4] as int,
+          destDir: a[5] as String,
+          opId: a[6] as int,
+        );
+        return [rc, record];
+      }
     case 'opCancel':
       n.opCancel(a[0] as int);
       return null;

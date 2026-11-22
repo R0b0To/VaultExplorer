@@ -25,6 +25,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
+import 'desktop_archive.dart';
 import 'desktop_crypto.dart';
 import 'desktop_external.dart';
 import 'desktop_hash.dart';
@@ -72,6 +73,17 @@ class DesktopEngineHost {
     volFor: _vol,
     emit: emit,
     native: () => _nativeLocal,
+    withActivity: (body) => _withActivity<Object?>(body),
+  );
+
+  /// Archive browsing and extraction over the engine's archive ABI (see desktop_archive.dart).
+  late final DesktopArchive _archive = DesktopArchive(
+    call: pool.call,
+    volFor: _vol,
+    volOrNull: (uri) => _volByUri[uri],
+    isFolderVault: (vol) => _meta[vol]?.isFolderVault ?? false,
+    registerOp: (opId) => _nativeLocal.opRegister(opId, veOpCopy),
+    unregisterOp: (opId) => _nativeLocal.opUnregister(opId),
     withActivity: (body) => _withActivity<Object?>(body),
   );
 
@@ -197,6 +209,24 @@ class DesktopEngineHost {
   Future<Object?> handle(MethodCall call) async {
     final args = call.arguments is Map ? Map<Object?, Object?>.from(call.arguments as Map) : const <Object?, Object?>{};
     switch (call.method) {
+      case ChannelMethods.archiveScanVault:
+        return _archive.scanVault(args);
+      case ChannelMethods.archiveScanLocal:
+        return _archive.scanLocal(args);
+      case ChannelMethods.archiveExtractVaultEntry:
+        return _archive.extractVaultEntry(args);
+      case ChannelMethods.archiveExtractLocalEntry:
+        return _archive.extractLocalEntry(args);
+      case ChannelMethods.archiveStageBrowseEntry:
+        return _archive.stageBrowseEntry(args);
+      case ChannelMethods.archiveDiscardBrowseFile:
+        return _archive.discardBrowseFile(args['path']);
+      case ChannelMethods.archiveExtractVaultAll:
+        return _archive.extractAll(args);
+      case ChannelMethods.pickArchiveFile:
+        return _archive.pickArchiveFile();
+      case ChannelMethods.pickExtractFolder:
+        return _archive.pickExtractFolder();
       case ChannelMethods.pickContainer:
         return _pickContainer();
       case ChannelMethods.pickCryptoFiles: // the "add a vault" picker (multi-select, composite-aware)
@@ -1100,6 +1130,7 @@ class DesktopEngineHost {
     await pool.call('lock', [vol]);
     _forget(vol);
     await _external.cleanupVolume(vol);
+    await _archive.cleanupVolume(vol);
     return true;
   }
 
@@ -1126,6 +1157,7 @@ class DesktopEngineHost {
       if (r[0] == veErrNotUnlocked) {
         _forget(vol);
         await _external.cleanupVolume(vol);
+        await _archive.cleanupVolume(vol);
         continue;
       }
       final meta = _meta[vol];
@@ -1437,6 +1469,7 @@ class DesktopEngineHost {
     _meta.clear();
     await _mounts.dispose();
     await _external.cleanupAll();
+    await _archive.cleanupAll();
     await _hash.dispose();
     await pool.dispose();
   }

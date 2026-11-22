@@ -126,6 +126,21 @@ void main() {
       expect(phase0.where((m) => !answered.contains(m)), isEmpty);
     });
 
+    test('the Phase 1a browsing and extraction methods are really answered on desktop', () {
+      const archives = [
+        'archiveScanVault',
+        'archiveScanLocal',
+        'archiveExtractVaultEntry',
+        'archiveExtractLocalEntry',
+        'archiveExtractVaultAll',
+        'archiveStageBrowseEntry',
+        'archiveDiscardBrowseFile',
+        'pickArchiveFile',
+        'pickExtractFolder',
+      ];
+      expect(archives.where((m) => !handled.contains(m)), isEmpty);
+    });
+
     test('summary', () {
       final answered = {...handled, ...defaults};
       final line = 'desktop coverage: ${registry.length} methods, ${handled.length} handled, '

@@ -109,17 +109,9 @@ const Set<String> desktopAndroidOnlyMethods = {
 /// Methods that SHOULD work on desktop and are planned, grouped by the phase that delivers them.
 /// Each one answers `null` today; when a phase lands, move its methods out of this set.
 const Set<String> desktopPendingMethods = {
-  // Phase 1a -- archives (libarchive engine is compiled in, no C ABI yet).
+  // Phase 1a, second half -- creating archives. Browsing, extracting, staging and the pickers are done
+  // (ve_archive_* in ffi/ve_archive.cpp, desktop_archive.dart).
   'archiveCreate',
-  'archiveDiscardBrowseFile',
-  'archiveExtractLocalEntry',
-  'archiveExtractVaultAll',
-  'archiveExtractVaultEntry',
-  'archiveScanLocal',
-  'archiveScanVault',
-  'archiveStageBrowseEntry',
-  'pickArchiveFile',
-  'pickExtractFolder',
 
   // Phase 1b -- Check & Repair and header backup.
   'checkFolderVault',

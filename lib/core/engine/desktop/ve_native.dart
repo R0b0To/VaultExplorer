@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 9;
+const int kVeAbiVersion = 10;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -431,6 +431,23 @@ class VeNative {
       _lib.lookupFunction<Int32 Function(Pointer<VeBuffer>), int Function(Pointer<VeBuffer>)>('ve_list_mounts');
   late final int Function(Pointer<Utf8>, int) _mountLastError =
       _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Size), int Function(Pointer<Utf8>, int)>('ve_mount_last_error');
+
+  // Archives (ABI 10): ve_archive_scan / ve_archive_extract_entry / ve_archive_extract_all (ve_engine.h).
+  late final int Function(int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>) _archiveScan = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>),
+      int Function(int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_archive_scan');
+  late final int Function(int, Pointer<Utf8>, int, Pointer<Utf8>, int, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>)
+      _archiveExtractEntry = _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Utf8>, Int32, Pointer<Utf8>, Int32, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>),
+          int Function(int, Pointer<Utf8>, int, Pointer<Utf8>, int, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>)>(
+        've_archive_extract_entry',
+      );
+  late final int Function(int, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, int, Pointer<Utf8>, int, Pointer<VeBuffer>)
+      _archiveExtractAll = _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Int32, Pointer<Utf8>, Int32, Pointer<VeBuffer>),
+          int Function(int, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, int, Pointer<Utf8>, int, Pointer<VeBuffer>)>(
+        've_archive_extract_all',
+      );
   late final int Function(int) _format;
   late final int Function(int) _matchedCipher;
   late final int Function(int) _matchedHash;
@@ -1526,6 +1543,79 @@ class VeNative {
   /// Entries hidden from listings in [path] (>= 0), or a negative -veErr* code.
   int fvHiddenEntryCount(int volId, String path) => _withUtf8(path, (p) => _fvHidden(volId, p));
   int fvFinishWrite(int volId, String path) => _withUtf8(path, (p) => _fvFinishWrite(volId, p));
+
+  // ── archives (ABI 10) ───────────────────────────────────────────────────
+  // Each call answers VE_OK with a result record (layout in ve_engine.h, decoded by ArchiveRecord in
+  // desktop_archive.dart); what happened to the archive is inside the record. srcVol < 0 means a host file.
+
+  T _withOptUtf8<T>(String? s, T Function(Pointer<Utf8>) body) => s == null ? body(nullptr) : _withUtf8(s, body);
+
+  (int, Uint8List?) archiveScan(int srcVol, String srcPath, String? passphrase) => _withUtf8(
+        srcPath,
+        (src) => _withOptUtf8(passphrase, (pw) => _withBuffer((out) => _archiveScan(srcVol, src, pw, out))),
+      );
+
+  /// One entry. With [destPath] null the entry comes back in `data` (an empty list for a zero-byte entry);
+  /// otherwise it is streamed into that host file ([destVol] < 0) or vault file.
+  ({int rc, Uint8List? record, Uint8List? data}) archiveExtractEntry({
+    required int srcVol,
+    required String srcPath,
+    required int index,
+    String? passphrase,
+    int destVol = -1,
+    String? destPath,
+  }) {
+    final toMemory = destPath == null;
+    final data = calloc<VeBuffer>();
+    final record = calloc<VeBuffer>();
+    final src = srcPath.toNativeUtf8();
+    final Pointer<Utf8> pw = passphrase == null ? nullptr : passphrase.toNativeUtf8();
+    final Pointer<Utf8> dst = destPath == null ? nullptr : destPath.toNativeUtf8();
+    Uint8List? take(Pointer<VeBuffer> b) {
+      Uint8List? bytes;
+      if (b.ref.data != nullptr && b.ref.len > 0) bytes = Uint8List.fromList(b.ref.data.asTypedList(b.ref.len));
+      _bufferFree(b); // wipes: the data can be plaintext
+      return bytes;
+    }
+
+    try {
+      final rc = _archiveExtractEntry(srcVol, src, index, pw, destVol, dst, toMemory ? data : nullptr, record);
+      final recordBytes = take(record);
+      final dataBytes = toMemory && rc == veOk ? (take(data) ?? Uint8List(0)) : null;
+      return (rc: rc, record: recordBytes, data: dataBytes);
+    } finally {
+      calloc.free(src);
+      if (pw != nullptr) calloc.free(pw);
+      if (dst != nullptr) calloc.free(dst);
+      calloc.free(data);
+      calloc.free(record);
+    }
+  }
+
+  /// Everything, or the entries under [subPath], into the folder [destDir] (host folder when [destVol] < 0).
+  /// [opId] > 0 must be registered (opRegister) to be cancellable; progress arrives as split/join events.
+  (int, Uint8List?) archiveExtractAll({
+    required int srcVol,
+    required String srcPath,
+    String? passphrase,
+    String? subPath,
+    int destVol = -1,
+    required String destDir,
+    int opId = 0,
+  }) =>
+      _withUtf8(
+        srcPath,
+        (src) => _withOptUtf8(
+          passphrase,
+          (pw) => _withOptUtf8(
+            subPath,
+            (sub) => _withUtf8(
+              destDir,
+              (dst) => _withBuffer((out) => _archiveExtractAll(srcVol, src, pw, sub, destVol, dst, opId, out)),
+            ),
+          ),
+        ),
+      );
   /// kind 0 = writes, 1 = deletes.
   int fvBatch(int volId, int kind, {required bool begin}) => _fvBatch(volId, kind, begin ? 1 : 0);
 

@@ -349,7 +349,11 @@ PreferredSizeWidget buildBrowserAppBar(
       onSyncSettings?.call(entry);
     }
 
-    if (!isLandscape) {
+    // The desktop toolbar embeds this bar in a fixed 40px strip and relies on
+    // the compact form at every window width. Without this check, narrowing
+    // the window below the landscape breakpoint swapped in the phone-style
+    // bar, whose close and select-all buttons then appeared in the toolbar.
+    if (!isLandscape && !desktopCompactSelection) {
       return SelectionAppBar(
         selectedCount: selectedCount,
         selectionLabel: sizeLabel,

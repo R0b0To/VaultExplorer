@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 9 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 10 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -464,6 +464,40 @@ VE_API int32_t ve_fv_batch(int32_t vol_id, int32_t kind, int32_t begin);
 VE_API int32_t ve_write_file_at(int32_t vol_id, const char* path, int64_t offset, const uint8_t* data, size_t len);
 VE_API int32_t ve_truncate(int32_t vol_id, const char* path, int64_t size);
 VE_API int32_t ve_create_empty_file(int32_t vol_id, const char* path);
+
+/* ---- archives -----------------------------------------------------------------------------------
+ * Reads zip, 7z, rar, tar.*, iso and cpio archives, including split sets (name.7z.001, name.z01 + name.zip --
+ * opening any part opens the whole set). A SOURCE is a file inside an unlocked slot (src_vol >= 0, src_path is
+ * the vault path) or a host file (src_vol < 0, src_path is a filesystem path). A SINK is memory, a host file or
+ * folder (dest_vol < 0), or a vault file or folder (dest_vol >= 0). Nothing is staged on disk for an in-vault
+ * source, folder vaults included. Passphrases are raw UTF-8, NULL or "" for none.
+ *
+ * Every call returns VE_OK when it ran and filled its record, VE_ERR_INVALID_ARG for bad arguments, or another
+ * VE_ERR_* if it could not even allocate the answer. What happened to the archive is INSIDE the record
+ * (little-endian; a string is u32 length + UTF-8 bytes):
+ *     u32 status    0 ok, 1 unsupported format, 2 passphrase required, 3 wrong passphrase, 4 I/O error
+ *     u32 flags     bit 0 solid archive, bit 1 7z, bit 2 the run was cancelled (status is still 0)
+ *     u32 count     scan: number of entries that follow; extract_all: files extracted; extract_entry: 0
+ *     string message   engine error text, empty on success
+ * ve_archive_scan appends `count` entries:
+ *     string path, u64 uncompressed size, u64 compressed size, i64 mtime (epoch seconds),
+ *     u32 flags (bit 0 encrypted, bit 1 directory), i32 index (the value to pass to extract_entry)
+ * Free every ve_buffer with ve_buffer_free. */
+VE_API int32_t ve_archive_scan(int32_t src_vol, const char* src_path, const char* passphrase, ve_buffer* out);
+
+/* One entry. With dest_path NULL the bytes come back in *data_out; otherwise they are streamed into that host
+ * file (dest_vol < 0) or vault file (dest_vol >= 0) and *data_out may be NULL. A failed run removes the partial
+ * destination. */
+VE_API int32_t ve_archive_extract_entry(int32_t src_vol, const char* src_path, int32_t target_index,
+                                        const char* passphrase, int32_t dest_vol, const char* dest_path,
+                                        ve_buffer* data_out, ve_buffer* result_out);
+
+/* Everything (or only the entries under sub_path, NULL/"" for all) into the folder dest_dir, created as needed.
+ * op_id > 0: progress is reported as VE_EVENT_SPLITJOIN_PROGRESS with n0 = files extracted so far (n1 = 0, the
+ * total is unknown), and ve_op_cancel(op_id) stops the run after the current file. */
+VE_API int32_t ve_archive_extract_all(int32_t src_vol, const char* src_path, const char* passphrase,
+                                      const char* sub_path, int32_t dest_vol, const char* dest_dir,
+                                      int32_t op_id, ve_buffer* out);
 
 /* ---- OS mounts (Linux: FUSE 3; Windows: WinFsp, not built yet) -------------------------------------
  * Exposes an unlocked slot as a real folder / drive so any application and the file manager can use it --

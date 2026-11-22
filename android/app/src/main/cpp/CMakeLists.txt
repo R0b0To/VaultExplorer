@@ -708,6 +708,7 @@ if(VAULTEXPLORER_DESKTOP)
             ffi/ve_crypto.cpp
             ffi/ve_foldervault.cpp
             ffi/ve_callbacks.cpp
+            ffi/ve_archive.cpp
             ffi/ve_mount_fs.cpp
             ffi/ve_mount_fuse.cpp)
     if(WIN32)
@@ -1083,6 +1084,17 @@ if(NOT ANDROID)
     target_link_libraries(archive_split_test ${ARCHIVE_ENGINE_LIBRARY})
     list(APPEND VAULTEXPLORER_HOST_TESTS archive_split_test)
 
+    # The archive C ABI (ffi/ve_archive.cpp) over an in-memory fake vault: vault and host sources and sinks,
+    # split sets, short stream reads, folder-vault finish semantics, cancel and failure cleanup.
+    add_executable(ve_archive_test
+            ffi/test/ve_archive_test.cpp
+            ffi/ve_archive.cpp
+            archive/archive_engine.cpp
+            archive/archive_split.cpp)
+    target_include_directories(ve_archive_test PRIVATE ${ARCHIVE_ENGINE_INCLUDE_DIRS})
+    target_link_libraries(ve_archive_test ${ARCHIVE_ENGINE_LIBRARY})
+    list(APPEND VAULTEXPLORER_HOST_TESTS ve_archive_test)
+
     # Folder-vault core: known-answer vectors, per-format scenarios, tamper /
     # rollback / legacy-name handling and thread stress. The interop scripts in
     # foldervault/test/interop additionally drive `fvcli` against the real
@@ -1252,5 +1264,8 @@ if(NOT ANDROID)
     endif()
     if(TARGET archive_split_test)
         add_test(NAME archive_split_test COMMAND archive_split_test)
+    endif()
+    if(TARGET ve_archive_test)
+        add_test(NAME ve_archive_test COMMAND ve_archive_test)
     endif()
 endif()

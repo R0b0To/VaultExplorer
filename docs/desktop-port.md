@@ -3,12 +3,28 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
-**Update for v1.66.0 (ABI 9).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
-library is at `VE_ABI_VERSION` 9 (`ffi/ve_engine.h`). Method coverage is now measured, not counted by hand:
+**Update for v1.66.0 (ABI 10).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
+library is at `VE_ABI_VERSION` 10 (`ffi/ve_engine.h`; ABI 10 adds the `ve_archive_*` calls). Method coverage is now measured, not counted by hand:
 `test/core/engine/desktop/desktop_method_coverage_test.dart` diffs `ChannelMethods` against the host, the crypto
 handler, the Android-only defaults and the two explicit lists in `lib/core/engine/desktop/desktop_method_support.dart`
 (see "Engine-channel coverage" under "Not yet"). CI (`ci.yml`, job `desktop_engine_linux`) now builds the Linux engine,
 runs `ve_smoke_test` and `ve_mount_test`, and builds the Linux app.
+
+**Archives (Phase 1a, browsing and extraction).** `ffi/ve_archive.cpp` exposes the archive engine that was already compiled
+into the desktop library: `ve_archive_scan`, `ve_archive_extract_entry` (to memory, a host file or a vault file) and
+`ve_archive_extract_all` (to a host folder or a vault folder, with progress and cancel). A source is a vault file or a host
+file; split sets (`.7z.001`, `.z01` + `.zip`) are found next to the opened file with `std::filesystem` or `ve_list_directory`.
+Everything goes through the public `ve_*` stream/write calls, so folder vaults work and **no plaintext is staged on disk
+for an in-vault archive** (Android's JNI path is block-volume only and stages folder-vault archives to cache files).
+`desktop_archive.dart` maps the eight `VaultArchiveApi` methods plus `pickArchiveFile` and `pickExtractFolder` (the generic
+folder picker the extract/export/tool screens share) onto those calls. Browse staging (`archiveStageBrowseEntry`) is the one
+place a plaintext file exists: a private, owner-only directory under `$XDG_RUNTIME_DIR` (else the system temp folder), only
+`archive_browse_*` files directly inside it can be discarded, removed when the vault locks and at shutdown, purged after a
+crash. Tested by `ve_archive_test` (CMake host test, real libarchive, fake vault: short stream reads, split sets,
+folder-vault finish semantics, cancel and failure cleanup; also clean under ASan/UBSan) and
+`desktop_archive_test.dart`. Not done yet: `archiveCreate` (vault/local to file, split), and per-filesystem name
+sanitising when extracting to Windows (reserved names, `?*"<>|`) -- the engine rejects `..` and `:` but the host
+refuses a name its file system cannot hold, which fails that extraction.
 
 **Rebased onto the latest v1.50.0 main** (the second 1.50.0 snapshot, which adds in-place ext/NTFS grow, Cryptomator
 symlinks, the Cryptomator key-file backup option and the format probe). The port was first written against v1.39.0;
@@ -307,10 +323,10 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 
 ## Not yet
 
-- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 121 of them (including the
+- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 130 of them (including the
   crypto primitives), gives 42 more an Android-only default (`_androidOnlyDefaults`), lists 66 as Android-only
   (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, USB, SAF, APK install, Jetpack PDF, ...)
-  and 52 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them: archives, repair and header
+  and 43 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them: archive creation, repair and header
   backup, expansion and hidden volumes, composite/split containers, AVIF, PDF, comic/EPUB, image probing, audio/video
   editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
   stays true; run it to see the current numbers. These counts cover the one engine channel only. Camera, Media3,
@@ -327,7 +343,7 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
   ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.
 - Windows: folder vaults on a real Windows machine (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
   MinGW, and re-running the engine smoke test after the rebase.
-- Archives, PDF, camera, video/audio editing -- need their
+- Archive creation, PDF, camera, video/audio editing -- need their
   desktop backends (they are platform code on Android). Video **playback** and **thumbnails** are done (below);
   scrub-preview frames, picture-in-picture and background playback / media session are not.
 - Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification

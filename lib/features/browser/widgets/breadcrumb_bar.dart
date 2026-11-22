@@ -229,11 +229,6 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
         decoration: BoxDecoration(
           color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(8),
-          // Outlined on desktop; on a phone the field has no border, to stay
-          // discreet.
-          border: PlatformFeatures.isDesktop
-              ? Border.all(color: cs.outlineVariant.withValues(alpha: 0.8))
-              : null,
         ),
         child: Listener(
         onPointerSignal: (event) {

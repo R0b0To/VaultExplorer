@@ -20,6 +20,8 @@ import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/auto_lock_indicator.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
+import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
 
 const _kLogTag = 'ContainerCard';
 
@@ -42,6 +44,9 @@ class BaseContainerCard extends ConsumerWidget {
   final Color? backgroundColor;
   final BorderRadiusGeometry? borderRadius;
 
+  /// Called with the click position on a right-click (desktop context menu).
+  final void Function(Offset globalPosition)? onContextMenu;
+
   const BaseContainerCard({
     super.key,
     required this.onTap,
@@ -55,6 +60,7 @@ class BaseContainerCard extends ConsumerWidget {
     this.trailingAction,
     this.backgroundColor,
     this.borderRadius,
+    this.onContextMenu,
   });
 
   @override
@@ -64,7 +70,9 @@ class BaseContainerCard extends ConsumerWidget {
     final effectiveRadius = borderRadius ?? BorderRadius.circular(18);
     final nameMode = ref.watch(longFileNameDisplayModeProvider);
 
-    return Card(
+    return ContextMenuRegion(
+      onOpen: onContextMenu,
+      child: Card(
       elevation: 0,
       color: backgroundColor ?? cs.surfaceContainer,
       clipBehavior: Clip.antiAlias,
@@ -133,6 +141,7 @@ class BaseContainerCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -260,14 +269,19 @@ class ContainerCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _LockButton(container: container, onLocked: onLocked),
-          const SizedBox(width: 6),
-          _VaultMoreMenuButton(
-            onEdit: onEdit,
-            onDelete: onDelete,
-            isMounted: true,
-          ),
+          // Desktop opens these actions with a right-click instead.
+          if (!PlatformFeatures.isDesktop) ...[
+            const SizedBox(width: 6),
+            _VaultMoreMenuButton(
+              onEdit: onEdit,
+              onDelete: onDelete,
+              isMounted: true,
+            ),
+          ],
         ],
       ),
+      onContextMenu: (pos) =>
+          showVaultCardMenu(context, pos, onEdit: onEdit, onDelete: onDelete),
       backgroundColor: SkinAreaScope.colorOf(
         context,
         SkinToken.surfaceCardActive,
@@ -337,11 +351,15 @@ class SavedContainerCard extends StatelessWidget {
       iconBackgroundColor: cs.surfaceContainerHighest,
       title: name,
       subtitle: subtitleWidget,
-      trailingAction: _VaultMoreMenuButton(
-        onEdit: onEdit,
-        onDelete: onDelete,
-        isMounted: false,
-      ),
+      trailingAction: PlatformFeatures.isDesktop
+          ? null
+          : _VaultMoreMenuButton(
+              onEdit: onEdit,
+              onDelete: onDelete,
+              isMounted: false,
+            ),
+      onContextMenu: (pos) =>
+          showVaultCardMenu(context, pos, onEdit: onEdit, onDelete: onDelete),
       // Inside the Dashboard scope this role *is* the page's card color.
       backgroundColor: cs.surfaceContainerHigh,
       borderRadius: borderRadius,
@@ -513,6 +531,57 @@ class _LockButtonState extends ConsumerState<_LockButton> {
   }
 }
 
+List<PopupMenuEntry<String>> _vaultCardMenuItems(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
+  return [
+    PopupMenuItem(
+      value: 'edit',
+      child: Row(
+        children: [
+          Icon(Icons.tune_rounded, size: 20, color: cs.onSurface),
+          const SizedBox(width: 12),
+          Text(context.l10n.edit),
+        ],
+      ),
+    ),
+    PopupMenuItem(
+      value: 'delete',
+      child: Row(
+        children: [
+          Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
+          const SizedBox(width: 12),
+          Text(context.l10n.remove, style: TextStyle(color: cs.error)),
+        ],
+      ),
+    ),
+  ];
+}
+
+/// The vault card's Edit / Remove menu, opened at a right-click on desktop.
+Future<void> showVaultCardMenu(
+  BuildContext context,
+  Offset position, {
+  required VoidCallback onEdit,
+  required VoidCallback onDelete,
+}) async {
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  if (overlay == null) return;
+  final action = await showMenu<String>(
+    context: context,
+    position: RelativeRect.fromRect(
+      position & const Size(40, 40),
+      Offset.zero & overlay.size,
+    ),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    items: _vaultCardMenuItems(context),
+  );
+  if (action == 'edit') {
+    onEdit();
+  } else if (action == 'delete') {
+    onDelete();
+  }
+}
+
 class _VaultMoreMenuButton extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -539,28 +608,7 @@ class _VaultMoreMenuButton extends StatelessWidget {
           onDelete();
         }
       },
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: 'edit',
-          child: Row(
-            children: [
-              Icon(Icons.tune_rounded, size: 20, color: cs.onSurface),
-              const SizedBox(width: 12),
-              Text(context.l10n.edit),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
-              const SizedBox(width: 12),
-              Text(context.l10n.remove, style: TextStyle(color: cs.error)),
-            ],
-          ),
-        ),
-      ],
+      itemBuilder: _vaultCardMenuItems,
     );
   }
 }

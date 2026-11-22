@@ -2381,7 +2381,8 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
   /// floating-point noise at the end of a settle from counting as "visible".
   static const double _visibleSpan = 0.999;
 
-  late bool _onScreen;
+  bool _onScreen = false;
+  bool _onScreenKnown = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -2391,6 +2392,7 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
     super.initState();
     widget.controller.addListener(_onScrolled);
     _onScreen = _computeOnScreen();
+    _onScreenKnown = true;
   }
 
   @override
@@ -2418,6 +2420,17 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
     // purpose: it asserts that content dimensions exist, which is not yet
     // true when a page is built during the viewport's first layout.
     var page = controller.initialPage.toDouble();
+    // While the window is resized the pager can be rebuilt in a different
+    // spot of the tree: the new PageView attaches to this shared controller
+    // before the old one has detached, so for a frame it holds two positions
+    // and `controller.position` asserts. Keep the last known answer then; the
+    // old position detaches by the end of the frame and the scroll listener
+    // re-evaluates.
+    if (controller.positions.length > 1) {
+      return _onScreenKnown
+          ? _onScreen
+          : (page - widget.index).abs() < _visibleSpan;
+    }
     if (controller.hasClients) {
       final position = controller.position;
       if (position.hasPixels &&

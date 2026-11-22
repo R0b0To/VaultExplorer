@@ -20,6 +20,7 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_boo
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
+import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
 
 /// The navigation drawer's bookmarks, grouped by their vault or storage
 /// location.
@@ -143,18 +144,21 @@ class _DrawerBookmarksSectionState
     );
   }
 
+  /// [at] is where a right-click landed; without it (a long-press) the menu
+  /// opens at the tile's centre.
   void _showMenu(
     BuildContext tileContext,
     MountedContainer vault,
-    VaultBookmark bookmark,
-  ) {
+    VaultBookmark bookmark, {
+    Offset? at,
+  }) {
     HapticFeedback.mediumImpact();
     final cs = Theme.of(tileContext).colorScheme;
     final overlay =
         Overlay.of(tileContext).context.findRenderObject() as RenderBox?;
     final box = tileContext.findRenderObject() as RenderBox?;
     if (overlay == null || box == null) return;
-    final position = box.localToGlobal(box.size.center(Offset.zero));
+    final position = at ?? box.localToGlobal(box.size.center(Offset.zero));
     final notifier = ref.read(
       fileBrowserPinsBookmarksProvider(vault.volId).notifier,
     );
@@ -300,14 +304,16 @@ class _DrawerBookmarksSectionState
       key: ValueKey('drawer_bookmarks_${vault.volId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
+        ContextMenuRegion(
+          onOpen: (_) => _manage(context, vault),
+          child: InkWell(
           borderRadius: BorderRadius.circular(28),
           onTap: () => unawaited(
             ref
                 .read(fileManagerToolbarSettingsProvider(null).notifier)
                 .toggleBookmarkGroupCollapsed(vault.uri),
           ),
-          onLongPress: () => _manage(context, vault),
+          onLongPress: touchOnlyLongPress(() => _manage(context, vault)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 2, 4),
             child: Row(
@@ -333,6 +339,7 @@ class _DrawerBookmarksSectionState
               ],
             ),
           ),
+          ),
         ),
         if (!collapsed)
           for (final bookmark in bookmarks)
@@ -347,7 +354,10 @@ class _DrawerBookmarksSectionState
                       ? skin.folderIconColor(cs)
                       : skin.fileIconColor(cs, name),
                 );
-                return ListTile(
+                return ContextMenuRegion(
+                  onOpen: (pos) =>
+                      _showMenu(tileContext, vault, bookmark, at: pos),
+                  child: ListTile(
                   key: ValueKey(
                     'drawer_bookmark_${vault.volId}_${bookmark.path}',
                   ),
@@ -384,7 +394,10 @@ class _DrawerBookmarksSectionState
                         ),
                   onTap: () =>
                       _open(tileContext, vault, bookmark, inNewTab: false),
-                  onLongPress: () => _showMenu(tileContext, vault, bookmark),
+                  onLongPress: touchOnlyLongPress(
+                    () => _showMenu(tileContext, vault, bookmark),
+                  ),
+                  ),
                 );
               },
             ),

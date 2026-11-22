@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+const double kDesktopTitleBarHeight = 32;
 const double kDesktopTitleBarCaptionButtonWidth = 46;
 const double kDesktopTitleBarCaptionWidth =
     kDesktopTitleBarCaptionButtonWidth * 3;
@@ -28,6 +29,53 @@ class DesktopWindowTitleBarScope extends InheritedWidget {
       onDoubleTap != oldWidget.onDoubleTap;
 }
 
+/// Lets a [DesktopCaptionFrame] know that the page it wraps already draws its
+/// own [DesktopWindowTitleBar], so the frame must not add a second row.
+class DesktopCaptionClaims extends ChangeNotifier {
+  int _count = 0;
+  bool _disposed = false;
+
+  bool get claimed => _count > 0;
+
+  void claim() {
+    _count++;
+    notifyListeners();
+  }
+
+  void release() {
+    _count--;
+    // Releasing happens while the tree is torn down, when layout must not be
+    // invalidated yet, so the listeners hear about it after the frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_disposed) notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+class DesktopCaptionClaimsScope extends InheritedWidget {
+  final DesktopCaptionClaims claims;
+
+  const DesktopCaptionClaimsScope({
+    super.key,
+    required this.claims,
+    required super.child,
+  });
+
+  static DesktopCaptionClaims? maybeOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<DesktopCaptionClaimsScope>()
+      ?.claims;
+
+  @override
+  bool updateShouldNotify(DesktopCaptionClaimsScope oldWidget) =>
+      claims != oldWidget.claims;
+}
+
 /// Windows caption controls hosted in Flutter so browser tabs can share the
 /// top row with the system window actions.
 class DesktopWindowTitleBar extends StatefulWidget {
@@ -53,11 +101,19 @@ class DesktopWindowTitleBar extends StatefulWidget {
 class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
   static const _channel = MethodChannel('vaultexplorer/window');
   bool _maximized = false;
+  DesktopCaptionClaims? _claims;
 
   @override
   void initState() {
     super.initState();
+    _claims = DesktopCaptionClaimsScope.maybeOf(context)?..claim();
     _refreshMaximized();
+  }
+
+  @override
+  void dispose() {
+    _claims?.release();
+    super.dispose();
   }
 
   Future<void> _refreshMaximized() async {
@@ -141,10 +197,20 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
                     : widget.leading!,
               ),
             Expanded(
-              child: DesktopWindowTitleBarScope(
-                onDragStart: _startDragging,
-                onDoubleTap: () => _invoke('toggleMaximize'),
-                child: widget.tabs,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Stretches the tabs leave empty (Tools and Settings show no
+                  // tabs at all) still drag and maximize the window.
+                  Positioned.fill(
+                    child: _dragRegion(child: const SizedBox.expand()),
+                  ),
+                  DesktopWindowTitleBarScope(
+                    onDragStart: _startDragging,
+                    onDoubleTap: () => _invoke('toggleMaximize'),
+                    child: widget.tabs,
+                  ),
+                ],
               ),
             ),
             SizedBox(

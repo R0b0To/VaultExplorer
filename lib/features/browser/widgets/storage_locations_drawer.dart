@@ -15,6 +15,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_secti
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
 
 /// Prompts for All Files Access when a raw-path volume (SD card / USB) is
 /// selected without permission granted.
@@ -241,7 +242,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
                             ),
                             onLongPress: loc.isSystemVolume
                                 ? null
-                                : () {
+                                : touchOnlyLongPress(() {
                                     final box =
                                         tileContext.findRenderObject()
                                             as RenderBox?;
@@ -256,7 +257,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
                                       loc,
                                       pos,
                                     );
-                                  },
+                                  }),
                             onTap: () async {
                               if (isCurrent) {
                                 Navigator.pop(context);

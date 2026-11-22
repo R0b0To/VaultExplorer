@@ -17,6 +17,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
@@ -133,6 +134,7 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
                         darkDynamic != null;
                     return MaterialApp(
                       navigatorKey: appNavigatorKey,
+                      navigatorObservers: [desktopModalTracker],
                       debugShowCheckedModeBanner: false,
                       theme: _lightThemeFor(
                         dynamicScheme: useDynamic ? lightDynamic : null,
@@ -197,7 +199,9 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
                               },
                               child: SkinEditorHost(
                                 child: PictureInPictureLayer(
-                                  child: child ?? const SizedBox.shrink(),
+                                  child: DesktopModalWindowDrag(
+                                    child: child ?? const SizedBox.shrink(),
+                                  ),
                                 ),
                               ),
                             );

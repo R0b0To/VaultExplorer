@@ -33,6 +33,7 @@ import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
+import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
 
 /// Prompts for All Files Access when a raw-path volume (SD card / USB) is
 /// selected without permission granted.
@@ -808,7 +809,12 @@ class AppNavigationDrawer extends ConsumerWidget {
                     // Keeps the drives' free space current while the list is on screen.
                     if (PlatformFeatures.isDesktop) const _DriveListRefresher(),
                     Builder(
-                      builder: (tileContext) => ListTile(
+                      builder: (tileContext) => ContextMenuRegion(
+                        onOpen: (onOpenInNewTab != null && primary != null)
+                            ? (pos) =>
+                                  _showOpenInNewTabMenu(context, pos, primary)
+                            : null,
+                        child: ListTile(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(28),
                         ),
@@ -830,8 +836,9 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 : FontWeight.w500,
                           ),
                         ),
-                        onLongPress: (onOpenInNewTab != null && primary != null)
-                            ? () {
+                        onLongPress:
+                            (onOpenInNewTab != null && primary != null)
+                            ? touchOnlyLongPress(() {
                                 final box =
                                     tileContext.findRenderObject()
                                         as RenderBox?;
@@ -841,7 +848,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                       )
                                     : Offset.zero;
                                 _showOpenInNewTabMenu(context, pos, primary);
-                              }
+                              })
                             : null,
                         onTap: () {
                           _closeDrawer(context);
@@ -852,6 +859,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                             onSelectContainer?.call(primary);
                           }
                         },
+                        ),
                       ),
                     ),
 
@@ -907,7 +915,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               subtitle: loc.usedFraction == null
                                   ? null
                                   : _DriveUsageBar(fraction: loc.usedFraction!),
-                              onLongPress: () {
+                              onLongPress: touchOnlyLongPress(() {
                                 final box =
                                     tileContext.findRenderObject()
                                         as RenderBox?;
@@ -922,7 +930,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   loc,
                                   pos,
                                 );
-                              },
+                              }),
                               onTap: () async {
                                 if (currentVolId == loc.volId) {
                                   _closeDrawer(context);
@@ -1364,7 +1372,9 @@ class _DrawerVaultRow extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: Builder(
         builder: (tileContext) {
-          return ListTile(
+          return ContextMenuRegion(
+            onOpen: (pos) => _showContextMenu(context, pos),
+            child: ListTile(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28),
             ),
@@ -1417,14 +1427,15 @@ class _DrawerVaultRow extends ConsumerWidget {
                     onPressed: onLock,
                   )
                 : null,
-            onLongPress: () {
+            onLongPress: touchOnlyLongPress(() {
               final box = tileContext.findRenderObject() as RenderBox?;
               final pos = box != null
                   ? box.localToGlobal(box.size.center(Offset.zero))
                   : Offset.zero;
               _showContextMenu(context, pos);
-            },
+            }),
             onTap: onTap,
+            ),
           );
         },
       ),

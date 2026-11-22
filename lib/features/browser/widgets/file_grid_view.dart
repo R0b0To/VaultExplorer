@@ -739,6 +739,7 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
           enableHoldDrag:
               widget.enableFileDrag && widget.archiveContext == null,
           enableMouseMarquee: PlatformFeatures.isDesktop,
+          trailingMouseGutter: FastScrollbar.defaultTouchWidth,
           onScaleStart: _handleScaleStart,
           onScaleUpdate: _handleScaleUpdate,
           onScaleEnd: _handleScaleEnd,

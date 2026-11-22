@@ -508,11 +508,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   ScrollController _browserScrollController = ScrollController();
-  final GlobalKey<FileMasonryViewState> _masonryKey =
-      GlobalKey<FileMasonryViewState>();
-  final GlobalKey<FileGridViewState> _gridKey = GlobalKey<FileGridViewState>();
   // Not final: replaced on every folder change, see
   // [_resetBrowserScrollController].
+  GlobalKey<FileMasonryViewState> _masonryKey =
+      GlobalKey<FileMasonryViewState>();
+  GlobalKey<FileGridViewState> _gridKey = GlobalKey<FileGridViewState>();
   GlobalKey<FileListViewState> _listKey = GlobalKey<FileListViewState>();
   ScrollController _backGesturePreviewScrollController = ScrollController();
 
@@ -527,14 +527,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _browserScrollController = ScrollController(
       initialScrollOffset: initialOffset,
     );
-    // The list is keyed by a GlobalKey (so reveals can ask it where a tile
-    // sits), and a GlobalKey lets its state, and the scroll position inside
-    // it, move into the next folder's subtree. A kept position ignores the new
-    // controller's `initialScrollOffset`, so going back would not land where
-    // the folder was left. A new key gives the next folder a fresh list that
-    // starts at the saved offset on its first frame, which is what the
-    // predictive back preview already shows.
+    // The list, grid and gallery (masonry) views are keyed by GlobalKeys (so
+    // reveals can ask them where a tile sits), and a GlobalKey lets the view's
+    // state, and the scroll position inside it, move into the next folder's
+    // subtree. A kept position absorbs the one it replaces and ignores the new
+    // controller's `initialScrollOffset`, so going back would land where the
+    // folder just left was scrolled to, not where this one was left. New keys
+    // give the next folder a fresh view that starts at the saved offset on its
+    // first frame, which is what the predictive back preview already shows.
     _listKey = GlobalKey<FileListViewState>();
+    _gridKey = GlobalKey<FileGridViewState>();
+    _masonryKey = GlobalKey<FileMasonryViewState>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       old.dispose();
     });

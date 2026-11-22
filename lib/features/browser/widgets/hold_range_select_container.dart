@@ -159,6 +159,11 @@ class HoldRangeSelectContainer extends StatefulWidget {
   final void Function(RawEntry entry)? onLongPressSelect;
   final bool enableHoldDrag;
   final bool enableMouseMarquee;
+
+  /// Width of a strip along the right edge that belongs to a scrollbar
+  /// handle. A mouse press there is a scroll gesture, not the start of a
+  /// marquee or a hold selection.
+  final double trailingMouseGutter;
   final GestureScaleStartCallback? onScaleStart;
   final GestureScaleUpdateCallback? onScaleUpdate;
   final GestureScaleEndCallback? onScaleEnd;
@@ -174,6 +179,7 @@ class HoldRangeSelectContainer extends StatefulWidget {
     this.onLongPressSelect,
     this.enableHoldDrag = false,
     this.enableMouseMarquee = false,
+    this.trailingMouseGutter = 0,
     this.onScaleStart,
     this.onScaleUpdate,
     this.onScaleEnd,
@@ -352,12 +358,28 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     return false;
   }
 
+  bool _isInScrollbarGutter(PointerDownEvent event) {
+    if (widget.trailingMouseGutter <= 0 ||
+        event.kind != PointerDeviceKind.mouse) {
+      return false;
+    }
+    final box = _containerKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return false;
+    final local = box.globalToLocal(event.position);
+    return local.dx >= box.size.width - widget.trailingMouseGutter;
+  }
+
   void _handlePointerDown(PointerDownEvent event) {
     _downPointers.add(event.pointer);
     if (_downPointers.length > 1) return;
 
     _hasMoved = false;
     _pointerDownPosition = event.position;
+    if (_isInScrollbarGutter(event)) {
+      // The scrollbar handle owns this press: no item, no marquee.
+      _pointerDownItem = null;
+      return;
+    }
     _pointerDownItem = _findItemAt(event.position);
     if (widget.enableMouseMarquee &&
         event.kind == PointerDeviceKind.mouse &&

@@ -44,6 +44,11 @@ class FastScrollbar extends StatefulWidget {
   final double touchWidth;
   final Axis axis;
 
+  /// Default width of the draggable edge strip. Views that sit under the
+  /// scroller use it to keep their own pointer handling (drag-selection) out
+  /// of that strip.
+  static const double defaultTouchWidth = 28.0;
+
   /// Called with `true` when the handle is grabbed and `false` when it is
   /// released (or the drag is cancelled).
   ///
@@ -67,7 +72,7 @@ class FastScrollbar extends StatefulWidget {
     this.sortBy,
     this.sectionsBuilder,
     this.padding = EdgeInsets.zero,
-    this.touchWidth = 28.0,
+    this.touchWidth = defaultTouchWidth,
     this.axis = Axis.vertical,
     this.onDragStateChanged,
     this.scrollSpeed,
@@ -622,7 +627,15 @@ void _onControllerChange() {
       child: Stack(
         fit: StackFit.passthrough,
         children: [
-          ScrollSpeedScope(fast: _speedNotifier, child: widget.child),
+          // This widget draws its own handle. On desktop the framework adds
+          // a second, platform scrollbar to every scroll view, which showed
+          // up as two handles side by side.
+          ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: ScrollSpeedScope(fast: _speedNotifier, child: widget.child),
+          ),
          Positioned.fill(
             child: LayoutBuilder(
               builder: (context, constraints) {

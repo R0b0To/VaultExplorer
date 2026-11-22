@@ -759,6 +759,7 @@ class FileListViewState extends State<FileListView> {
       onLongPressSelect: (entry) => widget.onItemLongPress(entry),
       enableHoldDrag: widget.enableFileDrag && widget.archiveContext == null,
       enableMouseMarquee: PlatformFeatures.isDesktop,
+          trailingMouseGutter: FastScrollbar.defaultTouchWidth,
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       onScaleEnd: _handleScaleEnd,

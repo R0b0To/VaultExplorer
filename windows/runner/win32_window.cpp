@@ -134,12 +134,11 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
-  constexpr DWORD kNativeCaptionStyles =
-      WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
-  const DWORD window_style = WS_OVERLAPPEDWINDOW & ~kNativeCaptionStyles;
-
+  // Keep the full overlapped style: Aero Snap, the maximize/restore
+  // animation and the DWM shadow need WS_CAPTION, WS_MAXIMIZEBOX and
+  // WS_THICKFRAME. The OS caption is hidden in WM_NCCALCSIZE instead.
   HWND window = CreateWindow(
-      window_class, title.c_str(), window_style,
+      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
@@ -148,13 +147,8 @@ bool Win32Window::Create(const std::wstring& title,
     return false;
   }
 
-  // Reapply the frameless style after creation and force Windows to refresh
-  // its non-client frame before Flutter measures the client area. This keeps
-  // the OS caption from appearing above the Flutter tab and caption row.
-  const LONG_PTR current_style = GetWindowLongPtr(window, GWL_STYLE);
-  const LONG_PTR frameless_style =
-      current_style & ~static_cast<LONG_PTR>(kNativeCaptionStyles);
-  SetWindowLongPtr(window, GWL_STYLE, frameless_style);
+  // Force a non-client recalculation so WM_NCCALCSIZE has hidden the OS
+  // caption before Flutter measures the client area.
   SetWindowPos(window, nullptr, 0, 0, 0, 0,
                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                    SWP_NOACTIVATE);
@@ -194,6 +188,28 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_NCCALCSIZE: {
+      if (wparam != TRUE) break;
+      auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+      const LONG original_top = params->rgrc[0].top;
+      // Let Windows compute the left/right/bottom resize frame first.
+      const LRESULT result = DefWindowProc(hwnd, message, wparam, lparam);
+      if (result != 0) return result;
+      if (IsZoomed(hwnd)) {
+        // A maximized window overhangs the monitor by the sizing-frame
+        // thickness, so push the client area back on screen.
+        const UINT dpi = GetDpiForWindow(hwnd);
+        params->rgrc[0].top = original_top +
+            GetSystemMetricsForDpi(SM_CYFRAME, dpi) +
+            GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+      } else {
+        // Drop the OS caption. Keep 1px so DWM still draws its border and
+        // the top edge stays grabbable.
+        params->rgrc[0].top = original_top + 1;
+      }
+      return 0;
+    }
+
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();

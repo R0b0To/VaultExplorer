@@ -12,6 +12,7 @@ import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/category_shortcuts_editor.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
 
 /// The drawer's CATEGORIES section: compact shortcuts that open a
 /// [CategoryBrowserScreen] gathering one kind of file from every storage.
@@ -77,7 +78,9 @@ class DrawerCategoriesSection extends ConsumerWidget {
           ),
         ),
         for (final category in categories)
-          ListTile(
+          ContextMenuRegion(
+            onOpen: (_) => _manage(context),
+            child: ListTile(
             dense: true,
             visualDensity: VisualDensity.compact,
             shape: RoundedRectangleBorder(
@@ -89,7 +92,8 @@ class DrawerCategoriesSection extends ConsumerWidget {
               style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
             ),
             onTap: () => _open(context, category),
-            onLongPress: () => _manage(context),
+            onLongPress: touchOnlyLongPress(() => _manage(context)),
+            ),
           ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 1),

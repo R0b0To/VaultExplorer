@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_colors.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
@@ -565,7 +566,13 @@ ThemeData _buildTheme(
     visualDensity: VisualDensity.adaptivePlatformDensity,
     splashFactory: InkSparkle.splashFactory,
     pageTransitionsTheme: const PageTransitionsTheme(
-      builders: {TargetPlatform.android: CrossfadePageTransitionsBuilder()},
+      builders: {
+        TargetPlatform.android: CrossfadePageTransitionsBuilder(),
+        // Pushed pages cover the shell's caption row, so each gets its own.
+        TargetPlatform.windows: DesktopCaptionPageTransitionsBuilder(
+          ZoomPageTransitionsBuilder(),
+        ),
+      },
     ),
     extensions: [
       semanticColors ?? _semanticColors(isDark, appSkin, customAppSkin),

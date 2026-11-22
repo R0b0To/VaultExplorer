@@ -29,6 +29,7 @@ import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart';
@@ -578,9 +579,51 @@ class AppNavigationDrawer extends ConsumerWidget {
     final isDashboard = currentVolId == null && selectedTabIndex == 0;
     final isTools = currentVolId == null && selectedTabIndex == 1;
     final isSettings = currentVolId == null && selectedTabIndex == 2;
-    // Docked beside the content, Tools and Settings are a compact strip of
-    // icons along the bottom of the sidebar instead of two full-width rows.
-    final useStrip = docked && onSelectTab != null;
+
+    void openTools() {
+      if (docked && onSelectTab != null) {
+        // Docked: Tools opens in the content area, so the sidebar stays
+        // visible beside it.
+        onSelectTab!(1);
+        return;
+      }
+      _closeDrawer(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.tools,
+            child: ToolsScreen(
+              mountedContainers: ValueNotifier(dashboardState.mounted),
+              localStorageContainer: localStorageNotifier,
+              onOpenInBrowser: onSelectContainer == null
+                  ? null
+                  : (container) {
+                      if (navigator.canPop()) navigator.pop();
+                      onSelectContainer!(container);
+                    },
+            ),
+          ),
+        ),
+      );
+    }
+
+    void openSettings() {
+      if (docked && onSelectTab != null) {
+        onSelectTab!(2);
+        return;
+      }
+      _closeDrawer(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.settings,
+            child: const AppSettingsScreen(),
+          ),
+        ),
+      );
+    }
 
     return _DrawerShell(
       docked: docked,
@@ -620,7 +663,8 @@ class AppNavigationDrawer extends ConsumerWidget {
                   ),
 
                   // 2. Encrypted Vaults Section (Swipeable Rows with Lock Button)
-                  if (displayItems.isNotEmpty || onAddVault != null) ...[
+                  if (displayItems.isNotEmpty || onAddVault != null)
+                    DrawerGroup(children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 2, 2),
                       child: Row(
@@ -776,7 +820,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                           onAddVault!();
                         },
                       ),
-                  ],
+                    ]),
 
                   // Bookmarks of unlocked vaults and available storage
                   // locations; empty (and invisible) when there are none.
@@ -801,12 +845,8 @@ class AppNavigationDrawer extends ConsumerWidget {
                     docked: docked,
                   ),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 1),
-                    child: Divider(),
-                  ),
-
-                  if (showStorageLocations) ...[
+                  if (showStorageLocations)
+                    DrawerGroup(children: [
                     // Keeps the drives' free space current while the list is on screen.
                     if (PlatformFeatures.isDesktop) const _DriveListRefresher(),
                     Builder(
@@ -1048,12 +1088,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                         }
                       },
                     ),
-                  ],
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 1),
-                    child: Divider(),
-                  ),
+                    ]),
 
                   // 3b. Category shortcuts (Images, Videos, Audio, Documents)
                   DrawerCategoriesSection(
@@ -1093,106 +1128,18 @@ class AppNavigationDrawer extends ConsumerWidget {
                       },
                     ),
 
-                  // 4. Tools Destination
-                  if (!useStrip) ...[
-                  ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    selected: isTools,
-                    selectedTileColor: cs.secondaryContainer.withValues(
-                      alpha: 0.5,
-                    ),
-                    leading: Icon(
-                      Icons.build_rounded,
-                      color: isTools ? cs.primary : cs.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      context.l10n.navBarToolsLabel,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isTools ? FontWeight.bold : FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      if (docked && onSelectTab != null) {
-                        // Docked: Tools opens in the content area, so the
-                        // sidebar stays visible beside it.
-                        onSelectTab!(1);
-                        return;
-                      }
-                      _closeDrawer(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SkinAreaScope(
-                            area: SkinArea.tools,
-                            child: ToolsScreen(
-                              mountedContainers: ValueNotifier(
-                                dashboardState.mounted,
-                              ),
-                              localStorageContainer: localStorageNotifier,
-                              onOpenInBrowser: onSelectContainer == null
-                                  ? null
-                                  : (container) {
-                                      if (navigator.canPop()) navigator.pop();
-                                      onSelectContainer!(container);
-                                    },
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  // 5. App & Security Settings
-                  ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    selected: isSettings,
-                    selectedTileColor: cs.secondaryContainer.withValues(
-                      alpha: 0.5,
-                    ),
-                    leading: Icon(
-                      Icons.settings,
-                      color: isSettings ? cs.primary : cs.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      context.l10n.settingsMenuItem,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isSettings
-                            ? FontWeight.bold
-                            : FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      if (docked && onSelectTab != null) {
-                        onSelectTab!(2);
-                        return;
-                      }
-                      _closeDrawer(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SkinAreaScope(
-                            area: SkinArea.settings,
-                            child: const AppSettingsScreen(),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  ],
                 ],
               ),
             ),
-            if (useStrip)
-              _DockedToolsStrip(
-                toolsSelected: isTools,
-                settingsSelected: isSettings,
-                onTools: () => onSelectTab!(1),
-                onSettings: () => onSelectTab!(2),
-              ),
+            // Tools and Settings are pinned to the bottom of the menu, outside
+            // the scrolling list, so they are always visible: the same compact
+            // icon strip whether the menu is docked or a modal drawer.
+            _ToolsStrip(
+              toolsSelected: isTools,
+              settingsSelected: isSettings,
+              onTools: openTools,
+              onSettings: openSettings,
+            ),
           ],
         ),
       ),
@@ -1200,10 +1147,10 @@ class AppNavigationDrawer extends ConsumerWidget {
   }
 }
 
-/// Tools and Settings as two icon buttons along the bottom of the docked
-/// sidebar, under a divider.
-class _DockedToolsStrip extends StatelessWidget {
-  const _DockedToolsStrip({
+/// Tools and Settings as two icon buttons along the bottom of the menu (docked
+/// sidebar or modal drawer). No divider above them: they continue the menu.
+class _ToolsStrip extends StatelessWidget {
+  const _ToolsStrip({
     required this.toolsSelected,
     required this.settingsSelected,
     required this.onTools,
@@ -1236,7 +1183,6 @@ class _DockedToolsStrip extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(

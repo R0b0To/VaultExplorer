@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
@@ -63,8 +64,7 @@ class DrawerCategoriesSection extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return DrawerGroup(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
@@ -95,10 +95,6 @@ class DrawerCategoriesSection extends ConsumerWidget {
             onLongPress: touchOnlyLongPress(() => _manage(context)),
             ),
           ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 1),
-          child: Divider(),
-        ),
       ],
     );
   }

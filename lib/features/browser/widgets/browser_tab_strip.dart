@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
@@ -34,7 +35,11 @@ class BrowserLocationIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (container.isExternalStorage) {
-      return Icon(Icons.sd_card_rounded, size: size, color: color);
+      return Icon(
+        PlatformFeatures.externalStorageIcon,
+        size: size,
+        color: color,
+      );
     }
     if (container.isLocalStorage) {
       return Icon(PlatformFeatures.localStorageIcon, size: size, color: color);
@@ -434,6 +439,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     final liveTabIds = tabs.map((tab) => tab.tabId).toSet();
     _tabItemKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _scrollActiveIntoView();
+    final windowTitleBar = DesktopWindowTitleBarScope.maybeOf(context);
 
     final stripBackground = cs.surfaceContainer;
     final activeBackground = cs.surfaceContainerHighest;
@@ -444,185 +450,243 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       child: Row(
         children: [
           Expanded(
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerMove: _trackDrag,
-              child: ReorderableListView.builder(
-                key: PageStorageKey<String>(
-                  '${widget.storageKey}-${pane?.name ?? 'all'}',
-                ),
-                scrollController: _scrollController,
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.hardEdge,
-                buildDefaultDragHandles: false,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: _stripPadding,
-                  vertical: 3,
-                ),
-                itemCount: tabs.length + 1,
-                onReorderStart: (index) {
-                  HapticFeedback.mediumImpact();
-                  _draggingTabId = index >= 0 && index < tabs.length
-                      ? tabs[index].tabId
-                      : null;
-                },
-                onReorderEnd: (_) => _finishDrag(actions),
-                onReorderItem: pane == null
-                    ? actions.reorderTabs
-                    : (oldIndex, newIndex) =>
-                          actions.reorderTabsInPane(pane, oldIndex, newIndex),
-                proxyDecorator: (child, index, animation) {
-                  return AnimatedBuilder(
-                    animation: animation,
-                    builder: (context, child) {
-                      final t = Curves.easeInOut.transform(animation.value);
-                      return Material(
-                        elevation: 6 * t,
-                        color: activeBackground,
-                        shadowColor: cs.shadow.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(8),
-                        child: child,
-                      );
-                    },
-                    child: child,
-                  );
-                },
-                itemBuilder: (context, index) {
-                  if (index == tabs.length) {
-                    return SizedBox(
-                      key: ValueKey<String>(
-                        'new-tab-${pane?.name ?? 'all'}',
-                      ),
-                      width: 48,
-                      child: IconButton(
-                        icon: const Icon(Icons.add_rounded, size: 20),
-                        style: PlatformFeatures.isDesktop
-                            ? IconButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size(
-                                  widget.height - 6,
-                                  widget.height - 6,
-                                ),
-                                maximumSize: Size(
-                                  widget.height - 6,
-                                  widget.height - 6,
-                                ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                              )
-                            : null,
-                        visualDensity: PlatformFeatures.isDesktop
-                            ? null
-                            : VisualDensity.compact,
-                        tooltip: context.l10n.browserTabNew,
-                        onPressed: () {
-                          // The new tab joins the pane whose + was pressed.
-                          if (pane != null) actions.focusPane(pane);
-                          widget.onNewTab();
-                        },
-                      ),
-                    );
-                  }
-                  final tab = tabs[index];
-                  final itemKey = _tabItemKeys.putIfAbsent(
-                    tab.tabId,
-                    GlobalKey.new,
-                  );
-                  final isShown = tab.tabId == shownTabId;
-                  // Every pane's shown tab is highlighted the same way; no
-                  // pane is singled out as the focused one.
-                  final isActive = isShown;
-                  return ReorderableDelayedDragStartListener(
-                    key: ValueKey<TabId>(tab.tabId),
-                    index: index,
-                    child: Builder(
-                      builder: (tabContext) => SizedBox(
-                        key: itemKey,
-                        width: kBrowserTabItemWidth,
-                        child: DragTarget<BrowserItemDragData>(
-                          onWillAcceptWithDetails: (details) {
-                            final destination = tab.container;
-                            if (destination == null ||
-                                tab.isDashboard ||
-                                tab.isCategory) {
-                              return false;
-                            }
-                            final navigation = ref.read(
-                              fileBrowserNavigationProvider(tab.tabId),
-                            );
-                            if (navigation.archiveContext != null) {
-                              return false;
-                            }
-                            final path = navigation.currentDirPath;
-                            if (!details.data.canDropInto(destination, path)) {
-                              return false;
-                            }
-                            _scheduleFileDropTabActivation(tab, actions);
-                            return true;
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final trailingBlankStart =
+                    _stripPadding * 2 + tabs.length * kBrowserTabItemWidth + 48;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned.fill(
+                      child: Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerMove: _trackDrag,
+                        child: ReorderableListView.builder(
+                          key: PageStorageKey<String>(
+                            '${widget.storageKey}-${pane?.name ?? 'all'}',
+                          ),
+                          scrollController: _scrollController,
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.hardEdge,
+                          buildDefaultDragHandles: false,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _stripPadding,
+                            vertical: 3,
+                          ),
+                          itemCount: tabs.length + 1,
+                          onReorderStart: (index) {
+                            HapticFeedback.mediumImpact();
+                            _draggingTabId = index >= 0 && index < tabs.length
+                                ? tabs[index].tabId
+                                : null;
                           },
-                          onMove: (_) =>
-                              _scheduleFileDropTabActivation(tab, actions),
-                          onLeave: (_) =>
-                              _cancelFileDropTabActivation(tab.tabId),
-                          onAcceptWithDetails: (details) {
-                            _cancelFileDropTabActivation(tab.tabId);
-                            final destination = tab.container;
-                            if (destination == null ||
-                                tab.isDashboard ||
-                                tab.isCategory) {
-                              return;
-                            }
-                            actions.activate(tab.tabId);
-                            final navigation = ref.read(
-                              fileBrowserNavigationProvider(tab.tabId),
-                            );
-                            if (navigation.archiveContext != null) return;
-                            // Same Copy / Move / Cancel menu as dropping in a
-                            // folder view (Move is left out when the items
-                            // already live in that tab's folder).
-                            unawaited(
-                              handleBrowserItemDrop(
-                                tabContext,
-                                details,
-                                destination,
-                                navigation.currentDirPath,
-                              ),
+                          onReorderEnd: (_) => _finishDrag(actions),
+                          onReorderItem: pane == null
+                              ? actions.reorderTabs
+                              : (oldIndex, newIndex) =>
+                                    actions.reorderTabsInPane(
+                                      pane,
+                                      oldIndex,
+                                      newIndex,
+                                    ),
+                          proxyDecorator: (child, index, animation) {
+                            return AnimatedBuilder(
+                              animation: animation,
+                              builder: (context, child) {
+                                final t = Curves.easeInOut.transform(
+                                  animation.value,
+                                );
+                                return Material(
+                                  elevation: 6 * t,
+                                  color: activeBackground,
+                                  shadowColor: cs.shadow.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: child,
+                                );
+                              },
+                              child: child,
                             );
                           },
-                          builder: (context, candidates, rejected) =>
-                              DecoratedBox(
-                                decoration: candidates.isEmpty
-                                    ? const BoxDecoration()
-                                    : BoxDecoration(
-                                        border: Border.all(
-                                          color: cs.primary,
-                                          width: 2,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                child: _TabItem(
-                                  tab: tab,
-                                  active: isActive,
-                                  activeBackground: activeBackground,
-                                  onTap: () => _onTabTapped(tab, tabContext),
-                                  onSecondaryTap: PlatformFeatures.isDesktop
-                                      ? () => unawaited(
-                                          _showTabMenu(tab, tabContext),
+                          itemBuilder: (context, index) {
+                            if (index == tabs.length) {
+                              return SizedBox(
+                                key: ValueKey<String>(
+                                  'new-tab-${pane?.name ?? 'all'}',
+                                ),
+                                width: 48,
+                                child: IconButton(
+                                  icon: const Icon(Icons.add_rounded, size: 20),
+                                  style: PlatformFeatures.isDesktop
+                                      ? IconButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          minimumSize: Size(
+                                            widget.height - 6,
+                                            widget.height - 6,
+                                          ),
+                                          maximumSize: Size(
+                                            widget.height - 6,
+                                            widget.height - 6,
+                                          ),
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                          visualDensity: VisualDensity.compact,
                                         )
                                       : null,
-                                  onClose:
-                                      PlatformFeatures.isDesktop &&
-                                          state.tabs.length > 1
-                                      ? () => actions.closeTab(tab.tabId)
-                                      : null,
+                                  visualDensity: PlatformFeatures.isDesktop
+                                      ? null
+                                      : VisualDensity.compact,
+                                  tooltip: context.l10n.browserTabNew,
+                                  onPressed: () {
+                                    // The new tab joins the pane whose + was pressed.
+                                    if (pane != null) actions.focusPane(pane);
+                                    widget.onNewTab();
+                                  },
+                                ),
+                              );
+                            }
+                            final tab = tabs[index];
+                            final itemKey = _tabItemKeys.putIfAbsent(
+                              tab.tabId,
+                              GlobalKey.new,
+                            );
+                            final isShown = tab.tabId == shownTabId;
+                            // Every pane's shown tab is highlighted the same way; no
+                            // pane is singled out as the focused one.
+                            final isActive = isShown;
+                            return ReorderableDelayedDragStartListener(
+                              key: ValueKey<TabId>(tab.tabId),
+                              index: index,
+                              child: Builder(
+                                builder: (tabContext) => SizedBox(
+                                  key: itemKey,
+                                  width: kBrowserTabItemWidth,
+                                  child: DragTarget<BrowserItemDragData>(
+                                    onWillAcceptWithDetails: (details) {
+                                      final destination = tab.container;
+                                      if (destination == null ||
+                                          tab.isDashboard ||
+                                          tab.isCategory) {
+                                        return false;
+                                      }
+                                      final navigation = ref.read(
+                                        fileBrowserNavigationProvider(
+                                          tab.tabId,
+                                        ),
+                                      );
+                                      if (navigation.archiveContext != null) {
+                                        return false;
+                                      }
+                                      final path = navigation.currentDirPath;
+                                      if (!details.data.canDropInto(
+                                        destination,
+                                        path,
+                                      )) {
+                                        return false;
+                                      }
+                                      _scheduleFileDropTabActivation(
+                                        tab,
+                                        actions,
+                                      );
+                                      return true;
+                                    },
+                                    onMove: (_) =>
+                                        _scheduleFileDropTabActivation(
+                                          tab,
+                                          actions,
+                                        ),
+                                    onLeave: (_) =>
+                                        _cancelFileDropTabActivation(tab.tabId),
+                                    onAcceptWithDetails: (details) {
+                                      _cancelFileDropTabActivation(tab.tabId);
+                                      final destination = tab.container;
+                                      if (destination == null ||
+                                          tab.isDashboard ||
+                                          tab.isCategory) {
+                                        return;
+                                      }
+                                      actions.activate(tab.tabId);
+                                      final navigation = ref.read(
+                                        fileBrowserNavigationProvider(
+                                          tab.tabId,
+                                        ),
+                                      );
+                                      if (navigation.archiveContext != null)
+                                        return;
+                                      // Same Copy / Move / Cancel menu as dropping in a
+                                      // folder view (Move is left out when the items
+                                      // already live in that tab's folder).
+                                      unawaited(
+                                        handleBrowserItemDrop(
+                                          tabContext,
+                                          details,
+                                          destination,
+                                          navigation.currentDirPath,
+                                        ),
+                                      );
+                                    },
+                                    builder: (context, candidates, rejected) =>
+                                        DecoratedBox(
+                                          decoration: candidates.isEmpty
+                                              ? const BoxDecoration()
+                                              : BoxDecoration(
+                                                  border: Border.all(
+                                                    color: cs.primary,
+                                                    width: 2,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                          child: _TabItem(
+                                            tab: tab,
+                                            active: isActive,
+                                            activeBackground: activeBackground,
+                                            onTap: () =>
+                                                _onTabTapped(tab, tabContext),
+                                            onSecondaryTap:
+                                                PlatformFeatures.isDesktop
+                                                ? () => unawaited(
+                                                    _showTabMenu(
+                                                      tab,
+                                                      tabContext,
+                                                    ),
+                                                  )
+                                                : null,
+                                            onClose:
+                                                PlatformFeatures.isDesktop &&
+                                                    state.tabs.length > 1
+                                                ? () => actions.closeTab(
+                                                    tab.tabId,
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                  ),
                                 ),
                               ),
+                            );
+                          },
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
+                    if (windowTitleBar != null &&
+                        trailingBlankStart < constraints.maxWidth)
+                      Positioned(
+                        left: trailingBlankStart,
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onPanStart: (_) => windowTitleBar.onDragStart(),
+                          onDoubleTap: windowTitleBar.onDoubleTap,
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ],

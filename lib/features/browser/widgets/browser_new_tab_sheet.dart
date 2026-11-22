@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
@@ -184,7 +185,7 @@ class BrowserNewTabSheet extends ConsumerWidget {
               ),
             for (final loc in externals)
               ListTile(
-                leading: Icon(Icons.sd_card_rounded, color: cs.secondary),
+                leading: Icon(PlatformFeatures.externalStorageIcon, color: cs.secondary),
                 title: Text(
                   loc.displayName,
                   maxLines: 1,

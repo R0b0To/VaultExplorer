@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/core/utils/listing_job.dart';
 import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 /// Real, on-disk file operations for the decoy's local storage explorer.
@@ -57,6 +58,9 @@ class DecoyLocalRepository {
   /// archive screen already uses to find Downloads, generalized to return
   /// the root itself rather than joining `Download` onto it.
   Future<Directory> primaryRoot() async {
+    // There is no shared-storage root on desktop; "Local storage" is the home
+    // folder, and the drives are listed beside it (see DesktopStorage).
+    if (PlatformFeatures.isDesktop) return _desktopHome();
     try {
       final appExternal = await getExternalStorageDirectory();
       if (appExternal == null) {
@@ -72,6 +76,14 @@ class DecoyLocalRepository {
     } catch (_) {
       return Directory('/storage/emulated/0');
     }
+  }
+
+  /// The user's home folder, falling back to the working directory.
+  Directory _desktopHome() {
+    final env = Platform.environment;
+    final home = (Platform.isWindows ? env['USERPROFILE'] : env['HOME']) ?? '';
+    if (home.isNotEmpty && Directory(home).existsSync()) return Directory(home);
+    return Directory.current;
   }
 
   /// Lists the immediate children of [path] as [RawEntry] values, sourced

@@ -134,10 +134,12 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  constexpr DWORD kNativeCaptionStyles =
+      WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+  const DWORD window_style = WS_OVERLAPPEDWINDOW & ~kNativeCaptionStyles;
+
   HWND window = CreateWindow(
-      window_class, title.c_str(),
-      WS_OVERLAPPEDWINDOW &
-          ~(WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX),
+      window_class, title.c_str(), window_style,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
@@ -145,6 +147,17 @@ bool Win32Window::Create(const std::wstring& title,
   if (!window) {
     return false;
   }
+
+  // Reapply the frameless style after creation and force Windows to refresh
+  // its non-client frame before Flutter measures the client area. This keeps
+  // the OS caption from appearing above the Flutter tab and caption row.
+  const LONG_PTR current_style = GetWindowLongPtr(window, GWL_STYLE);
+  const LONG_PTR frameless_style =
+      current_style & ~static_cast<LONG_PTR>(kNativeCaptionStyles);
+  SetWindowLongPtr(window, GWL_STYLE, frameless_style);
+  SetWindowPos(window, nullptr, 0, 0, 0, 0,
+               SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                   SWP_NOACTIVATE);
 
   UpdateTheme(window);
 

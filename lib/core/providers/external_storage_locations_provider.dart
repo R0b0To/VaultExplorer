@@ -194,6 +194,8 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
           path: path,
           displayName: desc.isEmpty ? id : desc,
           volId: volId,
+          totalBytes: (vol['totalBytes'] as num?)?.toInt(),
+          freeBytes: (vol['freeBytes'] as num?)?.toInt(),
         ));
         existingKeys.add(path);
       }

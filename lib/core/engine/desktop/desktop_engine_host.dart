@@ -32,6 +32,7 @@ import 'desktop_images.dart';
 import 'desktop_media_server.dart';
 import 'desktop_mounts.dart';
 import 'desktop_secure_store.dart';
+import 'desktop_storage.dart';
 import 'desktop_split_join.dart';
 import 'desktop_transfers.dart';
 import 'desktop_video_thumbnails.dart';
@@ -100,6 +101,7 @@ class DesktopEngineHost {
 
   /// Handing files to other apps + a few host-file helpers (see desktop_external.dart).
   final DesktopExternal _external = DesktopExternal();
+  final DesktopStorage _storage = const DesktopStorage();
 
   /// "Expose this folder" as a real directory in the OS (FUSE on Linux; see desktop_mounts.dart) -- the
   /// desktop counterpart of Android's DocumentsProvider.
@@ -290,6 +292,8 @@ class DesktopEngineHost {
           }
           return true;
         }
+      case ChannelMethods.getStorageVolumes:
+        return _storage.volumes(); // the computer's drives, listed like Android's SD cards
       case ChannelMethods.getDeviceCapabilityProfile:
         return _capabilityProfile();
       case ChannelMethods.getMirrorPushActivity:

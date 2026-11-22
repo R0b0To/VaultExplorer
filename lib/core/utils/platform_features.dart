@@ -42,6 +42,11 @@ abstract final class PlatformFeatures {
   static IconData get localStorageIcon =>
       isDesktop ? Icons.computer_rounded : Icons.phone_android_rounded;
 
+  /// Icon for an extra storage location: an SD card on Android, a drive on
+  /// desktop.
+  static IconData get externalStorageIcon =>
+      isDesktop ? Icons.storage_rounded : Icons.sd_card_rounded;
+
   // ── Security & privacy ────────────────────────────────────────────────────
 
   /// Mask Mode: swaps the launcher identity (activity alias, icon and label)

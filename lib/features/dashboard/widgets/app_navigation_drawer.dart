@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -202,7 +205,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     if (lower.contains('primary') || lower.contains('emulated')) {
       return Icons.folder_special_rounded;
     }
-    return Icons.sd_card_rounded;
+    return PlatformFeatures.externalStorageIcon;
   }
 
   void _showLocationContextMenu(
@@ -799,6 +802,8 @@ class AppNavigationDrawer extends ConsumerWidget {
                   ),
 
                   if (showStorageLocations) ...[
+                    // Keeps the drives' free space current while the list is on screen.
+                    if (PlatformFeatures.isDesktop) const _DriveListRefresher(),
                     Builder(
                       builder: (tileContext) => ListTile(
                         shape: RoundedRectangleBorder(
@@ -882,6 +887,23 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              // Free / total space and a usage bar, for drives
+                              // whose size is known (desktop).
+                              trailing: loc.freeBytes == null ||
+                                      loc.totalBytes == null
+                                  ? null
+                                  : Text(
+                                      _freeOfTotal(
+                                        loc.freeBytes!,
+                                        loc.totalBytes!,
+                                      ),
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                              subtitle: loc.usedFraction == null
+                                  ? null
+                                  : _DriveUsageBar(fraction: loc.usedFraction!),
                               onLongPress: () {
                                 final box =
                                     tileContext.findRenderObject()
@@ -1334,4 +1356,77 @@ class _DrawerVaultRow extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// "171 / 999 GB": free space over total, with the unit written once when both
+/// use the same one.
+String _freeOfTotal(int free, int total) {
+  final f = formatBytes(free);
+  final t = formatBytes(total);
+  final fUnit = f.substring(f.lastIndexOf(' ') + 1);
+  final tUnit = t.substring(t.lastIndexOf(' ') + 1);
+  return fUnit == tUnit
+      ? '${f.substring(0, f.lastIndexOf(' '))} / $t'
+      : '$f / $t';
+}
+
+/// A thin bar showing how full a drive is; it turns to the error colour once
+/// the drive is nearly full.
+class _DriveUsageBar extends StatelessWidget {
+  const _DriveUsageBar({required this.fraction});
+
+  final double fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(2),
+        child: LinearProgressIndicator(
+          value: fraction,
+          minHeight: 4,
+          color: fraction >= 0.9 ? cs.error : cs.primary,
+          backgroundColor: cs.surfaceContainerHighest,
+        ),
+      ),
+    );
+  }
+}
+
+/// Re-reads the drives (their free space changes as files are written) when the
+/// list first appears and every 30 seconds while it stays on screen.
+class _DriveListRefresher extends ConsumerStatefulWidget {
+  const _DriveListRefresher();
+
+  @override
+  ConsumerState<_DriveListRefresher> createState() =>
+      _DriveListRefresherState();
+}
+
+class _DriveListRefresherState extends ConsumerState<_DriveListRefresher> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
+  }
+
+  void _refresh() {
+    unawaited(
+      ref.read(externalStorageLocationsProvider.notifier).refreshSystemVolumes(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

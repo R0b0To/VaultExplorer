@@ -8,6 +8,26 @@ const double kDesktopTitleBarDragWidth = 24;
 const double kDesktopTitleBarTrailingWidth =
     kDesktopTitleBarCaptionWidth + kDesktopTitleBarDragWidth;
 
+class DesktopWindowTitleBarScope extends InheritedWidget {
+  final VoidCallback onDragStart;
+  final VoidCallback onDoubleTap;
+
+  const DesktopWindowTitleBarScope({
+    super.key,
+    required this.onDragStart,
+    required this.onDoubleTap,
+    required super.child,
+  });
+
+  static DesktopWindowTitleBarScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<DesktopWindowTitleBarScope>();
+
+  @override
+  bool updateShouldNotify(DesktopWindowTitleBarScope oldWidget) =>
+      onDragStart != oldWidget.onDragStart ||
+      onDoubleTap != oldWidget.onDoubleTap;
+}
+
 /// Windows caption controls hosted in Flutter so browser tabs can share the
 /// top row with the system window actions.
 class DesktopWindowTitleBar extends StatefulWidget {
@@ -120,7 +140,13 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
                     ? _dragRegion(child: widget.leading!)
                     : widget.leading!,
               ),
-            Expanded(child: widget.tabs),
+            Expanded(
+              child: DesktopWindowTitleBarScope(
+                onDragStart: _startDragging,
+                onDoubleTap: () => _invoke('toggleMaximize'),
+                child: widget.tabs,
+              ),
+            ),
             SizedBox(
               width: kDesktopTitleBarDragWidth,
               height: widget.height,

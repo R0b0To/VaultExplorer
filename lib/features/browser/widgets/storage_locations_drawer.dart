@@ -59,7 +59,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
     if (lower.contains('primary') || lower.contains('emulated')) {
       return Icons.folder_special_rounded;
     }
-    return Icons.sd_card_rounded;
+    return PlatformFeatures.externalStorageIcon;
   }
 
   void _promptRename(BuildContext context, WidgetRef ref, ExternalStorageLocation loc) {

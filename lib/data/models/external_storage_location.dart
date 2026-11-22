@@ -10,12 +10,19 @@ class ExternalStorageLocation {
   final String displayName;
   final int volId;
 
+  /// Total and free space of the volume in bytes. Only auto-discovered volumes
+  /// know them (they are re-read on every refresh and never persisted).
+  final int? totalBytes;
+  final int? freeBytes;
+
   const ExternalStorageLocation({
     required this.id,
     required this.path,
     this.treeUri,
     required this.displayName,
     required this.volId,
+    this.totalBytes,
+    this.freeBytes,
   });
 
   ExternalStorageLocation copyWith({
@@ -24,6 +31,8 @@ class ExternalStorageLocation {
     String? treeUri,
     String? displayName,
     int? volId,
+    int? totalBytes,
+    int? freeBytes,
   }) {
     return ExternalStorageLocation(
       id: id ?? this.id,
@@ -31,6 +40,8 @@ class ExternalStorageLocation {
       treeUri: treeUri ?? this.treeUri,
       displayName: displayName ?? this.displayName,
       volId: volId ?? this.volId,
+      totalBytes: totalBytes ?? this.totalBytes,
+      freeBytes: freeBytes ?? this.freeBytes,
     );
   }
 
@@ -71,4 +82,12 @@ class ExternalStorageLocation {
   /// True for auto-discovered physical volumes (SD card, USB OTG). These
   /// cannot be renamed or removed from the list.
   bool get isSystemVolume => id.startsWith(systemVolumeIdPrefix);
+
+  /// Fraction of the volume in use (0..1), or null when its size is unknown.
+  double? get usedFraction {
+    final total = totalBytes;
+    final free = freeBytes;
+    if (total == null || free == null || total <= 0) return null;
+    return ((total - free) / total).clamp(0.0, 1.0);
+  }
 }

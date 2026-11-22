@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
@@ -145,7 +146,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       widget.localStorageNotifier?.value = null;
       return;
     }
-    final displayName = context.l10n.localStorageCardTitle;
+    final displayName = localStorageDisplayName(context.l10n.localStorageCardTitle);
     final root = await const DecoyLocalRepository().primaryRoot();
     if (!mounted) return;
     setState(() {
@@ -510,7 +511,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       if (!mounted) return;
       container = buildLocalStorageContainer(
         rootPath: root.path,
-        displayName: context.l10n.localStorageCardTitle,
+        displayName: localStorageDisplayName(context.l10n.localStorageCardTitle),
       );
       setState(() => _localStorageContainer = container);
       widget.localStorageNotifier?.value = container;

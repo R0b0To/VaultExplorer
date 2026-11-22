@@ -355,8 +355,15 @@ class StorageBreadcrumb extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      // Address-bar look, like the file browser's breadcrumb.
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.8)),
+        ),
+        child: Row(
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_upward_rounded),
@@ -372,6 +379,7 @@ class StorageBreadcrumb extends StatelessWidget {
           ),
           if (trailing != null) trailing!,
         ],
+      ),
       ),
     );
   }

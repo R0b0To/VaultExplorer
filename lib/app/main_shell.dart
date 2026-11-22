@@ -1247,18 +1247,22 @@ class _MainShellState extends ConsumerState<MainShell>
                     paneSplitInset;
                 final firstExtent = (fraction * (pageWidth - 8) -
                         paneSplitInset)
-                    .clamp(0.0, constraints.maxWidth - 1)
+                    .clamp(
+                      0.0,
+                      (constraints.maxWidth - 8).clamp(0.0, double.infinity),
+                    )
                     .toDouble();
                 return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
                       width: firstExtent,
                       child: buildShellTabStrip(pane: TabPane.primary),
                     ),
                     Container(
-                      width: 1,
-                      height: 22,
-                      color: Theme.of(context).colorScheme.outlineVariant,
+                      width: 8,
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      alignment: Alignment.center,
                     ),
                     Expanded(
                       child: buildShellTabStrip(pane: TabPane.secondary),

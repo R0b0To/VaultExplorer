@@ -6,6 +6,67 @@ import 'package:material_ui/material_ui.dart';
 /// top for a vertical split). A null [second] makes this a transparent
 /// wrapper, which lets callers keep one tree for both split and unsplit
 /// layouts.
+/// Tells the first child of a horizontal [ResizableSplitPane] how wide the
+/// divider beside it is, so full-width bars (a status strip, a column header)
+/// can paint across it with [BleedRight] instead of leaving a gap.
+class SplitPaneBleed extends InheritedWidget {
+  const SplitPaneBleed({super.key, required this.extent, required super.child});
+
+  final double extent;
+
+  static double of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SplitPaneBleed>()?.extent ??
+      0;
+
+  @override
+  bool updateShouldNotify(SplitPaneBleed old) => extent != old.extent;
+}
+
+/// Extends [child]'s background over the divider to its right (see
+/// [SplitPaneBleed]): [fill] colours the whole height, [bottomBorder] only a
+/// 1 px line along the bottom. The overflow is painted, not hit-tested, so the
+/// divider keeps its own gestures. Does nothing outside a split pane.
+class BleedRight extends StatelessWidget {
+  const BleedRight({
+    super.key,
+    required this.child,
+    this.fill,
+    this.bottomBorder,
+  });
+
+  final Widget child;
+  final Color? fill;
+  final Color? bottomBorder;
+
+  @override
+  Widget build(BuildContext context) {
+    final extent = SplitPaneBleed.of(context);
+    if (extent <= 0 || (fill == null && bottomBorder == null)) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        if (fill != null)
+          Positioned(
+            right: -extent,
+            top: 0,
+            bottom: 0,
+            width: extent,
+            child: IgnorePointer(child: ColoredBox(color: fill!)),
+          ),
+        if (bottomBorder != null)
+          Positioned(
+            right: -extent,
+            bottom: 0,
+            height: 1,
+            width: extent,
+            child: IgnorePointer(child: ColoredBox(color: bottomBorder!)),
+          ),
+      ],
+    );
+  }
+}
+
 class ResizableSplitPane extends StatefulWidget {
   final Axis axis;
   final Widget first;
@@ -244,7 +305,13 @@ class _ResizableSplitPaneState extends State<ResizableSplitPane> {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(width: firstExtent, child: widget.first),
+              SizedBox(
+                width: firstExtent,
+                child: SplitPaneBleed(
+                  extent: widget.dividerExtent,
+                  child: widget.first,
+                ),
+              ),
               splitter,
               Expanded(child: secondChild),
             ],

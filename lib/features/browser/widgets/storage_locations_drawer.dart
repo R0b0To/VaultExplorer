@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -195,7 +196,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
                         color: activeVolId == kDecoyLocalVolId ? cs.primary : cs.onSurfaceVariant,
                       ),
                       title: Text(
-                        context.l10n.localStorageCardTitle,
+                        localStorageDisplayName(context.l10n.localStorageCardTitle),
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight: activeVolId == kDecoyLocalVolId ? FontWeight.bold : FontWeight.w500,
                         ),
@@ -296,6 +297,8 @@ class StorageLocationsDrawer extends ConsumerWidget {
                     ),
                   ],
 
+                  // Desktop lists its drives itself; no manual add button there.
+                  if (!PlatformFeatures.isDesktop)
                   ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                     leading: Icon(Icons.add, color: cs.primary),

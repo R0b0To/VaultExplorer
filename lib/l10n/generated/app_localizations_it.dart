@@ -13001,4 +13001,23 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'Tutte le opzioni di questa schermata torneranno ai valori predefiniti, comprese le impostazioni di schede, layout, barra degli strumenti, griglia, miniature, visualizzatore e aspetto. File, segnalibri e scelte per cartella non vengono modificati.';
+
+  @override
+  String get dropImportOverlayLabel =>
+      'Rilascia per importare in questa cartella';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'I file possono essere rilasciati solo in una cartella di un vault.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementi rilasciati non possono essere importati',
+      one: '1 elemento rilasciato non può essere importato',
+    );
+    return '$_temp0';
+  }
 }

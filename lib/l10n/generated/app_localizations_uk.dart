@@ -13085,4 +13085,24 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'Усі параметри на цьому екрані повернуться до значень за замовчуванням, зокрема налаштування вкладок, розмітки, панелі інструментів, сітки, мініатюр, засобу перегляду та оформлення. Ваші файли, закладки та вибір для окремих папок не змінюються.';
+
+  @override
+  String get dropImportOverlayLabel => 'Відпустіть, щоб імпортувати в цю папку';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'Файли можна перетягувати лише до папки сховища.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count перетягнутих елементів не можна імпортувати',
+      many: '$count перетягнутих елементів не можна імпортувати',
+      few: '$count перетягнуті елементи не можна імпортувати',
+      one: '$count перетягнутий елемент не можна імпортувати',
+    );
+    return '$_temp0';
+  }
 }

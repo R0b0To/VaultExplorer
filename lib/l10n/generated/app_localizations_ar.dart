@@ -13051,4 +13051,26 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'سيعيد هذا كل خيار في هذه الشاشة إلى قيمته الافتراضية، بما في ذلك إعدادات علامات التبويب والتخطيط وشريط الأدوات والشبكة والصور المصغرة والعارض والمظهر. لن يتم تغيير ملفاتك ولا الإشارات المرجعية ولا خياراتك الخاصة بكل مجلد.';
+
+  @override
+  String get dropImportOverlayLabel => 'أفلت للاستيراد إلى هذا المجلد';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'يمكن إفلات الملفات داخل مجلد في خزنة فقط.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'لا يمكن استيراد $count عنصر تم إفلاته',
+      many: 'لا يمكن استيراد $count عنصرًا تم إفلاته',
+      few: 'لا يمكن استيراد $count عناصر تم إفلاتها',
+      two: 'لا يمكن استيراد عنصرين تم إفلاتهما',
+      one: 'لا يمكن استيراد عنصر واحد تم إفلاته',
+      zero: 'لا يمكن استيراد أي عناصر تم إفلاتها',
+    );
+    return '$_temp0';
+  }
 }

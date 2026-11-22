@@ -3577,5 +3577,8 @@
   "indexesAndThumbnailsTitle": "インデックスとサムネイル",
   "indexesAndThumbnailsSubtitle": "サムネイルの保存先、ギャラリーのメタデータ、音楽インデックスを管理します。",
   "resetFileManagerSettingsTitle": "ファイルマネージャーの設定をリセットしますか？",
-  "resetFileManagerSettingsMessage": "この画面のすべての項目が初期値に戻ります。タブ、レイアウト、ツールバー、グリッド、サムネイル、ビューア、スキンの設定も含まれます。ファイル、ブックマーク、フォルダごとの設定は変更されません。"
+  "resetFileManagerSettingsMessage": "この画面のすべての項目が初期値に戻ります。タブ、レイアウト、ツールバー、グリッド、サムネイル、ビューア、スキンの設定も含まれます。ファイル、ブックマーク、フォルダごとの設定は変更されません。",
+  "dropImportOverlayLabel": "ドロップしてこのフォルダにインポート",
+  "dropImportUnavailableHere": "ファイルは保管庫内のフォルダにのみドロップできます。",
+  "dropImportSkippedItems": "{count, plural, other{ドロップされた{count}件の項目はインポートできません}}"
 }

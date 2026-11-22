@@ -12092,4 +12092,20 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       '此屏幕上的所有选项都将恢复为默认值，包括标签页、布局、工具栏、网格、缩略图、查看器和皮肤设置。您的文件、书签和各文件夹的单独设置不会更改。';
+
+  @override
+  String get dropImportOverlayLabel => '松开以导入到此文件夹';
+
+  @override
+  String get dropImportUnavailableHere => '只能将文件拖放到保险库文件夹中。';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '有 $count 个拖入的项目无法导入',
+    );
+    return '$_temp0';
+  }
 }

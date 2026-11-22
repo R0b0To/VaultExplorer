@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -134,7 +135,7 @@ class _VaultSyncLocationPickerSheetState
 
     final root = _localRoot;
     if (root != null) {
-      final name = l10n.localStorageCardTitle;
+      final name = localStorageDisplayName(l10n.localStorageCardTitle);
       targets.add(
         _containerCache.putIfAbsent(
           'local|$root|$name',

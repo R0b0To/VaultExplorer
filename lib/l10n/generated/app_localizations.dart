@@ -21583,6 +21583,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This puts every option on this screen back to its default, including tabs, layout, toolbar, grid, thumbnail, viewer and skin settings. Your files, bookmarks and per-folder choices are not changed.'**
   String get resetFileManagerSettingsMessage;
+
+  /// Desktop: text over the file browser while files are dragged in from the operating system's file manager and held over it
+  ///
+  /// In en, this message translates to:
+  /// **'Drop to import into this folder'**
+  String get dropImportOverlayLabel;
+
+  /// Desktop: shown when files from the operating system are dropped on a place that cannot receive imports (a plain device folder or an archive being browsed)
+  ///
+  /// In en, this message translates to:
+  /// **'Files can only be dropped into a vault folder.'**
+  String get dropImportUnavailableHere;
+
+  /// Desktop: shown after files from the operating system were dropped on the file browser and some of them were left out (no longer there, not a file or folder, or the vault itself)
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 dropped item can’t be imported} other{{count} dropped items can’t be imported}}'**
+  String dropImportSkippedItems(num count);
 }
 
 class _AppLocalizationsDelegate

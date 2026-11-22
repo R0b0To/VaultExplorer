@@ -3577,5 +3577,8 @@
   "indexesAndThumbnailsTitle": "Índices e miniaturas",
   "indexesAndThumbnailsSubtitle": "Gira o armazenamento de miniaturas, os metadados da galeria e o índice de música.",
   "resetFileManagerSettingsTitle": "Redefinir as configurações do gerenciador de arquivos?",
-  "resetFileManagerSettingsMessage": "Isso devolve todas as opções desta tela ao valor padrão, incluindo as configurações de abas, layout, barra de ferramentas, grade, miniaturas, visualizador e aparência. Seus arquivos, favoritos e escolhas por pasta não são alterados."
+  "resetFileManagerSettingsMessage": "Isso devolve todas as opções desta tela ao valor padrão, incluindo as configurações de abas, layout, barra de ferramentas, grade, miniaturas, visualizador e aparência. Seus arquivos, favoritos e escolhas por pasta não são alterados.",
+  "dropImportOverlayLabel": "Solte para importar para esta pasta",
+  "dropImportUnavailableHere": "Os arquivos só podem ser soltos em uma pasta de um cofre.",
+  "dropImportSkippedItems": "{count, plural, =1{1 item solto não pode ser importado} other{{count} itens soltos não podem ser importados}}"
 }

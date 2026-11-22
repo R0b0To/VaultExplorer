@@ -351,8 +351,17 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
     final cs = context.colors;
     final textTheme = context.typography;
     final segments = _path.isEmpty ? <String>[] : _path.split('/');
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 44),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      // Address-bar look, like the file browser's breadcrumb.
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.8)),
+        ),
+        child: ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 40),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -375,6 +384,8 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
               maxLines: 1,
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

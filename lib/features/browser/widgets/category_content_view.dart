@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -429,7 +430,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 : isDevice
                 ? CategorySourceType.device
                 : CategorySourceType.storageLocation,
-            label: isDevice ? l10n.localStorageCardTitle : scoped.displayName,
+            label: isDevice ? localStorageDisplayName(l10n.localStorageCardTitle) : scoped.displayName,
             dedupeRoot: !isVault && scoped.isRawLocal ? scoped.uri : null,
           ),
         ),
@@ -445,7 +446,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           CategorySource(
             volId: primary.volId,
             type: CategorySourceType.device,
-            label: l10n.localStorageCardTitle,
+            label: localStorageDisplayName(l10n.localStorageCardTitle),
             dedupeRoot: primary.isRawLocal ? primary.uri : null,
           ),
         ),
@@ -2480,7 +2481,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       case CategorySourceKind.all:
         return effectiveL10n.categorySourceAll;
       case CategorySourceKind.device:
-        return effectiveL10n.localStorageCardTitle;
+        return localStorageDisplayName(effectiveL10n.localStorageCardTitle);
       case CategorySourceKind.vaults:
         return effectiveL10n.vaultsSectionTitle;
       case CategorySourceKind.vault:
@@ -2800,7 +2801,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 if (widget.primaryLocalContainer != null || hasLocations)
                   _sourceItem(
                     CategorySourceFilter.device,
-                    l10n.localStorageCardTitle,
+                    localStorageDisplayName(l10n.localStorageCardTitle),
                   ),
                 if (mountedVaults.isNotEmpty)
                   _sourceItem(
@@ -2878,7 +2879,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       return [
         entry(CategorySourceFilter.all, l10n.categorySourceAll),
         if (widget.primaryLocalContainer != null || hasLocations)
-          entry(CategorySourceFilter.device, l10n.localStorageCardTitle),
+          entry(CategorySourceFilter.device, localStorageDisplayName(l10n.localStorageCardTitle)),
         if (mountedVaults.isNotEmpty)
           entry(CategorySourceFilter.vaults, l10n.vaultsSectionTitle),
         for (final vault in mountedVaults)

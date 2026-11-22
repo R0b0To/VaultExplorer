@@ -216,11 +216,23 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
     return Container(
       width: double.infinity,
       height: 40,
-      alignment: Alignment.centerLeft, // Always pin breadcrumbs to the left
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: widget.backgroundColor ?? cs.surface,
       ),
-      child: Listener(
+      // Styled like a browser's address bar: a rounded, outlined field that
+      // the path sits inside, always pinned to the left.
+      child: Container(
+        alignment: Alignment.centerLeft,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: 0.8),
+          ),
+        ),
+        child: Listener(
         onPointerSignal: (event) {
           if (event is PointerScrollEvent && _scrollController.hasClients) {
             final delta = event.scrollDelta.dy != 0
@@ -256,7 +268,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
             controller: _scrollController,
             scrollDirection: Axis.horizontal,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -266,7 +278,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
                     // Current directory (non-interactive, full 40px height)
                     Container(
                       key: _currentKey,
-                      height: 40,
+                      height: 32,
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: i == 0
@@ -306,7 +318,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
                       onTap: () => widget.onTap(i),
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                       child: Container(
-                        height: 40,
+                        height: 32,
                         alignment: Alignment.center,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: i == 0
@@ -343,7 +355,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
                     ),
                   if (i < widget.stack.length - 1)
                     Container(
-                      height: 40,
+                      height: 32,
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: Icon(
@@ -357,7 +369,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
                 // and still tappable so the person can walk back down.
                 for (int f = 0; f < widget.forwardStack.length; f++) ...[
                   Container(
-                    height: 40,
+                    height: 32,
                     alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: Icon(
@@ -372,7 +384,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
                         : () => widget.onForwardTap!(f),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     child: Container(
-                      height: 40,
+                      height: 32,
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Row(
@@ -408,6 +420,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

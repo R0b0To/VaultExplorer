@@ -12799,4 +12799,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'This puts every option on this screen back to its default, including tabs, layout, toolbar, grid, thumbnail, viewer and skin settings. Your files, bookmarks and per-folder choices are not changed.';
+
+  @override
+  String get dropImportOverlayLabel => 'Drop to import into this folder';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'Files can only be dropped into a vault folder.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dropped items can’t be imported',
+      one: '1 dropped item can’t be imported',
+    );
+    return '$_temp0';
+  }
 }

@@ -54,6 +54,7 @@ void main() {
         FileItemAction.pin,
         FileItemAction.bookmark,
         FileItemAction.copyPath,
+        FileItemAction.info,
       ]);
     });
 
@@ -61,7 +62,7 @@ void main() {
       final groups = FileItemAction.values.map((a) => a.group).toList();
 
       expect(groups, [
-        0, 0, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, //
+        0, 0, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, 7, //
       ]);
     });
 
@@ -71,7 +72,7 @@ void main() {
           .map((a) => a.group)
           .toList();
 
-      expect(groups, [0, 0, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5]);
+      expect(groups, [0, 0, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 7]);
     });
 
     test('every action has a label and survives a JSON round trip', () {
@@ -86,6 +87,10 @@ void main() {
       expect(FileItemAction.values.first, FileItemAction.goToLocation);
       final delete = FileItemAction.values.indexOf(FileItemAction.delete);
       expect(FileItemAction.values[delete - 1], FileItemAction.copyPath);
+    });
+
+    test('file info is last, where the selection menu always put it', () {
+      expect(FileItemAction.values.last, FileItemAction.info);
     });
 
     test('fromJson ignores unknown and null names', () {

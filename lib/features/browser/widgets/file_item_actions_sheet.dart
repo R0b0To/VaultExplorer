@@ -269,26 +269,6 @@ class FileItemActionsSheet extends ConsumerWidget {
         ),
       );
     }
-    if (archiveContext == null) {
-      if (items.isNotEmpty) items.add(const PopupMenuDivider(height: 8));
-      items.add(
-        PopupMenuItem<VoidCallback>(
-          value: onInfo,
-          height: itemHeight,
-          child: Row(
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 18,
-                color: cs.onSurface,
-              ),
-              const SizedBox(width: 12),
-              Text(context.l10n.fileInfoAction),
-            ],
-          ),
-        ),
-      );
-    }
     if (quick.isNotEmpty) {
       items.insert(0, _QuickRowEntry(actions: quick));
       if (items.length > 1) {
@@ -523,6 +503,13 @@ class FileItemActionsSheet extends ConsumerWidget {
           label: l10n.copyPathAction,
           onTap: onCopyPath!,
         );
+      case FileItemAction.info:
+        if (inArchive) return null;
+        return _ActionSpec(
+          icon: Icons.info_outline_rounded,
+          label: l10n.fileInfoAction,
+          onTap: onInfo,
+        );
       case FileItemAction.delete:
         if (inArchive) return null;
         // Destructive: red accent. The confirmation dialog lives in the
@@ -601,7 +588,6 @@ class FileItemActionsSheet extends ConsumerWidget {
     }
 
     final isDir = entry.isDir;
-    final isInsideArchive = archiveContext != null;
     final ext = isDir
         ? ''
         : (entry.name.contains('.') ? entry.name.split('.').last : '');
@@ -666,17 +652,6 @@ class FileItemActionsSheet extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (!isInsideArchive)
-                    IconButton(
-                      icon: const Icon(Icons.info_outline_rounded),
-                      iconSize: 22,
-                      color: cs.onSurfaceVariant,
-                      tooltip: context.l10n.fileInfoAction,
-                      onPressed: () {
-                        Navigator.pop(context);
-                        onInfo();
-                      },
-                    ),
                 ],
               ),
             ),

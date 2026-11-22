@@ -68,6 +68,8 @@ abstract final class ChannelMethods {
   static const importFolder = 'importFolder';
   static const pickImportFiles = 'pickImportFiles';
   static const pickImportFolder = 'pickImportFolder';
+  // Desktop only: the OS file manager already told us which paths were dropped, so there is no picker.
+  static const prepareDropImport = 'prepareDropImport';
   static const cancelPickedImport = 'cancelPickedImport';
   static const exportAppSettingsFile = 'exportAppSettingsFile';
   static const importAppSettingsFile = 'importAppSettingsFile';

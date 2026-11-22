@@ -13080,4 +13080,22 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'Toutes les options de cet écran reviendront à leur valeur par défaut, y compris les paramètres des onglets, de la disposition, de la barre d’outils, de la grille, des miniatures, de la visionneuse et du thème. Vos fichiers, favoris et choix par dossier ne sont pas modifiés.';
+
+  @override
+  String get dropImportOverlayLabel => 'Déposez pour importer dans ce dossier';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'Les fichiers ne peuvent être déposés que dans un dossier d’un coffre.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count éléments déposés ne peuvent pas être importés',
+      one: '1 élément déposé ne peut pas être importé',
+    );
+    return '$_temp0';
+  }
 }

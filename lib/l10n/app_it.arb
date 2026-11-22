@@ -3577,5 +3577,8 @@
   "indexesAndThumbnailsTitle": "Indici e miniature",
   "indexesAndThumbnailsSubtitle": "Gestisci l’archiviazione delle miniature, i metadati della galleria e l’indice musicale.",
   "resetFileManagerSettingsTitle": "Ripristinare le impostazioni di gestione file?",
-  "resetFileManagerSettingsMessage": "Tutte le opzioni di questa schermata torneranno ai valori predefiniti, comprese le impostazioni di schede, layout, barra degli strumenti, griglia, miniature, visualizzatore e aspetto. File, segnalibri e scelte per cartella non vengono modificati."
+  "resetFileManagerSettingsMessage": "Tutte le opzioni di questa schermata torneranno ai valori predefiniti, comprese le impostazioni di schede, layout, barra degli strumenti, griglia, miniature, visualizzatore e aspetto. File, segnalibri e scelte per cartella non vengono modificati.",
+  "dropImportOverlayLabel": "Rilascia per importare in questa cartella",
+  "dropImportUnavailableHere": "I file possono essere rilasciati solo in una cartella di un vault.",
+  "dropImportSkippedItems": "{count, plural, =1{1 elemento rilasciato non può essere importato} other{{count} elementi rilasciati non possono essere importati}}"
 }

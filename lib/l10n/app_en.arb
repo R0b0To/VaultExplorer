@@ -14952,5 +14952,22 @@
   "resetFileManagerSettingsMessage": "This puts every option on this screen back to its default, including tabs, layout, toolbar, grid, thumbnail, viewer and skin settings. Your files, bookmarks and per-folder choices are not changed.",
   "@resetFileManagerSettingsMessage": {
     "description": "Body of the confirmation dialog for resetting file manager settings"
+  },
+  "dropImportOverlayLabel": "Drop to import into this folder",
+  "@dropImportOverlayLabel": {
+    "description": "Desktop: text over the file browser while files are dragged in from the operating system's file manager and held over it"
+  },
+  "dropImportUnavailableHere": "Files can only be dropped into a vault folder.",
+  "@dropImportUnavailableHere": {
+    "description": "Desktop: shown when files from the operating system are dropped on a place that cannot receive imports (a plain device folder or an archive being browsed)"
+  },
+  "dropImportSkippedItems": "{count, plural, =1{1 dropped item can’t be imported} other{{count} dropped items can’t be imported}}",
+  "@dropImportSkippedItems": {
+    "description": "Desktop: shown after files from the operating system were dropped on the file browser and some of them were left out (no longer there, not a file or folder, or the vault itself)",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
   }
 }

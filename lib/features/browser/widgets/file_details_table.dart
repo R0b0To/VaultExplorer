@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
+import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 
@@ -85,7 +86,9 @@ class FileDetailsHeader extends StatelessWidget {
         ? (54.0 * zoomLevel).clamp(36.0, 80.0) + 10.0
         : (32.0 * zoomLevel).clamp(24.0, 64.0) + 10.0;
 
-    return Container(
+    return BleedRight(
+      bottomBorder: cs.outlineVariant.withValues(alpha: 0.6),
+      child: Container(
       height: FileDetailsTable.headerHeight,
       // 1 px of row margin plus 12 px of row padding on each side.
       padding: const EdgeInsets.symmetric(horizontal: 13),
@@ -123,6 +126,7 @@ class FileDetailsHeader extends StatelessWidget {
           ],
           SizedBox(width: trailingSlotWidth),
         ],
+      ),
       ),
     );
   }

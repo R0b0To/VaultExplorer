@@ -91,6 +91,7 @@ import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart
 import 'package:vaultexplorer/features/browser/widgets/vault_listing_notices.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
+import 'package:vaultexplorer/features/browser/widgets/external_file_drop_zone.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
@@ -861,6 +862,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   final ChromeBarSlot _bottomBarSlot = ChromeBarSlot();
 
   Set<String> _pendingRevealNames = const {};
+
+  /// In dual-pane mode each pane folds its own preview: the first toggle
+  /// here takes this pane off the shared setting, so the other pane is left
+  /// alone. Null until then (the pane follows the setting).
+  bool? _dualPanePreviewCollapsed;
   int _pendingRevealToken = 0;
   Timer? _pendingRevealExpiry;
 
@@ -2279,7 +2285,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   Future<void> _navigateToPath(String fullPath, {required bool isDir}) async {
     _signalActivity();
-    if (isSelectionMode) exitSelectionMode();
+    if (isSelectionMode) exitSelectionMode(ownPane: true);
     final segments = fullPath.isEmpty ? [] : fullPath.split('/');
     if (segments.isEmpty && !isDir) return;
     if (isDir) {
@@ -2350,7 +2356,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final isDir = entry.isDir;
     // The selection holds the search listing's entry (whose name can be a
     // relative path), which is not the entry of the folder about to open.
-    exitSelectionMode();
+    exitSelectionMode(ownPane: true);
 
     if (parent == _currentDirPath) {
       _clearSearch();
@@ -2750,7 +2756,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (_hasScopedCategoryFilter) return;
     switch (_resolveBack()) {
       case BrowserBackAction.exitSelection:
-        exitSelectionMode();
+        exitSelectionMode(ownPane: true);
       case BrowserBackAction.clearSearch:
         setState(() => _clearSearch());
       case BrowserBackAction.navigateUp:
@@ -3078,7 +3084,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         .setSelectedItems(newSelection);
   }
 
-  void exitSelectionMode() {
+  /// Clears the selection of every tab. With [ownPane] (navigation, Escape,
+  /// Back in this pane) a dual-pane view clears only its own: the other pane
+  /// is on screen with its own selection and preview, which must survive.
+  void exitSelectionMode({bool ownPane = false}) {
+    if (ownPane && widget.isDualPane) {
+      ref
+          .read(fileBrowserSelectionProvider(_stateKey).notifier)
+          .exitSelectionMode();
+      return;
+    }
     for (final tab in _workspaceState.tabs) {
       if (tab.isDashboard) continue;
       ref
@@ -3215,7 +3230,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final selected = selectedItems;
     if (selected.length != 1) return;
     final entry = selected.first;
-    exitSelectionMode();
+    exitSelectionMode(ownPane: true);
     // With "double-click to open" on, a lone call would only select the item
     // again; Enter counts as the second click.
     _lastClickEntry = entry;
@@ -3353,7 +3368,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return true;
     }
     if (key == LogicalKeyboardKey.escape && hasSelection) {
-      exitSelectionMode();
+      exitSelectionMode(ownPane: true);
       return true;
     }
     return false;
@@ -3377,7 +3392,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _lastClickAt = isSecondClick ? null : now;
     _signalActivity();
     if (isSecondClick) {
-      exitSelectionMode();
+      exitSelectionMode(ownPane: true);
       return false;
     }
     setSelectedItems({entry});
@@ -5738,20 +5753,30 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     await _loadDirectoryContents(_currentDirPath, refresh: true);
   }
 
+  /// [candidateIsDir] is whether the incoming items are folders, for pickers
+  /// that only ever bring in one kind. `null` (a drag-and-drop can mix files
+  /// and folders) reads it per item from [pick].
   Future<ConflictPlan?> _resolveImportConflicts(
     ImportPickResult pick, {
-    required bool candidateIsDir,
+    required bool? candidateIsDir,
   }) async {
     if (pick.conflicts.isEmpty) return const {};
+    final incomingIsDir = {for (final i in pick.items) i.path: i.isDir};
     final entries = pick.conflicts
         .map(
           (c) => ConflictEntry(
-            item: ClipboardItem(path: c.name, isDir: candidateIsDir),
+            item: ClipboardItem(
+              path: c.name,
+              isDir: candidateIsDir ?? incomingIsDir[c.name] ?? c.destIsDir,
+            ),
             destIsDir: c.destIsDir,
           ),
         )
         .toList();
-    if (!mounted) return null;
+    if (!mounted) {
+      await ref.read(vaultFileIoApiProvider).cancelPickedImport(pick.pickToken);
+      return null;
+    }
     final result = await ConflictResolutionSheet.show(
       context,
       conflicts: entries,
@@ -5797,6 +5822,78 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       l10n: context.l10n,
     );
     _attachImportCompletionListener(op, isFolder: false);
+  }
+
+  /// Why files cannot be dropped on this pane from the OS file manager, or
+  /// `null` when they can. Only an unlocked vault folder takes imports (the
+  /// same places the "Import files" menu entry is offered).
+  String? _externalDropBlockedReason(BuildContext context) {
+    if (widget.container.isLocalStorage || _archiveContext != null) {
+      return context.l10n.dropImportUnavailableHere;
+    }
+    if (_isReadOnly) return context.l10n.readOnlyContainerWarning;
+    return null;
+  }
+
+  /// Files and folders dragged in from the OS file manager (Explorer,
+  /// Nautilus, ...) and dropped on this pane. Goes through the same steps as
+  /// "Import files": name conflicts are resolved in one sheet, the copy is a
+  /// queued transfer with progress, and the delete-originals preference is
+  /// honoured afterwards. A drop may mix files and folders.
+  Future<void> _handleExternalDrop(List<String> paths) async {
+    if (!mounted || paths.isEmpty || !_isVisibleTab) return;
+    final blocked = _externalDropBlockedReason(context);
+    if (blocked != null) {
+      _setStatus(blocked, error: true);
+      return;
+    }
+    _signalActivity();
+
+    // Navigating while the conflict sheet is open must not redirect the
+    // import: the conflicts were computed against this folder.
+    final container = widget.container;
+    final destDirPath = _currentDirPath;
+    final fileIo = ref.read(vaultFileIoApiProvider);
+
+    final pick = await fileIo.prepareDropImport(container, destDirPath, paths);
+    if (!mounted) {
+      if (pick != null) unawaited(fileIo.cancelPickedImport(pick.pickToken));
+      return;
+    }
+    if (pick == null) {
+      _setStatus(
+        context.l10n.dropImportSkippedItems(paths.length),
+        error: true,
+      );
+      return;
+    }
+    final skipped = paths.length - pick.items.length;
+
+    final conflictPlan = await _resolveImportConflicts(
+      pick,
+      candidateIsDir: null,
+    );
+    if (conflictPlan == null || !mounted) return;
+
+    final onlyFolders = pick.items.every((i) => i.isDir);
+    final op = _opSvc.enqueueImport(
+      dest: container,
+      destDirPath: destDirPath,
+      items: pick.items,
+      isFolder: onlyFolders,
+      performImport: (opId) => fileIo.importFiles(
+        container,
+        destDirPath,
+        opId,
+        pick.pickToken,
+        conflictPlan: conflictPlan.map((k, v) => MapEntry(k, v.name)),
+      ),
+      l10n: context.l10n,
+    );
+    _attachImportCompletionListener(op, isFolder: onlyFolders);
+    if (skipped > 0) {
+      _setStatus(context.l10n.dropImportSkippedItems(skipped), error: true);
+    }
   }
 
   /// Attaches the "operation finished" listener a queued import (file or
@@ -6735,11 +6832,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         PlatformFeatures.isDesktop && useBrowserTabs;
     // One setting for every pane and tab, so folding the preview away stays
     // folded when the tab changes and across restarts.
-    final previewPaneCollapsed = ref.watch(
+    final sharedPreviewPaneCollapsed = ref.watch(
       appSettingsControllerProvider.select(
         (settings) => settings.settings.desktopPreviewPaneCollapsed,
       ),
     );
+    final previewPaneCollapsed = widget.isDualPane
+        ? (_dualPanePreviewCollapsed ?? sharedPreviewPaneCollapsed)
+        : sharedPreviewPaneCollapsed;
     final isLandscape = context.screen.useLandscapeLayout;
     // True while another viewport owns a drag: this one is then only a drop
     // target. Selecting this watch by tab keeps the source viewport (and any
@@ -7567,7 +7667,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         : null)
                                                   : _navigateUp;
                                               final toolbarActionWidth = showActionBar
-                                                  ? (_visibleActions.length * 48.0)
+                                                  ? (_visibleActions.length * 40.0)
                                                         .clamp(
                                                           0.0,
                                                           constraints.maxWidth *
@@ -7688,7 +7788,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               : null,
                                           onSecondCollapsedChanged:
                                               desktopFileManager
-                                              ? (collapsed) => unawaited(
+                                              ? (collapsed) => widget.isDualPane
+                                                ? setState(
+                                                    () => _dualPanePreviewCollapsed =
+                                                        collapsed,
+                                                  )
+                                                : unawaited(
                                                   ref
                                                       .read(
                                                         appSettingsControllerProvider
@@ -7709,7 +7814,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                           first: Column(
                                             children: [
                                               if (desktopFileManager)
-                                                Material(
+                                                BleedRight(
+                                                  fill: Theme.of(
+                                                    context,
+                                                  ).colorScheme.surfaceContainerLow,
+                                                  child: Material(
                                                   color: Theme.of(
                                                     context,
                                                   ).colorScheme.surfaceContainerLow,
@@ -7746,42 +7855,40 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                                   .bodySmall,
                                                             ),
                                                           ],
-                                                          const Spacer(),
-                                                          if (localSelection.items
-                                                              .isNotEmpty) ...[
-                                                            Text(
-                                                              '${context.l10n.sortFieldSize}: ${localSelectionStats.hasPendingFolderSizes ? context.l10n.sizeCalculatingLabel : formatBytes(localSelectionStats.totalBytes)}',
-                                                              overflow:
-                                                                  TextOverflow.ellipsis,
-                                                              style: Theme.of(
-                                                                context,
-                                                              ).textTheme.bodySmall?.copyWith(
-                                                                color: Theme.of(
-                                                                  context,
-                                                                ).colorScheme.onSurfaceVariant,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(width: 16),
-                                                          ],
-                                                          Flexible(
-                                                            child: Text(
-                                                              '${context.l10n.totalSizeLabel}: ${currentFolderStatsLoading ? context.l10n.sizeCalculatingLabel : formatBytes(currentFolderTotalBytes)}',
-                                                              overflow:
-                                                                  TextOverflow.ellipsis,
-                                                              textAlign: TextAlign.end,
-                                                              style: Theme.of(context)
-                                                                  .textTheme
-                                                                  .bodySmall
-                                                                  ?.copyWith(
-                                                                    color: Theme.of(
-                                                                      context,
-                                                                    ).colorScheme.onSurfaceVariant,
+                                                          Expanded(
+                                                            child: Builder(
+                                                              builder: (context) {
+                                                                final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                                );
+                                                                // Bare numbers, floated right; the tooltip names them.
+                                                                return Tooltip(
+                                                                  message: localSelection.items.isNotEmpty
+                                                                      ? '${context.l10n.sortFieldSize} / ${context.l10n.totalSizeLabel}'
+                                                                      : context.l10n.totalSizeLabel,
+                                                                  child: Text(
+                                                                    [
+                                                                      if (localSelection.items.isNotEmpty)
+                                                                        localSelectionStats.hasPendingFolderSizes
+                                                                            ? context.l10n.sizeCalculatingLabel
+                                                                            : formatBytes(localSelectionStats.totalBytes),
+                                                                      currentFolderStatsLoading
+                                                                          ? context.l10n.sizeCalculatingLabel
+                                                                          : formatBytes(currentFolderTotalBytes),
+                                                                    ].join('  /  '),
+                                                                    maxLines: 1,
+                                                                    overflow: TextOverflow.ellipsis,
+                                                                    textAlign: TextAlign.end,
+                                                                    style: style,
                                                                   ),
+                                                                );
+                                                              },
                                                             ),
                                                           ),
                                                         ],
                                                       ),
                                                     ),
+                                                  ),
                                                   ),
                                                 ),
                                               Expanded(
@@ -8291,7 +8398,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           if (OpenDrawerBackGuard.hasOpenDrawer) return;
           _onSystemBack();
         },
-        child: browserBody,
+        child: ExternalFileDropZone(
+          label: context.l10n.dropImportOverlayLabel,
+          blockedReason: _externalDropBlockedReason(context),
+          isActive: () => mounted && _isVisibleTab,
+          onDropped: (paths) => unawaited(_handleExternalDrop(paths)),
+          onBlockedDrop: () {
+            final reason = _externalDropBlockedReason(context);
+            if (reason != null) _setStatus(reason, error: true);
+          },
+          child: browserBody,
+        ),
       ),
     );
     return screen;

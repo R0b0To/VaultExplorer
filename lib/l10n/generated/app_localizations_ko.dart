@@ -12282,4 +12282,20 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       '이 화면의 모든 옵션이 기본값으로 돌아갑니다. 탭, 레이아웃, 툴바, 그리드, 썸네일, 뷰어, 스킨 설정도 포함됩니다. 파일, 북마크, 폴더별 설정은 변경되지 않습니다.';
+
+  @override
+  String get dropImportOverlayLabel => '여기에 놓아 이 폴더로 가져오기';
+
+  @override
+  String get dropImportUnavailableHere => '파일은 볼트 폴더에만 놓을 수 있습니다.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '놓은 항목 $count개를 가져올 수 없습니다',
+    );
+    return '$_temp0';
+  }
 }

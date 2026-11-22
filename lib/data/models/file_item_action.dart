@@ -8,7 +8,9 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 /// nothing customised, both surfaces list their actions exactly as they did
 /// before this was configurable. [goToLocation] and [copyPath] came later:
 /// the first leads (it is what a search result's menu is opened for), the
-/// second sits with the other utility rows just above [delete].
+/// second sits with the other utility rows just above [delete]. [info] was
+/// fixed at the bottom of every menu before it became orderable, so it is
+/// last (in a group of its own) to keep that default.
 ///
 /// In the item sheet an action is either one of the *quick* actions, laid out
 /// as a horizontal row of icon-over-label buttons, or a list row. Which
@@ -36,7 +38,8 @@ enum FileItemAction {
   pin,
   bookmark,
   copyPath,
-  delete;
+  delete,
+  info;
 
   /// The actions in the item sheet's quick row until the user changes it.
   static const Set<FileItemAction> defaultQuickActions = {
@@ -76,6 +79,7 @@ enum FileItemAction {
     FileItemAction.bookmark ||
     FileItemAction.copyPath => 5,
     FileItemAction.delete => 6,
+    FileItemAction.info => 7,
   };
 
   IconData get icon => switch (this) {
@@ -101,6 +105,7 @@ enum FileItemAction {
     FileItemAction.bookmark => Icons.star_rounded,
     FileItemAction.copyPath => Icons.link_rounded,
     FileItemAction.delete => Icons.delete_outline_rounded,
+    FileItemAction.info => Icons.info_outline_rounded,
   };
 
   /// Label used in the settings list. Reuses the strings the menus already
@@ -129,6 +134,7 @@ enum FileItemAction {
     FileItemAction.bookmark => l10n.bookmarkAction,
     FileItemAction.copyPath => l10n.copyPathAction,
     FileItemAction.delete => l10n.delete,
+    FileItemAction.info => l10n.fileInfoAction,
   };
 
   String toJson() => name;

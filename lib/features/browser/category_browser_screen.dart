@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -248,7 +249,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
                 : isDevice
                 ? CategorySourceType.device
                 : CategorySourceType.storageLocation,
-            label: isDevice ? l10n.localStorageCardTitle : scoped.displayName,
+            label: isDevice ? localStorageDisplayName(l10n.localStorageCardTitle) : scoped.displayName,
             dedupeRoot: !isVault && scoped.isRawLocal ? scoped.uri : null,
           ),
         ),
@@ -263,7 +264,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
           CategorySource(
             volId: primary.volId,
             type: CategorySourceType.device,
-            label: l10n.localStorageCardTitle,
+            label: localStorageDisplayName(l10n.localStorageCardTitle),
             dedupeRoot: primary.isRawLocal ? primary.uri : null,
           ),
         ),
@@ -1267,7 +1268,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
       case CategorySourceKind.all:
         return l10n.categorySourceAll;
       case CategorySourceKind.device:
-        return l10n.localStorageCardTitle;
+        return localStorageDisplayName(l10n.localStorageCardTitle);
       case CategorySourceKind.vaults:
         return l10n.vaultsSectionTitle;
       case CategorySourceKind.vault:
@@ -1452,7 +1453,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
               if (widget.primaryLocalContainer != null || hasLocations)
                 _sourceItem(
                   CategorySourceFilter.device,
-                  l10n.localStorageCardTitle,
+                  localStorageDisplayName(l10n.localStorageCardTitle),
                 ),
               if (mountedVaults.isNotEmpty)
                 _sourceItem(

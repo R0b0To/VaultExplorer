@@ -12983,4 +12983,22 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'Isso devolve todas as opções desta tela ao valor padrão, incluindo as configurações de abas, layout, barra de ferramentas, grade, miniaturas, visualizador e aparência. Seus arquivos, favoritos e escolhas por pasta não são alterados.';
+
+  @override
+  String get dropImportOverlayLabel => 'Solte para importar para esta pasta';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'Os arquivos só podem ser soltos em uma pasta de um cofre.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count itens soltos não podem ser importados',
+      one: '1 item solto não pode ser importado',
+    );
+    return '$_temp0';
+  }
 }

@@ -1695,18 +1695,31 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                           kDesktopTitleBarTrailingWidth;
                       final firstExtent =
                           (_dualPaneSplitFraction * (pageWidth - 8))
-                              .clamp(0.0, constraints.maxWidth - 1)
+                              .clamp(
+                                0.0,
+                                (constraints.maxWidth - 8).clamp(
+                                  0.0,
+                                  double.infinity,
+                                ),
+                              )
                               .toDouble();
                       return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           SizedBox(
                             width: firstExtent,
                             child: paneStrip(TabPane.primary),
                           ),
                           Container(
-                            width: 1,
-                            height: 22,
-                            color: Theme.of(context).colorScheme.outlineVariant,
+                            width: 8,
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            alignment: Alignment.center,
+                            child: Container(
+                              width: 1,
+                              height: 22,
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
+                            ),
                           ),
                           Expanded(child: paneStrip(TabPane.secondary)),
                         ],
@@ -1727,7 +1740,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             bottom: false,
             child: Column(
               children: [
-                if (windowsTitleBar != null) windowsTitleBar,
+                ?windowsTitleBar,
                 if (!appBarAtBottom && !desktopFileManagerChrome)
                   appBarSlot,
                 if (dashboardChrome && !dualPaneForTabStrip)

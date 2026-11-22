@@ -3571,5 +3571,8 @@
   "indexesAndThumbnailsTitle": "Dizinler ve küçük resimler",
   "indexesAndThumbnailsSubtitle": "Küçük resim depolamasını, galeri meta verilerini ve müzik dizini ayarlarını yönetin.",
   "resetFileManagerSettingsTitle": "Dosya yöneticisi ayarları sıfırlansın mı?",
-  "resetFileManagerSettingsMessage": "Bu ekrandaki tüm seçenekler varsayılan değerlerine döner; sekme, düzen, araç çubuğu, ızgara, küçük resim, görüntüleyici ve tema ayarları da buna dahildir. Dosyalarınız, yer imleriniz ve klasöre özel tercihleriniz değişmez."
+  "resetFileManagerSettingsMessage": "Bu ekrandaki tüm seçenekler varsayılan değerlerine döner; sekme, düzen, araç çubuğu, ızgara, küçük resim, görüntüleyici ve tema ayarları da buna dahildir. Dosyalarınız, yer imleriniz ve klasöre özel tercihleriniz değişmez.",
+  "dropImportOverlayLabel": "Bu klasöre içe aktarmak için bırakın",
+  "dropImportUnavailableHere": "Dosyalar yalnızca bir kasa klasörüne bırakılabilir.",
+  "dropImportSkippedItems": "{count, plural, =1{Bırakılan 1 öğe içe aktarılamıyor} other{Bırakılan {count} öğe içe aktarılamıyor}}"
 }

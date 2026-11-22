@@ -40,7 +40,7 @@ abstract final class PlatformFeatures {
   /// Icon for the device's own storage ("Local storage"): a phone on Android,
   /// a computer on desktop.
   static IconData get localStorageIcon =>
-      isDesktop ? Icons.computer_rounded : Icons.phone_android_rounded;
+      isDesktop ? Icons.home_rounded : Icons.phone_android_rounded;
 
   /// Icon for an extra storage location: an SD card on Android, a drive on
   /// desktop.

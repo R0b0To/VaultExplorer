@@ -12878,4 +12878,22 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'Bu ekrandaki tüm seçenekler varsayılan değerlerine döner; sekme, düzen, araç çubuğu, ızgara, küçük resim, görüntüleyici ve tema ayarları da buna dahildir. Dosyalarınız, yer imleriniz ve klasöre özel tercihleriniz değişmez.';
+
+  @override
+  String get dropImportOverlayLabel => 'Bu klasöre içe aktarmak için bırakın';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'Dosyalar yalnızca bir kasa klasörüne bırakılabilir.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Bırakılan $count öğe içe aktarılamıyor',
+      one: 'Bırakılan 1 öğe içe aktarılamıyor',
+    );
+    return '$_temp0';
+  }
 }

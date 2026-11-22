@@ -12280,4 +12280,20 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'この画面のすべての項目が初期値に戻ります。タブ、レイアウト、ツールバー、グリッド、サムネイル、ビューア、スキンの設定も含まれます。ファイル、ブックマーク、フォルダごとの設定は変更されません。';
+
+  @override
+  String get dropImportOverlayLabel => 'ドロップしてこのフォルダにインポート';
+
+  @override
+  String get dropImportUnavailableHere => 'ファイルは保管庫内のフォルダにのみドロップできます。';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'ドロップされた$count件の項目はインポートできません',
+    );
+    return '$_temp0';
+  }
 }

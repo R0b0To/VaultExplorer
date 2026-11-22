@@ -210,4 +210,71 @@ void main() {
       expect(_values(result).last, 'file_info');
     });
   });
+
+  group('file info is configurable', () {
+    final menu = [
+      _item('select_all'),
+      _item('open_in_new_tab'),
+      _item('bookmark'),
+      _item('file_info'),
+    ];
+
+    test('by default it stays at the bottom', () {
+      expect(
+        _values(
+          applyItemActionMenuConfig(
+            menu,
+            order: FileItemAction.values,
+            hidden: const {},
+          ),
+        ),
+        _values(menu),
+      );
+    });
+
+    test('it can be moved ahead of the other actions', () {
+      final result = applyItemActionMenuConfig(
+        menu,
+        order: [
+          FileItemAction.info,
+          ...FileItemAction.values.where((a) => a != FileItemAction.info),
+        ],
+        hidden: const {},
+      );
+
+      expect(_values(result), [
+        'select_all',
+        'file_info',
+        'open_in_new_tab',
+        'bookmark',
+      ]);
+    });
+
+    test('it can be hidden', () {
+      final result = applyItemActionMenuConfig(
+        menu,
+        order: FileItemAction.values,
+        hidden: {FileItemAction.info},
+      );
+
+      expect(_values(result), ['select_all', 'open_in_new_tab', 'bookmark']);
+    });
+
+    test('as a quick action it leads the menu', () {
+      final result = applyItemActionMenuConfig(
+        menu,
+        order: quickActionsFirstOrder(FileItemAction.values, {
+          FileItemAction.info,
+        }),
+        hidden: const {},
+      );
+
+      expect(_values(result), [
+        'select_all',
+        'file_info',
+        'open_in_new_tab',
+        'bookmark',
+      ]);
+    });
+  });
 }

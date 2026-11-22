@@ -4,6 +4,8 @@
 // contract the Dart layer relies on is what this file reproduces:
 //
 //   pickImportFiles / pickImportFolder   -> {pickToken, conflicts, items}; nothing is written yet
+//   prepareDropImport                    -> the same result for paths dropped from the OS file manager
+//                                           (no dialog; files and folders may be mixed)
 //   importFile / importFolder            -> resumes a pick by token with a conflictPlan; returns the
 //                                           number of entries written
 //   exportFilesToFolder / exportFileToStorage / decryptFile / cancel* / deleteImportSources ...
@@ -23,6 +25,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import 'dropped_paths.dart';
 import 'engine_worker_pool.dart';
 import 've_native.dart';
 
@@ -231,6 +234,33 @@ class DesktopTransfers {
     final dir = await getDirectoryPath();
     if (dir == null) return null;
     return _registerPick(vol, args, [_PickedEntry(p.basename(dir), dir, true, 0)]);
+  }
+
+  /// Drag-and-drop counterpart of the two pickers: [args]`['paths']` are host paths the OS file manager
+  /// dropped on the window. Returns the same `{pickToken, conflicts, items}` shape (nothing is written
+  /// yet), or `null` when none of the paths can be imported -- see [resolveDroppedPaths] for what is
+  /// left out. Files and folders can be mixed in one drop; [importPicked] already handles both.
+  Future<Object?> prepareDropImport(Map<Object?, Object?> args) async {
+    final vol = volFor(args['filePath']);
+    final dropped = resolveDroppedPaths(
+      ((args['paths'] as List<Object?>?) ?? const []).whereType<String>(),
+      // On desktop the container "URI" is its own filesystem path.
+      vaultHostPath: args['filePath'] as String?,
+    );
+    final entries = <_PickedEntry>[];
+    for (final e in dropped.accepted) {
+      var size = 0;
+      if (!e.isDir) {
+        try {
+          size = await File(e.path).length();
+        } on FileSystemException {
+          continue; // vanished between the drop and now
+        }
+      }
+      entries.add(_PickedEntry(p.basename(e.path), e.path, e.isDir, size));
+    }
+    if (entries.isEmpty) return null;
+    return _registerPick(vol, args, entries);
   }
 
   Future<Object?> _registerPick(int vol, Map<Object?, Object?> args, List<_PickedEntry> entries) async {

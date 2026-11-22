@@ -1950,6 +1950,38 @@ class VaultFileIoApi {
     return _importPickResultFromChannel(result);
   }
 
+  /// Phase 1 of importing files and folders that were dragged in from the OS
+  /// file manager and dropped on the window (desktop only) -- the
+  /// drag-and-drop counterpart of [pickFilesForImport] and
+  /// [pickFolderForImport], returning the identical [ImportPickResult].
+  /// There is no picker: [hostPaths] are the dropped paths themselves, and
+  /// files and folders may be mixed. Follow up with [importFiles] (it also
+  /// imports the folders of a mixed drop), or [cancelPickedImport] if the
+  /// person backs out.
+  ///
+  /// Returns `null` when none of [hostPaths] can be imported (gone, not a
+  /// file or folder, or the vault itself); when only some can, the result
+  /// has fewer [ImportPickResult.items] than [hostPaths] has entries.
+  Future<ImportPickResult?> prepareDropImport(
+    MountedContainer container,
+    String targetPath,
+    List<String> hostPaths,
+  ) async {
+    try {
+      final result = await _channel
+          .invokeMapMethod<String, dynamic>(ChannelMethods.prepareDropImport, {
+            'filePath': container.uri,
+            'targetPath': targetPath,
+            'caseSensitive': namesAreCaseSensitive(container),
+            'paths': hostPaths,
+          });
+      return _importPickResultFromChannel(result);
+    } catch (e) {
+      logSwallowed('prepareDropImport', e);
+      return null;
+    }
+  }
+
   ImportPickResult? _importPickResultFromChannel(Map<String, dynamic>? result) {
     if (result == null) return null;
     final pickToken = result['pickToken'] as int?;

@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -829,7 +830,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               : cs.onSurfaceVariant,
                         ),
                         title: Text(
-                          context.l10n.localStorageCardTitle,
+                          localStorageDisplayName(context.l10n.localStorageCardTitle),
                           style: textTheme.bodyMedium?.copyWith(
                             fontWeight: currentVolId == kDecoyLocalVolId
                                 ? FontWeight.bold
@@ -882,39 +883,59 @@ class AppNavigationDrawer extends ConsumerWidget {
                               selected: currentVolId == loc.volId,
                               selectedTileColor: cs.secondaryContainer
                                   .withValues(alpha: 0.5),
-                              leading: Icon(
-                                _iconForStorage(loc.path),
-                                color: currentVolId == loc.volId
-                                    ? cs.primary
-                                    : cs.secondary,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 2,
                               ),
-                              title: Text(
-                                loc.displayName,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  fontWeight: currentVolId == loc.volId
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              // One block: icon, name and the free / total
+                              // size on a single row, with the usage bar
+                              // spanning the tile's full width underneath.
+                              title: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _iconForStorage(loc.path),
+                                        size: 20,
+                                        color: currentVolId == loc.volId
+                                            ? cs.primary
+                                            : cs.secondary,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          loc.displayName,
+                                          style: textTheme.bodyMedium?.copyWith(
+                                            fontWeight:
+                                                currentVolId == loc.volId
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (loc.freeBytes != null &&
+                                          loc.totalBytes != null) ...[
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _freeOfTotal(
+                                            loc.freeBytes!,
+                                            loc.totalBytes!,
+                                          ),
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  if (loc.usedFraction != null)
+                                    _DriveUsageBar(fraction: loc.usedFraction!),
+                                ],
                               ),
-                              // Free / total space and a usage bar, for drives
-                              // whose size is known (desktop).
-                              trailing: loc.freeBytes == null ||
-                                      loc.totalBytes == null
-                                  ? null
-                                  : Text(
-                                      _freeOfTotal(
-                                        loc.freeBytes!,
-                                        loc.totalBytes!,
-                                      ),
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: cs.onSurfaceVariant,
-                                      ),
-                                    ),
-                              subtitle: loc.usedFraction == null
-                                  ? null
-                                  : _DriveUsageBar(fraction: loc.usedFraction!),
                               onLongPress: touchOnlyLongPress(() {
                                 final box =
                                     tileContext.findRenderObject()
@@ -979,6 +1000,8 @@ class AppNavigationDrawer extends ConsumerWidget {
                       ),
                     ],
 
+                    // Desktop lists its drives itself; no manual add button there.
+                    if (!PlatformFeatures.isDesktop)
                     ListTile(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(28),
@@ -1466,12 +1489,12 @@ class _DriveUsageBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: 6),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(2),
         child: LinearProgressIndicator(
           value: fraction,
-          minHeight: 4,
+          minHeight: 5,
           color: fraction >= 0.9 ? cs.error : cs.primary,
           backgroundColor: cs.surfaceContainerHighest,
         ),

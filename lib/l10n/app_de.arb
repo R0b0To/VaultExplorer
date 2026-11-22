@@ -3577,5 +3577,8 @@
   "indexesAndThumbnailsTitle": "Indizes & Miniaturansichten",
   "indexesAndThumbnailsSubtitle": "Verwalte Miniaturansichten, Galerie-Metadaten und den Musikindex.",
   "resetFileManagerSettingsTitle": "Dateimanager-Einstellungen zurücksetzen?",
-  "resetFileManagerSettingsMessage": "Dadurch wird jede Option auf diesem Bildschirm auf den Standardwert zurückgesetzt, einschließlich der Einstellungen für Tabs, Layout, Symbolleiste, Raster, Vorschaubilder, Viewer und Design. Deine Dateien, Lesezeichen und ordnerspezifischen Einstellungen bleiben unverändert."
+  "resetFileManagerSettingsMessage": "Dadurch wird jede Option auf diesem Bildschirm auf den Standardwert zurückgesetzt, einschließlich der Einstellungen für Tabs, Layout, Symbolleiste, Raster, Vorschaubilder, Viewer und Design. Deine Dateien, Lesezeichen und ordnerspezifischen Einstellungen bleiben unverändert.",
+  "dropImportOverlayLabel": "Zum Importieren in diesen Ordner ablegen",
+  "dropImportUnavailableHere": "Dateien können nur in einen Tresorordner gezogen werden.",
+  "dropImportSkippedItems": "{count, plural, =1{1 abgelegtes Element kann nicht importiert werden} other{{count} abgelegte Elemente können nicht importiert werden}}"
 }

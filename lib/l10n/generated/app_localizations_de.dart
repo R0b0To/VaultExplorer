@@ -12981,4 +12981,23 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'Dadurch wird jede Option auf diesem Bildschirm auf den Standardwert zurückgesetzt, einschließlich der Einstellungen für Tabs, Layout, Symbolleiste, Raster, Vorschaubilder, Viewer und Design. Deine Dateien, Lesezeichen und ordnerspezifischen Einstellungen bleiben unverändert.';
+
+  @override
+  String get dropImportOverlayLabel =>
+      'Zum Importieren in diesen Ordner ablegen';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'Dateien können nur in einen Tresorordner gezogen werden.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count abgelegte Elemente können nicht importiert werden',
+      one: '1 abgelegtes Element kann nicht importiert werden',
+    );
+    return '$_temp0';
+  }
 }

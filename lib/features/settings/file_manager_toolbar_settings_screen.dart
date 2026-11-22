@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -71,7 +72,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
     final root = await const DecoyLocalRepository().primaryRoot();
     return buildLocalStorageContainer(
       rootPath: root.path,
-      displayName: context.l10n.localStorageCardTitle,
+      displayName: localStorageDisplayName(context.l10n.localStorageCardTitle),
     );
   }
 
@@ -1227,7 +1228,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       // ==========================================
                       // 7. THUMBNAILS & CACHE (LOCAL STORAGE)
                       // ==========================================
-                      SectionHeader(context.l10n.localStorageCardTitle),
+                      SectionHeader(localStorageDisplayName(context.l10n.localStorageCardTitle)),
                       SectionCard(
                         children: [
                           ThumbnailSettingsTiles(

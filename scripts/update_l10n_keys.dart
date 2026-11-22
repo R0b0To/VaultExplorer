@@ -11,11 +11,24 @@ import 'dart:io';
 ///     'description': 'Description for translators',
 ///   },
 const Map<String, dynamic> enMetadataAndValues = {
-  'motionPhotoCopyNote':
-      'The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.',
-  '@motionPhotoCopyNote': {
+  'dropImportOverlayLabel': 'Drop to import into this folder',
+  '@dropImportOverlayLabel': {
     'description':
-        'Notice shown when an image with protected metadata is edited: only a still-image copy can be saved; the original file and embedded content are protected.',
+        'Desktop: text over the file browser while files are dragged in from the operating system\'s file manager and held over it',
+  },
+  'dropImportUnavailableHere': 'Files can only be dropped into a vault folder.',
+  '@dropImportUnavailableHere': {
+    'description':
+        'Desktop: shown when files from the operating system are dropped on a place that cannot receive imports (a plain device folder or an archive being browsed)',
+  },
+  'dropImportSkippedItems':
+      '{count, plural, =1{1 dropped item can’t be imported} other{{count} dropped items can’t be imported}}',
+  '@dropImportSkippedItems': {
+    'description':
+        'Desktop: shown after files from the operating system were dropped on the file browser and some of them were left out (no longer there, not a file or folder, or the vault itself)',
+    'placeholders': {
+      'count': {'type': 'num'},
+    },
   },
 };
 
@@ -23,41 +36,78 @@ const Map<String, dynamic> enMetadataAndValues = {
 /// If a translation for a key is omitted, it falls back to the English value.
 const Map<String, Map<String, String>> localizedValues = {
   'ar': {
-    'motionPhotoCopyNote':
-        'ستكون النسخة المعدلة صورة ثابتة. سيبقى الملف الأصلي وبيانات EXIF وأي فيديو مضمّن دون تغيير.',
+    'dropImportOverlayLabel': 'أفلت للاستيراد إلى هذا المجلد',
+    'dropImportUnavailableHere': 'يمكن إفلات الملفات داخل مجلد في خزنة فقط.',
+    'dropImportSkippedItems':
+        '{count, plural, zero{لا يمكن استيراد أي عناصر تم إفلاتها} one{لا يمكن استيراد عنصر واحد تم إفلاته} two{لا يمكن استيراد عنصرين تم إفلاتهما} few{لا يمكن استيراد {count} عناصر تم إفلاتها} many{لا يمكن استيراد {count} عنصرًا تم إفلاته} other{لا يمكن استيراد {count} عنصر تم إفلاته}}',
   },
   'de': {
-    'motionPhotoCopyNote':
-        'Die bearbeitete Kopie ist ein Standbild. Die Originaldatei, ihre EXIF-Daten und eingebettete Videos bleiben unverändert.',
+    'dropImportOverlayLabel': 'Zum Importieren in diesen Ordner ablegen',
+    'dropImportUnavailableHere':
+        'Dateien können nur in einen Tresorordner gezogen werden.',
+    'dropImportSkippedItems':
+        '{count, plural, =1{1 abgelegtes Element kann nicht importiert werden} other{{count} abgelegte Elemente können nicht importiert werden}}',
   },
   'es': {
-    'motionPhotoCopyNote':
-        'La copia editada será una imagen fija. El archivo original, sus datos EXIF y cualquier vídeo integrado permanecerán intactos.',
+    'dropImportOverlayLabel': 'Suelta para importar en esta carpeta',
+    'dropImportUnavailableHere':
+        'Los archivos solo se pueden soltar en una carpeta de una bóveda.',
+    'dropImportSkippedItems':
+        '{count, plural, =1{No se puede importar 1 elemento soltado} other{No se pueden importar {count} elementos soltados}}',
   },
   'fr': {
-    'motionPhotoCopyNote':
-        'La copie modifiée sera une image fixe. Le fichier d’origine, ses données EXIF et toute vidéo intégrée resteront intacts.',
+    'dropImportOverlayLabel': 'Déposez pour importer dans ce dossier',
+    'dropImportUnavailableHere':
+        'Les fichiers ne peuvent être déposés que dans un dossier d’un coffre.',
+    'dropImportSkippedItems':
+        '{count, plural, =1{1 élément déposé ne peut pas être importé} other{{count} éléments déposés ne peuvent pas être importés}}',
   },
   'it': {
-    'motionPhotoCopyNote':
-        'La copia modificata sarà un’immagine statica. Il file originale, i dati EXIF e qualsiasi video incorporato resteranno invariati.',
+    'dropImportOverlayLabel': 'Rilascia per importare in questa cartella',
+    'dropImportUnavailableHere':
+        'I file possono essere rilasciati solo in una cartella di un vault.',
+    'dropImportSkippedItems':
+        '{count, plural, =1{1 elemento rilasciato non può essere importato} other{{count} elementi rilasciati non possono essere importati}}',
   },
   'ja': {
-    'motionPhotoCopyNote': '編集したコピーは静止画になります。元のファイル、EXIF情報、埋め込み動画は変更されません。',
+    'dropImportOverlayLabel': 'ドロップしてこのフォルダにインポート',
+    'dropImportUnavailableHere': 'ファイルは保管庫内のフォルダにのみドロップできます。',
+    'dropImportSkippedItems':
+        '{count, plural, other{ドロップされた{count}件の項目はインポートできません}}',
   },
   'ko': {
-    'motionPhotoCopyNote':
-        '편집된 사본은 정지 이미지로 저장됩니다. 원본 파일, EXIF 정보 및 내장 동영상은 변경되지 않습니다.',
+    'dropImportOverlayLabel': '여기에 놓아 이 폴더로 가져오기',
+    'dropImportUnavailableHere': '파일은 볼트 폴더에만 놓을 수 있습니다.',
+    'dropImportSkippedItems':
+        '{count, plural, other{놓은 항목 {count}개를 가져올 수 없습니다}}',
   },
   'pt': {
-    'motionPhotoCopyNote':
-        'A cópia editada será uma imagem estática. O arquivo original, os dados EXIF e qualquer vídeo incorporado permanecerão intactos.',
+    'dropImportOverlayLabel': 'Solte para importar para esta pasta',
+    'dropImportUnavailableHere':
+        'Os arquivos só podem ser soltos em uma pasta de um cofre.',
+    'dropImportSkippedItems':
+        '{count, plural, =1{1 item solto não pode ser importado} other{{count} itens soltos não podem ser importados}}',
+  },
+  'tr': {
+    'dropImportOverlayLabel': 'Bu klasöre içe aktarmak için bırakın',
+    'dropImportUnavailableHere':
+        'Dosyalar yalnızca bir kasa klasörüne bırakılabilir.',
+    'dropImportSkippedItems':
+        '{count, plural, =1{Bırakılan 1 öğe içe aktarılamıyor} other{Bırakılan {count} öğe içe aktarılamıyor}}',
   },
   'uk': {
-    'motionPhotoCopyNote':
-        'Відредагована копія буде нерухомим зображенням. Оригінальний файл, дані EXIF і будь-яке вбудоване відео залишаться незмінними.',
+    'dropImportOverlayLabel': 'Відпустіть, щоб імпортувати в цю папку',
+    'dropImportUnavailableHere':
+        'Файли можна перетягувати лише до папки сховища.',
+    'dropImportSkippedItems':
+        '{count, plural, one{{count} перетягнутий елемент не можна імпортувати} few{{count} перетягнуті елементи не можна імпортувати} many{{count} перетягнутих елементів не можна імпортувати} other{{count} перетягнутих елементів не можна імпортувати}}',
   },
-  'zh': {'motionPhotoCopyNote': '编辑后的副本将是静态图片。原始文件、EXIF 信息和任何嵌入的视频都将保持不变。'},
+  'zh': {
+    'dropImportOverlayLabel': '松开以导入到此文件夹',
+    'dropImportUnavailableHere': '只能将文件拖放到保险库文件夹中。',
+    'dropImportSkippedItems':
+        '{count, plural, other{有 {count} 个拖入的项目无法导入}}',
+  },
 };
 
 void main() async {

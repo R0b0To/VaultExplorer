@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
@@ -81,7 +82,7 @@ class BrowserNewTabSheet extends ConsumerWidget {
           if (!context.mounted) return null;
           localContainer = buildLocalStorageContainer(
             rootPath: root.path,
-            displayName: context.l10n.localStorageCardTitle,
+            displayName: localStorageDisplayName(context.l10n.localStorageCardTitle),
           );
         }
       } catch (_) {

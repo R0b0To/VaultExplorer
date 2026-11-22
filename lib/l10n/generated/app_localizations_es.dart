@@ -13011,4 +13011,22 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get resetFileManagerSettingsMessage =>
       'Esto devuelve cada opción de esta pantalla a su valor predeterminado, incluidos los ajustes de pestañas, diseño, barra de herramientas, cuadrícula, miniaturas, visor y apariencia. Tus archivos, marcadores y opciones por carpeta no se modifican.';
+
+  @override
+  String get dropImportOverlayLabel => 'Suelta para importar en esta carpeta';
+
+  @override
+  String get dropImportUnavailableHere =>
+      'Los archivos solo se pueden soltar en una carpeta de una bóveda.';
+
+  @override
+  String dropImportSkippedItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'No se pueden importar $count elementos soltados',
+      one: 'No se puede importar 1 elemento soltado',
+    );
+    return '$_temp0';
+  }
 }

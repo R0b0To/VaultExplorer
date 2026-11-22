@@ -248,6 +248,8 @@ class DesktopEngineHost {
         return _transfers.pickImportFiles(args);
       case ChannelMethods.pickImportFolder:
         return _transfers.pickImportFolder(args);
+      case ChannelMethods.prepareDropImport:
+        return _transfers.prepareDropImport(args);
       case ChannelMethods.cancelPickedImport:
         _transfers.cancelPickedImport(args['pickToken']);
         return null;

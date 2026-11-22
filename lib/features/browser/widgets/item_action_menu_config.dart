@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 
 /// Popup-menu `value` -> the configurable action it stands for. Values that
-/// are not listed (select all, file info, ...) are not configurable and are
+/// are not listed (select all, ...) are not configurable and are
 /// left alone by [applyItemActionMenuConfig].
 const Map<String, FileItemAction> _actionForMenuValue = {
   'go_to_location': FileItemAction.goToLocation,
@@ -29,6 +29,7 @@ const Map<String, FileItemAction> _actionForMenuValue = {
   'bookmark': FileItemAction.bookmark,
   'unbookmark': FileItemAction.bookmark,
   'copy_path': FileItemAction.copyPath,
+  'file_info': FileItemAction.info,
 };
 
 /// Puts the configured quick-action section before the remaining actions.
@@ -66,8 +67,8 @@ List<FileItemAction> orderFileItemActions(
 /// menu: drops the [hidden] actions and re-orders the rest by [order].
 ///
 /// Only the configurable items move, and only among the slots they already
-/// occupy, so unconfigurable items (select all at the top, file info at the
-/// bottom) stay where the menu put them. Items that map to the same action
+/// occupy, so unconfigurable items (select all at the top) stay where the menu
+/// put them. Items that map to the same action
 /// (pin / unpin) keep their relative order.
 List<PopupMenuItem<String>> applyItemActionMenuConfig(
   List<PopupMenuItem<String>> items, {

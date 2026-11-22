@@ -523,7 +523,13 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                     _stripPadding * 2 + tabs.length * kBrowserTabItemWidth;
                 final listWidth = PlatformFeatures.isDesktop
                     ? tabsWidth
-                          .clamp(0.0, (constraints.maxWidth - 48).clamp(0.0, double.infinity))
+                          .clamp(
+                            0.0,
+                            (constraints.maxWidth - 48).clamp(
+                              0.0,
+                              double.infinity,
+                            ),
+                          )
                           .toDouble()
                     : constraints.maxWidth;
                 final trailingBlankStart = listWidth + 48;
@@ -550,8 +556,8 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                             valueListenable: _stripHovered,
                             builder: (context, hovered, list) => RawScrollbar(
                               controller: _scrollController,
-                              thumbVisibility: PlatformFeatures.isDesktop &&
-                                  hovered,
+                              thumbVisibility:
+                                  PlatformFeatures.isDesktop && hovered,
                               interactive: PlatformFeatures.isDesktop,
                               scrollbarOrientation: ScrollbarOrientation.top,
                               thickness: 3,
@@ -566,190 +572,205 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                 context,
                               ).copyWith(scrollbars: false),
                               child: ReorderableListView.builder(
-                          key: PageStorageKey<String>(
-                            '${widget.storageKey}-${pane?.name ?? 'all'}',
-                          ),
-                          scrollController: _scrollController,
-                          scrollDirection: Axis.horizontal,
-                          clipBehavior: Clip.hardEdge,
-                          buildDefaultDragHandles: false,
-                          padding: connected
-                              ? EdgeInsets.fromLTRB(_stripPadding, 4, _stripPadding, 0)
-                              : EdgeInsets.symmetric(
-                                  horizontal: _stripPadding,
-                                  vertical: 3,
+                                key: PageStorageKey<String>(
+                                  '${widget.storageKey}-${pane?.name ?? 'all'}',
                                 ),
-                          // The + button is not a list item: see below.
-                          itemCount: tabs.length,
-                          onReorderStart: (index) {
-                            HapticFeedback.mediumImpact();
-                            _draggingTabId = index >= 0 && index < tabs.length
-                                ? tabs[index].tabId
-                                : null;
-                          },
-                          onReorderEnd: (_) => _finishDrag(actions),
-                          onReorderItem: pane == null
-                              ? actions.reorderTabs
-                              : (oldIndex, newIndex) =>
-                                    actions.reorderTabsInPane(
-                                      pane,
-                                      oldIndex,
-                                      newIndex,
-                                    ),
-                          proxyDecorator: (child, index, animation) {
-                            return AnimatedBuilder(
-                              animation: animation,
-                              builder: (context, child) {
-                                final t = Curves.easeInOut.transform(
-                                  animation.value,
-                                );
-                                return Material(
-                                  elevation: 6 * t,
-                                  color: activeBackground,
-                                  shadowColor: cs.shadow.withValues(
-                                    alpha: 0.35,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: child,
-                                );
-                              },
-                              child: child,
-                            );
-                          },
-                          itemBuilder: (context, index) {
-                            final tab = tabs[index];
-                            final itemKey = _tabItemKeys.putIfAbsent(
-                              tab.tabId,
-                              GlobalKey.new,
-                            );
-                            final isShown = tab.tabId == shownTabId;
-                            // Every pane's shown tab is highlighted the same way; no
-                            // pane is singled out as the focused one.
-                            final isActive = isShown;
-                            return ReorderableDelayedDragStartListener(
-                              key: ValueKey<TabId>(tab.tabId),
-                              index: index,
-                              child: Builder(
-                                builder: (tabContext) => SizedBox(
-                                  key: itemKey,
-                                  width: kBrowserTabItemWidth,
-                                  child: DragTarget<BrowserItemDragData>(
-                                    onWillAcceptWithDetails: (details) {
-                                      final destination = tab.container;
-                                      if (destination == null ||
-                                          tab.isDashboard ||
-                                          tab.isCategory) {
-                                        return false;
-                                      }
-                                      final navigation = ref.read(
-                                        fileBrowserNavigationProvider(
-                                          tab.tabId,
-                                        ),
+                                scrollController: _scrollController,
+                                scrollDirection: Axis.horizontal,
+                                clipBehavior: Clip.hardEdge,
+                                buildDefaultDragHandles: false,
+                                padding: connected
+                                    ? EdgeInsets.fromLTRB(
+                                        _stripPadding,
+                                        4,
+                                        _stripPadding,
+                                        0,
+                                      )
+                                    : EdgeInsets.symmetric(
+                                        horizontal: _stripPadding,
+                                        vertical: 3,
+                                      ),
+                                // The + button is not a list item: see below.
+                                itemCount: tabs.length,
+                                onReorderStart: (index) {
+                                  HapticFeedback.mediumImpact();
+                                  _draggingTabId =
+                                      index >= 0 && index < tabs.length
+                                      ? tabs[index].tabId
+                                      : null;
+                                },
+                                onReorderEnd: (_) => _finishDrag(actions),
+                                onReorderItem: pane == null
+                                    ? actions.reorderTabs
+                                    : (oldIndex, newIndex) =>
+                                          actions.reorderTabsInPane(
+                                            pane,
+                                            oldIndex,
+                                            newIndex,
+                                          ),
+                                proxyDecorator: (child, index, animation) {
+                                  return AnimatedBuilder(
+                                    animation: animation,
+                                    builder: (context, child) {
+                                      final t = Curves.easeInOut.transform(
+                                        animation.value,
                                       );
-                                      if (navigation.archiveContext != null) {
-                                        return false;
-                                      }
-                                      final path = navigation.currentDirPath;
-                                      if (!details.data.canDropInto(
-                                        destination,
-                                        path,
-                                      )) {
-                                        return false;
-                                      }
-                                      _scheduleFileDropTabActivation(
-                                        tab,
-                                        actions,
-                                      );
-                                      return true;
-                                    },
-                                    onMove: (_) =>
-                                        _scheduleFileDropTabActivation(
-                                          tab,
-                                          actions,
+                                      return Material(
+                                        elevation: 6 * t,
+                                        color: activeBackground,
+                                        shadowColor: cs.shadow.withValues(
+                                          alpha: 0.35,
                                         ),
-                                    onLeave: (_) =>
-                                        _cancelFileDropTabActivation(tab.tabId),
-                                    onAcceptWithDetails: (details) {
-                                      _cancelFileDropTabActivation(tab.tabId);
-                                      final destination = tab.container;
-                                      if (destination == null ||
-                                          tab.isDashboard ||
-                                          tab.isCategory) {
-                                        return;
-                                      }
-                                      actions.activate(tab.tabId);
-                                      final navigation = ref.read(
-                                        fileBrowserNavigationProvider(
-                                          tab.tabId,
-                                        ),
-                                      );
-                                      if (navigation.archiveContext != null)
-                                        return;
-                                      // Same Copy / Move / Cancel menu as dropping in a
-                                      // folder view (Move is left out when the items
-                                      // already live in that tab's folder).
-                                      unawaited(
-                                        handleBrowserItemDrop(
-                                          tabContext,
-                                          details,
-                                          destination,
-                                          navigation.currentDirPath,
-                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: child,
                                       );
                                     },
-                                    builder: (context, candidates, rejected) =>
-                                        DecoratedBox(
-                                          decoration: candidates.isEmpty
-                                              ? const BoxDecoration()
-                                              : BoxDecoration(
-                                                  border: Border.all(
-                                                    color: cs.primary,
-                                                    width: 2,
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                          child: _TabItem(
-                                            tab: tab,
-                                            active: isActive,
-                                            activeBackground: shownBackground,
-                                            connected: connected,
-                                            // Side by side, the focused pane's
-                                            // selected tab carries an accent line.
-                                            accent: pane != null && paneFocused,
-                                            onTap: () =>
-                                                _onTabTapped(tab, tabContext),
-                                            onSecondaryTap:
-                                                PlatformFeatures.isDesktop
-                                                ? () => unawaited(
-                                                    _showTabMenu(
-                                                      tab,
-                                                      tabContext,
+                                    child: child,
+                                  );
+                                },
+                                itemBuilder: (context, index) {
+                                  final tab = tabs[index];
+                                  final itemKey = _tabItemKeys.putIfAbsent(
+                                    tab.tabId,
+                                    GlobalKey.new,
+                                  );
+                                  final isShown = tab.tabId == shownTabId;
+                                  // Every pane's shown tab is highlighted the same way; no
+                                  // pane is singled out as the focused one.
+                                  final isActive = isShown;
+                                  return ReorderableDelayedDragStartListener(
+                                    key: ValueKey<TabId>(tab.tabId),
+                                    index: index,
+                                    child: Builder(
+                                      builder: (tabContext) => SizedBox(
+                                        key: itemKey,
+                                        width: kBrowserTabItemWidth,
+                                        child: DragTarget<BrowserItemDragData>(
+                                          onWillAcceptWithDetails: (details) {
+                                            final destination = tab.container;
+                                            if (destination == null ||
+                                                tab.isDashboard ||
+                                                tab.isCategory) {
+                                              return false;
+                                            }
+                                            final navigation = ref.read(
+                                              fileBrowserNavigationProvider(
+                                                tab.tabId,
+                                              ),
+                                            );
+                                            if (navigation.archiveContext !=
+                                                null) {
+                                              return false;
+                                            }
+                                            final path =
+                                                navigation.currentDirPath;
+                                            if (!details.data.canDropInto(
+                                              destination,
+                                              path,
+                                            )) {
+                                              return false;
+                                            }
+                                            _scheduleFileDropTabActivation(
+                                              tab,
+                                              actions,
+                                            );
+                                            return true;
+                                          },
+                                          onMove: (_) =>
+                                              _scheduleFileDropTabActivation(
+                                                tab,
+                                                actions,
+                                              ),
+                                          onLeave: (_) =>
+                                              _cancelFileDropTabActivation(
+                                                tab.tabId,
+                                              ),
+                                          onAcceptWithDetails: (details) {
+                                            _cancelFileDropTabActivation(
+                                              tab.tabId,
+                                            );
+                                            final destination = tab.container;
+                                            if (destination == null ||
+                                                tab.isDashboard ||
+                                                tab.isCategory) {
+                                              return;
+                                            }
+                                            actions.activate(tab.tabId);
+                                            final navigation = ref.read(
+                                              fileBrowserNavigationProvider(
+                                                tab.tabId,
+                                              ),
+                                            );
+                                            if (navigation.archiveContext !=
+                                                null)
+                                              return;
+                                            // Same Copy / Move / Cancel menu as dropping in a
+                                            // folder view (Move is left out when the items
+                                            // already live in that tab's folder).
+                                            unawaited(
+                                              handleBrowserItemDrop(
+                                                tabContext,
+                                                details,
+                                                destination,
+                                                navigation.currentDirPath,
+                                              ),
+                                            );
+                                          },
+                                          builder: (context, candidates, rejected) => DecoratedBox(
+                                            decoration: candidates.isEmpty
+                                                ? const BoxDecoration()
+                                                : BoxDecoration(
+                                                    border: Border.all(
+                                                      color: cs.primary,
+                                                      width: 2,
                                                     ),
-                                                  )
-                                                : null,
-                                            onClose:
-                                                PlatformFeatures.isDesktop &&
-                                                    state.tabs.length > 1
-                                                ? () => actions.closeTab(
-                                                    tab.tabId,
-                                                  )
-                                                : null,
-                                            // Only the active pane draws the
-                                            // buttons; the other pane's tabs
-                                            // still close with a middle click
-                                            // or from their menu.
-                                            closeVisible: paneFocused,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
+                                                  ),
+                                            child: _TabItem(
+                                              tab: tab,
+                                              active: isActive,
+                                              activeBackground: shownBackground,
+                                              connected: connected,
+                                              // Side by side, the focused pane's
+                                              // selected tab carries an accent line.
+                                              accent:
+                                                  pane != null && paneFocused,
+                                              onTap: () =>
+                                                  _onTabTapped(tab, tabContext),
+                                              onSecondaryTap:
+                                                  PlatformFeatures.isDesktop
+                                                  ? () => unawaited(
+                                                      _showTabMenu(
+                                                        tab,
+                                                        tabContext,
+                                                      ),
+                                                    )
+                                                  : null,
+                                              onClose:
+                                                  PlatformFeatures.isDesktop &&
+                                                      state.tabs.length > 1
+                                                  ? () => actions.closeTab(
+                                                      tab.tabId,
+                                                    )
+                                                  : null,
+                                              // Only the active pane draws the
+                                              // buttons; the other pane's tabs
+                                              // still close with a middle click
+                                              // or from their menu.
+                                              closeVisible: paneFocused,
+                                            ),
                                           ),
                                         ),
-                                  ),
-                                ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
-                        ),
-                        ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -923,126 +944,137 @@ class _TabItemState extends ConsumerState<_TabItem> {
           clipBehavior: Clip.none,
           fit: StackFit.passthrough,
           children: [
-        Material(
-        color: active ? widget.activeBackground : Colors.transparent,
-        borderRadius: shape,
-        child: Listener(
-          // A middle click closes the tab, as in a browser.
-          onPointerDown: (event) {
-            if (event.buttons == kMiddleMouseButton) onClose?.call();
-          },
-          child: InkWell(
-            borderRadius: shape,
-            onTap: widget.onTap,
-            onSecondaryTap: widget.onSecondaryTap,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 200),
-              padding: EdgeInsets.only(left: 8, right: onClose != null ? 4 : 8),
-              alignment: Alignment.center,
-              child: Row(
-                children: [
-                  if (selectedCount > 0)
-                    Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.primary,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$selectedCount',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: cs.onPrimary,
+            Material(
+              color: active ? widget.activeBackground : Colors.transparent,
+              borderRadius: shape,
+              child: Listener(
+                // A middle click closes the tab, as in a browser.
+                onPointerDown: (event) {
+                  if (event.buttons == kMiddleMouseButton) onClose?.call();
+                },
+                child: InkWell(
+                  borderRadius: shape,
+                  onTap: widget.onTap,
+                  onSecondaryTap: widget.onSecondaryTap,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 200),
+                    padding: EdgeInsets.only(
+                      left: 8,
+                      right: onClose != null ? 4 : 8,
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      children: [
+                        if (selectedCount > 0)
+                          Container(
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$selectedCount',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: cs.onPrimary,
+                              ),
+                            ),
+                          ),
+                        if (tab.isCategory) ...[
+                          Icon(
+                            tab.category!.icon,
+                            size: 15,
+                            color: active ? cs.primary : fg,
+                          ),
+                          const SizedBox(width: 5),
+                        ],
+                        Expanded(
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: active
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: fg,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  if (tab.isCategory) ...[
-                    Icon(
-                      tab.category!.icon,
-                      size: 15,
-                      color: active ? cs.primary : fg,
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                        color: fg,
-                      ),
+                        // Pinned to the tab's right edge.
+                        if (onClose != null)
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: showClose
+                                ? IconButton(
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                    iconSize: 14,
+                                    tooltip: context.l10n.browserTabClose,
+                                    onPressed: onClose,
+                                    icon: const Icon(Icons.close_rounded),
+                                  )
+                                : null,
+                          ),
+                      ],
                     ),
                   ),
-                  // Pinned to the tab's right edge.
-                  if (onClose != null)
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: showClose
-                          ? IconButton(
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                              iconSize: 14,
-                              tooltip: context.l10n.browserTabClose,
-                              onPressed: onClose,
-                              icon: const Icon(Icons.close_rounded),
-                            )
-                          : null,
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        ),
-        // Concave feet that blend the selected tab into the toolbar.
-        if (widget.connected && active) ...[
-          Positioned(
-            left: -_kTabFlare,
-            bottom: 0,
-            width: _kTabFlare,
-            height: _kTabFlare,
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _TabFootPainter(widget.activeBackground, left: true),
-              ),
-            ),
-          ),
-          Positioned(
-            right: -_kTabFlare,
-            bottom: 0,
-            width: _kTabFlare,
-            height: _kTabFlare,
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _TabFootPainter(widget.activeBackground, left: false),
-              ),
-            ),
-          ),
-        ],
-        if (widget.accent && active)
-          Positioned(
-            left: 8,
-            right: 8,
-            top: 0,
-            height: 2,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: cs.primary,
-                  borderRadius: BorderRadius.circular(1),
                 ),
               ),
             ),
-          ),
+            // Concave feet that blend the selected tab into the toolbar.
+            if (widget.connected && active) ...[
+              Positioned(
+                left: -_kTabFlare,
+                bottom: 0,
+                width: _kTabFlare,
+                height: _kTabFlare,
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _TabFootPainter(
+                      widget.activeBackground,
+                      left: true,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: -_kTabFlare,
+                bottom: 0,
+                width: _kTabFlare,
+                height: _kTabFlare,
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _TabFootPainter(
+                      widget.activeBackground,
+                      left: false,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (widget.accent && active)
+              Positioned(
+                left: 8,
+                right: 8,
+                top: 0,
+                height: 2,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

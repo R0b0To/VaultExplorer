@@ -827,7 +827,7 @@ class FileManagerToolbarConfig {
     'showListThumbnails': showListThumbnails,
     'showItemActionsMenu': showItemActionsMenu,
     'selectByIcon': selectByIcon,
-        'doubleClickToOpen': doubleClickToOpen,
+    'doubleClickToOpen': doubleClickToOpen,
     'showFileExtensions': showFileExtensions,
     'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
     'listZoomLevel': listZoomLevel,

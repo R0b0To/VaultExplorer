@@ -14,14 +14,17 @@ import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 
 void main() {
   group('FileManagerToolbarConfig toolbar action order', () {
-    test('play media is available but hidden in the fresh-install defaults', () {
-      final defaults = FileManagerToolbarConfig.defaults();
+    test(
+      'play media is available but hidden in the fresh-install defaults',
+      () {
+        final defaults = FileManagerToolbarConfig.defaults();
 
-      expect(defaults.order, contains(FileManagerAction.playMedia));
-      expect(defaults.hidden, contains(FileManagerAction.playMedia));
-      expect(defaults.visible, isNot(contains(FileManagerAction.playMedia)));
-      expect(defaults.visible.last, FileManagerAction.options);
-    });
+        expect(defaults.order, contains(FileManagerAction.playMedia));
+        expect(defaults.hidden, contains(FileManagerAction.playMedia));
+        expect(defaults.visible, isNot(contains(FileManagerAction.playMedia)));
+        expect(defaults.visible.last, FileManagerAction.options);
+      },
+    );
 
     test('the mode switches sit together and the options menu is last', () {
       final order = FileManagerToolbarConfig.defaultActionOrder;
@@ -78,24 +81,27 @@ void main() {
       ]);
     });
 
-    test('legacy orders gain the mode action and hide newly added play media', () {
-      final legacy = FileManagerToolbarConfig.defaults().toJson()
-        ..['order'] = [
-          FileManagerAction.search.name,
-          FileManagerAction.add.name,
-          FileManagerAction.gallery.name,
-          FileManagerAction.viewToggle.name,
-          FileManagerAction.sort.name,
-          FileManagerAction.filter.name,
-          FileManagerAction.options.name,
-        ]
-        ..['hidden'] = <String>[];
-      final restored = FileManagerToolbarConfig.fromJson(legacy);
+    test(
+      'legacy orders gain the mode action and hide newly added play media',
+      () {
+        final legacy = FileManagerToolbarConfig.defaults().toJson()
+          ..['order'] = [
+            FileManagerAction.search.name,
+            FileManagerAction.add.name,
+            FileManagerAction.gallery.name,
+            FileManagerAction.viewToggle.name,
+            FileManagerAction.sort.name,
+            FileManagerAction.filter.name,
+            FileManagerAction.options.name,
+          ]
+          ..['hidden'] = <String>[];
+        final restored = FileManagerToolbarConfig.fromJson(legacy);
 
-      expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
-      expect(restored.hidden, contains(FileManagerAction.playMedia));
-      expect(restored.visible.last, FileManagerAction.options);
-    });
+        expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
+        expect(restored.hidden, contains(FileManagerAction.playMedia));
+        expect(restored.visible.last, FileManagerAction.options);
+      },
+    );
   });
 
   group('FileManagerToolbarConfig autoStartPlaylistMode', () {
@@ -105,10 +111,7 @@ void main() {
     });
 
     test('defaults to false when unassigned in constructor', () {
-      final config = const FileManagerToolbarConfig(
-        order: [],
-        hidden: {},
-      );
+      final config = const FileManagerToolbarConfig(order: [], hidden: {});
       expect(config.autoStartPlaylistMode, isTrue);
     });
 
@@ -121,21 +124,22 @@ void main() {
       expect(reset.autoStartPlaylistMode, isFalse);
     });
 
-    test('serializes and deserializes autoStartPlaylistMode correctly in JSON', () {
-      final config = FileManagerToolbarConfig.defaults().copyWith(
-        autoStartPlaylistMode: true,
-      );
-      final json = config.toJson();
-      expect(json['autoStartPlaylistMode'], isTrue);
+    test(
+      'serializes and deserializes autoStartPlaylistMode correctly in JSON',
+      () {
+        final config = FileManagerToolbarConfig.defaults().copyWith(
+          autoStartPlaylistMode: true,
+        );
+        final json = config.toJson();
+        expect(json['autoStartPlaylistMode'], isTrue);
 
-      final restored = FileManagerToolbarConfig.fromJson(json);
-      expect(restored.autoStartPlaylistMode, isTrue);
-    });
+        final restored = FileManagerToolbarConfig.fromJson(json);
+        expect(restored.autoStartPlaylistMode, isTrue);
+      },
+    );
 
     test('fromJson falls back to false when key is missing', () {
-      final json = <String, dynamic>{
-        'showBreadcrumbBar': true,
-      };
+      final json = <String, dynamic>{'showBreadcrumbBar': true};
       final config = FileManagerToolbarConfig.fromJson(json);
       expect(config.autoStartPlaylistMode, isTrue);
     });
@@ -164,9 +168,7 @@ void main() {
       expect(
         config.visibleItemActions,
         FileItemAction.values.reversed
-            .where(
-              (a) => a != FileItemAction.delete && a != FileItemAction.pin,
-            )
+            .where((a) => a != FileItemAction.delete && a != FileItemAction.pin)
             .toList(),
       );
     });
@@ -234,29 +236,38 @@ void main() {
       expect(config.hiddenItemActions, isEmpty);
     });
 
-    test('a stored order from before go to location and copy path gets both, visible', () {
-      final old = FileItemAction.values
-          .where(
-            (a) =>
-                a != FileItemAction.goToLocation &&
-                a != FileItemAction.copyPath,
-          )
-          .map((a) => a.toJson())
-          .toList();
-      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
-        'itemActionsOrder': old,
-        'hiddenItemActions': ['pin'],
-      });
+    test(
+      'a stored order from before go to location and copy path gets both, visible',
+      () {
+        final old = FileItemAction.values
+            .where(
+              (a) =>
+                  a != FileItemAction.goToLocation &&
+                  a != FileItemAction.copyPath,
+            )
+            .map((a) => a.toJson())
+            .toList();
+        final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+          'itemActionsOrder': old,
+          'hiddenItemActions': ['pin'],
+        });
 
-      expect(config.itemActionsOrder.take(old.length).map((a) => a.toJson()), old);
-      expect(
-        config.itemActionsOrder.skip(old.length),
-        containsAll([FileItemAction.goToLocation, FileItemAction.copyPath]),
-      );
-      expect(config.hiddenItemActions, {FileItemAction.pin});
-      expect(config.visibleItemActions, contains(FileItemAction.copyPath));
-      expect(config.visibleItemActions, contains(FileItemAction.goToLocation));
-    });
+        expect(
+          config.itemActionsOrder.take(old.length).map((a) => a.toJson()),
+          old,
+        );
+        expect(
+          config.itemActionsOrder.skip(old.length),
+          containsAll([FileItemAction.goToLocation, FileItemAction.copyPath]),
+        );
+        expect(config.hiddenItemActions, {FileItemAction.pin});
+        expect(config.visibleItemActions, contains(FileItemAction.copyPath));
+        expect(
+          config.visibleItemActions,
+          contains(FileItemAction.goToLocation),
+        );
+      },
+    );
 
     test('fromJson drops unknown names and duplicates, appends missing', () {
       final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
@@ -269,10 +280,7 @@ void main() {
         FileItemAction.share,
       ]);
       expect(config.itemActionsOrder.toSet(), FileItemAction.values.toSet());
-      expect(
-        config.itemActionsOrder.length,
-        FileItemAction.values.length,
-      );
+      expect(config.itemActionsOrder.length, FileItemAction.values.length);
       expect(config.hiddenItemActions, {FileItemAction.copy});
     });
   });
@@ -285,7 +293,10 @@ void main() {
 
       const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
       expect(unassigned.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(unassigned.defaultThumbnailQuality, ThumbnailQuality.defaultAutoQuality);
+      expect(
+        unassigned.defaultThumbnailQuality,
+        ThumbnailQuality.defaultAutoQuality,
+      );
     });
 
     test('copyWith updates thumbnail settings', () {
@@ -317,7 +328,10 @@ void main() {
     test('fromJson falls back to defaults when keys are missing', () {
       final config = FileManagerToolbarConfig.fromJson({});
       expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(config.defaultThumbnailQuality, ThumbnailQuality.defaultAutoQuality);
+      expect(
+        config.defaultThumbnailQuality,
+        ThumbnailQuality.defaultAutoQuality,
+      );
     });
   });
 
@@ -325,7 +339,10 @@ void main() {
     test('defaults match the vault default', () {
       final def = FileManagerToolbarConfig.defaults();
       expect(def.localStorageThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(def.localStorageThumbnailQuality, ThumbnailQuality.defaultAutoQuality);
+      expect(
+        def.localStorageThumbnailQuality,
+        ThumbnailQuality.defaultAutoQuality,
+      );
 
       const unassigned = FileManagerToolbarConfig(order: [], hidden: {});
       expect(
@@ -342,21 +359,33 @@ void main() {
         defaultThumbnailCacheMode: ThumbnailCacheMode.appCache,
       );
       expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.appCache);
-      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.disabled);
+      expect(
+        config.localStorageThumbnailCacheMode,
+        ThumbnailCacheMode.disabled,
+      );
 
       final local = config.copyWith(
         localStorageThumbnailCacheMode: ThumbnailCacheMode.inContainer,
-        localStorageThumbnailQuality: const ThumbnailQuality(quality: 95, size: 320),
+        localStorageThumbnailQuality: const ThumbnailQuality(
+          quality: 95,
+          size: 320,
+        ),
       );
       expect(local.defaultThumbnailCacheMode, ThumbnailCacheMode.appCache);
-      expect(local.localStorageThumbnails.cacheMode, ThumbnailCacheMode.inContainer);
+      expect(
+        local.localStorageThumbnails.cacheMode,
+        ThumbnailCacheMode.inContainer,
+      );
       expect(local.localStorageThumbnails.quality.size, 320);
     });
 
     test('round-trips through JSON', () {
       final config = FileManagerToolbarConfig.defaults().copyWith(
         localStorageThumbnailCacheMode: ThumbnailCacheMode.inContainer,
-        localStorageThumbnailQuality: const ThumbnailQuality(quality: 95, size: 320),
+        localStorageThumbnailQuality: const ThumbnailQuality(
+          quality: 95,
+          size: 320,
+        ),
       );
       final json = config.toJson();
       expect(json['localStorageThumbnailCacheMode'], 'inContainer');
@@ -364,7 +393,10 @@ void main() {
       final restored = FileManagerToolbarConfig.fromJson(
         jsonDecode(jsonEncode(json)) as Map<String, dynamic>,
       );
-      expect(restored.localStorageThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+      expect(
+        restored.localStorageThumbnailCacheMode,
+        ThumbnailCacheMode.inContainer,
+      );
       expect(restored.localStorageThumbnailQuality.quality, 95);
       expect(restored.localStorageThumbnailQuality.size, 320);
     });
@@ -376,13 +408,21 @@ void main() {
         'defaultThumbnailQuality': {'quality': 70, 'size': 300},
       };
       final config = FileManagerToolbarConfig.fromJson(legacy);
-      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+      expect(
+        config.localStorageThumbnailCacheMode,
+        ThumbnailCacheMode.inContainer,
+      );
       expect(config.localStorageThumbnailQuality.quality, 70);
       expect(config.localStorageThumbnailQuality.size, 300);
 
       // From then on the two are independent.
-      final moved = config.copyWith(defaultThumbnailCacheMode: ThumbnailCacheMode.disabled);
-      expect(moved.localStorageThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+      final moved = config.copyWith(
+        defaultThumbnailCacheMode: ThumbnailCacheMode.disabled,
+      );
+      expect(
+        moved.localStorageThumbnailCacheMode,
+        ThumbnailCacheMode.inContainer,
+      );
     });
 
     test('a stored slot is not overwritten by the default', () {
@@ -391,7 +431,10 @@ void main() {
         'localStorageThumbnailCacheMode': 'disabled',
       });
       expect(config.defaultThumbnailCacheMode, ThumbnailCacheMode.appCache);
-      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.disabled);
+      expect(
+        config.localStorageThumbnailCacheMode,
+        ThumbnailCacheMode.disabled,
+      );
     });
 
     test('an unreadable stored mode falls back to the default value', () {
@@ -399,7 +442,10 @@ void main() {
         'defaultThumbnailCacheMode': 'appCache',
         'localStorageThumbnailCacheMode': 'nonsense',
       });
-      expect(config.localStorageThumbnailCacheMode, ThumbnailCacheMode.appCache);
+      expect(
+        config.localStorageThumbnailCacheMode,
+        ThumbnailCacheMode.appCache,
+      );
     });
   });
 
@@ -476,8 +522,10 @@ void main() {
       expect(updated.skin, SkinPreset.terminal.skin);
       expect(updated.showHiddenFiles, isTrue);
       // Omitting skin keeps whatever was there.
-      expect(updated.copyWith(showHiddenFiles: false).skin,
-          SkinPreset.terminal.skin);
+      expect(
+        updated.copyWith(showHiddenFiles: false).skin,
+        SkinPreset.terminal.skin,
+      );
     });
 
     test('a skin survives the JSON round trip storage performs', () {
@@ -504,8 +552,10 @@ void main() {
 
       final restored = FileManagerToolbarConfig.fromJson(legacy);
       expect(restored.skin, FileManagerSkin.classic);
-      expect(FileManagerToolbarConfig.fromJson({}).skin,
-          FileManagerSkin.classic);
+      expect(
+        FileManagerToolbarConfig.fromJson({}).skin,
+        FileManagerSkin.classic,
+      );
     });
 
     test('a corrupted skin falls back to classic without losing the rest', () {
@@ -522,21 +572,28 @@ void main() {
 
   group('FileManagerToolbarConfig resetSizeOnLayoutChange', () {
     test('is enabled by default in defaults() and the constructor', () {
-      expect(FileManagerToolbarConfig.defaults().resetSizeOnLayoutChange,
-          isTrue);
       expect(
-        const FileManagerToolbarConfig(order: [], hidden: {})
-            .resetSizeOnLayoutChange,
+        FileManagerToolbarConfig.defaults().resetSizeOnLayoutChange,
+        isTrue,
+      );
+      expect(
+        const FileManagerToolbarConfig(
+          order: [],
+          hidden: {},
+        ).resetSizeOnLayoutChange,
         isTrue,
       );
     });
 
     test('copyWith toggles it', () {
-      final off = FileManagerToolbarConfig.defaults()
-          .copyWith(resetSizeOnLayoutChange: false);
+      final off = FileManagerToolbarConfig.defaults().copyWith(
+        resetSizeOnLayoutChange: false,
+      );
       expect(off.resetSizeOnLayoutChange, isFalse);
-      expect(off.copyWith(resetSizeOnLayoutChange: true)
-          .resetSizeOnLayoutChange, isTrue);
+      expect(
+        off.copyWith(resetSizeOnLayoutChange: true).resetSizeOnLayoutChange,
+        isTrue,
+      );
     });
 
     test('round-trips through JSON', () {
@@ -544,14 +601,16 @@ void main() {
           .copyWith(resetSizeOnLayoutChange: false)
           .toJson();
       expect(json['resetSizeOnLayoutChange'], isFalse);
-      expect(FileManagerToolbarConfig.fromJson(json).resetSizeOnLayoutChange,
-          isFalse);
+      expect(
+        FileManagerToolbarConfig.fromJson(json).resetSizeOnLayoutChange,
+        isFalse,
+      );
     });
 
     test('fromJson defaults to enabled when the key is missing', () {
-      final config = FileManagerToolbarConfig.fromJson(
-        <String, dynamic>{'showBreadcrumbBar': true},
-      );
+      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'showBreadcrumbBar': true,
+      });
       expect(config.resetSizeOnLayoutChange, isTrue);
     });
 
@@ -585,14 +644,18 @@ void main() {
     test('defaults to false in defaults() factory and constructor', () {
       expect(FileManagerToolbarConfig.defaults().showNoMediaFolders, isFalse);
       expect(
-        const FileManagerToolbarConfig(order: [], hidden: {}).showNoMediaFolders,
+        const FileManagerToolbarConfig(
+          order: [],
+          hidden: {},
+        ).showNoMediaFolders,
         isFalse,
       );
     });
 
     test('copyWith updates showNoMediaFolders', () {
-      final config = FileManagerToolbarConfig.defaults()
-          .copyWith(showNoMediaFolders: true);
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        showNoMediaFolders: true,
+      );
       expect(config.showNoMediaFolders, isTrue);
     });
 
@@ -608,9 +671,9 @@ void main() {
     });
 
     test('fromJson falls back to false when key is missing', () {
-      final config = FileManagerToolbarConfig.fromJson(
-        <String, dynamic>{'showBreadcrumbBar': true},
-      );
+      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'showBreadcrumbBar': true,
+      });
       expect(config.showNoMediaFolders, isFalse);
     });
   });
@@ -624,8 +687,10 @@ void main() {
       var config = FileManagerToolbarConfig.defaults()
           .withGalleryFoldersForStorage('vault://a', ['DCIM', 'Trips/2024'])
           .withGalleryFoldersForStorage('vault://b', ['Pics']);
-      expect(config.galleryFoldersForStorage('vault://a'),
-          ['DCIM', 'Trips/2024']);
+      expect(config.galleryFoldersForStorage('vault://a'), [
+        'DCIM',
+        'Trips/2024',
+      ]);
       expect(config.galleryFoldersForStorage('vault://b'), ['Pics']);
 
       config = config.withGalleryFoldersForStorage('vault://a', const []);
@@ -642,7 +707,8 @@ void main() {
       );
       expect(decoded.galleryFoldersForStorage('vault://a'), ['DCIM']);
 
-      final json = jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>;
+      final json =
+          jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>;
       json['galleryFoldersByStorage'] = {
         'vault://ok': ['A', '', 3],
         'vault://bad': 'nope',
@@ -691,8 +757,14 @@ void main() {
       final decoded = FileManagerToolbarConfig.fromJson(
         jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>,
       );
-      expect(decoded.isGalleryPromptSkippedForStorage('vault://gallery'), isTrue);
-      expect(decoded.isGalleryPromptSkippedForStorage('vault://other'), isFalse);
+      expect(
+        decoded.isGalleryPromptSkippedForStorage('vault://gallery'),
+        isTrue,
+      );
+      expect(
+        decoded.isGalleryPromptSkippedForStorage('vault://other'),
+        isFalse,
+      );
       expect(decoded.isMusicPromptSkippedForStorage('vault://music'), isTrue);
       expect(decoded.isMusicPromptSkippedForStorage('vault://other'), isFalse);
     });
@@ -734,9 +806,9 @@ void main() {
     });
 
     test('fromJson falls back to false when keys are missing', () {
-      final decoded = FileManagerToolbarConfig.fromJson(
-        <String, dynamic>{'showBreadcrumbBar': true},
-      );
+      final decoded = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'showBreadcrumbBar': true,
+      });
       expect(decoded.autoHideToolbar, isFalse);
       expect(decoded.autoHideBreadcrumbBar, isFalse);
     });
@@ -764,7 +836,8 @@ void main() {
       final config = FileManagerToolbarConfig.defaults().copyWith(
         doubleClickToOpen: true,
       );
-      final json = jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>;
+      final json =
+          jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>;
       expect(json['doubleClickToOpen'], isTrue);
       expect(FileManagerToolbarConfig.fromJson(json).doubleClickToOpen, isTrue);
     });
@@ -780,7 +853,10 @@ void main() {
     );
 
     test('travels with the behavior half of an export, not the look half', () {
-      expect(FileManagerToolbarConfig.behaviorKeys, contains('doubleClickToOpen'));
+      expect(
+        FileManagerToolbarConfig.behaviorKeys,
+        contains('doubleClickToOpen'),
+      );
       final config = FileManagerToolbarConfig.defaults().copyWith(
         doubleClickToOpen: true,
       );

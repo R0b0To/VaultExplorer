@@ -66,14 +66,29 @@ void main() {
       await controller.setShowFileExtensions(false);
       expect(container.read(provider).config.showFileExtensions, isFalse);
 
-      await controller.setPlaylistTransitionEffect(PlaylistTransitionEffect.fade);
-      expect(container.read(provider).config.playlistTransitionEffect, PlaylistTransitionEffect.fade);
+      await controller.setPlaylistTransitionEffect(
+        PlaylistTransitionEffect.fade,
+      );
+      expect(
+        container.read(provider).config.playlistTransitionEffect,
+        PlaylistTransitionEffect.fade,
+      );
 
-      await controller.setDefaultThumbnailCacheMode(ThumbnailCacheMode.inContainer);
-      expect(container.read(provider).config.defaultThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+      await controller.setDefaultThumbnailCacheMode(
+        ThumbnailCacheMode.inContainer,
+      );
+      expect(
+        container.read(provider).config.defaultThumbnailCacheMode,
+        ThumbnailCacheMode.inContainer,
+      );
 
-      await controller.setDefaultThumbnailQuality(const ThumbnailQuality(quality: 80, size: 240));
-      expect(container.read(provider).config.defaultThumbnailQuality.quality, 80);
+      await controller.setDefaultThumbnailQuality(
+        const ThumbnailQuality(quality: 80, size: 240),
+      );
+      expect(
+        container.read(provider).config.defaultThumbnailQuality.quality,
+        80,
+      );
       expect(container.read(provider).config.defaultThumbnailQuality.size, 240);
     });
 
@@ -82,10 +97,16 @@ void main() {
       await controller.load(null);
 
       await controller.toggleActionVisible(FileManagerAction.search, false);
-      expect(container.read(provider).config.hidden, contains(FileManagerAction.search));
+      expect(
+        container.read(provider).config.hidden,
+        contains(FileManagerAction.search),
+      );
 
       await controller.toggleActionVisible(FileManagerAction.search, true);
-      expect(container.read(provider).config.hidden, isNot(contains(FileManagerAction.search)));
+      expect(
+        container.read(provider).config.hidden,
+        isNot(contains(FileManagerAction.search)),
+      );
     });
 
     test('toggleItemActionVisible hides and reveals item actions', () async {
@@ -180,22 +201,25 @@ void main() {
       expect(container.read(provider).config.quickItemActions, isEmpty);
     });
 
-    test('resetItemActions restores order, visibility and quick row only', () async {
-      final controller = container.read(provider.notifier);
-      await controller.load(null);
+    test(
+      'resetItemActions restores order, visibility and quick row only',
+      () async {
+        final controller = container.read(provider.notifier);
+        await controller.load(null);
 
-      await controller.setShowHiddenFiles(true);
-      await controller.toggleItemActionVisible(FileItemAction.share, false);
-      await controller.reorderItemActions(true, 0, 3);
-      await controller.setItemActionInQuickRow(FileItemAction.rename, true);
-      await controller.resetItemActions();
+        await controller.setShowHiddenFiles(true);
+        await controller.toggleItemActionVisible(FileItemAction.share, false);
+        await controller.reorderItemActions(true, 0, 3);
+        await controller.setItemActionInQuickRow(FileItemAction.rename, true);
+        await controller.resetItemActions();
 
-      final config = container.read(provider).config;
-      expect(config.itemActionsOrder, FileItemAction.values);
-      expect(config.hiddenItemActions, isEmpty);
-      expect(config.quickItemActions, FileItemAction.defaultQuickActions);
-      expect(config.showHiddenFiles, isTrue);
-    });
+        final config = container.read(provider).config;
+        expect(config.itemActionsOrder, FileItemAction.values);
+        expect(config.hiddenItemActions, isEmpty);
+        expect(config.quickItemActions, FileItemAction.defaultQuickActions);
+        expect(config.showHiddenFiles, isTrue);
+      },
+    );
 
     test('setSkin updates the skin and leaves other settings alone', () async {
       final controller = container.read(provider.notifier);
@@ -218,41 +242,101 @@ void main() {
       expect(container.read(provider).config.skin, FileManagerSkin.classic);
     });
 
-    test('toggleDetailColumnVisible hides and reveals detail columns', () async {
-      final controller = container.read(provider.notifier);
-      await controller.load(null);
+    test(
+      'toggleDetailColumnVisible hides and reveals detail columns',
+      () async {
+        final controller = container.read(provider.notifier);
+        await controller.load(null);
 
-      await controller.toggleDetailColumnVisible(FileDetailColumn.size, false);
-      expect(container.read(provider).config.hiddenDetailColumns, contains(FileDetailColumn.size));
+        await controller.toggleDetailColumnVisible(
+          FileDetailColumn.size,
+          false,
+        );
+        expect(
+          container.read(provider).config.hiddenDetailColumns,
+          contains(FileDetailColumn.size),
+        );
 
-      await controller.toggleDetailColumnVisible(FileDetailColumn.size, true);
-      expect(container.read(provider).config.hiddenDetailColumns, isNot(contains(FileDetailColumn.size)));
-    });
+        await controller.toggleDetailColumnVisible(FileDetailColumn.size, true);
+        expect(
+          container.read(provider).config.hiddenDetailColumns,
+          isNot(contains(FileDetailColumn.size)),
+        );
+      },
+    );
 
-    test('setMediaViewerSwipeToDismissEnabled updates mediaViewerToolbarConfig', () async {
-      final controller = container.read(provider.notifier);
-      await controller.load(null);
+    test(
+      'setMediaViewerSwipeToDismissEnabled updates mediaViewerToolbarConfig',
+      () async {
+        final controller = container.read(provider.notifier);
+        await controller.load(null);
 
-      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToDismissEnabled, isTrue);
+        expect(
+          container
+              .read(provider)
+              .config
+              .mediaViewerToolbarConfig
+              .swipeToDismissEnabled,
+          isTrue,
+        );
 
-      await controller.setMediaViewerSwipeToDismissEnabled(false);
-      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToDismissEnabled, isFalse);
+        await controller.setMediaViewerSwipeToDismissEnabled(false);
+        expect(
+          container
+              .read(provider)
+              .config
+              .mediaViewerToolbarConfig
+              .swipeToDismissEnabled,
+          isFalse,
+        );
 
-      await controller.setMediaViewerSwipeToDismissEnabled(true);
-      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToDismissEnabled, isTrue);
-    });
+        await controller.setMediaViewerSwipeToDismissEnabled(true);
+        expect(
+          container
+              .read(provider)
+              .config
+              .mediaViewerToolbarConfig
+              .swipeToDismissEnabled,
+          isTrue,
+        );
+      },
+    );
 
-    test('setMediaViewerSwipeToSeekEnabled updates mediaViewerToolbarConfig', () async {
-      final controller = container.read(provider.notifier);
-      await controller.load(null);
+    test(
+      'setMediaViewerSwipeToSeekEnabled updates mediaViewerToolbarConfig',
+      () async {
+        final controller = container.read(provider.notifier);
+        await controller.load(null);
 
-      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToSeekEnabled, isFalse);
+        expect(
+          container
+              .read(provider)
+              .config
+              .mediaViewerToolbarConfig
+              .swipeToSeekEnabled,
+          isFalse,
+        );
 
-      await controller.setMediaViewerSwipeToSeekEnabled(true);
-      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToSeekEnabled, isTrue);
+        await controller.setMediaViewerSwipeToSeekEnabled(true);
+        expect(
+          container
+              .read(provider)
+              .config
+              .mediaViewerToolbarConfig
+              .swipeToSeekEnabled,
+          isTrue,
+        );
 
-      await controller.setMediaViewerSwipeToSeekEnabled(false);
-      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToSeekEnabled, isFalse);
-    });
+        await controller.setMediaViewerSwipeToSeekEnabled(false);
+        expect(
+          container
+              .read(provider)
+              .config
+              .mediaViewerToolbarConfig
+              .swipeToSeekEnabled,
+          isFalse,
+        );
+      },
+    );
   });
 }

@@ -211,8 +211,7 @@ Widget buildBrowserBody(
       // In double-click mode the icon follows the row behavior too: the
       // first click selects and the second opens. Otherwise it can be a
       // dedicated selection target when that option is enabled.
-      onIconTap:
-          toolbarConfig.selectByIcon && !toolbarConfig.doubleClickToOpen
+      onIconTap: toolbarConfig.selectByIcon && !toolbarConfig.doubleClickToOpen
           ? onIconTap
           : null,
       onSelectionChanged: onSelectionChanged,

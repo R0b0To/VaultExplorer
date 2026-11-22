@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/utils/last_pointer.dart';
 import 'package:vaultexplorer/app/app_bootstrap.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';

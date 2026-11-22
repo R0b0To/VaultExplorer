@@ -1058,6 +1058,7 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
           : () => widget.onFileLongMenu!(entry),
       preview: previewWidget,
       label: displayName,
+      renameKey: entry.name,
       searchQuery: widget.searchQuery,
     );
   }

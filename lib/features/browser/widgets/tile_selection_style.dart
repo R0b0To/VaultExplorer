@@ -211,6 +211,7 @@ class FileRowShell extends StatelessWidget {
       children: [
         FileNameLabel(
           text: displayName,
+          renameKey: entry.name,
           query: searchQuery,
           mode: longFileNameMode,
           style: skin.nameStyle(
@@ -445,6 +446,7 @@ class FileRowShell extends StatelessWidget {
                         ? _buildDetailedNameBlock(context, textTheme, cs)
                         : FileNameLabel(
                             text: displayName,
+                            renameKey: entry.name,
                             query: searchQuery,
                             mode: longFileNameMode,
                             style: skin.nameStyle(

@@ -82,6 +82,9 @@ class GridCheckBadge extends StatelessWidget {
 class GridCardShell extends StatelessWidget {
   final Widget preview;
   final String label;
+
+  /// The item's real name, when [label] may leave out its extension.
+  final String? renameKey;
   final String? searchQuery;
   final bool isSelected;
   final bool isSelectionMode;
@@ -123,6 +126,7 @@ class GridCardShell extends StatelessWidget {
     super.key,
     required this.preview,
     required this.label,
+    this.renameKey,
     this.searchQuery,
     required this.isSelected,
     required this.isSelectionMode,
@@ -271,6 +275,7 @@ class GridCardShell extends StatelessWidget {
 
     final nameLabel = FileNameLabel(
       text: label,
+      renameKey: renameKey ?? label,
       query: searchQuery,
       mode: longFileNameMode,
       style: skin.nameStyle(

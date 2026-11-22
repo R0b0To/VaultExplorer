@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
+import 'package:vaultexplorer/features/browser/widgets/inline_rename.dart';
 
 /// Renders a file/folder name on a single line, shortening it to fit
 /// according to [mode] instead of ever wrapping onto a second line.
@@ -15,6 +16,10 @@ import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 /// [HighlightedText].
 class FileNameLabel extends StatelessWidget {
   final String text;
+
+  /// The item's real name when [text] may differ from it (an extension left
+  /// out); the item being renamed in place is matched by this.
+  final String? renameKey;
   final String? query;
   final TextStyle? style;
   final LongFileNameDisplayMode mode;
@@ -22,6 +27,7 @@ class FileNameLabel extends StatelessWidget {
   const FileNameLabel({
     super.key,
     required this.text,
+    this.renameKey,
     this.query,
     this.style,
     this.mode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -37,6 +43,11 @@ class FileNameLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The item being renamed in place shows its text field instead.
+    final rename = InlineRenameScope.maybeOf(context);
+    if (rename != null && rename.isRenaming(renameKey ?? text)) {
+      return InlineRenameField(controller: rename, style: style);
+    }
     switch (mode) {
       case LongFileNameDisplayMode.marquee:
         // Search highlighting isn't meaningful on scrolling text (there's

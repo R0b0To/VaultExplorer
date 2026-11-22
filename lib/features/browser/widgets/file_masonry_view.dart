@@ -1844,6 +1844,7 @@ void _hydrateFromIndex() {
           : () => widget.onFileLongMenu!(entry),
       preview: previewWidget,
       label: displayName,
+      renameKey: entry.name,
       searchQuery: widget.searchQuery,
     );
   }

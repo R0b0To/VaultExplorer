@@ -59,6 +59,7 @@ import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/archive_preview_file.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/features/browser/widgets/inline_rename.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
@@ -742,6 +743,49 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   // how the listener ends up firing late.
   bool _disposed = false;
 
+  /// The item whose name is being edited in place (desktop rename).
+  final InlineRenameController _inlineRename = InlineRenameController();
+
+  /// Renames [entry] in place on desktop, in a text field where its name is;
+  /// elsewhere (phones, archives) with the rename dialog.
+  void _startRename(RawEntry entry) {
+    if (_isReadOnly ||
+        _archiveContext != null ||
+        !PlatformFeatures.isDesktop) {
+      unawaited(
+        BrowserDialogs.showRename(
+          context,
+          container: widget.container,
+          oldEntries: [entry],
+          existingEntries: _currentItems,
+          currentDirPath: _currentDirPath,
+          onSuccess: exitSelectionMode,
+          readOnly: _isReadOnly,
+        ),
+      );
+      return;
+    }
+    _inlineRename.start(
+      entry,
+      existing: _currentItems,
+      fsType: resolveFilesystemType(widget.container),
+      onCommit: (oldEntry, newName) async {
+        final ok = await renameEntryInline(
+          ref: ref,
+          context: context,
+          container: widget.container,
+          oldEntry: oldEntry,
+          newName: newName,
+          currentDirPath: _currentDirPath,
+        );
+        if (ok && mounted) {
+          exitSelectionMode();
+          unawaited(_loadDirectoryContents(_currentDirPath, refresh: true));
+        }
+      },
+    );
+  }
+
   // Set once the first listing (or the initial path) has loaded; a bookmark
   // requested from the drawer waits for it. See _consumeBookmarkRequest.
   bool _initialLoadDone = false;
@@ -1038,6 +1082,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   @override
   void dispose() {
     _disposed = true;
+    _inlineRename.dispose();
     HardwareKeyboard.instance.removeHandler(_handleBrowserKey);
     MouseNavDispatcher.instance.unregister(_handleMouseNav);
     _music.removeListener(_onMusicChanged);
@@ -1382,6 +1427,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     _signalActivity();
     HapticFeedback.selectionClick();
+    // Opened on one of several selected items (desktop): rename, copy, move
+    // and delete act on the whole selection, not on just the one clicked.
+    final targets =
+        PlatformFeatures.isDesktop &&
+            selectedItems.length > 1 &&
+            selectedItems.contains(entry)
+        ? selectedItems.toList()
+        : <RawEntry>[entry];
     final fullPath = _fullPathOf(entry);
     final extension =
         ArchiveService.splitPartExtension(entry.name) ??
@@ -1405,20 +1458,27 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       isBookmark: _isBookmark(entry),
       isDocumentProviderMounted: _isFolderMounted(entry),
       onRename: () {
-        BrowserDialogs.showRename(
-          context,
-          container: widget.container,
-          oldEntries: [entry],
-          existingEntries: _currentItems,
-          currentDirPath: _currentDirPath,
-          onSuccess: () {},
-          readOnly: _isReadOnly,
-        );
+        if (targets.length > 1 && _archiveContext == null) {
+          // Several items: the advanced (pattern based) rename.
+          unawaited(
+            BrowserDialogs.showAdvancedRename(
+              context,
+              container: widget.container,
+              oldEntries: targets,
+              existingEntries: _currentItems,
+              currentDirPath: _currentDirPath,
+              onSuccess: exitSelectionMode,
+              readOnly: _isReadOnly,
+            ),
+          );
+          return;
+        }
+        _startRename(entry);
       },
       onDelete: () {
         BrowserDialogs.showBatchDelete(
           context,
-          toDelete: [entry],
+          toDelete: targets,
           onConfirmed: (entries) {
             final clipItems = entries
                 .map((e) => ClipboardItem(path: _fullPathOf(e), isDir: e.isDir))
@@ -1453,15 +1513,22 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           displayName: widget.container.displayName,
           cut: false,
           clipItems: [
-            ClipboardItem(
-              path: fullPath,
-              isDir: entry.isDir,
-              sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
-              modifiedSecs: entry.modifiedSecs,
-            ),
+            for (final target in targets)
+              ClipboardItem(
+                path: _fullPathOf(target),
+                isDir: target.isDir,
+                sizeBytes: target.isDir ? 0 : target.sizeBytes,
+                modifiedSecs: target.modifiedSecs,
+              ),
           ],
         );
-        _setStatus(context.l10n.copiedSuffix(entry.name));
+        _setStatus(
+          context.l10n.copiedSuffix(
+            targets.length > 1
+                ? context.l10n.folderItemCount(targets.length)
+                : entry.name,
+          ),
+        );
       },
       onCut: () {
         if (_isReadOnly) {
@@ -1473,12 +1540,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           displayName: widget.container.displayName,
           cut: true,
           clipItems: [
-            ClipboardItem(
-              path: fullPath,
-              isDir: entry.isDir,
-              sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
-              modifiedSecs: entry.modifiedSecs,
-            ),
+            for (final target in targets)
+              ClipboardItem(
+                path: _fullPathOf(target),
+                isDir: target.isDir,
+                sizeBytes: target.isDir ? 0 : target.sizeBytes,
+                modifiedSecs: target.modifiedSecs,
+              ),
           ],
         );
         _setStatus(context.l10n.clipboardVerbMoving);
@@ -3245,18 +3313,23 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   void _renameSelectedWithKeyboard() {
     final selected = selectedItems;
-    if (selected.length != 1 || _isReadOnly || _archiveContext != null) return;
-    unawaited(
-      BrowserDialogs.showRename(
-        context,
-        container: widget.container,
-        oldEntries: [selected.first],
-        existingEntries: _currentItems,
-        currentDirPath: _currentDirPath,
-        onSuccess: exitSelectionMode,
-        readOnly: _isReadOnly,
-      ),
-    );
+    if (selected.isEmpty || _isReadOnly || _archiveContext != null) return;
+    if (selected.length > 1) {
+      // Several items: the advanced (pattern based) rename.
+      unawaited(
+        BrowserDialogs.showAdvancedRename(
+          context,
+          container: widget.container,
+          oldEntries: selected.toList(),
+          existingEntries: _currentItems,
+          currentDirPath: _currentDirPath,
+          onSuccess: exitSelectionMode,
+          readOnly: _isReadOnly,
+        ),
+      );
+      return;
+    }
+    _startRename(selected.first);
   }
 
   /// File manager keys: arrows (and Home/End) move the selection, Enter opens
@@ -3364,7 +3437,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       _refreshListing();
       return true;
     }
-    if (key == LogicalKeyboardKey.f2 && selectedItems.length == 1) {
+    if (key == LogicalKeyboardKey.f2 && selectedItems.isNotEmpty) {
       _renameSelectedWithKeyboard();
       return true;
     }
@@ -6766,7 +6839,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           : skinTokens.fileManagerFollowsAppSkin
           ? skinTokens.fileManagerSkin
           : skinTokens.manualFileManagerSkin,
-      child: _buildBrowser(context),
+      child: InlineRenameScope(
+        controller: _inlineRename,
+        child: _buildBrowser(context),
+      ),
     );
     PerfTrace.end('ui.dir_view.build_ms', t0, slowMs: 25);
     return built;
@@ -7375,6 +7451,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onTogglePin: _togglePinSelected,
         onToggleBookmark: _toggleBookmarkSelected,
         onDirectoryReload: _loadDirectoryContents,
+        onRenameSingle: desktopFileManager ? _startRename : null,
         onSetStatus: (msg, {required bool error}) =>
             _setStatus(msg, error: error),
         onShowOpenWithDialog: _showOpenWithDialog,

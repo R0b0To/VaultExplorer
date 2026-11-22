@@ -97,6 +97,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required void Function({required bool pin}) onTogglePin,
   required void Function({required bool bookmark}) onToggleBookmark,
   required void Function(String path) onDirectoryReload,
+  void Function(RawEntry entry)? onRenameSingle,
   required void Function(String msg, {required bool error}) onSetStatus,
   required Future<void> Function(
     String fileName,
@@ -262,16 +263,33 @@ PreferredSizeWidget buildBrowserAppBar(
           return;
         }
       }
+      // One item on desktop: renamed in place, in the list.
+      if (entries.length == 1 && onRenameSingle != null) {
+        onRenameSingle(entries.first);
+        return;
+      }
+      // Several items go straight to the advanced (pattern based) rename, the
+      // same as the item context menu; one item gets the plain rename.
       unawaited(
-        BrowserDialogs.showRename(
-          context,
-          container: container,
-          oldEntries: entries,
-          existingEntries: allItems,
-          currentDirPath: currentDirPath,
-          onSuccess: () => onDirectoryReload(currentDirPath),
-          readOnly: isReadOnly,
-        ),
+        entries.length > 1
+            ? BrowserDialogs.showAdvancedRename(
+                context,
+                container: container,
+                oldEntries: entries,
+                existingEntries: allItems,
+                currentDirPath: currentDirPath,
+                onSuccess: () => onDirectoryReload(currentDirPath),
+                readOnly: isReadOnly,
+              )
+            : BrowserDialogs.showRename(
+                context,
+                container: container,
+                oldEntries: entries,
+                existingEntries: allItems,
+                currentDirPath: currentDirPath,
+                onSuccess: () => onDirectoryReload(currentDirPath),
+                readOnly: isReadOnly,
+              ),
       );
       onExitSelectionMode();
     }

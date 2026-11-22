@@ -545,6 +545,31 @@ class DesktopTransfers {
     }
   }
 
+  /// Writes one host file into a vault path (the reverse of [decryptFile]). Android's `writeBackFile` is the
+  /// same engine call the import path uses (`fsWriteBackFile` for a block volume), so this is `ve_import_file`
+  /// for a single file with no picker, no unique-name policy and no import-source bookkeeping: the caller
+  /// already chose the exact vault path. A failed or cancelled write leaves nothing to clean up here, the
+  /// engine removes its own partial file.
+  Future<bool> writeBackFile(Map<Object?, Object?> args) async {
+    final fileName = args['fileName'];
+    final sourcePath = args['sourcePath'];
+    if (fileName is! String || sourcePath is! String) {
+      throw PlatformException(code: 'INVALID_ARGS', message: 'fileName and sourcePath required');
+    }
+    final vol = volFor(args['filePath']);
+    final opId = (args['opId'] as num?)?.toInt() ?? 0;
+    if (opId > 0) native().opRegister(opId, veOpImport);
+    try {
+      final rc = await withActivity(() => pool.call('import', [vol, fileName, sourcePath, opId])) as int;
+      return rc == veOk;
+    } finally {
+      if (opId > 0) {
+        native().opUnregister(opId);
+        _cancelled.remove(opId);
+      }
+    }
+  }
+
   // ── cancellation ────────────────────────────────────────────────────────
 
   void cancel(int opId) {

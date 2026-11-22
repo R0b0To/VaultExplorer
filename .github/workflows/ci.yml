@@ -130,3 +130,72 @@ jobs:
 
       - name: Build and run ntfs_backend_test
         run: sh android/app/src/main/cpp/filesystems/test/run_ntfs_backend_test.sh
+
+  # Desktop (dart:ffi) engine: nothing above builds it, so a change to ffi/, volman/, the shared engines or the
+  # desktop host could break Linux/Windows without any job noticing. These are the safety net the plan's
+  # Phase 2 (one slot owner in C++) depends on. Windows is built by build-desktop.yml (manual); a Windows
+  # cross-build joins this workflow when the portability phase lands.
+  desktop_engine_linux:
+    name: Desktop engine (Linux) - build, smoke test, mounts, app build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Same package set as build-desktop.yml (Flutter's Linux toolchain, libsecret/jsoncpp for
+      # flutter_secure_storage, libmpv for media_kit, libfuse3 so the engine is built WITH OS mounts).
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config git perl curl unzip xz-utils zip \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libsecret-1-dev libjsoncpp-dev \
+            libmpv-dev mpv libfuse3-dev fuse3 zlib1g-dev
+
+      - name: Build the desktop engine and ve_smoke_test
+        run: |
+          bash scripts/build_desktop_engine.sh
+          if ! grep -q '^VE_FUSE3_INCLUDE_DIR:PATH=/' build/desktop-engine/CMakeCache.txt; then
+            echo "::error::libfuse3 headers were not found, so the engine was built without OS mounts"
+            exit 1
+          fi
+
+      # Black-box test of the exported C ABI on every container filesystem, hidden volumes, password change,
+      # folder vaults (gocryptfs / Cryptomator / CryFS), one-shot crypto, hashing and single-file crypto.
+      - name: Run ve_smoke_test
+        run: build/desktop-engine/ve_smoke_test fat exfat ntfs ext4
+
+      - name: Build ve_mount_test
+        run: cmake --build build/desktop-engine --target ve_mount_test
+
+      # Drives real FUSE mounts. Hosted runners normally expose /dev/fuse, but that is not guaranteed, so a
+      # missing device skips the step with a notice instead of failing, and a failure does not block the job
+      # until this has been seen green on the runner (then drop continue-on-error).
+      - name: Run ve_mount_test (needs /dev/fuse)
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          if [ ! -c /dev/fuse ] || ! command -v fusermount3 >/dev/null; then
+            echo "::notice::/dev/fuse or fusermount3 unavailable on this runner; skipping the mount test"
+            exit 0
+          fi
+          build/desktop-engine/ve_mount_test
+
+      - name: Fetch Flutter tags
+        run: git -C .flutter fetch --tags
+
+      - name: Add Flutter (submodule) to PATH
+        run: echo "$GITHUB_WORKSPACE/.flutter/bin" >> "$GITHUB_PATH"
+
+      - name: flutter pub get
+        run: |
+          flutter config --no-analytics
+          flutter pub get --enforce-lockfile
+
+      # linux/CMakeLists.txt bundles build/desktop-engine/libvaultexplorer_engine.so, built above.
+      - name: flutter build linux (debug)
+        run: flutter build linux --debug

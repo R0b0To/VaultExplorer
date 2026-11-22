@@ -3,6 +3,13 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
+**Update for v1.66.0 (ABI 9).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
+library is at `VE_ABI_VERSION` 9 (`ffi/ve_engine.h`). Method coverage is now measured, not counted by hand:
+`test/core/engine/desktop/desktop_method_coverage_test.dart` diffs `ChannelMethods` against the host, the crypto
+handler, the Android-only defaults and the two explicit lists in `lib/core/engine/desktop/desktop_method_support.dart`
+(see "Engine-channel coverage" under "Not yet"). CI (`ci.yml`, job `desktop_engine_linux`) now builds the Linux engine,
+runs `ve_smoke_test` and `ve_mount_test`, and builds the Linux app.
+
 **Rebased onto the latest v1.50.0 main** (the second 1.50.0 snapshot, which adds in-place ext/NTFS grow, Cryptomator
 symlinks, the Cryptomator key-file backup option and the format probe). The port was first written against v1.39.0;
 it now sits on top of main:
@@ -190,7 +197,7 @@ list / read / write / rename / delete / mkdir / set-mtime / import / export / st
 on it unchanged. `ve_copy_file` between any mix of container and vault slots streams through memory in 2 MiB
 steps (and finishes the destination vault file). Format-specific calls: `ve_fv_probe / unlock / create /
 change_password / migrate_cryptomator / info / list_symlinks / read_symlink / hidden_entry_count /
-finish_write / batch` (ABI 8, `ve_engine.h`). `ve_fv_unlock` takes `backup_key_files` (Cryptomator `.bkup` copies of
+finish_write / batch` (`ve_engine.h`). `ve_fv_unlock` takes `backup_key_files` (Cryptomator `.bkup` copies of
 the key files on read-write unlocks; the per-vault choice lives in `<app support>/vault_open_prefs.json`, default on) and
 `ve_fv_probe_cryptomator` is the password-free format check behind the "upgrade this vault" tile.
 
@@ -200,7 +207,15 @@ a link to a folder is listed as `LD|0|mtime|name`.
 
 - **A chunk-written file only becomes valid after `finishWrite`**, and chunks must arrive in order from offset 0
   (the core's contract; the Dart layer already calls `finishWrite` on Android). Skipping it left the engine
-  smoke test hanging until timeout -- why was not investigated.
+  smoke test hanging until timeout. Cause (read from `foldervault/fv_engine.cpp`, not yet reproduced under a debugger):
+  `ChunkedFileEngine::writeFileChunk` marks the path as "writing" and keeps the encrypted file open in `openWrites_`;
+  only `finishWrite`, a failed chunk, `writeFrom` replacing a stale handle, or `close()` clears the mark.
+  `readFileChunk` starts with `waitNotWriting(path)`, an untimed condition-variable wait, so the first read of a path
+  whose write was never finished blocks forever. That is deliberate (a reader must never see a half-written file),
+  but it means a Dart-side failure or cancel between chunks wedges every reader of that path, and with a fixed
+  worker pool a few such reads would stall the whole engine. The FUSE layer is safe because it finishes the write
+  on release. A fix belongs with Phase 2: give the slot owner an idle timeout that aborts abandoned writes, or an
+  explicit abort entry point for cancelled copies.
 - Dart: `pick*Vault` uses `file_selector.getDirectoryPath`; CryFS keeps its per-vault integrity state in
   `<app support>/cryfs-state` (it must survive restarts). A wrong password surfaces as `AUTH_FAIL` /
   `INCORRECT_PASSWORD`, anything else as `INVALID_VAULT`.
@@ -292,14 +307,21 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 
 ## Not yet
 
-- Engine-channel coverage: of the 375 methods the Dart layer calls, the desktop host answers 111 and answers
-  45 Android-only ones with a harmless default; **224 still reply `null`**. Many are Android-only (camera 26,
-  Media3 23, audio recorder 12, panic 11, disguise 10, automation 10, PiP 6, quick capture 7). The ones worth
-  doing for desktop: repair / check / header tools (`vault_repair_api`, 11, including
-  `checkFolderVault` / `repairFolderVault`), archives (`vault_archive_api`, 8 -- the libarchive engine is already
-  in the build, it only needs ABI functions), PDF (8), audio editing (4), `mountContainerFolder` /
-  `createUsbContainer` / pickers in `vault_lifecycle_api`, and part of `vault_file_io_api` (32, e.g.
-  `probeImageDimensions`, which the gallery only uses to lay tiles out early and treats `null` as "unknown").
+- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 121 of them (including the
+  crypto primitives), gives 42 more an Android-only default (`_androidOnlyDefaults`), lists 66 as Android-only
+  (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, USB, SAF, APK install, Jetpack PDF, ...)
+  and 52 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them: archives, repair and header
+  backup, expansion and hidden volumes, composite/split containers, AVIF, PDF, comic/EPUB, image probing, audio/video
+  editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
+  stays true; run it to see the current numbers. These counts cover the one engine channel only. Camera, Media3,
+  picture-in-picture, brightness, panorama, disguise mode and the platform views use their own channels, which the
+  desktop binding passes to Flutter (they throw `MissingPluginException` on desktop unless the Dart caller is guarded).
+  Answered since the earlier counts: `getAppVersion` (the version name from `desktop_host_info.dart`; a test keeps it
+  equal to `pubspec.yaml`), `getContainerSizeInfo` (file size, plus free space from `df -Pk` on Linux or PowerShell
+  on Windows, `null` when unknown), `resolveRawStoragePath`, `exportAppSettingsFile` / `importAppSettingsFile`
+  (`file_selector` dialogs), `writeBackFile` (the same `ve_import_file` call the import path uses), and explicit
+  "unsupported" answers for the sensitive-clipboard pair (the Dart caller falls back to Flutter's clipboard) and
+  `setKeepScreenOn`.
 - In-place growth (new in this main): `expandVeraCryptContainer`, `expandLuksContainer`, `growVeraCryptFileSystem`,
   `growLuksFileSystem`. The engine already has `fsGrowToFit` (NTFS and ext2/3/4; FAT/exFAT report unsupported); it only needs
   ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.

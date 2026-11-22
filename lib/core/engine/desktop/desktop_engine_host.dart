@@ -28,8 +28,10 @@ import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'desktop_crypto.dart';
 import 'desktop_external.dart';
 import 'desktop_hash.dart';
+import 'desktop_host_info.dart';
 import 'desktop_images.dart';
 import 'desktop_media_server.dart';
+import 'desktop_method_support.dart';
 import 'desktop_mounts.dart';
 import 'desktop_secure_store.dart';
 import 'desktop_storage.dart';
@@ -184,6 +186,12 @@ class DesktopEngineHost {
     'notifyResumedFramePainted': null,
     'warmContainer': null,
     'biometricKeyDelete': true,
+    // Explicit "not supported" answers (false), so the caller's fallback runs: the sensitive-clipboard pair
+    // falls back to Flutter's clipboard plus a compare-and-clear timer (sensitive_clipboard.dart); the
+    // keep-screen-on request is fire-and-forget and desktop has no wake-lock API without a plugin.
+    'setSensitiveClipboardText': false,
+    'clearSensitiveClipboardText': false,
+    'setKeepScreenOn': false,
   };
 
   Future<Object?> handle(MethodCall call) async {
@@ -296,6 +304,18 @@ class DesktopEngineHost {
         return _storage.volumes(); // the computer's drives, listed like Android's SD cards
       case ChannelMethods.getDeviceCapabilityProfile:
         return _capabilityProfile();
+      case ChannelMethods.getAppVersion:
+        return desktopAppVersion;
+      case ChannelMethods.getContainerSizeInfo:
+        return desktopContainerSizeInfo(args['uri']);
+      case ChannelMethods.resolveRawStoragePath:
+        return desktopRawStoragePath(args['uri']);
+      case ChannelMethods.exportAppSettingsFile:
+        return desktopExportSettingsFile(args['contents'], args['fileName']);
+      case ChannelMethods.importAppSettingsFile:
+        return desktopImportSettingsFile();
+      case ChannelMethods.writeBackFile:
+        return _transfers.writeBackFile(args);
       case ChannelMethods.getMirrorPushActivity:
         return {'activeCount': 0}; // no mirror proxy on desktop
       case ChannelMethods.purgeExpiredDerivedKeys:
@@ -559,6 +579,9 @@ class DesktopEngineHost {
     if (handledByCrypto) return cryptoResult;
 
     if (_androidOnlyDefaults.containsKey(call.method)) return _androidOnlyDefaults[call.method];
+
+    // Android-only features answer null quietly (see desktop_method_support.dart); anything else is a gap.
+    if (desktopAndroidOnlyMethods.contains(call.method)) return null;
 
     if (kDebugMode && _warned.add(call.method)) {
       debugPrint('[desktop-engine] not implemented yet: ${call.method} (replying null)');

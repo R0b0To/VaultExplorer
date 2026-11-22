@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/adaptive_action_strip.dart';
 import 'package:vaultexplorer/features/browser/metadata/metadata_edit_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
@@ -6455,6 +6456,98 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  /// Builds the menu form of every toolbar action for [actions]. One source
+  /// of truth for the floating toolbar's "More" button and for the app bar's
+  /// adaptive overflow menu.
+  FileManagerMoreMenuButton _buildMoreMenuModel({
+    required List<FileManagerAction> actions,
+    required bool searchActive,
+    required FileBrowserSearch searchNotifier,
+    required SortBy sortBy,
+    required bool sortAscending,
+    required String? currentFilter,
+    required BrowserLayoutMode layoutMode,
+    required FileManagerToolbarConfig toolbarConfig,
+    required String currentDirPath,
+    required List<RawEntry> currentItems,
+  }) {
+    final musicEntry = _music;
+    return FileManagerMoreMenuButton(
+      actions: actions,
+      searchActive: searchActive,
+      onToggleSearch: () => searchNotifier.toggleActive(),
+      sortBy: sortBy,
+      sortAscending: sortAscending,
+      onSortChanged: _onSortChanged,
+      currentFilter: currentFilter,
+      onFilterChanged: _onFilterChosen,
+      hideVaultOnlyActions: widget.container.isLocalStorage,
+      layoutMode: layoutMode,
+      onLayoutModeChanged: _onLayoutModeChanged,
+      gridAspectRatio: toolbarConfig.getGridAspectRatioForFolder(
+        widget.container.uri,
+        currentDirPath,
+      ),
+      onGridAspectRatioChanged: _onGridAspectRatioChanged,
+      canPlayMedia: _canPlayMediaIn(currentItems),
+      onPlayMedia: _startMediaViewerFromCurrentLocation,
+      musicModeActive: musicEntry.config.enabled,
+      onToggleMusicMode: () =>
+          unawaited(toggleMusicMode(context, ref, musicEntry)),
+      isGalleryMode: _isGalleryMode,
+      onToggleGallery: () => unawaited(_toggleGalleryMode()),
+      onPickGalleryFolders: () => unawaited(_editGalleryFolders()),
+      galleryFolderCount: toolbarConfig
+          .galleryFoldersForStorage(widget.container.uri)
+          .length,
+      toolbarConfig: toolbarConfig,
+      onToggleShowHiddenFiles: (v) =>
+          _updateToolbarConfigField((c) => c.copyWith(showHiddenFiles: v)),
+      onToggleShowNoMediaFolders: (v) =>
+          _updateToolbarConfigField((c) => c.copyWith(showNoMediaFolders: v)),
+      onToggleShowGridFileNames: (v) =>
+          _updateToolbarConfigField((c) => c.copyWith(showGridFileNames: v)),
+      onToggleShowFileExtensions: (v) =>
+          _updateToolbarConfigField((c) => c.copyWith(showFileExtensions: v)),
+      onToggleShowListThumbnails: (v) =>
+          _updateToolbarConfigField((c) => c.copyWith(showListThumbnails: v)),
+      onOpenSettings: _openFileManagerSettings,
+    );
+  }
+
+  /// Overflow-menu entries for every toolbar action that can collapse. `add`
+  /// is absent on purpose: it is the primary action and stays pinned inline.
+  Map<FileManagerAction, Widget? Function(BuildContext)>
+  _buildActionMenuEntries({
+    required bool searchActive,
+    required FileBrowserSearch searchNotifier,
+    required SortBy sortBy,
+    required bool sortAscending,
+    required String? currentFilter,
+    required BrowserLayoutMode layoutMode,
+    required FileManagerToolbarConfig toolbarConfig,
+    required String currentDirPath,
+    required List<RawEntry> currentItems,
+  }) {
+    final model = _buildMoreMenuModel(
+      actions: FileManagerAction.values,
+      searchActive: searchActive,
+      searchNotifier: searchNotifier,
+      sortBy: sortBy,
+      sortAscending: sortAscending,
+      currentFilter: currentFilter,
+      layoutMode: layoutMode,
+      toolbarConfig: toolbarConfig,
+      currentDirPath: currentDirPath,
+      currentItems: currentItems,
+    );
+    return {
+      for (final action in FileManagerAction.values)
+        if (action != FileManagerAction.add)
+          action: (context) => model.menuEntryFor(context, action),
+    };
+  }
+
   Map<FileManagerAction, WidgetBuilder> _buildActionBuilders({
     required bool searchActive,
     required bool isReadOnly,
@@ -6600,8 +6693,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final widgets = <Widget>[];
 
     if (showMore) {
-      final canPlayMedia = _canPlayMediaIn(_currentItems);
-
       // When the Add FAB is visible, place More to its left (56dp FAB + 12dp spacing = 68dp).
       // If the Add FAB is hidden via config, More takes the primary bottom-right slot.
       final moreRight = showAddFab ? (baseRight + 68.0) : baseRight;
@@ -6615,51 +6706,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               4.0, // 4dp offset centers the 48dp button against the 56dp Add FAB
           child: ListenableBuilder(
             listenable: musicEntry,
-            builder: (context, _) => FileManagerMoreMenuButton(
+            builder: (context, _) => _buildMoreMenuModel(
               actions: moreActions,
               searchActive: _searchActive,
-              onToggleSearch: () => _searchNotifier.toggleActive(),
+              searchNotifier: _searchNotifier,
               sortBy: sortBy,
               sortAscending: sortAscending,
-              onSortChanged: _onSortChanged,
               currentFilter: _currentFilter,
-              onFilterChanged: _onFilterChosen,
-              hideVaultOnlyActions: widget.container.isLocalStorage,
               layoutMode: _layoutMode,
-              onLayoutModeChanged: _onLayoutModeChanged,
-              gridAspectRatio: _toolbarConfig.getGridAspectRatioForFolder(
-                widget.container.uri,
-                _currentDirPath,
-              ),
-              onGridAspectRatioChanged: _onGridAspectRatioChanged,
-              canPlayMedia: canPlayMedia,
-              onPlayMedia: _startMediaViewerFromCurrentLocation,
-              musicModeActive: musicEntry.config.enabled,
-              onToggleMusicMode: () =>
-                  unawaited(toggleMusicMode(context, ref, musicEntry)),
-              isGalleryMode: _isGalleryMode,
-              onToggleGallery: () => unawaited(_toggleGalleryMode()),
-              onPickGalleryFolders: () => unawaited(_editGalleryFolders()),
-              galleryFolderCount: _toolbarConfig
-                  .galleryFoldersForStorage(widget.container.uri)
-                  .length,
               toolbarConfig: _toolbarConfig,
-              onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
-                (c) => c.copyWith(showHiddenFiles: v),
-              ),
-              onToggleShowNoMediaFolders: (v) => _updateToolbarConfigField(
-                (c) => c.copyWith(showNoMediaFolders: v),
-              ),
-              onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
-                (c) => c.copyWith(showGridFileNames: v),
-              ),
-              onToggleShowFileExtensions: (v) => _updateToolbarConfigField(
-                (c) => c.copyWith(showFileExtensions: v),
-              ),
-              onToggleShowListThumbnails: (v) => _updateToolbarConfigField(
-                (c) => c.copyWith(showListThumbnails: v),
-              ),
-              onOpenSettings: _openFileManagerSettings,
+              currentDirPath: _currentDirPath,
+              currentItems: _currentItems,
             ),
           ),
         ),
@@ -7130,6 +7187,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       sortBy: appBarSort.sortBy,
       sortAscending: appBarSort.sortAscending,
     );
+    final actionMenuEntries = _buildActionMenuEntries(
+      searchActive: appBarSearchActive,
+      searchNotifier: appBarSearchNotifier,
+      sortBy: appBarSort.sortBy,
+      sortAscending: appBarSort.sortAscending,
+      currentFilter: appBarCurrentFilter,
+      layoutMode: appBarLayoutMode,
+      toolbarConfig: appBarToolbarConfig,
+      currentDirPath: appBarCurrentDirPath,
+      currentItems: appBarCurrentItems,
+    );
     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar =
         _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
@@ -7257,6 +7325,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             : null,
         selectionActive: selectionBarVisible,
         actionBuilders: actionBuilders,
+        actionMenuEntries: actionMenuEntries,
+        actionsRebuildOn: _music,
         isFolderMounted: appBarIsFolderMounted,
         isPinned: appBarIsPinned,
         isBookmark: appBarIsBookmarked,
@@ -7666,15 +7736,41 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         ? _handleBackAtRoot
                                                         : null)
                                                   : _navigateUp;
-                                              final toolbarActionWidth = showActionBar
-                                                  ? (_visibleActions.length * 40.0)
-                                                        .clamp(
-                                                          0.0,
-                                                          constraints.maxWidth *
-                                                              0.42,
-                                                        )
-                                                        .toDouble()
+                                              // Back, forward, refresh, the divider and the
+                                              // transfer button never move. The rest of the
+                                              // width is shared between the toolbar actions and
+                                              // the selection actions in proportion to what
+                                              // each wants, and each side moves whatever does
+                                              // not fit into its own "more" menu, so nothing
+                                              // overlaps or needs scrolling to reach.
+                                              const fixedToolbarWidth =
+                                                  3 * 40.0 + 1 + 48 + 4;
+                                              const selectionWanted = 7 * 40.0;
+                                              final actionsWanted = showActionBar
+                                                  ? _visibleActions.length * 40.0
                                                   : 0.0;
+                                              final shareable =
+                                                  (constraints.maxWidth -
+                                                          fixedToolbarWidth)
+                                                      .clamp(0.0, double.infinity)
+                                                      .toDouble();
+                                              final toolbarActionWidth =
+                                                  actionsWanted == 0
+                                                  ? 0.0
+                                                  : actionsWanted +
+                                                            selectionWanted <=
+                                                        shareable
+                                                  ? actionsWanted
+                                                  : math.min(
+                                                      actionsWanted,
+                                                      math.max(
+                                                        80.0,
+                                                        shareable *
+                                                            actionsWanted /
+                                                            (actionsWanted +
+                                                                selectionWanted),
+                                                      ),
+                                                    );
                                               return Material(
                                                 color: Theme.of(
                                                   context,
@@ -7713,14 +7809,26 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                             width: toolbarActionWidth,
                                                             height: 40,
                                                             child: ClipRect(
-                                                              child: SingleChildScrollView(
-                                                                scrollDirection: Axis.horizontal,
-                                                                child: Row(
-                                                                  mainAxisSize: MainAxisSize.min,
-                                                                  children: [
+                                                              child: Align(
+                                                                alignment: Alignment.centerLeft,
+                                                                child: AdaptiveActionStrip(
+                                                                  itemExtent: 40,
+                                                                  availableWidth: toolbarActionWidth,
+                                                                  rebuildOn: _music,
+                                                                  items: [
                                                                     for (final action in _visibleActions)
-                                                                      if (showActionBar)
-                                                                        actionBuilders[action]!(toolbarContext),
+                                                                      AdaptiveActionItem(
+                                                                        id: action,
+                                                                        builder: actionBuilders[action]!,
+                                                                        // Add and search are
+                                                                        // what the bar is for,
+                                                                        // so they never collapse.
+                                                                        menuBuilder:
+                                                                            action == FileManagerAction.add ||
+                                                                                action == FileManagerAction.search
+                                                                            ? null
+                                                                            : actionMenuEntries[action],
+                                                                      ),
                                                                   ],
                                                                 ),
                                                               ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/adaptive_action_strip.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -58,6 +59,16 @@ PreferredSizeWidget buildBrowserAppBar(
   required int selectedTotalBytes,
   required bool hasPendingFolderSizes,
   required Map<FileManagerAction, WidgetBuilder> actionBuilders,
+
+
+  /// The overflow-menu form of each toolbar action. When the bar is too
+  /// narrow for every action, those that have an entry here collapse into a
+  /// "more" menu instead of overlapping the title or running off the edge.
+  Map<FileManagerAction, Widget? Function(BuildContext)> actionMenuEntries =
+      const {},
+
+  /// Rebuilds the overflow entries when it changes (music mode).
+  Listenable? actionsRebuildOn,
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
   required bool Function(RawEntry entry) isBookmark,
@@ -419,6 +430,8 @@ PreferredSizeWidget buildBrowserAppBar(
       showActionBar: toolbarConfig.bottomSelectionBar ? false : showActionBar,
       visibleActions: toolbarConfig.visible,
       actionBuilders: actionBuilders,
+      actionMenuEntries: actionMenuEntries,
+      actionsRebuildOn: actionsRebuildOn,
       onClose: onExitSelectionMode,
       onSelectAll: onSelectAll,
       onRename: doRename,
@@ -725,7 +738,13 @@ PreferredSizeWidget buildBrowserAppBar(
     );
   }
 
-  return AppBar(
+  // An AppBar lays its actions out with unbounded width, so it cannot tell how
+  // much room they have. WidthAwareAppBar measures the bar, and the actions
+  // that do not fit collapse into a "more" menu rather than overlapping the
+  // title or running off the edge when the window is resized.
+  final hasLeading = !docked || canGoUp;
+  return WidthAwareAppBar(
+    builder: (context, barWidth) => AppBar(
     leading: docked
         ? (canGoUp
               ? IconButton(
@@ -836,12 +855,33 @@ PreferredSizeWidget buildBrowserAppBar(
     ),
     actions: [
       const AppBarTransferButton(),
-      if (isLandscape && showActionBar) ...[
-        ...toolbarConfig.visible
-            .where((action) => actionBuilders.containsKey(action))
-            .map((action) => actionBuilders[action]!(context)),
-      ],
+      if (isLandscape && showActionBar)
+        AdaptiveActionStrip(
+          availableWidth: appBarActionsBudget(
+            barWidth: barWidth,
+            hasLeading: hasLeading,
+            // The transfer button sits beside the strip.
+            otherActionsWidth: 48,
+          ),
+          rebuildOn: actionsRebuildOn,
+          items: [
+            for (final action in toolbarConfig.visible)
+              if (actionBuilders.containsKey(action))
+                AdaptiveActionItem(
+                  id: action,
+                  builder: actionBuilders[action]!,
+                  // Add and search are what the bar is for, so they stay
+                  // inline; everything else can move into the menu.
+                  menuBuilder:
+                      action == FileManagerAction.add ||
+                          action == FileManagerAction.search
+                      ? null
+                      : actionMenuEntries[action],
+                ),
+          ],
+        ),
     ],
+  ),
   );
 }
 

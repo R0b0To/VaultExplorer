@@ -127,12 +127,26 @@ class FileManagerMoreMenuButton extends StatelessWidget {
     this.galleryFolderCount = 0,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = context.l10n;
+  /// The overflow-menu form of [action]: a [MenuItemButton], or a
+  /// [SubmenuButton] holding the action's own options. Null for [add] (it has
+  /// no menu form) and for options without a [toolbarConfig].
+  ///
+  /// Shared with the app bar's adaptive overflow, so the floating toolbar and
+  /// the resizable desktop toolbar build every entry the same way.
+  Widget? menuEntryFor(BuildContext context, FileManagerAction action) =>
+      _entryFor(
+        context,
+        Theme.of(context).colorScheme,
+        context.l10n,
+        action,
+      );
 
-    Widget? entryFor(FileManagerAction action) {
+  Widget? _entryFor(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+    FileManagerAction action,
+  ) {
       switch (action) {
         case FileManagerAction.add:
           return null; // Promoted to its own FAB; never shown here.
@@ -246,7 +260,14 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             child: Text(l10n.optionsAction),
           );
       }
-    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    Widget? entryFor(FileManagerAction action) =>
+        _entryFor(context, cs, l10n, action);
 
     final entries = actions.map(entryFor).whereType<Widget>().toList(growable: false);
     if (entries.isEmpty) return const SizedBox.shrink();

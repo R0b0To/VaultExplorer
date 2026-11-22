@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/adaptive_action_strip.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -26,6 +27,14 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final bool showActionBar;
   final List<FileManagerAction> visibleActions;
   final Map<FileManagerAction, WidgetBuilder> actionBuilders;
+
+  /// The overflow-menu form of each toolbar action, used when the bar is too
+  /// narrow to show them inline. An action without one stays pinned inline.
+  final Map<FileManagerAction, Widget? Function(BuildContext)>
+  actionMenuEntries;
+
+  /// Rebuilds the bar's overflow menu entries when it changes (music mode).
+  final Listenable? actionsRebuildOn;
   final VoidCallback? onFileInfo;
 
   /// Opens the edit tags / date & time / remove metadata menu. Null hides it.
@@ -113,6 +122,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.showActionBar,
     required this.visibleActions,
     required this.actionBuilders,
+    this.actionMenuEntries = const {},
+    this.actionsRebuildOn,
     required this.onClose,
     required this.onSelectAll,
     required this.onRename,
@@ -235,6 +246,56 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
       _ => throw StateError('Unexpected selection-bar action: $action'),
     };
 
+    // The same action as an overflow-menu entry, for when the bar is too
+    // narrow to show every button.
+    Widget buildActionMenuItem(FileItemAction action, {bool enabled = true}) {
+      final l10n = context.l10n;
+      final IconData icon;
+      final String label;
+      final VoidCallback callback;
+      Color? color;
+      switch (action) {
+        case FileItemAction.extract:
+          icon = Icons.unarchive_outlined;
+          label = l10n.extract;
+          callback = onExtractSelectedArchive;
+        case FileItemAction.share:
+          icon = Icons.share_rounded;
+          label = l10n.shareAction;
+          callback = onShare;
+        case FileItemAction.copy:
+          icon = Icons.copy_rounded;
+          label = l10n.copyTooltip;
+          callback = onCopy;
+        case FileItemAction.move:
+          icon = Icons.cut_rounded;
+          label = readOnly ? l10n.readOnlyCantMoveTooltip : l10n.moveAction;
+          callback = onCut;
+          if (readOnly) color = cs.onSurfaceVariant.withValues(alpha: 0.5);
+        case FileItemAction.rename:
+          icon = Icons.drive_file_rename_outline_rounded;
+          label = readOnly
+              ? l10n.readOnlyCantRenameTooltip
+              : l10n.renameTooltip;
+          callback = onRename;
+          if (readOnly) color = cs.onSurfaceVariant.withValues(alpha: 0.5);
+        case FileItemAction.delete:
+          icon = Icons.delete_outline_rounded;
+          label = readOnly ? l10n.readOnlyCantDeleteTooltip : l10n.delete;
+          callback = onDelete;
+          color = readOnly
+              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+              : cs.error;
+        default:
+          throw StateError('Unexpected selection-bar action: $action');
+      }
+      return MenuItemButton(
+        leadingIcon: Icon(icon, color: enabled ? color : null),
+        onPressed: enabled ? callback : null,
+        child: Text(label),
+      );
+    }
+
     if (desktopCompact) {
       // The desktop bar never adds or removes buttons as the selection
       // changes: every action stays in place and the ones that do not apply
@@ -261,68 +322,37 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
           selectionActive && !isInsideArchive && allowRenameAction,
         _ => selectionActive && !isInsideArchive,
       };
+      // Whatever does not fit the window moves into a "more" menu instead of
+      // being clipped or only reachable by scrolling. Paste has no menu form,
+      // so it stays inline.
+      final compactItems = <AdaptiveActionItem>[
+        if (pasteAction != null && !compactOrder.contains(FileItemAction.copy))
+          AdaptiveActionItem(id: 'paste', builder: (_) => pasteAction!),
+        for (final action in compactOrder) ...[
+          AdaptiveActionItem(
+            id: action,
+            builder: (_) =>
+                buildActionButton(action, enabled: compactEnabled(action)),
+            menuBuilder: (_) =>
+                buildActionMenuItem(action, enabled: compactEnabled(action)),
+          ),
+          if (action == FileItemAction.copy && pasteAction != null)
+            AdaptiveActionItem(id: 'paste', builder: (_) => pasteAction!),
+        ],
+      ];
       return Material(
         color: cs.surfaceContainer,
         child: SizedBox(
           height: toolbarHeight,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (pasteAction != null &&
-                    !compactOrder.contains(FileItemAction.copy))
-                  pasteAction!,
-                for (final action in compactOrder) ...[
-                  buildActionButton(action, enabled: compactEnabled(action)),
-                  if (action == FileItemAction.copy && pasteAction != null)
-                    pasteAction!,
-                ],
-              ],
-            ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: AdaptiveActionStrip(itemExtent: 40, items: compactItems),
           ),
         ),
       );
     }
 
-    return AppBar(
-      toolbarHeight: toolbarHeight,
-      leading: IconButton(
-        icon: const Icon(Icons.close_rounded),
-        tooltip: context.l10n.clearSelectionTooltip,
-        onPressed: onClose,
-      ),
-      titleSpacing: 0,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-            ),
-            child: Text(
-              '$selectedCount',
-              style: textTheme.labelLarge?.copyWith(
-                color: cs.onPrimaryContainer,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              selectionLabel,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.titleSmall,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        ...visibleActionOrder.map(buildActionButton),
-        PopupMenuButton<String>(
+    final Widget selectionMoreMenu = PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
           tooltip: context.l10n.moreOptionsTooltip,
           onSelected: (value) {
@@ -616,14 +646,93 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             ),
             hidden: hiddenItemActions,
           ),
-        ),
-        const SizedBox(width: 8),
-        VerticalDivider(width: 1, indent: 12, endIndent: 12, color: cs.outlineVariant),
-        const SizedBox(width: 4),
-        if (showActionBar)
-          ...visibleActions.map((action) => actionBuilders[action]!(context)),
-        if (!showActionBar) const SizedBox(width: 4),
-      ],
+        );
+
+    // An AppBar lays its actions out with unbounded width, so the bar's own
+    // width is measured here and the actions are given what the leading
+    // button and the title leave.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final barWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final stripBudget = appBarActionsBudget(
+          barWidth: barWidth,
+          hasLeading: true,
+          minTitleWidth: 120,
+          otherActionsWidth: 4,
+        );
+        return AppBar(
+          toolbarHeight: toolbarHeight,
+          leading: IconButton(
+            icon: const Icon(Icons.close_rounded),
+            tooltip: context.l10n.clearSelectionTooltip,
+            onPressed: onClose,
+          ),
+          titleSpacing: 0,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  '$selectedCount',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  selectionLabel,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            AdaptiveActionStrip(
+              availableWidth: stripBudget,
+              rebuildOn: actionsRebuildOn,
+              items: [
+                // The selection's own actions come first and collapse last; the
+                // general toolbar actions give way to them.
+                for (final action in visibleActionOrder)
+                  AdaptiveActionItem(
+                    id: action,
+                    builder: (_) => buildActionButton(action),
+                    menuBuilder: (_) => buildActionMenuItem(action),
+                    priority: 2,
+                  ),
+                AdaptiveActionItem(
+                  id: 'selection-more',
+                  builder: (_) => selectionMoreMenu,
+                ),
+                if (showActionBar &&
+                    visibleActions.any(actionBuilders.containsKey)) ...[
+                  const AdaptiveActionItem.separator(id: 'toolbar-separator'),
+                  for (final action in visibleActions)
+                    if (actionBuilders.containsKey(action))
+                      AdaptiveActionItem(
+                        id: action,
+                        builder: actionBuilders[action]!,
+                        menuBuilder: actionMenuEntries[action],
+                        priority: 1,
+                      ),
+                ],
+              ],
+            ),
+            const SizedBox(width: 4),
+          ],
+        );
+      },
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/widgets/adaptive_action_strip.dart';
 import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -2898,6 +2899,77 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       return actionBuilders.containsKey(a);
     }).toList();
 
+    // One model of every toolbar action's menu form, shared by the floating
+    // toolbar's "More" button and the app bar's adaptive overflow menu.
+    FileManagerMoreMenuButton moreMenuModel(
+      List<FileManagerAction> actions,
+    ) => FileManagerMoreMenuButton(
+              actions: actions,
+              searchActive: _searchActive,
+              onToggleSearch: _toggleSearch,
+              sortBy: _sortBy,
+              sortAscending: _sortAscending,
+              onSortChanged: (field) {
+                setState(() {
+                  if (_sortBy == field) {
+                    _sortAscending = !_sortAscending;
+                  } else {
+                    _sortBy = field;
+                    _sortAscending = field == SortBy.name;
+                  }
+                });
+              },
+              currentFilter: _scoped ? widget.category.filterKey : null,
+              onFilterChanged: _scoped
+                  ? (filter) => widget.onScopedFilterChanged?.call(filter)
+                  : (_) {},
+              hideVaultOnlyActions:
+                  !_scoped || widget.scopedContainer!.isLocalStorage,
+              customFilterMenuBuilder: _isGallery
+                  ? _galleryFilterMenuItems
+                  : (_scoped ? null : buildSourceMenuItems),
+              customFilterActive: _isGallery
+                  ? _galleryFilter.hasFilters
+                  : _source != CategorySourceFilter.all,
+              customFilterIcon: _isGallery
+                  ? Icons.filter_alt_outlined
+                  : Icons.storage_rounded,
+              customFilterTooltip: _isGallery
+                  ? l10n.galleryFilterTooltip
+                  : l10n.categorySourceTooltip,
+              layoutMode: _layout,
+              onLayoutModeChanged: _setLayout,
+              gridAspectRatio: toolbarConfig.gridAspectRatio,
+              onGridAspectRatioChanged: (ratio) => _updateToolbarConfig(
+                (c) => c.copyWith(gridAspectRatio: ratio),
+              ),
+              canPlayMedia: canPlayMedia,
+              onPlayMedia: _playMediaFromFirst,
+              isGalleryMode: _isGallery,
+              onToggleGallery: _toggleScopedGallery,
+              toolbarConfig: toolbarConfig,
+              onToggleShowHiddenFiles: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
+              },
+              onToggleShowNoMediaFolders: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showNoMediaFolders: v));
+              },
+              onToggleShowGridFileNames: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
+              },
+              onToggleShowFileExtensions: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showFileExtensions: v));
+              },
+              onToggleShowListThumbnails: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
+              },
+              onOpenSettings: _openFileManagerSettings,
+              onPickGalleryFolders: _scoped && _isGallery
+                  ? _pickGalleryFolders
+                  : null,
+              galleryFolderCount: _galleryRoots.length,
+            );
+
     // 1. Regular AppBar
     PreferredSizeWidget regularAppBarFactory(BuildContext context) {
       if (_deactivated || _disposed) {
@@ -2917,7 +2989,13 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           const TextStyle(fontWeight: FontWeight.bold);
       final pathStack = _buildPathStack(location, l10n);
 
-      return AppBar(
+      final dockedSidebar = DockedSidebarScope.of(context);
+      final overflowModel = moreMenuModel(visibleActions);
+      // An AppBar lays its actions out with unbounded width, so the bar is
+      // measured and the actions that do not fit collapse into a "more" menu
+      // instead of overlapping the title when the window is resized.
+      return WidthAwareAppBar(
+        builder: (context, barWidth) => AppBar(
         // Beside a docked sidebar there is no drawer to open, so no menu button.
         leading: DockedSidebarScope.of(context)
             ? null
@@ -3073,29 +3151,77 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: Icon(
-              _folderMode
-                  ? Icons.folder_copy_rounded
-                  : Icons.folder_copy_outlined,
-              color: _folderMode ? Theme.of(context).colorScheme.primary : null,
+          AdaptiveActionStrip(
+            availableWidth: appBarActionsBudget(
+              barWidth: barWidth,
+              hasLeading: !dockedSidebar,
             ),
-            tooltip: l10n.categoryFolderStructure,
-            onPressed: () => _setFolderMode(!_folderMode),
-          ),
-          if (_scoped && _isGallery)
-            IconButton(
-              icon: Badge(
-                isLabelVisible: _galleryRoots.isNotEmpty,
-                label: Text('${_galleryRoots.length}'),
-                child: const Icon(Icons.folder_outlined),
+            items: [
+              AdaptiveActionItem(
+                id: 'folder-structure',
+                builder: (context) => IconButton(
+                  icon: Icon(
+                    _folderMode
+                        ? Icons.folder_copy_rounded
+                        : Icons.folder_copy_outlined,
+                    color: _folderMode
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
+                  tooltip: l10n.categoryFolderStructure,
+                  onPressed: () => _setFolderMode(!_folderMode),
+                ),
+                menuBuilder: (context) => MenuItemButton(
+                  leadingIcon: Icon(
+                    _folderMode
+                        ? Icons.folder_copy_rounded
+                        : Icons.folder_copy_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  onPressed: () => _setFolderMode(!_folderMode),
+                  child: Text(l10n.categoryFolderStructure),
+                ),
+                priority: 2,
               ),
-              tooltip: l10n.galleryFoldersMenu,
-              onPressed: _pickGalleryFolders,
-            ),
-          if (isLandscape && showActionBar)
-            ...visibleActions.map((a) => actionBuilders[a]!(context)),
+              if (_scoped && _isGallery)
+                AdaptiveActionItem(
+                  id: 'gallery-folders',
+                  builder: (context) => IconButton(
+                    icon: Badge(
+                      isLabelVisible: _galleryRoots.isNotEmpty,
+                      label: Text('${_galleryRoots.length}'),
+                      child: const Icon(Icons.folder_outlined),
+                    ),
+                    tooltip: l10n.galleryFoldersMenu,
+                    onPressed: _pickGalleryFolders,
+                  ),
+                  menuBuilder: (context) => MenuItemButton(
+                    leadingIcon: Icon(
+                      Icons.folder_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    onPressed: _pickGalleryFolders,
+                    child: Text(l10n.galleryFoldersMenu),
+                  ),
+                  priority: 2,
+                ),
+              if (isLandscape && showActionBar)
+                for (final a in visibleActions)
+                  AdaptiveActionItem(
+                    id: a,
+                    builder: actionBuilders[a]!,
+                    // Search stays inline; add has no menu form.
+                    menuBuilder:
+                        a == FileManagerAction.add ||
+                            a == FileManagerAction.search
+                        ? null
+                        : (context) => overflowModel.menuEntryFor(context, a),
+                    priority: 1,
+                  ),
+            ],
+          ),
         ],
+      ),
       );
     }
 
@@ -3304,72 +3430,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       final showFloatingAction =
           useFab && !_searchActive && visibleActions.isNotEmpty;
       final floatingWidget = showFloatingAction
-          ? FileManagerMoreMenuButton(
-              actions: visibleActions,
-              searchActive: _searchActive,
-              onToggleSearch: _toggleSearch,
-              sortBy: _sortBy,
-              sortAscending: _sortAscending,
-              onSortChanged: (field) {
-                setState(() {
-                  if (_sortBy == field) {
-                    _sortAscending = !_sortAscending;
-                  } else {
-                    _sortBy = field;
-                    _sortAscending = field == SortBy.name;
-                  }
-                });
-              },
-              currentFilter: _scoped ? widget.category.filterKey : null,
-              onFilterChanged: _scoped
-                  ? (filter) => widget.onScopedFilterChanged?.call(filter)
-                  : (_) {},
-              hideVaultOnlyActions:
-                  !_scoped || widget.scopedContainer!.isLocalStorage,
-              customFilterMenuBuilder: _isGallery
-                  ? _galleryFilterMenuItems
-                  : (_scoped ? null : buildSourceMenuItems),
-              customFilterActive: _isGallery
-                  ? _galleryFilter.hasFilters
-                  : _source != CategorySourceFilter.all,
-              customFilterIcon: _isGallery
-                  ? Icons.filter_alt_outlined
-                  : Icons.storage_rounded,
-              customFilterTooltip: _isGallery
-                  ? l10n.galleryFilterTooltip
-                  : l10n.categorySourceTooltip,
-              layoutMode: _layout,
-              onLayoutModeChanged: _setLayout,
-              gridAspectRatio: toolbarConfig.gridAspectRatio,
-              onGridAspectRatioChanged: (ratio) => _updateToolbarConfig(
-                (c) => c.copyWith(gridAspectRatio: ratio),
-              ),
-              canPlayMedia: canPlayMedia,
-              onPlayMedia: _playMediaFromFirst,
-              isGalleryMode: _isGallery,
-              onToggleGallery: _toggleScopedGallery,
-              toolbarConfig: toolbarConfig,
-              onToggleShowHiddenFiles: (v) {
-                _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
-              },
-              onToggleShowNoMediaFolders: (v) {
-                _updateToolbarConfig((c) => c.copyWith(showNoMediaFolders: v));
-              },
-              onToggleShowGridFileNames: (v) {
-                _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
-              },
-              onToggleShowFileExtensions: (v) {
-                _updateToolbarConfig((c) => c.copyWith(showFileExtensions: v));
-              },
-              onToggleShowListThumbnails: (v) {
-                _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
-              },
-              onOpenSettings: _openFileManagerSettings,
-              onPickGalleryFolders: _scoped && _isGallery
-                  ? _pickGalleryFolders
-                  : null,
-              galleryFolderCount: _galleryRoots.length,
-            )
+          ? moreMenuModel(visibleActions)
           : null;
       _chrome.setFloatingAction(widget.tabId, floatingWidget);
     });

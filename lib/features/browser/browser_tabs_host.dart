@@ -19,6 +19,7 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
+import 'package:vaultexplorer/features/dashboard/dashboard_toolbar_actions.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
@@ -587,12 +588,30 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 minimumSize: WidgetStatePropertyAll(Size(36, 36)),
               ),
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Row(
               children: [
-                AppBarAuthenticatorButton(),
-                AppBarTransferButton(),
-                SizedBox(width: 8),
+                const SizedBox(width: 6),
+                // Same 40px row, same compact icon buttons as the file
+                // manager's toolbar, so Home and a storage share one chrome
+                // height and nothing shifts when switching between them.
+                _DashboardToolbarButton(
+                  listenable: ref
+                      .read(dashboardToolbarActionsProvider)
+                      .addVault,
+                  icon: Icons.lock_open_rounded,
+                  tooltip: context.l10n.mountExistingContainerTitle,
+                ),
+                _DashboardToolbarButton(
+                  listenable: ref
+                      .read(dashboardToolbarActionsProvider)
+                      .createVault,
+                  icon: Icons.add_box_rounded,
+                  tooltip: context.l10n.createNewContainerTitle,
+                ),
+                const Spacer(),
+                const AppBarAuthenticatorButton(),
+                const AppBarTransferButton(),
+                const SizedBox(width: 8),
               ],
             ),
           ),
@@ -2215,6 +2234,30 @@ class _TopSelectionBarOverlay extends ConsumerWidget {
 /// Paints the system navigation inset under a bottom app bar in the bar's own
 /// color, so the bar seems to run to the very edge of the screen. It stays put
 /// when the bar auto-hides, which keeps the pages clear of the system bar.
+/// A compact icon button of the desktop Home toolbar. It is enabled only while
+/// a dashboard is mounted and has registered its action in [listenable].
+class _DashboardToolbarButton extends StatelessWidget {
+  const _DashboardToolbarButton({
+    required this.listenable,
+    required this.icon,
+    required this.tooltip,
+  });
+
+  final ValueListenable<VoidCallback?> listenable;
+  final IconData icon;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<VoidCallback?>(
+    valueListenable: listenable,
+    builder: (context, onPressed, _) => IconButton(
+      icon: Icon(icon),
+      tooltip: tooltip,
+      onPressed: onPressed,
+    ),
+  );
+}
+
 class _AppBarInsetFill extends StatelessWidget {
   const _AppBarInsetFill({required this.area});
 

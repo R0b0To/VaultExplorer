@@ -26,6 +26,7 @@ import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart'
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/widgets/external_file_drop_zone.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/dashboard/dashboard_toolbar_actions.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
@@ -89,6 +90,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isFabVisible = true;
   late final ProviderContainer _container;
+  DashboardToolbarActions? _toolbarActions;
 
   // Cached stand-in [MountedContainer] for real device storage (see
   // buildLocalStorageContainer), refreshed whenever all-files access is
@@ -111,6 +113,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   MountedContainer? _pendingLocalStorageOriginContainer;
   int _localStoragePermissionRequestId = 0;
   void showAddOptionsSheet() => _showAddOptionsSheet();
+
+  /// Desktop toolbar entry points: mount an existing container / vault
+  /// folder, or create a new container.
+  void showMountSheet() => unawaited(_showUnlockSheet());
+  void showCreateContainerSheet() => unawaited(_showCreateSheet());
 
   /// Opens Local storage (or an external raw-path storage [external] --
   /// SD card / USB volume), first walking the person through granting
@@ -208,6 +215,14 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     // vault is opened from it, so this widget is not always alive.
     WidgetsBinding.instance.addObserver(this);
     _checkStorageAccess();
+    _toolbarActions = _container.read(dashboardToolbarActionsProvider);
+    // Published after the first frame: notifying listeners while the tree is
+    // still being built would throw.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _toolbarActions!.addVault.value = showMountSheet;
+      _toolbarActions!.createVault.value = showCreateContainerSheet;
+    });
   }
 
   @override
@@ -285,6 +300,17 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
 
   @override
   void dispose() {
+    final toolbar = _toolbarActions;
+    if (toolbar != null) {
+      // Only clear what is still ours: a newer dashboard instance may have
+      // registered already (Home is rebuilt when a vault replaces its tab).
+      if (toolbar.addVault.value == showMountSheet) {
+        toolbar.addVault.value = null;
+      }
+      if (toolbar.createVault.value == showCreateContainerSheet) {
+        toolbar.createVault.value = null;
+      }
+    }
     _dashboardAppBarAnimController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -1029,15 +1055,18 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             const ClipboardFab(heroTag: 'dashboard_clipboard_fab'),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 64,
-              height: 64,
-              child: FloatingActionButton(
-                onPressed: _isFabVisible ? _showAddOptionsSheet : null,
-                child: const Icon(Icons.add_rounded, size: 28),
+            // Desktop adds and creates vaults from the toolbar instead.
+            if (!PlatformFeatures.isDesktop) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: FloatingActionButton(
+                  onPressed: _isFabVisible ? _showAddOptionsSheet : null,
+                  child: const Icon(Icons.add_rounded, size: 28),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

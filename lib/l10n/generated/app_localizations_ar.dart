@@ -4578,6 +4578,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get toolsScreenTitle => 'الأدوات';
 
   @override
+  String get toolsSearchHint => 'ابحث في الأدوات…';
+
+  @override
   String get toolsSectionContainerUtilities => 'أدوات الحاوية المساعدة';
 
   @override

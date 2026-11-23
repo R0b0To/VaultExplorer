@@ -1103,6 +1103,7 @@
   "navBarVaultsLabel": "Сховища",
   "navBarToolsLabel": "Інструменти",
   "toolsScreenTitle": "Інструменти",
+  "toolsSearchHint": "Пошук інструментів…",
   "toolsSectionContainerUtilities": "Утиліти контейнерів",
   "toolsSectionFileCryptography": "Криптографія файлів",
   "toolsSectionStorageDiagnostics": "Пам'ять та діагностика",

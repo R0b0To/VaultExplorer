@@ -1092,6 +1092,7 @@
   "navBarVaultsLabel": "الخزنات",
   "navBarToolsLabel": "الأدوات",
   "toolsScreenTitle": "الأدوات",
+  "toolsSearchHint": "ابحث في الأدوات…",
   "toolsSectionContainerUtilities": "أدوات الحاوية المساعدة",
   "toolsSectionFileCryptography": "تشفير الملفات",
   "toolsSectionStorageDiagnostics": "التخزين والتشخيص",

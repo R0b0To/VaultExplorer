@@ -4522,6 +4522,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get toolsScreenTitle => 'Herramientas';
 
   @override
+  String get toolsSearchHint => 'Buscar herramientas…';
+
+  @override
   String get toolsSectionContainerUtilities => 'Utilidades de contenedor';
 
   @override

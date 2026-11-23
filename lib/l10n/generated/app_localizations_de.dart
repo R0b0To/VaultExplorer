@@ -4523,6 +4523,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get toolsScreenTitle => 'Werkzeuge';
 
   @override
+  String get toolsSearchHint => 'Werkzeuge durchsuchen…';
+
+  @override
   String get toolsSectionContainerUtilities => 'Container-Dienstprogramme';
 
   @override

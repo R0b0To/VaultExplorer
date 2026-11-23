@@ -4246,6 +4246,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolsScreenTitle => '工具';
 
   @override
+  String get toolsSearchHint => '搜索工具…';
+
+  @override
   String get toolsSectionContainerUtilities => '容器实用工具';
 
   @override
@@ -12091,44 +12094,4 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetFileManagerSettingsMessage =>
-      '此屏幕上的所有选项都将恢复为默认值，包括标签页、布局、工具栏、网格、缩略图、查看器和皮肤设置。您的文件、书签和各文件夹的单独设置不会更改。';
-
-  @override
-  String get dropImportOverlayLabel => '松开以导入到此文件夹';
-
-  @override
-  String get dropImportUnavailableHere => '只能将文件拖放到保险库文件夹中。';
-
-  @override
-  String dropImportSkippedItems(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '有 $count 个拖入的项目无法导入',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get dropVaultOverlayLabel => '松开以添加容器或保险库文件夹';
-
-  @override
-  String get dropVaultUnsupported => '请拖入容器文件，或仅拖入一个保险库文件夹。';
-
-  @override
-  String get pathFieldHint => '输入路径';
-
-  @override
-  String get editPathTooltip => '编辑路径';
-
-  @override
-  String get goToPathTooltip => '前往';
-
-  @override
-  String get pathOutsideStorage => '该路径位于此存储之外';
-
-  @override
-  String pathNotFound(String path) {
-    return '未找到路径：$path';
-  }
-}
+ 

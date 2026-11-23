@@ -1092,6 +1092,7 @@
   "navBarVaultsLabel": "Coffres",
   "navBarToolsLabel": "Outils",
   "toolsScreenTitle": "Outils",
+  "toolsSearchHint": "Rechercher des outils…",
   "toolsSectionContainerUtilities": "Utilitaires de conteneur",
   "toolsSectionFileCryptography": "Cryptographie de fichiers",
   "toolsSectionStorageDiagnostics": "Stockage et diagnostics",

@@ -1092,6 +1092,7 @@
   "navBarVaultsLabel": "保险库",
   "navBarToolsLabel": "工具",
   "toolsScreenTitle": "工具",
+  "toolsSearchHint": "搜索工具…",
   "toolsSectionContainerUtilities": "容器实用工具",
   "toolsSectionFileCryptography": "文件加密",
   "toolsSectionStorageDiagnostics": "存储与诊断",

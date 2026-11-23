@@ -2099,7 +2099,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bitlockerToolsPasswordLabel => 'Password or recovery key';
 
   @override
-  String get toolHiddenInExistingTitle => 'Add hidden volume';
+  String get toolHiddenInExistingTitle => 'Add Hidden Volume';
 
   @override
   String get toolHiddenInExistingSubtitle =>
@@ -2122,7 +2122,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Fills the added space with data encrypted under the volume key so it cannot be told apart from the rest. Turn off for a quick expand.';
 
   @override
-  String get vcToolsExpandAction => 'Expand volume';
+  String get vcToolsExpandAction => 'Expand Volume';
 
   @override
   String get vcToolsExpandNote =>
@@ -4452,6 +4452,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolsScreenTitle => 'Tools';
 
   @override
+  String get toolsSearchHint => 'Search tools…';
+
+  @override
   String get toolsSectionContainerUtilities => 'Container Utilities';
 
   @override
@@ -5709,7 +5712,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolVaultSyncSubtitle =>
-      'Compare two folders — in vaults, on this device or on a document provider — and copy over what\'s missing or newer';
+      'Compare two folders and copy over what\'s missing or newer';
 
   @override
   String get vaultSyncTapToSelect => 'Tap to select a storage & folder';
@@ -8042,7 +8045,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolPasswordInterchangeSubtitle =>
-      'Move logins, cards and notes to or from KeePass, Bitwarden and other password managers';
+      'Move logins and notes to or from KeePass, Bitwarden & more';
 
   @override
   String get toolsSectionPasswordManager => 'Password Manager';

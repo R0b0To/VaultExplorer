@@ -4302,6 +4302,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get toolsScreenTitle => 'ツール';
 
   @override
+  String get toolsSearchHint => 'ツールを検索…';
+
+  @override
   String get toolsSectionContainerUtilities => 'コンテナユーティリティ';
 
   @override

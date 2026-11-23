@@ -1092,6 +1092,7 @@
   "navBarVaultsLabel": "Tresore",
   "navBarToolsLabel": "Werkzeuge",
   "toolsScreenTitle": "Werkzeuge",
+  "toolsSearchHint": "Werkzeuge durchsuchen…",
   "toolsSectionContainerUtilities": "Container-Dienstprogramme",
   "toolsSectionFileCryptography": "Dateiverschlüsselung",
   "toolsSectionStorageDiagnostics": "Speicher & Diagnose",

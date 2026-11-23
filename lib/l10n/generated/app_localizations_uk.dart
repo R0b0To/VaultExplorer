@@ -4551,6 +4551,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get toolsScreenTitle => 'Інструменти';
 
   @override
+  String get toolsSearchHint => 'Пошук інструментів…';
+
+  @override
   String get toolsSectionContainerUtilities => 'Утиліти контейнерів';
 
   @override

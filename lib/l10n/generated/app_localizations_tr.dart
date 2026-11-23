@@ -4482,6 +4482,9 @@ class AppLocalizationsTr extends AppLocalizations {
   String get toolsScreenTitle => 'Araçlar';
 
   @override
+  String get toolsSearchHint => 'Araçlarda ara…';
+
+  @override
   String get toolsSectionContainerUtilities => 'Kapsayıcı araçları';
 
   @override

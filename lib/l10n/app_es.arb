@@ -1092,6 +1092,7 @@
   "navBarVaultsLabel": "Bóvedas",
   "navBarToolsLabel": "Herramientas",
   "toolsScreenTitle": "Herramientas",
+  "toolsSearchHint": "Buscar herramientas…",
   "toolsSectionContainerUtilities": "Utilidades de contenedor",
   "toolsSectionFileCryptography": "Criptografía de archivos",
   "toolsSectionStorageDiagnostics": "Almacenamiento y diagnóstico",

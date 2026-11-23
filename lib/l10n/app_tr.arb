@@ -1211,6 +1211,7 @@
   "navBarVaultsLabel": "Kasalar",
   "navBarToolsLabel": "Araçlar",
   "toolsScreenTitle": "Araçlar",
+  "toolsSearchHint": "Araçlarda ara…",
   "toolsSectionContainerUtilities": "Kapsayıcı araçları",
   "toolsSectionFileCryptography": "Dosya kriptografisi",
   "toolsSectionStorageDiagnostics": "Depolama ve tanılama",

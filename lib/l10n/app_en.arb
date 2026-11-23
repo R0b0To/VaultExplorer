@@ -2747,7 +2747,7 @@
   "@bitlockerToolsPasswordLabel": {
     "description": "Credential field label for BitLocker tools: a password or the 48-digit recovery key"
   },
-  "toolHiddenInExistingTitle": "Add hidden volume",
+  "toolHiddenInExistingTitle": "Add Hidden Volume",
   "@toolHiddenInExistingTitle": {
     "description": "Tools row: create a hidden volume inside an existing volume"
   },
@@ -2775,7 +2775,7 @@
   "@vcToolsInitFreeSpaceHint": {
     "description": "Explains the initialize new space switch"
   },
-  "vcToolsExpandAction": "Expand volume",
+  "vcToolsExpandAction": "Expand Volume",
   "@vcToolsExpandAction": {
     "description": "Button: run the expansion"
   },
@@ -5732,6 +5732,10 @@
   "@toolsScreenTitle": {
     "description": "AppBar title for the Tools tab"
   },
+  "toolsSearchHint": "Search tools…",
+  "@toolsSearchHint": {
+    "description": "Hint text of the search field on the Tools screen"
+  },
   "toolsSectionContainerUtilities": "Container Utilities",
   "@toolsSectionContainerUtilities": {
     "description": "Section header on the Tools tab, above Split/Repair"
@@ -7267,7 +7271,7 @@
   "@toolVaultSyncTitle": {
     "description": "Tool card title for the Vault-to-Vault Synchronizer / Diff tool"
   },
-  "toolVaultSyncSubtitle": "Compare two folders — in vaults, on this device or on a document provider — and copy over what's missing or newer",
+  "toolVaultSyncSubtitle": "Compare two folders and copy over what's missing or newer",
   "@toolVaultSyncSubtitle": {
     "description": "Tool card subtitle for the Vault-to-Vault Synchronizer / Diff tool"
   },
@@ -10177,7 +10181,7 @@
   "@toolPasswordInterchangeTitle": {
     "description": "Tools screen row title and screen app bar title for the password-manager interchange tool"
   },
-  "toolPasswordInterchangeSubtitle": "Move logins, cards and notes to or from KeePass, Bitwarden and other password managers",
+  "toolPasswordInterchangeSubtitle": "Move logins and notes to or from KeePass, Bitwarden & more",
   "@toolPasswordInterchangeSubtitle": {
     "description": "Tools screen row subtitle for the password-manager interchange tool"
   },

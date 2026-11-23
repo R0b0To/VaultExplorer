@@ -1092,6 +1092,7 @@
   "navBarVaultsLabel": "볼트",
   "navBarToolsLabel": "도구",
   "toolsScreenTitle": "도구",
+  "toolsSearchHint": "도구 검색…",
   "toolsSectionContainerUtilities": "컨테이너 유틸리티",
   "toolsSectionFileCryptography": "파일 암호화",
   "toolsSectionStorageDiagnostics": "저장소 및 진단",

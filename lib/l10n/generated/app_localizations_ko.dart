@@ -4300,6 +4300,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolsScreenTitle => '도구';
 
   @override
+  String get toolsSearchHint => '도구 검색…';
+
+  @override
   String get toolsSectionContainerUtilities => '컨테이너 유틸리티';
 
   @override

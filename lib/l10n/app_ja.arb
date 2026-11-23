@@ -1092,6 +1092,7 @@
   "navBarVaultsLabel": "ボールト",
   "navBarToolsLabel": "ツール",
   "toolsScreenTitle": "ツール",
+  "toolsSearchHint": "ツールを検索…",
   "toolsSectionContainerUtilities": "コンテナユーティリティ",
   "toolsSectionFileCryptography": "ファイル暗号化",
   "toolsSectionStorageDiagnostics": "ストレージと診断",

@@ -26,7 +26,7 @@ import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
-import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
@@ -492,33 +492,7 @@ class AppNavigationDrawer extends ConsumerWidget {
       onEditVault!(item);
       return;
     }
-    final state = ref.read(vaultDashboardControllerProvider);
-    final existing = state.records[item.uri];
-    MountedContainer? mountedC;
-    for (final m in state.mounted) {
-      if (m.uri == item.uri) {
-        mountedC = m;
-        break;
-      }
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SkinAreaScope(
-          area: SkinArea.dashboard,
-          child: ContainerConfigScreen(
-            uri: item.uri,
-            currentLabel: item.name,
-            existingRecord: existing,
-            appSettings: state.appSettings,
-            mountedContainer: mountedC,
-            onSaved: (record) => ref
-                .read(vaultDashboardControllerProvider.notifier)
-                .updateContainerRecord(item.uri, record),
-          ),
-        ),
-      ),
-    );
+    openContainerConfig(context, uri: item.uri, currentLabel: item.name);
   }
 
   void _handleDeleteVault(

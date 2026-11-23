@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
+import 'package:vaultexplorer/app/app_theme_cache.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_layer.dart';
@@ -15,7 +16,6 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
@@ -42,70 +42,7 @@ class VaultExplorerApp extends ConsumerStatefulWidget {
 }
 
 class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
-  Object? _lightThemeKey;
-  ThemeData? _cachedLightTheme;
-  Object? _darkThemeKey;
-  ThemeData? _cachedDarkTheme;
-
-  ThemeData _lightThemeFor({
-    required ColorScheme? dynamicScheme,
-    required AppSkinPreset skinPreset,
-    required dynamic customSkin,
-    required dynamic manualFileManagerSkin,
-    required bool fileManagerFollowsAppSkin,
-    required bool editorFollowsAppSkin,
-  }) {
-    final key = (
-      dynamicScheme,
-      skinPreset,
-      customSkin,
-      manualFileManagerSkin,
-      fileManagerFollowsAppSkin,
-      editorFollowsAppSkin,
-    );
-    if (_cachedLightTheme != null && _lightThemeKey == key) {
-      return _cachedLightTheme!;
-    }
-    _lightThemeKey = key;
-    return _cachedLightTheme = buildLightTheme(
-      dynamicScheme: dynamicScheme,
-      appSkin: skinPreset,
-      customAppSkin: customSkin,
-      manualFileManagerSkin: manualFileManagerSkin,
-      fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
-      editorFollowsAppSkin: editorFollowsAppSkin,
-    );
-  }
-
-  ThemeData _darkThemeFor({
-    required ColorScheme? dynamicScheme,
-    required AppSkinPreset skinPreset,
-    required dynamic customSkin,
-    required dynamic manualFileManagerSkin,
-    required bool fileManagerFollowsAppSkin,
-    required bool editorFollowsAppSkin,
-  }) {
-    final key = (
-      dynamicScheme,
-      skinPreset,
-      customSkin,
-      manualFileManagerSkin,
-      fileManagerFollowsAppSkin,
-      editorFollowsAppSkin,
-    );
-    if (_cachedDarkTheme != null && _darkThemeKey == key) {
-      return _cachedDarkTheme!;
-    }
-    _darkThemeKey = key;
-    return _cachedDarkTheme = buildDarkTheme(
-      dynamicScheme: dynamicScheme,
-      appSkin: skinPreset,
-      customAppSkin: customSkin,
-      manualFileManagerSkin: manualFileManagerSkin,
-      fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
-      editorFollowsAppSkin: editorFollowsAppSkin,
-    );
-  }
+  final AppThemeCache _themes = AppThemeCache();
 
   @override
   void initState() {
@@ -150,7 +87,7 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
                       navigatorKey: appNavigatorKey,
                       navigatorObservers: [desktopModalTracker],
                       debugShowCheckedModeBanner: false,
-                      theme: _lightThemeFor(
+                      theme: _themes.lightThemeFor(
                         dynamicScheme: useDynamic ? lightDynamic : null,
                         skinPreset: skinPreset,
                         customSkin: customSkin,
@@ -159,7 +96,7 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
                             appSkin.fileManagerFollowsAppSkin,
                         editorFollowsAppSkin: appSkin.editorFollowsAppSkin,
                       ),
-                      darkTheme: _darkThemeFor(
+                      darkTheme: _themes.darkThemeFor(
                         dynamicScheme: useDynamic ? darkDynamic : null,
                         skinPreset: skinPreset,
                         customSkin: customSkin,
@@ -181,21 +118,9 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
                       ),
                       locale: locale,
 
-                      localizationsDelegates: [
-                        AppLocalizations.delegate,
-                        ...GlobalMaterialLocalizations.delegates,
-                      ],
+                      localizationsDelegates: appLocalizationsDelegates,
                       supportedLocales: AppLocalizations.supportedLocales,
-                      localeResolutionCallback:
-                          (deviceLocale, supportedLocales) {
-                            for (final supported in supportedLocales) {
-                              if (supported.languageCode ==
-                                  deviceLocale?.languageCode) {
-                                return supported;
-                              }
-                            }
-                            return const Locale('en');
-                          },
+                      localeResolutionCallback: appResolveLocale,
                       builder: (context, child) {
                         return Consumer(
                           builder: (context, ref, _) {

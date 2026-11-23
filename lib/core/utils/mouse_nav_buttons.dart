@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/gestures.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
@@ -45,6 +47,11 @@ class MouseNavDispatcher {
     if (event is! PointerDownEvent || event.kind != PointerDeviceKind.mouse) {
       return;
     }
+    // A global route hears every view. The handlers and the navigator below
+    // belong to the main window; a press in a secondary window (vault
+    // settings) is handled by that window itself.
+    final mainViewId = PlatformDispatcher.instance.implicitView?.viewId;
+    if (mainViewId != null && event.viewId != mainViewId) return;
     final MouseNavButton button;
     if (event.buttons & kBackMouseButton != 0) {
       button = MouseNavButton.back;

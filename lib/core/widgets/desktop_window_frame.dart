@@ -8,6 +8,24 @@ import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 
 enum _FrameSlot { bar, page }
 
+/// Marks a window that has its own native title bar (a secondary window made
+/// by the windowing API), as opposed to the main Windows window whose caption
+/// is drawn by Flutter.
+///
+/// Inside it [DesktopCaptionFrame] draws nothing: its minimize / maximize /
+/// close buttons talk to the main window through the runner, so in another
+/// window they would act on the wrong one.
+class NativeWindowChrome extends InheritedWidget {
+  const NativeWindowChrome({super.key, required super.child});
+
+  /// Whether [context] sits in a window with a native title bar.
+  static bool of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<NativeWindowChrome>() != null;
+
+  @override
+  bool updateShouldNotify(NativeWindowChrome oldWidget) => false;
+}
+
 /// Gives a pushed page its own caption row (drag area plus minimize, maximize
 /// and close) on Windows, where the runner has no native title bar.
 ///
@@ -33,7 +51,12 @@ class _DesktopCaptionFrameState extends State<DesktopCaptionFrame> {
   }
 
   @override
-  Widget build(BuildContext context) => CustomMultiChildLayout(
+  Widget build(BuildContext context) {
+    if (NativeWindowChrome.of(context)) return widget.child;
+    return _buildFrame();
+  }
+
+  Widget _buildFrame() => CustomMultiChildLayout(
     delegate: _FrameLayoutDelegate(_claims),
     children: [
       LayoutId(
@@ -108,12 +131,13 @@ class DesktopCaptionPageTransitionsBuilder extends PageTransitionsBuilder {
     // routes get a frame.
     final isRootRoute =
         route.navigator == Navigator.maybeOf(context, rootNavigator: true);
+    final needsFrame = isRootRoute && !NativeWindowChrome.of(context);
     return inner.buildTransitions<T>(
       route,
       context,
       animation,
       secondaryAnimation,
-      isRootRoute ? DesktopCaptionFrame(child: child) : child,
+      needsFrame ? DesktopCaptionFrame(child: child) : child,
     );
   }
 }

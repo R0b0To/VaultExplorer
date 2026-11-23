@@ -28,7 +28,7 @@ import 'package:vaultexplorer/features/browser/widgets/external_file_drop_zone.d
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
-import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_sheet.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sheet.dart';
@@ -882,34 +882,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     required String currentLabel,
   }) {
     HapticFeedback.mediumImpact();
-    final state = ref.read(vaultDashboardControllerProvider);
-    final existing = state.records[uri];
-    MountedContainer? mountedContainer;
-    for (final m in state.mounted) {
-      if (m.uri == uri) {
-        mountedContainer = m;
-        break;
-      }
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => SkinAreaScope(
-          area: SkinArea.dashboard,
-          child: ContainerConfigScreen(
-            uri: uri,
-            currentLabel: currentLabel,
-            existingRecord: existing,
-            appSettings: state.appSettings,
-            mountedContainer: mountedContainer,
-            onSaved: (record) => ref
-                .read(vaultDashboardControllerProvider.notifier)
-                .updateContainerRecord(uri, record),
-          ),
-        ),
-      ),
-    );
+    openContainerConfig(context, uri: uri, currentLabel: currentLabel);
   }
 
   Future<void> _openBrowser(MountedContainer container) async {

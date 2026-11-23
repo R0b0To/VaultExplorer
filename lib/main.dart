@@ -5,12 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/utils/last_pointer.dart';
 import 'package:vaultexplorer/app/app_bootstrap.dart';
+import 'package:vaultexplorer/app/secondary_window_app.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/windowing/desktop_windowing.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/sync/services/scheduled_sync_background.dart';
 
@@ -80,7 +83,16 @@ void main() async {
   runApp(
     UncontrolledProviderScope(
       container: appContainer,
-      child: const VaultExplorerApp(),
+      // Linux/Windows can show some pages (vault settings) in a native window
+      // of their own; the host draws those next to the app. Android keeps the
+      // bare app, exactly as before.
+      child: DesktopWindowing.isSupportedPlatform
+          ? SecondaryWindowsHost(
+              windowBuilder: (context, entry) =>
+                  SecondaryWindowApp(entry: entry),
+              child: const VaultExplorerApp(),
+            )
+          : const VaultExplorerApp(),
     ),
   );
 

@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
@@ -466,6 +467,10 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!mounted || _isEnforcingLock) return;
     _isEnforcingLock = true;
     try {
+      // Native windows (vault settings on desktop) are not routes of the
+      // navigator popped below, so they are closed here: nothing from a vault
+      // may stay on screen behind the lock gate.
+      SecondaryWindows.instance.closeAll();
       final mode = await disguiseModeApi.getMode();
       if (!mounted) return;
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide ReorderableListView;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart' show ReorderableListView;
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -16,6 +17,13 @@ class VaultDashboardContentView extends ConsumerWidget {
   final VaultDashboardViewState state;
   final AppSettings settings;
   final VoidCallback onAdd;
+
+  /// False while the list is filtered: the shown indices no longer match the
+  /// stored order, so dragging would reorder the wrong cards.
+  final bool reorderEnabled;
+
+  /// True when [items] is empty only because of the search filter.
+  final bool filteredEmpty;
   final ValueChanged<VaultListItem> onOpen;
   final ValueChanged<VaultListItem> onEdit;
   final ValueChanged<VaultListItem> onDelete;
@@ -26,6 +34,8 @@ class VaultDashboardContentView extends ConsumerWidget {
     required this.state,
     required this.settings,
     required this.onAdd,
+    this.reorderEnabled = true,
+    this.filteredEmpty = false,
     required this.onOpen,
     required this.onEdit,
     required this.onDelete,
@@ -34,6 +44,16 @@ class VaultDashboardContentView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (items.isEmpty && !state.isLoading) {
+      if (filteredEmpty) {
+        return Center(
+          child: Text(
+            context.l10n.noResultsTitle,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        );
+      }
       return EmptyState(onAdd: onAdd);
     }
 
@@ -92,7 +112,8 @@ class VaultDashboardContentView extends ConsumerWidget {
   ) {
     final cellWidth =
         (width - _kGridSidePadding * 2 - _kGridGap * (columns - 1)) / columns;
-    final reorderable = settings.containerSortMode == ContainerSortMode.manual;
+    final reorderable =
+        reorderEnabled && settings.containerSortMode == ContainerSortMode.manual;
 
     Widget cell(int index) {
       final item = items[index];
@@ -220,7 +241,9 @@ class VaultDashboardContentView extends ConsumerWidget {
               .onContainerLocked(volId),
           isRemoving: state.animatingOutUris.contains(item.uri),
           isInserting: state.animatingInUris.contains(item.uri),
-          dragEnabled: settings.containerSortMode == ContainerSortMode.manual,
+          dragEnabled:
+              reorderEnabled &&
+              settings.containerSortMode == ContainerSortMode.manual,
         );
       },
     );

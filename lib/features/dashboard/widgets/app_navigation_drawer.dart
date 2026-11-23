@@ -32,6 +32,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_secti
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/lock_all_vaults.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
@@ -408,80 +409,13 @@ class AppNavigationDrawer extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     List<MountedContainer> mounted,
-  ) async {
-    final willLeaveCurrentScreen =
-        currentVolId != null && mounted.any((c) => c.volId == currentVolId);
-    final controller = ref.read(vaultDashboardControllerProvider.notifier);
-    final currentVaultGuardAcquired =
-        willLeaveCurrentScreen && controller.acquireLockGuard(currentVolId!);
-    if (currentVaultGuardAcquired) {
-      _closeDrawer(context);
-    }
-    var currentVaultGuardHeld = currentVaultGuardAcquired;
-    var skippedBusyVault = false;
-    // Vaults whose USB device refused the final write-back. They stay open; the
-    // person is asked about each one only after every other vault has been locked.
-    final flushRefused = <MountedContainer>[];
-    try {
-      for (final c in mounted) {
-        final guardAlreadyHeld =
-            c.volId == currentVolId && currentVaultGuardHeld;
-        if (!guardAlreadyHeld && !controller.acquireLockGuard(c.volId)) {
-          skippedBusyVault = true;
-          continue;
-        }
-        try {
-          final result = await ref
-              .read(vaultLifecycleApiProvider)
-              .lockContainerDetailed(c.uri);
-          if (result == LockResult.locked) {
-            controller.onContainerLocked(c.volId);
-          } else if (result == LockResult.flushRefused) {
-            flushRefused.add(c);
-          } else {
-            skippedBusyVault = true;
-          }
-        } catch (_) {
-          skippedBusyVault = true;
-        } finally {
-          controller.releaseLockGuard(c.volId);
-          if (guardAlreadyHeld) currentVaultGuardHeld = false;
-        }
-      }
-    } finally {
-      if (currentVaultGuardHeld) {
-        controller.releaseLockGuard(currentVolId!);
-      }
-    }
-    for (final c in flushRefused) {
-      if (!controller.acquireLockGuard(c.volId)) continue;
-      try {
-        final result = await lockWithFlushPrompt(
-          context: context,
-          lifecycle: ref.read(vaultLifecycleApiProvider),
-          uri: c.uri,
-          displayName: c.displayName,
-          firstResult: LockResult.flushRefused,
-        );
-        if (result == LockResult.locked) {
-          controller.onContainerLocked(c.volId);
-        } else if (result == LockResult.failed) {
-          skippedBusyVault = true;
-        }
-      } catch (_) {
-        skippedBusyVault = true;
-      } finally {
-        controller.releaseLockGuard(c.volId);
-      }
-    }
-    if (skippedBusyVault && context.mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.operationInProgressWaitMessage,
-        tone: AppBannerTone.warning,
-      );
-    }
-  }
+  ) => lockAllVaults(
+    context,
+    ref,
+    mounted,
+    currentVolId: currentVolId,
+    onLeavingCurrentVault: () => _closeDrawer(context),
+  );
 
   void _handleEditVault(
     BuildContext context,

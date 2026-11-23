@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
@@ -61,6 +63,11 @@ class BreadcrumbBar extends StatefulWidget implements PreferredSizeWidget {
   final List<PathSegment> forwardStack;
   final ValueChanged<int>? onForwardTap;
 
+  /// A separate box at the end of the row (the desktop search field). The
+  /// path then shares the row with it, like Explorer's address and search
+  /// boxes, instead of filling it.
+  final Widget? trailing;
+
   const BreadcrumbBar({
     super.key,
     required this.stack,
@@ -68,6 +75,7 @@ class BreadcrumbBar extends StatefulWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.forwardStack = const [],
     this.onForwardTap,
+    this.trailing,
   });
 
   @override
@@ -214,16 +222,9 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      width: double.infinity,
-      height: 40,
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: widget.backgroundColor ?? cs.surface,
-      ),
-      // Styled like a browser's address bar: a rounded, outlined field that
-      // the path sits inside, always pinned to the left.
-      child: Container(
+    // Styled like a browser's address bar: a rounded, outlined field that
+    // the path sits inside, always pinned to the left.
+    final pathField = Container(
         alignment: Alignment.centerLeft,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -419,7 +420,32 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
           ),
         ),
       ),
+      );
+
+    final trailing = widget.trailing;
+    return Container(
+      width: double.infinity,
+      height: 40,
+      padding: trailing == null
+          ? const EdgeInsets.symmetric(vertical: 4)
+          : const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      decoration: BoxDecoration(
+        color: widget.backgroundColor ?? cs.surface,
       ),
+      child: trailing == null
+          ? pathField
+          : LayoutBuilder(
+              builder: (context, constraints) => Row(
+                children: [
+                  Expanded(child: pathField),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: math.min(260.0, constraints.maxWidth * 0.4),
+                    child: trailing,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

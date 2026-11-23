@@ -19,7 +19,11 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
+import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/features/browser/widgets/address_search_field.dart';
 import 'package:vaultexplorer/features/dashboard/dashboard_toolbar_actions.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/lock_all_vaults.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
@@ -571,6 +575,20 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                   context.l10n.dashboardNavLabel,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
+                // Same search box as the file manager's breadcrumb row.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 260),
+                      child: _DashboardSearchBox(
+                        query: ref
+                            .read(dashboardToolbarActionsProvider)
+                            .searchQuery,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -594,19 +612,24 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 // Same 40px row, same compact icon buttons as the file
                 // manager's toolbar, so Home and a storage share one chrome
                 // height and nothing shifts when switching between them.
+                // Opens the "Add a vault" prompt (mount existing, create new,
+                // USB) instead of jumping straight into one flow.
                 _DashboardToolbarButton(
                   listenable: ref
                       .read(dashboardToolbarActionsProvider)
                       .addVault,
-                  icon: Icons.lock_open_rounded,
-                  tooltip: context.l10n.mountExistingContainerTitle,
+                  icon: Icons.add_rounded,
+                  tooltip: context.l10n.addVaultFabLabel,
                 ),
-                _DashboardToolbarButton(
-                  listenable: ref
-                      .read(dashboardToolbarActionsProvider)
-                      .createVault,
-                  icon: Icons.add_box_rounded,
-                  tooltip: context.l10n.createNewContainerTitle,
+                const VerticalDivider(width: 1, indent: 8, endIndent: 8),
+                const _DashboardLockAllButton(),
+                const _DashboardSortButton(),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: context.l10n.refreshListButton,
+                  onPressed: () => unawaited(
+                    ref.read(vaultDashboardControllerProvider.notifier).loadAll(),
+                  ),
                 ),
                 const Spacer(),
                 const AppBarAuthenticatorButton(),
@@ -2231,9 +2254,6 @@ class _TopSelectionBarOverlay extends ConsumerWidget {
   }
 }
 
-/// Paints the system navigation inset under a bottom app bar in the bar's own
-/// color, so the bar seems to run to the very edge of the screen. It stays put
-/// when the bar auto-hides, which keeps the pages clear of the system bar.
 /// A compact icon button of the desktop Home toolbar. It is enabled only while
 /// a dashboard is mounted and has registered its action in [listenable].
 class _DashboardToolbarButton extends StatelessWidget {
@@ -2258,6 +2278,107 @@ class _DashboardToolbarButton extends StatelessWidget {
   );
 }
 
+/// Locks every unlocked vault. Disabled while none is unlocked.
+class _DashboardLockAllButton extends ConsumerWidget {
+  const _DashboardLockAllButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mounted = ref.watch(
+      vaultDashboardControllerProvider.select((s) => s.mounted),
+    );
+    return IconButton(
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.lock_outline_rounded),
+          if (mounted.isNotEmpty)
+            Positioned(
+              right: -8,
+              top: -6,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    '${mounted.length}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1.4,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      tooltip: context.l10n.lockAllVaultsTitle,
+      onPressed: mounted.isEmpty
+          ? null
+          : () => unawaited(lockAllVaults(context, ref, mounted)),
+    );
+  }
+}
+
+/// Vault list order, the same setting as in Settings.
+class _DashboardSortButton extends ConsumerWidget {
+  const _DashboardSortButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.containerSortMode,
+      ),
+    );
+    return PopupMenuButton<ContainerSortMode>(
+      icon: const Icon(Icons.sort_rounded),
+      tooltip: context.l10n.sortContainersByLabel,
+      initialValue: current,
+      onSelected: (mode) => unawaited(
+        ref
+            .read(appSettingsControllerProvider.notifier)
+            .updateSettings((s) => s.copyWith(containerSortMode: mode)),
+      ),
+      itemBuilder: (ctx) => [
+        for (final mode in ContainerSortMode.values)
+          CheckedPopupMenuItem<ContainerSortMode>(
+            value: mode,
+            checked: mode == current,
+            child: Text(mode.getLocalizedLabel(ctx.l10n)),
+          ),
+      ],
+    );
+  }
+}
+
+/// The Home row's search box: the shared [AddressSearchField] bound to the
+/// dashboard's query. The dashboard does the filtering.
+class _DashboardSearchBox extends StatelessWidget {
+  const _DashboardSearchBox({required this.query});
+
+  final ValueNotifier<String> query;
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<String>(
+    valueListenable: query,
+    builder: (context, value, _) => AddressSearchField(
+      height: 28,
+      query: value,
+      hintText: context.l10n.search,
+      onChanged: (text) => query.value = text,
+      onClear: () => query.value = '',
+    ),
+  );
+}
+
+/// Paints the system navigation inset under a bottom app bar in the bar's own
+/// color, so the bar seems to run to the very edge of the screen. It stays put
+/// when the bar auto-hides, which keeps the pages clear of the system bar.
 class _AppBarInsetFill extends StatelessWidget {
   const _AppBarInsetFill({required this.area});
 

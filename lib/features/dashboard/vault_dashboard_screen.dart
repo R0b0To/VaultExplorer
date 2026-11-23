@@ -114,11 +114,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   int _localStoragePermissionRequestId = 0;
   void showAddOptionsSheet() => _showAddOptionsSheet();
 
-  /// Desktop toolbar entry points: mount an existing container / vault
-  /// folder, or create a new container.
-  void showMountSheet() => unawaited(_showUnlockSheet());
-  void showCreateContainerSheet() => unawaited(_showCreateSheet());
-
   /// Opens Local storage (or an external raw-path storage [external] --
   /// SD card / USB volume), first walking the person through granting
   /// all-files access when it is missing. Exposed so the app shell's drawer
@@ -220,9 +215,26 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     // still being built would throw.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _toolbarActions!.addVault.value = showMountSheet;
-      _toolbarActions!.createVault.value = showCreateContainerSheet;
+      _toolbarActions!.addVault.value = showAddOptionsSheet;
     });
+    _toolbarActions!.searchQuery.addListener(_onSearchQueryChanged);
+  }
+
+  bool get _isSearchFiltering =>
+      (_toolbarActions?.searchQuery.value.trim().isNotEmpty ?? false);
+
+  void _onSearchQueryChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// [items] narrowed to the vaults whose name contains the toolbar's search
+  /// text. Only the shown list is filtered; stored order is untouched.
+  List<VaultListItem> _applySearchFilter(List<VaultListItem> items) {
+    final query = _toolbarActions?.searchQuery.value.trim().toLowerCase() ?? '';
+    if (query.isEmpty) return items;
+    return items
+        .where((item) => item.name.toLowerCase().contains(query))
+        .toList(growable: false);
   }
 
   @override
@@ -302,13 +314,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   void dispose() {
     final toolbar = _toolbarActions;
     if (toolbar != null) {
+      toolbar.searchQuery.removeListener(_onSearchQueryChanged);
       // Only clear what is still ours: a newer dashboard instance may have
       // registered already (Home is rebuilt when a vault replaces its tab).
-      if (toolbar.addVault.value == showMountSheet) {
+      if (toolbar.addVault.value == showAddOptionsSheet) {
         toolbar.addVault.value = null;
-      }
-      if (toolbar.createVault.value == showCreateContainerSheet) {
-        toolbar.createVault.value = null;
       }
     }
     _dashboardAppBarAnimController.dispose();
@@ -963,6 +973,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     state: state,
     settings: appSettings,
     onAdd: _showAddOptionsSheet,
+    reorderEnabled: !_isSearchFiltering,
+    filteredEmpty: _isSearchFiltering && displayItems.isEmpty,
     onOpen: openItem,
     onEdit: _requestEdit,
     onDelete: _requestDelete,
@@ -974,9 +986,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     final appSettingsState = ref.watch(appSettingsControllerProvider);
     final toolbarSettings = ref.watch(fileManagerToolbarSettingsProvider(null));
     final appSettings = appSettingsState.settings;
-    final displayItems = ref
-        .read(vaultDashboardControllerProvider.notifier)
-        .getDisplayItems();
+    final displayItems = _applySearchFilter(
+      ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems(),
+    );
 
     if (widget.backPreviewOnly) {
       return ColoredBox(

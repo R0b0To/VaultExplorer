@@ -108,6 +108,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/auto_hide_scroll_host.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_preview_pane.dart';
+import 'package:vaultexplorer/features/browser/widgets/address_search_field.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
@@ -594,6 +595,28 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ref.read(fileBrowserSearchProvider(_stateKey).notifier);
 
   bool get _searchActive => _search.active;
+
+  /// Desktop search box beside the breadcrumb path. Set from build() (it
+  /// depends on the layout), read by the shortcut and the toolbar's search
+  /// action so they focus that box instead of opening the bottom search bar.
+  final FocusNode _desktopSearchFocus = FocusNode();
+  bool _desktopInlineSearch = false;
+
+  /// What the search shortcut / toolbar action does: focus the inline box on
+  /// desktop, otherwise toggle the bottom search bar.
+  void _toggleOrFocusSearch(FileBrowserSearch notifier) {
+    if (_desktopInlineSearch) {
+      _desktopSearchFocus.requestFocus();
+      return;
+    }
+    notifier.toggleActive();
+  }
+
+  /// Typing into the inline box opens the search on the first character.
+  void _onInlineSearchChanged(String query) {
+    if (!_searchActive) _searchNotifier.toggleActive();
+    _onSearchQueryChanged(query);
+  }
   String get _searchQuery => _search.query;
   bool get _isDeepSearch => _search.isDeepSearch;
   bool get _isSearchingSubfolders => _search.isSearchingSubfolders;
@@ -1082,6 +1105,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   @override
   void dispose() {
     _disposed = true;
+    _desktopSearchFocus.dispose();
     _inlineRename.dispose();
     HardwareKeyboard.instance.removeHandler(_handleBrowserKey);
     MouseNavDispatcher.instance.unregister(_handleMouseNav);
@@ -3405,7 +3429,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         return true;
       }
       if (key == LogicalKeyboardKey.keyF) {
-        _searchNotifier.toggleActive();
+        _toggleOrFocusSearch(_searchNotifier);
         return true;
       }
       return false;
@@ -6548,7 +6572,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     return FileManagerMoreMenuButton(
       actions: actions,
       searchActive: searchActive,
-      onToggleSearch: () => searchNotifier.toggleActive(),
+      onToggleSearch: () => _toggleOrFocusSearch(searchNotifier),
       sortBy: sortBy,
       sortAscending: sortAscending,
       onSortChanged: _onSortChanged,
@@ -6644,7 +6668,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         tooltip: searchActive
             ? context.l10n.closeSearchTooltip
             : context.l10n.searchInThisFolderTooltip,
-        onPressed: () => searchNotifier.toggleActive(),
+        onPressed: () => _toggleOrFocusSearch(searchNotifier),
       ),
       FileManagerAction.add: (context) => AddItemMenuButton(
         isReadOnly: isReadOnly,
@@ -6963,6 +6987,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     );
     final desktopFileManager =
         PlatformFeatures.isDesktop && useBrowserTabs;
+    // The breadcrumb row carries its own search box here, so the bottom
+    // search bar (and the room it reserves) is not needed.
+    final desktopInlineSearch =
+        desktopFileManager &&
+        _toolbarConfig.showBreadcrumbBar &&
+        !_toolbarConfig.autoHideBreadcrumbBar;
+    _desktopInlineSearch = desktopInlineSearch;
+    final bottomSearchBarShown = _searchActive && !desktopInlineSearch;
     // One setting for every pane and tab, so folding the preview away stays
     // folded when the tab changes and across restarts.
     final sharedPreviewPaneCollapsed = ref.watch(
@@ -6990,7 +7022,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final useFab =
         !desktopFileManager && _toolbarConfig.useFabForToolbar;
     final showActionBar =
-        !_searchActive && (!useFab || desktopFileManager) && !_musicOwnsToolbar;
+        (!_searchActive || desktopFileManager) &&
+        (!useFab || desktopFileManager) &&
+        !_musicOwnsToolbar;
     final workspace = widget.workspaceConfig;
     final appBarNavigation = _nav;
     final appBarSearch = _search;
@@ -7330,9 +7364,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         bottomSystemInset +
         (hasFloatingActions ? 16.0 + fabClearance : 0.0) +
         (showBookmarkBarInViewport ? 48.0 : 0.0) +
-        (_searchActive ? 64.0 : 0.0);
+        (bottomSearchBarShown ? 64.0 : 0.0);
 
-    final double bannerBottomOffset = _searchActive
+    final double bannerBottomOffset = bottomSearchBarShown
         ? 0.0
         : (baseBottomOffset + fabClearance);
 
@@ -7799,6 +7833,31 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                             onTap: _jumpTo,
                                             forwardStack: _forwardStack,
                                             onForwardTap: _navigateForward,
+                                            trailing: desktopInlineSearch
+                                                ? AddressSearchField(
+                                                    focusNode:
+                                                        _desktopSearchFocus,
+                                                    query: _searchQuery,
+                                                    hintText: _isDeepSearch
+                                                        ? context
+                                                              .l10n
+                                                              .searchInSubfoldersHint
+                                                        : context
+                                                              .l10n
+                                                              .searchInThisFolderHint,
+                                                    onChanged:
+                                                        _onInlineSearchChanged,
+                                                    onClear: () => setState(
+                                                      _clearSearch,
+                                                    ),
+                                                    isSearching:
+                                                        _isSearchingSubfolders,
+                                                    isDeepSearch:
+                                                        _isDeepSearch,
+                                                    onDeepSearchToggle:
+                                                        _onDeepSearchToggled,
+                                                  )
+                                                : null,
                                             // On desktop this is the navigation row
                                             // the selected tab flows into.
                                             backgroundColor: desktopFileManager
@@ -8508,7 +8567,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                     if (_statusMessage != null)
                                       Padding(
                                         padding: EdgeInsets.only(
-                                          bottom: _searchActive ? 16 : 8,
+                                          bottom: bottomSearchBarShown ? 16 : 8,
                                           left: 16,
                                           right: 16,
                                         ),
@@ -8541,7 +8600,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                           ),
                                         ),
                                       ),
-                                    if (_searchActive)
+                                    if (bottomSearchBarShown)
                                       BottomSearchBar(
                                         initialQuery: _searchQuery,
                                         onChanged: _onSearchQueryChanged,

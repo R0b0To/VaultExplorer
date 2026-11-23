@@ -19,6 +19,7 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 enum FileItemAction {
   goToLocation,
   openInNewTab,
+  openInNewWindow,
   extract,
   openWith,
   share,
@@ -58,7 +59,9 @@ enum FileItemAction {
   /// grouping while the order is the default one and degrades gracefully
   /// when the user mixes groups. The numbers follow the default order.
   int get group => switch (this) {
-    FileItemAction.goToLocation || FileItemAction.openInNewTab => 0,
+    FileItemAction.goToLocation ||
+    FileItemAction.openInNewTab ||
+    FileItemAction.openInNewWindow => 0,
     FileItemAction.extract => 1,
     FileItemAction.openWith ||
     FileItemAction.share ||
@@ -85,6 +88,7 @@ enum FileItemAction {
   IconData get icon => switch (this) {
     FileItemAction.goToLocation => Icons.folder_open_rounded,
     FileItemAction.openInNewTab => Icons.tab_rounded,
+    FileItemAction.openInNewWindow => Icons.launch_rounded,
     FileItemAction.extract => Icons.unarchive_outlined,
     FileItemAction.openWith => Icons.open_in_new_rounded,
     FileItemAction.share => Icons.share_rounded,
@@ -114,6 +118,7 @@ enum FileItemAction {
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
     FileItemAction.goToLocation => l10n.goToLocationAction,
     FileItemAction.openInNewTab => l10n.browserTabOpenInNewTab,
+    FileItemAction.openInNewWindow => l10n.browserTabOpenInNewWindow,
     FileItemAction.extract => l10n.extract,
     FileItemAction.openWith => l10n.openWithAppAction,
     FileItemAction.share => l10n.shareAction,

@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
+import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
@@ -36,6 +37,8 @@ import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
+import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
+import 'package:vaultexplorer/features/browser/file_manager_window.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
@@ -104,6 +107,24 @@ class _MainShellState extends ConsumerState<MainShell>
     if (dashboard != null) {
       _cachedLocalStorageContainer = dashboard.localStorageContainer;
     }
+  }
+
+  MountedContainer? _resolveContainer(int volId) {
+    for (final c in _mountedNotifier.value) {
+      if (c.volId == volId) return c;
+    }
+    if (volId <= kExternalStorageBaseVolId) {
+      final external = ref
+          .read(externalStorageLocationsProvider.notifier)
+          .resolveContainer(volId);
+      if (external != null) return external;
+    }
+    final fromDashboard = _dashboardKey.currentState?.resolveAnyContainer(
+      volId,
+    );
+    if (fromDashboard != null) return fromDashboard;
+    final localStorage = _cachedLocalStorageContainer;
+    return localStorage?.volId == volId ? localStorage : null;
   }
 
   void _onScaffoldDrawerChanged(bool isOpen) {
@@ -188,6 +209,9 @@ class _MainShellState extends ConsumerState<MainShell>
     // Only while this page is the one in front: not under a dialog, a sheet or
     // another page, whose own fields keep their keys.
     if (ModalRoute.of(context)?.isCurrent != true) return false;
+    // Keys typed in another window (a file manager window) are not for this
+    // shell's tabs.
+    if (!keyboardFocusIsInViewOf(context)) return false;
     final keyboard = HardwareKeyboard.instance;
     final useMeta = Theme.of(context).platform == TargetPlatform.macOS;
     final primary = useMeta
@@ -248,6 +272,14 @@ class _MainShellState extends ConsumerState<MainShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleTabShortcutKey);
+    FileManagerEnvironment.instance.attach(
+      resolveContainer: _resolveContainer,
+      mountedContainers: () =>
+          ref.read(vaultDashboardControllerProvider).mounted,
+      primaryLocalContainer: () => _primaryLocalStorageContainer,
+      openWindow: (container, initialPath) =>
+          openFileManagerWindow(container: container, initialPath: initialPath),
+    );
     // Cached so asynchronous lock callbacks stay safe after this widget is
     // unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
@@ -550,6 +582,7 @@ class _MainShellState extends ConsumerState<MainShell>
 
   @override
   void dispose() {
+    FileManagerEnvironment.instance.detach();
     HardwareKeyboard.instance.removeHandler(_handleTabShortcutKey);
     WidgetsBinding.instance.removeObserver(this);
     OpenDrawerBackGuard.setDrawerOpen(this, false);
@@ -1055,24 +1088,6 @@ class _MainShellState extends ConsumerState<MainShell>
       ],
     );
 
-    MountedContainer? resolveContainer(int volId) {
-      for (final c in _mountedNotifier.value) {
-        if (c.volId == volId) return c;
-      }
-      if (volId <= kExternalStorageBaseVolId) {
-        final external = ref
-            .read(externalStorageLocationsProvider.notifier)
-            .resolveContainer(volId);
-        if (external != null) return external;
-      }
-      final fromDashboard = _dashboardKey.currentState?.resolveAnyContainer(
-        volId,
-      );
-      if (fromDashboard != null) return fromDashboard;
-      final localStorage = _cachedLocalStorageContainer;
-      return localStorage?.volId == volId ? localStorage : null;
-    }
-
     Widget buildDrawer({
       int? currentVolId,
       BrowserTabsConfig? workspace,
@@ -1136,7 +1151,7 @@ class _MainShellState extends ConsumerState<MainShell>
           child: BrowserTabsShell(
             key: const ValueKey('main-shell-browser-tabs-host'),
             initialContainer: null,
-            resolveContainer: resolveContainer,
+            resolveContainer: _resolveContainer,
             mountedContainers: () =>
                 ref.read(vaultDashboardControllerProvider).mounted,
             primaryLocalContainer: () => _primaryLocalStorageContainer,

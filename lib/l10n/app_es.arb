@@ -3588,5 +3588,6 @@
   "editPathTooltip": "Editar ruta",
   "goToPathTooltip": "Ir",
   "pathOutsideStorage": "Esa ruta está fuera de este almacenamiento",
-  "pathNotFound": "Ruta no encontrada: {path}"
+  "pathNotFound": "Ruta no encontrada: {path}",
+  "browserTabOpenInNewWindow": "Abrir en una ventana nueva"
 }

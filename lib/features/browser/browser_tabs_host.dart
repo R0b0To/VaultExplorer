@@ -17,6 +17,7 @@ import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart' show NativeWindowChrome;
 import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -50,25 +51,10 @@ import 'package:vaultexplorer/features/browser/widgets/settle_touch_page_control
 import 'package:vaultexplorer/features/library/widgets/music_mode_host.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/browser/browser_tab_paths.dart';
 
-/// Directory a duplicated / newly opened tab should start in for [nav]'s
-/// current location. Inside an archive the "directory" is a virtual path in
-/// the archive, which another tab can't open directly, so fall back to the
-/// directory that contains the archive file.
-String browserTabDuplicatePath(FileBrowserNavigationState nav) {
-  final archive = nav.archiveContext;
-  if (archive != null) {
-    // For an archive opened from inside another archive, the folder to use
-    // is the one that holds the outermost archive; the nested ones only exist
-    // as virtual paths.
-    final idx = archive.outermost.pathStackEntryIndex - 1;
-    if (idx >= 0 && idx < nav.pathStack.length) {
-      return nav.pathStack[idx].fatPath;
-    }
-    return '';
-  }
-  return nav.currentDirPath;
-}
+export 'package:vaultexplorer/features/browser/browser_tab_paths.dart'
+    show browserTabDuplicatePath;
 
 typedef BrowserHomeBuilder =
     Widget Function({
@@ -1542,6 +1528,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final appBarAtBottom = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.appBarAtBottom),
     );
+    // The main Windows window draws its own caption row (with the tabs in
+    // it). A window that has a native title bar, like a file manager window
+    // opened from this one, does not, and keeps the tab strip below its app
+    // bar as on Linux.
+    final windowsCaption =
+        PlatformFeatures.isWindows && !NativeWindowChrome.of(context);
     final desktopFileManagerChrome =
         PlatformFeatures.isDesktop &&
         tabsEnabled &&
@@ -1639,7 +1631,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     /// bar, app bar and tab strip.
     double browserChromeBottom() {
       final visibleTabStripHeight =
-          PlatformFeatures.isWindows || widget.externallyHostedTabStrip
+          windowsCaption || widget.externallyHostedTabStrip
           ? 32.0
           : tabsEnabled && tabs.isNotEmpty
           ? tabStripVisibleHeight()
@@ -1727,7 +1719,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       ),
     );
     final Widget tabStripSlot = stripSlotFor(strip);
-    final windowsTitleBar = PlatformFeatures.isWindows &&
+    final windowsTitleBar = windowsCaption &&
             !widget.externallyHostedTabStrip
         ? DesktopWindowTitleBar(
             height: 32,
@@ -1774,7 +1766,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           )
         : null;
     final windowsTabsAreInTitleBar =
-        PlatformFeatures.isWindows || widget.externallyHostedTabStrip;
+        windowsCaption || widget.externallyHostedTabStrip;
     final dashboardChrome = desktopDashboardChrome;
 
     final Widget shellBody = Stack(

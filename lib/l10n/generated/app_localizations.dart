@@ -21649,6 +21649,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Path not found: {path}'**
   String pathNotFound(String path);
+
+  /// Desktop: menu entry that opens a folder, a tab's location or a vault in a new window of its own
+  ///
+  /// In en, this message translates to:
+  /// **'Open in new window'**
+  String get browserTabOpenInNewWindow;
 }
 
 class _AppLocalizationsDelegate

@@ -12924,4 +12924,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String pathNotFound(String path) {
     return 'Yol bulunamadı: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => 'Yeni pencerede aç';
 }

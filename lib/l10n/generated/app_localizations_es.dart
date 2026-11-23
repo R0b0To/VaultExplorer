@@ -13057,4 +13057,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String pathNotFound(String path) {
     return 'Ruta no encontrada: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => 'Abrir en una ventana nueva';
 }

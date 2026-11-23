@@ -17,9 +17,11 @@ import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/browser_tab_paths.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
+import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
@@ -64,6 +66,7 @@ enum _TabMenuAction {
   closeToLeft,
   closeToRight,
   duplicate,
+  openInNewWindow,
   moveToOtherPane,
 }
 
@@ -434,6 +437,14 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           l10n.browserTabDuplicate,
           enabled: !tab.isDashboard && !state.atLimit,
         ),
+        if (FileManagerEnvironment.instance.canOpenWindow)
+          item(
+            _TabMenuAction.openInNewWindow,
+            Icons.launch_rounded,
+            l10n.browserTabOpenInNewWindow,
+            enabled:
+                tab.container != null && !tab.isDashboard && !tab.isCategory,
+          ),
       ],
     );
     if (!mounted ||
@@ -456,9 +467,26 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
         actions.closeToRight(tab.tabId);
       case _TabMenuAction.duplicate:
         widget.onDuplicate(tab);
+      case _TabMenuAction.openInNewWindow:
+        _openInNewWindow(tab);
       case _TabMenuAction.moveToOtherPane:
         actions.moveToPane(tab.tabId, tab.pane.other);
     }
+  }
+
+  /// Shows the tab's current location in a window of its own. Where windows
+  /// cannot be opened (the menu entry is then hidden, but a window can also
+  /// fail to open) a duplicate tab is the next best thing.
+  void _openInNewWindow(BrowserTabState tab) {
+    final container = tab.container;
+    if (container == null) return;
+    final nav = ref.read(fileBrowserNavigationProvider(tab.tabId));
+    final path = browserTabDuplicatePath(nav);
+    final opened = FileManagerEnvironment.instance.openWindow(
+      container,
+      initialPath: path.isEmpty ? null : path,
+    );
+    if (!opened) widget.onDuplicate(tab);
   }
 
   @override

@@ -3588,5 +3588,6 @@
   "editPathTooltip": "Modifier le chemin",
   "goToPathTooltip": "Aller",
   "pathOutsideStorage": "Ce chemin est en dehors de ce stockage",
-  "pathNotFound": "Chemin introuvable : {path}"
+  "pathNotFound": "Chemin introuvable : {path}",
+  "browserTabOpenInNewWindow": "Ouvrir dans une nouvelle fenêtre"
 }

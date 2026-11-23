@@ -1,6 +1,7 @@
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 
@@ -9,18 +10,20 @@ enum MouseNavButton { back, forward }
 
 /// Gives the mouse's back and forward buttons to whichever screen wants them.
 ///
-/// One global pointer route watches every press. Screens that have history of
-/// their own (the file browser) [register] a handler; the newest one that
-/// returns `true` wins, so only the focused pane reacts. A back press nobody
-/// takes closes the topmost page, dialog or sheet of the app's navigator, the
-/// way the button works in most desktop programs. Forward does nothing unless
-/// a handler takes it.
+/// One global pointer route watches every press, in every window. Screens that
+/// have history of their own (the file browser) [register] a handler; the
+/// newest one *of the window the press happened in* that returns `true` wins,
+/// so only the focused pane of that window reacts. A back press nobody takes
+/// closes the topmost page, dialog or sheet of that window's navigator, the way
+/// the button works in most desktop programs. Forward does nothing unless a
+/// handler takes it.
 class MouseNavDispatcher {
   MouseNavDispatcher._();
 
   static final MouseNavDispatcher instance = MouseNavDispatcher._();
 
-  final List<bool Function(MouseNavButton button)> _handlers = [];
+  final List<_Registration> _handlers = [];
+  final Map<int, GlobalKey<NavigatorState>> _viewNavigators = {};
   bool _installed = false;
 
   /// Starts listening. Does nothing off desktop, and a second call is a no-op.
@@ -37,21 +40,30 @@ class MouseNavDispatcher {
   }
 
   /// [handler] returns whether it used the press.
-  void register(bool Function(MouseNavButton button) handler) =>
-      _handlers.add(handler);
+  ///
+  /// [viewId] says which window the handler belongs to (asked at the time of a
+  /// press, since a widget can only find out once it is built). Without it, or
+  /// when it returns null, the handler hears presses from every window.
+  void register(
+    bool Function(MouseNavButton button) handler, {
+    int? Function()? viewId,
+  }) => _handlers.add(_Registration(handler, viewId));
 
   void unregister(bool Function(MouseNavButton button) handler) =>
-      _handlers.remove(handler);
+      _handlers.removeWhere((entry) => entry.handler == handler);
+
+  /// Tells the dispatcher which navigator an unclaimed back press closes
+  /// things in for the secondary window [viewId]. The main window's is
+  /// [appNavigatorKey].
+  void registerViewNavigator(int viewId, GlobalKey<NavigatorState> key) =>
+      _viewNavigators[viewId] = key;
+
+  void unregisterViewNavigator(int viewId) => _viewNavigators.remove(viewId);
 
   void _onPointer(PointerEvent event) {
     if (event is! PointerDownEvent || event.kind != PointerDeviceKind.mouse) {
       return;
     }
-    // A global route hears every view. The handlers and the navigator below
-    // belong to the main window; a press in a secondary window (vault
-    // settings) is handled by that window itself.
-    final mainViewId = PlatformDispatcher.instance.implicitView?.viewId;
-    if (mainViewId != null && event.viewId != mainViewId) return;
     final MouseNavButton button;
     if (event.buttons & kBackMouseButton != 0) {
       button = MouseNavButton.back;
@@ -60,16 +72,19 @@ class MouseNavDispatcher {
     } else {
       return;
     }
-    dispatch(button);
+    dispatch(button, viewId: event.viewId);
   }
 
-  /// Runs the handlers, newest first. Public for tests.
-  bool dispatch(MouseNavButton button) {
-    for (final handler in _handlers.reversed.toList()) {
-      if (handler(button)) return true;
+  /// Runs the handlers, newest first. Public for tests. [viewId] is the window
+  /// the press happened in; null means "any window" (the original behaviour).
+  bool dispatch(MouseNavButton button, {int? viewId}) {
+    for (final entry in _handlers.reversed.toList()) {
+      final owner = entry.viewId?.call();
+      if (owner != null && viewId != null && owner != viewId) continue;
+      if (entry.handler(button)) return true;
     }
     if (button == MouseNavButton.back) {
-      final navigator = appNavigatorKey.currentState;
+      final navigator = _navigatorFor(viewId)?.currentState;
       if (navigator != null && navigator.canPop()) {
         navigator.maybePop();
         return true;
@@ -77,4 +92,19 @@ class MouseNavDispatcher {
     }
     return false;
   }
+
+  GlobalKey<NavigatorState>? _navigatorFor(int? viewId) {
+    if (viewId == null) return appNavigatorKey;
+    if (viewId == PlatformDispatcher.instance.implicitView?.viewId) {
+      return appNavigatorKey;
+    }
+    return _viewNavigators[viewId];
+  }
+}
+
+class _Registration {
+  const _Registration(this.handler, this.viewId);
+
+  final bool Function(MouseNavButton button) handler;
+  final int? Function()? viewId;
 }

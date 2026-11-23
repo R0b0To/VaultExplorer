@@ -3588,5 +3588,6 @@
   "editPathTooltip": "Pfad bearbeiten",
   "goToPathTooltip": "Los",
   "pathOutsideStorage": "Dieser Pfad liegt außerhalb dieses Speichers",
-  "pathNotFound": "Pfad nicht gefunden: {path}"
+  "pathNotFound": "Pfad nicht gefunden: {path}",
+  "browserTabOpenInNewWindow": "In neuem Fenster öffnen"
 }

@@ -3588,5 +3588,6 @@
   "editPathTooltip": "경로 편집",
   "goToPathTooltip": "이동",
   "pathOutsideStorage": "이 경로는 이 저장소 밖에 있습니다",
-  "pathNotFound": "경로를 찾을 수 없음: {path}"
+  "pathNotFound": "경로를 찾을 수 없음: {path}",
+  "browserTabOpenInNewWindow": "새 창에서 열기"
 }

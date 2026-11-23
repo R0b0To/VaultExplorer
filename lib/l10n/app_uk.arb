@@ -3588,5 +3588,6 @@
   "editPathTooltip": "Редагувати шлях",
   "goToPathTooltip": "Перейти",
   "pathOutsideStorage": "Цей шлях поза цим сховищем",
-  "pathNotFound": "Шлях не знайдено: {path}"
+  "pathNotFound": "Шлях не знайдено: {path}",
+  "browserTabOpenInNewWindow": "Відкрити в новому вікні"
 }

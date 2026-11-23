@@ -12322,4 +12322,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String pathNotFound(String path) {
     return 'パスが見つかりません: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => '新しいウィンドウで開く';
 }

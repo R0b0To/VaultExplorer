@@ -65,6 +65,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
 
   /// Set only for a single selected folder while the file manager is in tabs.
   final VoidCallback? onOpenInNewTab;
+  final VoidCallback? onOpenInNewWindow;
   final VoidCallback onExport;
   final bool allowExportAction;
   final bool allowExtractAction;
@@ -133,6 +134,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.pasteAction,
     this.selectionActive = true,
     this.onOpenInNewTab,
+    this.onOpenInNewWindow,
     required this.onExport,
     this.allowExportAction = true,
     this.allowExtractAction = true,
@@ -359,6 +361,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'select_all') onSelectAll();
             if (value == 'share') onShare();
             if (value == 'open_in_new_tab') onOpenInNewTab?.call();
+            if (value == 'open_in_new_window') onOpenInNewWindow?.call();
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'edit_image') onEditImage();
             if (value == 'edit_video') onEditVideo();
@@ -388,6 +391,17 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     Icon(Icons.tab_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                     const SizedBox(width: 12),
                     Text(context.l10n.browserTabOpenInNewTab),
+                  ],
+                ),
+              ),
+            if (onOpenInNewWindow != null)
+              PopupMenuItem<String>(
+                value: 'open_in_new_window',
+                child: Row(
+                  children: [
+                    Icon(Icons.launch_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.browserTabOpenInNewWindow),
                   ],
                 ),
               ),

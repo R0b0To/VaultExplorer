@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/app/app_theme_cache.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
@@ -40,6 +40,35 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
   late final _CloseWhenPageLeaves _observer = _CloseWhenPageLeaves(
     widget.entry.close,
   );
+  int? _viewId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The mouse's back button closes things in this window's own navigator.
+    final viewId = View.maybeOf(context)?.viewId;
+    if (viewId == _viewId) return;
+    final previous = _viewId;
+    if (previous != null) {
+      MouseNavDispatcher.instance.unregisterViewNavigator(previous);
+    }
+    _viewId = viewId;
+    if (viewId != null) {
+      MouseNavDispatcher.instance.registerViewNavigator(
+        viewId,
+        widget.entry.navigatorKey,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    final viewId = _viewId;
+    if (viewId != null) {
+      MouseNavDispatcher.instance.unregisterViewNavigator(viewId);
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,10 +112,12 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
               localizationsDelegates: appLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               localeResolutionCallback: appResolveLocale,
-              builder: (context, child) => NativeWindowChrome(
-                child: _SecondaryWindowShell(
-                  entry: widget.entry,
-                  child: child ?? const SizedBox.shrink(),
+              builder: (context, child) => SecondaryWindowScope(
+                entry: widget.entry,
+                child: NativeWindowChrome(
+                  child: _SecondaryWindowShell(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
               home: _SecondaryWindowRoot(entry: widget.entry),
@@ -98,13 +129,11 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
   }
 }
 
-/// Counts interaction in this window as activity (so working in vault
-/// settings does not let the auto-lock timers run out, as in the main window)
-/// and gives the mouse's back button its usual meaning here.
+/// Counts interaction in this window as activity, so working here does not let
+/// the auto-lock timers run out (as in the main window).
 class _SecondaryWindowShell extends ConsumerWidget {
-  const _SecondaryWindowShell({required this.entry, required this.child});
+  const _SecondaryWindowShell({required this.child});
 
-  final SecondaryWindowEntry entry;
   final Widget child;
 
   @override
@@ -116,12 +145,6 @@ class _SecondaryWindowShell extends ConsumerWidget {
         ref
             .read(vaultDashboardControllerProvider.notifier)
             .resetAllAutoCloseTimers();
-        // MouseNavDispatcher only serves the main window; closing the topmost
-        // dialog, sheet or page is what Back does there too.
-        if (event.kind == PointerDeviceKind.mouse &&
-            event.buttons & kBackMouseButton != 0) {
-          unawaited(entry.navigatorKey.currentState?.maybePop());
-        }
       },
       child: child,
     );

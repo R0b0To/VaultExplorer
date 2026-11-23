@@ -12134,4 +12134,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String pathNotFound(String path) {
     return '未找到路径：$path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => '在新窗口中打开';
 }

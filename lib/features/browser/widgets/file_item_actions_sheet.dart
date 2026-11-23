@@ -67,6 +67,9 @@ class FileItemActionsSheet extends ConsumerWidget {
   /// Tab actions (only wired while the file manager is hosted in tabs).
   final VoidCallback? onOpenInNewTab;
 
+  /// Desktop only: shows the folder in a window of its own.
+  final VoidCallback? onOpenInNewWindow;
+
   /// Set only when the sheet is opened from search results: shows the item in
   /// the folder it lives in. Has no meaning outside a search, so the caller
   /// leaves it null there and [FileItemAction.goToLocation] is not offered.
@@ -119,6 +122,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onEncrypt,
     this.onDecrypt,
     this.onOpenInNewTab,
+    this.onOpenInNewWindow,
     this.onGoToLocation,
     this.onCopyPath,
     this.actionOrder = FileItemAction.values,
@@ -161,6 +165,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onEncrypt,
     VoidCallback? onDecrypt,
     VoidCallback? onOpenInNewTab,
+    VoidCallback? onOpenInNewWindow,
     VoidCallback? onGoToLocation,
     VoidCallback? onCopyPath,
     List<FileItemAction> actionOrder = FileItemAction.values,
@@ -201,6 +206,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onEncrypt: onEncrypt,
         onDecrypt: onDecrypt,
         onOpenInNewTab: onOpenInNewTab,
+        onOpenInNewWindow: onOpenInNewWindow,
         onGoToLocation: onGoToLocation,
         onCopyPath: onCopyPath,
         actionOrder: actionOrder,
@@ -355,6 +361,13 @@ class FileItemActionsSheet extends ConsumerWidget {
           icon: Icons.tab_rounded,
           label: l10n.browserTabOpenInNewTab,
           onTap: onOpenInNewTab!,
+        );
+      case FileItemAction.openInNewWindow:
+        if (onOpenInNewWindow == null) return null;
+        return _ActionSpec(
+          icon: Icons.launch_rounded,
+          label: l10n.browserTabOpenInNewWindow,
+          onTap: onOpenInNewWindow!,
         );
       case FileItemAction.extract:
         // Archive entries are virtual, read-only entries. The sole file

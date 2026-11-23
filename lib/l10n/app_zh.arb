@@ -3588,5 +3588,6 @@
   "editPathTooltip": "编辑路径",
   "goToPathTooltip": "前往",
   "pathOutsideStorage": "该路径位于此存储之外",
-  "pathNotFound": "未找到路径：{path}"
+  "pathNotFound": "未找到路径：{path}",
+  "browserTabOpenInNewWindow": "在新窗口中打开"
 }

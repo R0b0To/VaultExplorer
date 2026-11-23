@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/file_item_action.dart';
 const Map<String, FileItemAction> _actionForMenuValue = {
   'go_to_location': FileItemAction.goToLocation,
   'open_in_new_tab': FileItemAction.openInNewTab,
+  'open_in_new_window': FileItemAction.openInNewWindow,
   'extract': FileItemAction.extract,
   'open_with_app': FileItemAction.openWith,
   'share': FileItemAction.share,

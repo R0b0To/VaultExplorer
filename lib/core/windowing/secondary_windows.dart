@@ -19,7 +19,7 @@ class SecondaryWindowEntry {
   /// asking for the same thing twice brings the existing window forward.
   final String key;
 
-  final String title;
+  String title;
 
   /// Builds the window's page. It runs under the window's own `MaterialApp`,
   /// so it gets its own `Navigator`, theme and localizations.
@@ -34,6 +34,37 @@ class SecondaryWindowEntry {
 
   /// Closes this window.
   void close() => SecondaryWindows.instance.close(key);
+
+  /// Changes the title in the window's title bar.
+  void setTitle(String value) {
+    if (value == title) return;
+    title = value;
+    try {
+      _controller.setTitle(value);
+    } catch (error) {
+      VeLog.w(_kLogTag, 'Could not retitle window "$key"', error);
+    }
+  }
+}
+
+/// Lets the page inside a secondary window reach the window it is in (to close
+/// it, or to set its title).
+class SecondaryWindowScope extends InheritedWidget {
+  const SecondaryWindowScope({
+    super.key,
+    required this.entry,
+    required super.child,
+  });
+
+  final SecondaryWindowEntry entry;
+
+  /// The window [context] is in, or null in the main window.
+  static SecondaryWindowEntry? maybeOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<SecondaryWindowScope>()?.entry;
+
+  @override
+  bool updateShouldNotify(SecondaryWindowScope oldWidget) =>
+      entry != oldWidget.entry;
 }
 
 /// Native windows other than the main one (Linux and Windows).

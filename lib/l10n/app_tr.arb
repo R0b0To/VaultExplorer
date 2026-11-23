@@ -3582,5 +3582,6 @@
   "editPathTooltip": "Yolu düzenle",
   "goToPathTooltip": "Git",
   "pathOutsideStorage": "Bu yol bu depolamanın dışında",
-  "pathNotFound": "Yol bulunamadı: {path}"
+  "pathNotFound": "Yol bulunamadı: {path}",
+  "browserTabOpenInNewWindow": "Yeni pencerede aç"
 }

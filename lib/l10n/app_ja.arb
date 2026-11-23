@@ -3588,5 +3588,6 @@
   "editPathTooltip": "パスを編集",
   "goToPathTooltip": "移動",
   "pathOutsideStorage": "このパスはこのストレージの外にあります",
-  "pathNotFound": "パスが見つかりません: {path}"
+  "pathNotFound": "パスが見つかりません: {path}",
+  "browserTabOpenInNewWindow": "新しいウィンドウで開く"
 }

@@ -36,6 +36,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   /// Set only for a single selected folder while the file manager is in tabs.
   final VoidCallback? onOpenInNewTab;
+  final VoidCallback? onOpenInNewWindow;
   final VoidCallback onExport;
   final bool allowExportAction;
   final bool allowExtractAction;
@@ -96,6 +97,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onCopy,
     required this.onCut,
     this.onOpenInNewTab,
+    this.onOpenInNewWindow,
     required this.onExport,
     this.allowExportAction = true,
     this.allowExtractAction = true,
@@ -216,6 +218,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         );
         final bool hasMoreActions =
             (onOpenInNewTab != null && shown(FileItemAction.openInNewTab)) ||
+            (onOpenInNewWindow != null &&
+                shown(FileItemAction.openInNewWindow)) ||
             (canShowExtractButton && !showExtractButton) ||
             (canShowShareButton && !showShareButton) ||
             (singleFileSelected && shown(FileItemAction.openWith)) ||
@@ -400,6 +404,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'share') onShare();
                 if (value == 'delete') onDelete();
                 if (value == 'open_in_new_tab') onOpenInNewTab?.call();
+                if (value == 'open_in_new_window') onOpenInNewWindow?.call();
                 if (value == 'open_with_app') onOpenWithApp();
                 if (value == 'edit_image') onEditImage();
                 if (value == 'edit_video') onEditVideo();
@@ -433,6 +438,17 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         Icon(Icons.tab_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.browserTabOpenInNewTab),
+                      ],
+                    ),
+                  ),
+                if (onOpenInNewWindow != null)
+                  PopupMenuItem<String>(
+                    value: 'open_in_new_window',
+                    child: Row(
+                      children: [
+                        Icon(Icons.launch_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.browserTabOpenInNewWindow),
                       ],
                     ),
                   ),

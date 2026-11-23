@@ -13126,4 +13126,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String pathNotFound(String path) {
     return 'Chemin introuvable : $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => 'Ouvrir dans une nouvelle fenêtre';
 }

@@ -24,6 +24,8 @@ import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
+import 'package:vaultexplorer/core/windowing/view_focus.dart';
+import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -1068,7 +1070,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleBrowserKey);
-    MouseNavDispatcher.instance.register(_handleMouseNav);
+    MouseNavDispatcher.instance.register(_handleMouseNav, viewId: _ownViewId);
     if (widget.scrollController != null) {
       _browserScrollController = widget.scrollController!;
     }
@@ -1592,6 +1594,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               stateKey: _stateKey,
               selectedEntry: selectedItems.contains(entry) ? entry : null,
             )
+          : null,
+      onOpenInNewWindow:
+          (FileManagerEnvironment.instance.canOpenWindow &&
+              entry.isDir &&
+              _archiveContext == null)
+          ? () => _openFolderInNewWindow(widget.container, fullPath)
           : null,
       onTogglePin: () async {
         await _pinsBookmarksNotifier.togglePins(widget.container, [
@@ -2877,6 +2885,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// closes a selection or search first, then goes up a folder; forward steps
   /// into the folder back just left. Gated like the keyboard shortcuts, so
   /// only the focused pane answers.
+  /// The window this viewport is in; presses of the mouse buttons in another
+  /// window are not for it.
+  int? _ownViewId() => mounted ? View.maybeOf(context)?.viewId : null;
+
   bool _handleMouseNav(MouseNavButton button) {
     if (!_isKeyboardTarget) return false;
     switch (button) {
@@ -3344,6 +3356,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return true;
     });
     if (hidden) return false;
+    // Key handlers hear every window; only the one holding the focus answers.
+    if (!keyboardFocusIsInViewOf(context)) return false;
     final focused = FocusManager.instance.primaryFocus?.context;
     return focused?.findAncestorWidgetOfExactType<EditableText>() == null;
   }
@@ -4916,6 +4930,30 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return null;
     }
     return selected.single;
+  }
+
+  /// The one selected folder, when "open in new window" is on offer. Unlike
+  /// the new-tab variant this does not depend on the tabs setting: a window
+  /// has tabs of its own.
+  _SelectedBrowserEntry? get _singleSelectedFolderForNewWindow {
+    if (!FileManagerEnvironment.instance.canOpenWindow) return null;
+    if (_selectedBrowserEntryCount != 1) return null;
+    final selected = _selectedBrowserEntries;
+    if (selected.length != 1 ||
+        !selected.single.entry.isDir ||
+        selected.single.insideArchive) {
+      return null;
+    }
+    return selected.single;
+  }
+
+  void _openFolderInNewWindow(MountedContainer container, String fullPath) {
+    final opened = FileManagerEnvironment.instance.openWindow(
+      container,
+      initialPath: fullPath,
+    );
+    // No native window to be had: the folder still opens, in a tab.
+    if (!opened) _openFolderInNewTab(container, fullPath);
   }
 
   void _openFolderInNewTab(
@@ -7143,6 +7181,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final appBarBookmarkPaths = _bookmarkPaths;
     final appBarSettingsService = ref.read(appSettingsServiceProvider);
     final appBarSingleSelectedFolderForNewTab = _singleSelectedFolderForNewTab;
+    final appBarSingleSelectedFolderForNewWindow =
+        _singleSelectedFolderForNewWindow;
 
     final localSelection = ref.read(fileBrowserSelectionProvider(_stateKey));
     final localSelectionIsNonEmpty = localSelection.items.isNotEmpty;
@@ -7565,6 +7605,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                   fullPathOf(selected.entry, selected.currentDirPath),
                   stateKey: selected.stateKey,
                   selectedEntry: selected.entry,
+                );
+              },
+        onOpenInNewWindow: appBarSingleSelectedFolderForNewWindow == null
+            ? null
+            : () {
+                final selected = appBarSingleSelectedFolderForNewWindow;
+                _openFolderInNewWindow(
+                  selected.container,
+                  fullPathOf(selected.entry, selected.currentDirPath),
                 );
               },
         onExport: _exportSelectedToStorage,

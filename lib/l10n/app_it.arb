@@ -3588,5 +3588,6 @@
   "editPathTooltip": "Modifica percorso",
   "goToPathTooltip": "Vai",
   "pathOutsideStorage": "Questo percorso è fuori da questa archiviazione",
-  "pathNotFound": "Percorso non trovato: {path}"
+  "pathNotFound": "Percorso non trovato: {path}",
+  "browserTabOpenInNewWindow": "Apri in una nuova finestra"
 }

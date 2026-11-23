@@ -12324,4 +12324,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String pathNotFound(String path) {
     return '경로를 찾을 수 없음: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => '새 창에서 열기';
 }

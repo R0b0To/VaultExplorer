@@ -13133,4 +13133,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String pathNotFound(String path) {
     return 'Шлях не знайдено: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => 'Відкрити в новому вікні';
 }

@@ -15006,5 +15006,9 @@
         "type": "String"
       }
     }
+  },
+  "browserTabOpenInNewWindow": "Open in new window",
+  "@browserTabOpenInNewWindow": {
+    "description": "Desktop: menu entry that opens a folder, a tab's location or a vault in a new window of its own"
   }
 }

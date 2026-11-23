@@ -13029,4 +13029,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String pathNotFound(String path) {
     return 'Caminho não encontrado: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => 'Abrir em nova janela';
 }

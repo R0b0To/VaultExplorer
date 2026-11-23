@@ -13100,4 +13100,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String pathNotFound(String path) {
     return 'المسار غير موجود: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => 'فتح في نافذة جديدة';
 }

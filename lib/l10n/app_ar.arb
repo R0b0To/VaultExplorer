@@ -3588,5 +3588,6 @@
   "editPathTooltip": "تعديل المسار",
   "goToPathTooltip": "انتقال",
   "pathOutsideStorage": "هذا المسار خارج وحدة التخزين هذه",
-  "pathNotFound": "المسار غير موجود: {path}"
+  "pathNotFound": "المسار غير موجود: {path}",
+  "browserTabOpenInNewWindow": "فتح في نافذة جديدة"
 }

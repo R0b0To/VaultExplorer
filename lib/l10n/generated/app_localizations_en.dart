@@ -12845,4 +12845,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String pathNotFound(String path) {
     return 'Path not found: $path';
   }
+
+  @override
+  String get browserTabOpenInNewWindow => 'Open in new window';
 }

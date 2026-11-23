@@ -548,8 +548,21 @@ class AppNavigationDrawer extends ConsumerWidget {
 
     return _DrawerShell(
       docked: docked,
+      // In landscape the system puts a cutout / nav bar inset on one side
+      // (which one flips with the rotation). The modal drawer paints its own
+      // background under it, so padding the content by that inset only
+      // leaves an empty strip and squeezes the titles: ignore both sides.
+      // A docked sidebar sits at the window edge, so it keeps its left inset.
       child: SafeArea(
-        child: Column(
+        left: docked,
+        right: false,
+        // ListTile adds its own SafeArea, so without this every row would
+        // still reserve the inset and shrink the titles.
+        child: MediaQuery.removePadding(
+          context: context,
+          removeLeft: !docked,
+          removeRight: true,
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
@@ -1084,6 +1097,7 @@ class AppNavigationDrawer extends ConsumerWidget {
               onSettings: openSettings,
             ),
           ],
+        ),
         ),
       ),
     );

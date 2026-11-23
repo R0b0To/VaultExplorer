@@ -79,6 +79,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onCopy,
   required VoidCallback onCut,
   VoidCallback? onOpenInNewTab,
+  VoidCallback? onOpenInNewWindow,
 
   /// Leaves the search and shows the single selected item in the folder it
   /// lives in. Offered only while a search is showing and outside archives.
@@ -402,6 +403,7 @@ PreferredSizeWidget buildBrowserAppBar(
         onCopy: onCopy,
         onCut: onCut,
         onOpenInNewTab: onOpenInNewTab,
+        onOpenInNewWindow: onOpenInNewWindow,
         onExport: onExport,
         allowExportAction: allowExportAction,
         allowExtractAction: allowExtractAction,
@@ -461,6 +463,7 @@ PreferredSizeWidget buildBrowserAppBar(
       onCopy: onCopy,
       onCut: onCut,
       onOpenInNewTab: onOpenInNewTab,
+      onOpenInNewWindow: onOpenInNewWindow,
       onExport: onExport,
       allowExportAction: allowExportAction,
       allowExtractAction: allowExtractAction,

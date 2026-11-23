@@ -38,6 +38,7 @@ void main() {
       expect(list, [
         FileItemAction.goToLocation,
         FileItemAction.openInNewTab,
+        FileItemAction.openInNewWindow,
         FileItemAction.extract,
         FileItemAction.openWith,
         FileItemAction.editImage,
@@ -62,7 +63,7 @@ void main() {
       final groups = FileItemAction.values.map((a) => a.group).toList();
 
       expect(groups, [
-        0, 0, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, 7, //
+        0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, 7, //
       ]);
     });
 
@@ -72,7 +73,9 @@ void main() {
           .map((a) => a.group)
           .toList();
 
-      expect(groups, [0, 0, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 7]);
+      expect(groups, [
+        0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 7, //
+      ]);
     });
 
     test('every action has a label and survives a JSON round trip', () {

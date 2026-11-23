@@ -3588,5 +3588,6 @@
   "editPathTooltip": "Editar caminho",
   "goToPathTooltip": "Ir",
   "pathOutsideStorage": "Esse caminho está fora deste armazenamento",
-  "pathNotFound": "Caminho não encontrado: {path}"
+  "pathNotFound": "Caminho não encontrado: {path}",
+  "browserTabOpenInNewWindow": "Abrir em nova janela"
 }

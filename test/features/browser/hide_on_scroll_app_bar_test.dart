@@ -2,18 +2,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 class _FakeAppSettingsService extends AppSettingsService {
   @override
-  Future<AppSettings> loadSettings() async => AppSettings();
+  Future<AppSettings> loadSettings() async => AppSettings(useBrowserTabs: false);
 }
 
 class _FakeContainerRepository implements ContainerRepository {
@@ -51,6 +53,8 @@ void _expectAppBarCollapsed(WidgetTester tester) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() => PlatformFeatures.debugIsDesktopOverride = false);
+  tearDownAll(() => PlatformFeatures.debugIsDesktopOverride = null);
 
   const engineChannel = MethodChannel('com.aeidolon.vaultexplorer/engine');
   List<String> dirListing = <String>[];
@@ -253,7 +257,10 @@ void main() {
     expect(posAfter.dy, equals(posBefore.dy));
 
     // Exit selection mode via the close button
-    final closeFinder = find.byIcon(Icons.close_rounded);
+    final closeFinder = find.descendant(
+      of: overlayFinder,
+      matching: find.byIcon(Icons.close_rounded),
+    );
     expect(closeFinder, findsOneWidget);
     await tester.tap(closeFinder);
     await tester.pump();
@@ -294,7 +301,10 @@ void main() {
     expect(tester.getTopLeft(fileTileFinder).dy, equals(posBefore.dy));
 
     // Exit selection mode
-    final closeFinder = find.byIcon(Icons.close_rounded);
+    final closeFinder = find.descendant(
+      of: overlayFinder,
+      matching: find.byIcon(Icons.close_rounded),
+    );
     await tester.tap(closeFinder);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
@@ -345,10 +355,13 @@ void main() {
     // App bar must STILL be collapsed (not reset to visible!)
     _expectAppBarCollapsed(tester);
 
-    // Navigate back to root via breadcrumb home button
-    final homeFinder = find.byIcon(Icons.home_outlined);
-    expect(homeFinder, findsOneWidget);
-    await tester.tap(homeFinder);
+    // Navigate back to root via its named breadcrumb.
+    final rootCrumbFinder = find.descendant(
+      of: find.byType(BreadcrumbBar),
+      matching: find.text(container.displayName),
+    );
+    expect(rootCrumbFinder, findsOneWidget);
+    await tester.tap(rootCrumbFinder);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

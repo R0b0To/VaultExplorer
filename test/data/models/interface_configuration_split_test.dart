@@ -102,6 +102,7 @@ AppSettings _customSettings() => AppSettings(
   categoryShortcutsEnabled: false,
   categoryShortcutOrder: AppSettings().categoryShortcutOrder.reversed.toList(),
   hiddenCategoryShortcuts: ['videos'],
+  desktopPreviewPaneCollapsed: true,
   categorySources: {'images': 'vault:3', 'audio': 'device'},
   categoryLayouts: {'gallery': 'masonry', 'images': 'list'},
   categoryFolderStructure: ['documents'],

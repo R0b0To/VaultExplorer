@@ -133,6 +133,7 @@ void main() {
                 width: width,
                 child: AdaptiveActionStrip(
                   items: [for (var i = 0; i < 6; i++) _item(i)],
+                  overflowTooltip: 'More options',
                 ),
               ),
             ),

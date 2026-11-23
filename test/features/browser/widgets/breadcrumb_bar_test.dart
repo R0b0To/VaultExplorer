@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 
@@ -133,6 +133,7 @@ void main() {
       (r) => Offset(r.right - 200, r.bottom - 1), // bottom margin
     ];
     for (final spot in spots) {
+      await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(_host(bar));
       await tester.tapAt(spot(tester.getRect(find.byType(BreadcrumbBar))));
       await tester.pumpAndSettle();

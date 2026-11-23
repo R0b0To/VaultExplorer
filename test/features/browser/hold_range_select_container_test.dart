@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
@@ -9,6 +10,8 @@ import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() => PlatformFeatures.debugIsDesktopOverride = false);
+  tearDownAll(() => PlatformFeatures.debugIsDesktopOverride = null);
 
   final testItems = List.generate(
     10,

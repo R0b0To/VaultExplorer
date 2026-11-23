@@ -34,7 +34,11 @@ DroppedImportSet resolveDroppedPaths(
   var skipped = 0;
 
   for (final raw in paths) {
-    if (raw.isEmpty || !ctx.isAbsolute(raw) || ctx.basename(raw).isEmpty) {
+    final normalized = ctx.normalize(raw);
+    if (raw.isEmpty ||
+        !ctx.isAbsolute(raw) ||
+        ctx.basename(raw).isEmpty ||
+        ctx.dirname(normalized) == normalized) {
       skipped++;
       continue;
     }

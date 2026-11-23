@@ -117,6 +117,8 @@ class VaultBrowserScaffold extends ConsumerWidget {
             BreadcrumbBar(
               stack: segments,
               onTap: notifier.jumpTo,
+              rootLabel: state.selectedContainer.displayName,
+              rootIcon: breadcrumbRootIconFor(state.selectedContainer),
             ),
             Expanded(
               child: state.loading

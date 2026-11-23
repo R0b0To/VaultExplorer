@@ -4432,6 +4432,8 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
               ),
               child: BreadcrumbBar(
                 stack: _drawerPathStack,
+                rootLabel: widget.container.displayName,
+                rootIcon: breadcrumbRootIconFor(widget.container),
                 backgroundColor: Colors.transparent,
                 onTap: (index) {
                   final target = _drawerPathStack[index];

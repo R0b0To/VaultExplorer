@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "Les fichiers ne peuvent être déposés que dans un dossier d’un coffre.",
   "dropImportSkippedItems": "{count, plural, =1{1 élément déposé ne peut pas être importé} other{{count} éléments déposés ne peuvent pas être importés}}",
   "dropVaultOverlayLabel": "Déposez un conteneur ou un dossier de coffre pour l’ajouter",
-  "dropVaultUnsupported": "Déposez des fichiers de conteneur ou un seul dossier de coffre."
+  "dropVaultUnsupported": "Déposez des fichiers de conteneur ou un seul dossier de coffre.",
+  "pathFieldHint": "Saisissez un chemin",
+  "editPathTooltip": "Modifier le chemin",
+  "goToPathTooltip": "Aller",
+  "pathOutsideStorage": "Ce chemin est en dehors de ce stockage",
+  "pathNotFound": "Chemin introuvable : {path}"
 }

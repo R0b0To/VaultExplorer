@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "파일은 볼트 폴더에만 놓을 수 있습니다.",
   "dropImportSkippedItems": "{count, plural, other{놓은 항목 {count}개를 가져올 수 없습니다}}",
   "dropVaultOverlayLabel": "컨테이너 또는 볼트 폴더를 놓아 추가하기",
-  "dropVaultUnsupported": "컨테이너 파일 또는 볼트 폴더 하나만 놓아 주세요."
+  "dropVaultUnsupported": "컨테이너 파일 또는 볼트 폴더 하나만 놓아 주세요.",
+  "pathFieldHint": "경로 입력",
+  "editPathTooltip": "경로 편집",
+  "goToPathTooltip": "이동",
+  "pathOutsideStorage": "이 경로는 이 저장소 밖에 있습니다",
+  "pathNotFound": "경로를 찾을 수 없음: {path}"
 }

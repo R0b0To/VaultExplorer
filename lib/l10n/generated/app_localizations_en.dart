@@ -12825,4 +12825,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Drop container files, or a single vault folder.';
+
+  @override
+  String get pathFieldHint => 'Type a path';
+
+  @override
+  String get editPathTooltip => 'Edit path';
+
+  @override
+  String get goToPathTooltip => 'Go';
+
+  @override
+  String get pathOutsideStorage => 'That path is outside this storage';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Path not found: $path';
+  }
 }

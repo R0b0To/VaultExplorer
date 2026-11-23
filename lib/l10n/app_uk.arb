@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "Файли можна перетягувати лише до папки сховища.",
   "dropImportSkippedItems": "{count, plural, one{{count} перетягнутий елемент не можна імпортувати} few{{count} перетягнуті елементи не можна імпортувати} many{{count} перетягнутих елементів не можна імпортувати} other{{count} перетягнутих елементів не можна імпортувати}}",
   "dropVaultOverlayLabel": "Відпустіть контейнер або папку сховища, щоб додати",
-  "dropVaultUnsupported": "Перетягніть файли контейнерів або лише одну папку сховища."
+  "dropVaultUnsupported": "Перетягніть файли контейнерів або лише одну папку сховища.",
+  "pathFieldHint": "Введіть шлях",
+  "editPathTooltip": "Редагувати шлях",
+  "goToPathTooltip": "Перейти",
+  "pathOutsideStorage": "Цей шлях поза цим сховищем",
+  "pathNotFound": "Шлях не знайдено: {path}"
 }

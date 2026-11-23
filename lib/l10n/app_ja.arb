@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "ファイルは保管庫内のフォルダにのみドロップできます。",
   "dropImportSkippedItems": "{count, plural, other{ドロップされた{count}件の項目はインポートできません}}",
   "dropVaultOverlayLabel": "コンテナまたは保管庫フォルダをドロップして追加",
-  "dropVaultUnsupported": "コンテナファイル、または保管庫フォルダ1つだけをドロップしてください。"
+  "dropVaultUnsupported": "コンテナファイル、または保管庫フォルダ1つだけをドロップしてください。",
+  "pathFieldHint": "パスを入力",
+  "editPathTooltip": "パスを編集",
+  "goToPathTooltip": "移動",
+  "pathOutsideStorage": "このパスはこのストレージの外にあります",
+  "pathNotFound": "パスが見つかりません: {path}"
 }

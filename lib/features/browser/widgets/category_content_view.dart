@@ -3535,6 +3535,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                             onTap: _onJumpTo,
                             forwardStack: _forwardStack,
                             onForwardTap: _onForwardTo,
+                            // The first step already carries the category's
+                            // (or the scoped storage's) name.
+                            rootLabel: _buildPathStack(location, l10n)
+                                .first
+                                .label,
+                            rootIcon: _scoped
+                                ? breadcrumbRootIconFor(widget.scopedContainer!)
+                                : widget.category.icon,
                           )
                         : null,
                     child: Column(

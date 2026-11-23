@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "Dateien können nur in einen Tresorordner gezogen werden.",
   "dropImportSkippedItems": "{count, plural, =1{1 abgelegtes Element kann nicht importiert werden} other{{count} abgelegte Elemente können nicht importiert werden}}",
   "dropVaultOverlayLabel": "Container oder Tresorordner ablegen, um ihn hinzuzufügen",
-  "dropVaultUnsupported": "Container-Dateien oder nur einen einzelnen Tresorordner ablegen."
+  "dropVaultUnsupported": "Container-Dateien oder nur einen einzelnen Tresorordner ablegen.",
+  "pathFieldHint": "Pfad eingeben",
+  "editPathTooltip": "Pfad bearbeiten",
+  "goToPathTooltip": "Los",
+  "pathOutsideStorage": "Dieser Pfad liegt außerhalb dieses Speichers",
+  "pathNotFound": "Pfad nicht gefunden: {path}"
 }

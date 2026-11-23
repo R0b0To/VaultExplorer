@@ -21613,6 +21613,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drop container files, or a single vault folder.'**
   String get dropVaultUnsupported;
+
+  /// Hint in the breadcrumb bar's editable path field
+  ///
+  /// In en, this message translates to:
+  /// **'Type a path'**
+  String get pathFieldHint;
+
+  /// Accessibility label for tapping the breadcrumb bar to type a path
+  ///
+  /// In en, this message translates to:
+  /// **'Edit path'**
+  String get editPathTooltip;
+
+  /// Tooltip of the button that goes to the path typed in the breadcrumb bar
+  ///
+  /// In en, this message translates to:
+  /// **'Go'**
+  String get goToPathTooltip;
+
+  /// Shown when a path typed in the breadcrumb bar leads outside the storage being browsed (another drive, above the root)
+  ///
+  /// In en, this message translates to:
+  /// **'That path is outside this storage'**
+  String get pathOutsideStorage;
+
+  /// Shown when a path typed in the breadcrumb bar does not exist; {path} is what was typed
+  ///
+  /// In en, this message translates to:
+  /// **'Path not found: {path}'**
+  String pathNotFound(String path);
 }
 
 class _AppLocalizationsDelegate

@@ -13037,4 +13037,21 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Suelta archivos de contenedor o una sola carpeta de bóveda.';
+
+  @override
+  String get pathFieldHint => 'Escribe una ruta';
+
+  @override
+  String get editPathTooltip => 'Editar ruta';
+
+  @override
+  String get goToPathTooltip => 'Ir';
+
+  @override
+  String get pathOutsideStorage => 'Esa ruta está fuera de este almacenamiento';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Ruta no encontrada: $path';
+  }
 }

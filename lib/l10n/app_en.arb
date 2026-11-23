@@ -14977,5 +14977,30 @@
   "dropVaultUnsupported": "Drop container files, or a single vault folder.",
   "@dropVaultUnsupported": {
     "description": "Desktop: shown in the add-a-vault sheet when the dropped items are not one vault folder or a set of container files (several folders, or files and a folder together)"
+  },
+  "pathFieldHint": "Type a path",
+  "@pathFieldHint": {
+    "description": "Hint in the breadcrumb bar's editable path field"
+  },
+  "editPathTooltip": "Edit path",
+  "@editPathTooltip": {
+    "description": "Accessibility label for tapping the breadcrumb bar to type a path"
+  },
+  "goToPathTooltip": "Go",
+  "@goToPathTooltip": {
+    "description": "Tooltip of the button that goes to the path typed in the breadcrumb bar"
+  },
+  "pathOutsideStorage": "That path is outside this storage",
+  "@pathOutsideStorage": {
+    "description": "Shown when a path typed in the breadcrumb bar leads outside the storage being browsed (another drive, above the root)"
+  },
+  "pathNotFound": "Path not found: {path}",
+  "@pathNotFound": {
+    "description": "Shown when a path typed in the breadcrumb bar does not exist; {path} is what was typed",
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
   }
 }

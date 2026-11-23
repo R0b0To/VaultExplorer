@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "يمكن إفلات الملفات داخل مجلد في خزنة فقط.",
   "dropImportSkippedItems": "{count, plural, zero{لا يمكن استيراد أي عناصر تم إفلاتها} one{لا يمكن استيراد عنصر واحد تم إفلاته} two{لا يمكن استيراد عنصرين تم إفلاتهما} few{لا يمكن استيراد {count} عناصر تم إفلاتها} many{لا يمكن استيراد {count} عنصرًا تم إفلاته} other{لا يمكن استيراد {count} عنصر تم إفلاته}}",
   "dropVaultOverlayLabel": "أفلت حاوية أو مجلد خزنة لإضافتها",
-  "dropVaultUnsupported": "أفلت ملفات حاويات، أو مجلد خزنة واحدًا فقط."
+  "dropVaultUnsupported": "أفلت ملفات حاويات، أو مجلد خزنة واحدًا فقط.",
+  "pathFieldHint": "اكتب مسارًا",
+  "editPathTooltip": "تعديل المسار",
+  "goToPathTooltip": "انتقال",
+  "pathOutsideStorage": "هذا المسار خارج وحدة التخزين هذه",
+  "pathNotFound": "المسار غير موجود: {path}"
 }

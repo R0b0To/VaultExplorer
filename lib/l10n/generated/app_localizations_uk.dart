@@ -13113,4 +13113,21 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Перетягніть файли контейнерів або лише одну папку сховища.';
+
+  @override
+  String get pathFieldHint => 'Введіть шлях';
+
+  @override
+  String get editPathTooltip => 'Редагувати шлях';
+
+  @override
+  String get goToPathTooltip => 'Перейти';
+
+  @override
+  String get pathOutsideStorage => 'Цей шлях поза цим сховищем';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Шлях не знайдено: $path';
+  }
 }

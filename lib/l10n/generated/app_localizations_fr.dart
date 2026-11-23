@@ -13106,4 +13106,21 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Déposez des fichiers de conteneur ou un seul dossier de coffre.';
+
+  @override
+  String get pathFieldHint => 'Saisissez un chemin';
+
+  @override
+  String get editPathTooltip => 'Modifier le chemin';
+
+  @override
+  String get goToPathTooltip => 'Aller';
+
+  @override
+  String get pathOutsideStorage => 'Ce chemin est en dehors de ce stockage';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Chemin introuvable : $path';
+  }
 }

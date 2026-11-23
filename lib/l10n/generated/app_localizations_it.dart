@@ -13028,4 +13028,22 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Rilascia file contenitore o una sola cartella vault.';
+
+  @override
+  String get pathFieldHint => 'Digita un percorso';
+
+  @override
+  String get editPathTooltip => 'Modifica percorso';
+
+  @override
+  String get goToPathTooltip => 'Vai';
+
+  @override
+  String get pathOutsideStorage =>
+      'Questo percorso è fuori da questa archiviazione';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Percorso non trovato: $path';
+  }
 }

@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "I file possono essere rilasciati solo in una cartella di un vault.",
   "dropImportSkippedItems": "{count, plural, =1{1 elemento rilasciato non può essere importato} other{{count} elementi rilasciati non possono essere importati}}",
   "dropVaultOverlayLabel": "Rilascia un contenitore o una cartella vault per aggiungerlo",
-  "dropVaultUnsupported": "Rilascia file contenitore o una sola cartella vault."
+  "dropVaultUnsupported": "Rilascia file contenitore o una sola cartella vault.",
+  "pathFieldHint": "Digita un percorso",
+  "editPathTooltip": "Modifica percorso",
+  "goToPathTooltip": "Vai",
+  "pathOutsideStorage": "Questo percorso è fuori da questa archiviazione",
+  "pathNotFound": "Percorso non trovato: {path}"
 }

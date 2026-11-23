@@ -12304,4 +12304,21 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get dropVaultUnsupported => '컨테이너 파일 또는 볼트 폴더 하나만 놓아 주세요.';
+
+  @override
+  String get pathFieldHint => '경로 입력';
+
+  @override
+  String get editPathTooltip => '경로 편집';
+
+  @override
+  String get goToPathTooltip => '이동';
+
+  @override
+  String get pathOutsideStorage => '이 경로는 이 저장소 밖에 있습니다';
+
+  @override
+  String pathNotFound(String path) {
+    return '경로를 찾을 수 없음: $path';
+  }
 }

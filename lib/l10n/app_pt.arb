@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "Os arquivos só podem ser soltos em uma pasta de um cofre.",
   "dropImportSkippedItems": "{count, plural, =1{1 item solto não pode ser importado} other{{count} itens soltos não podem ser importados}}",
   "dropVaultOverlayLabel": "Solte um contêiner ou uma pasta de cofre para adicioná-lo",
-  "dropVaultUnsupported": "Solte arquivos de contêiner ou apenas uma pasta de cofre."
+  "dropVaultUnsupported": "Solte arquivos de contêiner ou apenas uma pasta de cofre.",
+  "pathFieldHint": "Digite um caminho",
+  "editPathTooltip": "Editar caminho",
+  "goToPathTooltip": "Ir",
+  "pathOutsideStorage": "Esse caminho está fora deste armazenamento",
+  "pathNotFound": "Caminho não encontrado: {path}"
 }

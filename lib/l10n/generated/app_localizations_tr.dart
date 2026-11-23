@@ -12904,4 +12904,21 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Kapsayıcı dosyalarını veya yalnızca tek bir kasa klasörünü bırakın.';
+
+  @override
+  String get pathFieldHint => 'Bir yol yazın';
+
+  @override
+  String get editPathTooltip => 'Yolu düzenle';
+
+  @override
+  String get goToPathTooltip => 'Git';
+
+  @override
+  String get pathOutsideStorage => 'Bu yol bu depolamanın dışında';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Yol bulunamadı: $path';
+  }
 }

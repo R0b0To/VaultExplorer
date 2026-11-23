@@ -111,6 +111,7 @@ import 'package:vaultexplorer/features/browser/widgets/browser_preview_pane.dart
 import 'package:vaultexplorer/features/browser/widgets/address_search_field.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/breadcrumb_path_codec.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/category_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
@@ -3066,6 +3067,79 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _loadDirectoryContents(newPath);
   }
 
+  // ── Breadcrumb bar: root name and editable path ──────────────────────────
+
+  final BreadcrumbBarController _breadcrumbController =
+      BreadcrumbBarController();
+
+  /// Name of the storage the path starts from: the vault's name, the device
+  /// storage's name or the drive. Replaces the home icon the bar used to show.
+  String get _breadcrumbRootLabel => widget.container.displayName;
+
+  BreadcrumbPathCodec get _breadcrumbCodec => BreadcrumbPathCodec.forStorage(
+    rootUri: widget.container.uri,
+    isLocalStorage: widget.container.isLocalStorage,
+  );
+
+  /// The editable path, or null where typing a path makes no sense: inside an
+  /// archive the folders are not real folders of the storage.
+  BreadcrumbEditConfig? _breadcrumbEditConfig() {
+    if (_archiveContext != null) return null;
+    final l10n = context.l10n;
+    return BreadcrumbEditConfig(
+      pathText: _breadcrumbCodec.format(_currentDirPath),
+      onSubmit: _submitBreadcrumbPath,
+      hintText: l10n.pathFieldHint,
+      tooltip: l10n.editPathTooltip,
+      goTooltip: l10n.goToPathTooltip,
+      cancelTooltip: l10n.cancel,
+    );
+  }
+
+  /// Goes to what was typed in the breadcrumb bar. True when it navigated; on
+  /// false the bar stays open for a correction and the reason is shown here.
+  Future<bool> _submitBreadcrumbPath(String text) async {
+    if (!mounted || _disposed) return false;
+    final l10n = context.l10n;
+    final target = _breadcrumbCodec.resolve(text, _currentDirPath);
+    if (target == null) return false;
+    if (target.outside) {
+      _setStatus(l10n.pathOutsideStorage, error: true);
+      return false;
+    }
+    final relative = target.relative!;
+    if (relative == _currentDirPath) return true;
+
+    // A folder the person is already inside of is the same as clicking its
+    // crumb: its listing and scroll position are still remembered.
+    final ancestor = _pathStack.indexWhere((s) => s.fatPath == relative);
+    if (ancestor >= 0 && ancestor < _pathStack.length - 1) {
+      _jumpTo(ancestor);
+      return true;
+    }
+
+    final container = widget.container;
+    final fileIo = ref.read(vaultFileIoApiProvider);
+    final isFolder =
+        relative.isEmpty ||
+        await fileIo.entryExists(container, relative, isDir: true);
+    if (!mounted || _disposed) return false;
+    // Not awaited: like clicking a crumb, the bar closes at once and the
+    // folder shows its own loading state.
+    if (isFolder) {
+      unawaited(_navigateToPath(relative, isDir: true));
+      return true;
+    }
+    // A file's path opens its folder and then the file, as a bookmark does.
+    if (await fileIo.entryExists(container, relative, isDir: false)) {
+      if (!mounted || _disposed) return false;
+      unawaited(_navigateToPath(relative, isDir: false));
+      return true;
+    }
+    if (mounted) _setStatus(l10n.pathNotFound(text.trim()), error: true);
+    return false;
+  }
+
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
     exitSelectionMode(ownPane: true);
@@ -3363,7 +3437,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// File manager keys: arrows (and Home/End) move the selection, Enter opens
   /// it, Backspace or Alt+Up/Left go up a folder, Ctrl/Cmd+A selects all,
   /// Ctrl/Cmd+C/X/V copy, cut and paste, Delete deletes, F2 renames, Ctrl/Cmd+F
-  /// searches and Escape clears the selection. In the grid and masonry layouts
+  /// searches, Ctrl/Cmd+L, Alt+D and F4 edit the path in the breadcrumb bar and
+  /// Escape clears the selection. In the grid and masonry layouts
   /// Left/Right step through the items; up and down are left alone there.
   ///
   /// A global handler gated on [_isKeyboardTarget] rather than a focus node,
@@ -3407,6 +3482,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         _navigateUp();
         return true;
       }
+      // Alt+D: the address bar, as in most desktop browsers and file managers.
+      if (key == LogicalKeyboardKey.keyD && _breadcrumbController.isAttached) {
+        _breadcrumbController.startEditing();
+        return true;
+      }
       return false;
     }
 
@@ -3436,6 +3516,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         _toggleOrFocusSearch(_searchNotifier);
         return true;
       }
+      if (key == LogicalKeyboardKey.keyL && _breadcrumbController.isAttached) {
+        _breadcrumbController.startEditing();
+        return true;
+      }
       return false;
     }
 
@@ -3463,6 +3547,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     if (key == LogicalKeyboardKey.f5 && !isRepeat) {
       _refreshListing();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.f4 && _breadcrumbController.isAttached) {
+      _breadcrumbController.startEditing();
       return true;
     }
     if (key == LogicalKeyboardKey.f2 && selectedItems.isNotEmpty) {
@@ -7837,6 +7925,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                             onTap: _jumpTo,
                                             forwardStack: _forwardStack,
                                             onForwardTap: _navigateForward,
+                                            rootLabel: _breadcrumbRootLabel,
+                                            rootIcon: breadcrumbRootIconFor(widget.container),
+                                            edit: _breadcrumbEditConfig(),
+                                            controller: _breadcrumbController,
                                             trailing: desktopInlineSearch
                                                 ? AddressSearchField(
                                                     focusNode:

@@ -13080,4 +13080,21 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'أفلت ملفات حاويات، أو مجلد خزنة واحدًا فقط.';
+
+  @override
+  String get pathFieldHint => 'اكتب مسارًا';
+
+  @override
+  String get editPathTooltip => 'تعديل المسار';
+
+  @override
+  String get goToPathTooltip => 'انتقال';
+
+  @override
+  String get pathOutsideStorage => 'هذا المسار خارج وحدة التخزين هذه';
+
+  @override
+  String pathNotFound(String path) {
+    return 'المسار غير موجود: $path';
+  }
 }

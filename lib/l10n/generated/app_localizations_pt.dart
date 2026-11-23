@@ -13009,4 +13009,21 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Solte arquivos de contêiner ou apenas uma pasta de cofre.';
+
+  @override
+  String get pathFieldHint => 'Digite um caminho';
+
+  @override
+  String get editPathTooltip => 'Editar caminho';
+
+  @override
+  String get goToPathTooltip => 'Ir';
+
+  @override
+  String get pathOutsideStorage => 'Esse caminho está fora deste armazenamento';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Caminho não encontrado: $path';
+  }
 }

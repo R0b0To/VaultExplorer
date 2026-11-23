@@ -3576,5 +3576,10 @@
   "dropImportUnavailableHere": "Dosyalar yalnızca bir kasa klasörüne bırakılabilir.",
   "dropImportSkippedItems": "{count, plural, =1{Bırakılan 1 öğe içe aktarılamıyor} other{Bırakılan {count} öğe içe aktarılamıyor}}",
   "dropVaultOverlayLabel": "Eklemek için bir kapsayıcı veya kasa klasörü bırakın",
-  "dropVaultUnsupported": "Kapsayıcı dosyalarını veya yalnızca tek bir kasa klasörünü bırakın."
+  "dropVaultUnsupported": "Kapsayıcı dosyalarını veya yalnızca tek bir kasa klasörünü bırakın.",
+  "pathFieldHint": "Bir yol yazın",
+  "editPathTooltip": "Yolu düzenle",
+  "goToPathTooltip": "Git",
+  "pathOutsideStorage": "Bu yol bu depolamanın dışında",
+  "pathNotFound": "Yol bulunamadı: {path}"
 }

@@ -13008,4 +13008,22 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get dropVaultUnsupported =>
       'Container-Dateien oder nur einen einzelnen Tresorordner ablegen.';
+
+  @override
+  String get pathFieldHint => 'Pfad eingeben';
+
+  @override
+  String get editPathTooltip => 'Pfad bearbeiten';
+
+  @override
+  String get goToPathTooltip => 'Los';
+
+  @override
+  String get pathOutsideStorage =>
+      'Dieser Pfad liegt außerhalb dieses Speichers';
+
+  @override
+  String pathNotFound(String path) {
+    return 'Pfad nicht gefunden: $path';
+  }
 }

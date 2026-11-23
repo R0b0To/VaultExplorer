@@ -12302,4 +12302,21 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get dropVaultUnsupported => 'コンテナファイル、または保管庫フォルダ1つだけをドロップしてください。';
+
+  @override
+  String get pathFieldHint => 'パスを入力';
+
+  @override
+  String get editPathTooltip => 'パスを編集';
+
+  @override
+  String get goToPathTooltip => '移動';
+
+  @override
+  String get pathOutsideStorage => 'このパスはこのストレージの外にあります';
+
+  @override
+  String pathNotFound(String path) {
+    return 'パスが見つかりません: $path';
+  }
 }

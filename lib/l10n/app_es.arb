@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "Los archivos solo se pueden soltar en una carpeta de una bóveda.",
   "dropImportSkippedItems": "{count, plural, =1{No se puede importar 1 elemento soltado} other{No se pueden importar {count} elementos soltados}}",
   "dropVaultOverlayLabel": "Suelta un contenedor o una carpeta de bóveda para añadirlo",
-  "dropVaultUnsupported": "Suelta archivos de contenedor o una sola carpeta de bóveda."
+  "dropVaultUnsupported": "Suelta archivos de contenedor o una sola carpeta de bóveda.",
+  "pathFieldHint": "Escribe una ruta",
+  "editPathTooltip": "Editar ruta",
+  "goToPathTooltip": "Ir",
+  "pathOutsideStorage": "Esa ruta está fuera de este almacenamiento",
+  "pathNotFound": "Ruta no encontrada: {path}"
 }

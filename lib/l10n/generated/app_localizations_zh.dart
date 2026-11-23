@@ -12114,4 +12114,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dropVaultUnsupported => '请拖入容器文件，或仅拖入一个保险库文件夹。';
+
+  @override
+  String get pathFieldHint => '输入路径';
+
+  @override
+  String get editPathTooltip => '编辑路径';
+
+  @override
+  String get goToPathTooltip => '前往';
+
+  @override
+  String get pathOutsideStorage => '该路径位于此存储之外';
+
+  @override
+  String pathNotFound(String path) {
+    return '未找到路径：$path';
+  }
 }

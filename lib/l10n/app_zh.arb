@@ -3582,5 +3582,10 @@
   "dropImportUnavailableHere": "只能将文件拖放到保险库文件夹中。",
   "dropImportSkippedItems": "{count, plural, other{有 {count} 个拖入的项目无法导入}}",
   "dropVaultOverlayLabel": "松开以添加容器或保险库文件夹",
-  "dropVaultUnsupported": "请拖入容器文件，或仅拖入一个保险库文件夹。"
+  "dropVaultUnsupported": "请拖入容器文件，或仅拖入一个保险库文件夹。",
+  "pathFieldHint": "输入路径",
+  "editPathTooltip": "编辑路径",
+  "goToPathTooltip": "前往",
+  "pathOutsideStorage": "该路径位于此存储之外",
+  "pathNotFound": "未找到路径：{path}"
 }

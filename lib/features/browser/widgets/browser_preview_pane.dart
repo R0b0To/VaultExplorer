@@ -9,7 +9,9 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart'
     show FileThumbnailLeading;
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/preview_pane_media.dart';
 
 /// A compact details and thumbnail panel for the file manager's current
 /// selection. It sits beside a single pane and below the focused pane in
@@ -64,7 +66,20 @@ class BrowserPreviewPane extends StatelessWidget {
               ? context.l10n.sizeCalculatingLabel
               : formatBytes(listedFileBytes)
         : formatBytes(folderTotalBytes!);
-    final imageExtent = isBottom ? 132.0 : 240.0;
+    // Images and videos get a larger area than the generic thumbnail, since
+    // they show the real content (full-resolution image / playable video).
+    final isMediaPreview =
+        entry != null &&
+        !entry.isDir &&
+        !entry.isPlaceholder &&
+        archiveContext == null &&
+        (MediaViewerConstants.isImage(entry.name) ||
+            MediaViewerConstants.isVideo(entry.name));
+    final imageExtent = isBottom
+        ? 132.0
+        : isMediaPreview
+        ? 420.0
+        : 240.0;
 
     return Material(
       color: cs.surfaceContainerLow,
@@ -91,7 +106,7 @@ class BrowserPreviewPane extends StatelessWidget {
                         ? imageExtent
                         : isBottom
                         ? constraints.maxHeight
-                        : (constraints.maxHeight * 0.45)
+                        : (constraints.maxHeight * (isMediaPreview ? 0.6 : 0.45))
                               .clamp(96.0, imageExtent)
                               .toDouble();
                     final fallbackColor = entry.isDir
@@ -140,14 +155,45 @@ class BrowserPreviewPane extends StatelessWidget {
                                 : iconForFile(entry.name),
                             fallbackIconColor: fallbackColor,
                           );
+                    // Images show at full resolution and videos play in place;
+                    // the thumbnail stays as the video's poster.
+                    final entryPath = currentDirPath.isEmpty
+                        ? entry.name
+                        : '$currentDirPath/${entry.name}';
+                    final Widget previewContent = !isMediaPreview
+                        ? thumbnailContent
+                        : MediaViewerConstants.isVideo(entry.name)
+                        ? PreviewPaneVideo(
+                            key: ValueKey<String>(
+                              'desktop_preview_video:${container.volId}:$entryPath',
+                            ),
+                            container: container,
+                            filePath: entryPath,
+                            poster: thumbnailContent,
+                          )
+                        : PreviewPaneImage(
+                            container: container,
+                            filePath: entryPath,
+                            quality: quality,
+                            cacheMode: cacheMode,
+                          );
                     final thumbnail = DecoratedBox(
+                      position: DecorationPosition.foreground,
                       decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.35),
+                        ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: thumbnailContent,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: previewContent,
+                        ),
                       ),
                     );
 
@@ -186,10 +232,11 @@ class BrowserPreviewPane extends StatelessWidget {
                           label: context.l10n.sortFieldSize,
                           value: formatBytes(entry.sizeBytes),
                         ),
-                      _DetailRow(
-                        label: context.l10n.sortFieldDate,
-                        value: formatEntryDate(entry.modifiedSecs, context),
-                      ),
+                      if (entry.modifiedSecs > 0)
+                        _DetailRow(
+                          label: context.l10n.sortFieldDate,
+                          value: formatEntryDate(entry.modifiedSecs, context),
+                        ),
                     ];
 
                     if (isBottom) {

@@ -407,7 +407,8 @@ class _SplitHandleState extends State<_SplitHandle> {
       mark = Container(
         width: horizontal ? 1 : 32,
         height: horizontal ? 32 : 1,
-        color: active ? cs.primary : cs.outlineVariant,
+        // Only visible while the divider is hovered or dragged.
+        color: active ? cs.primary : Colors.transparent,
       );
     }
 

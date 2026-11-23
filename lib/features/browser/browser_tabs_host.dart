@@ -566,7 +566,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             child: Row(
               children: [
                 Icon(
-                  Icons.home_rounded,
+                  Icons.dashboard_rounded,
                   size: 17,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),

@@ -86,47 +86,50 @@ class FileDetailsHeader extends StatelessWidget {
         ? (54.0 * zoomLevel).clamp(36.0, 80.0) + 10.0
         : (32.0 * zoomLevel).clamp(24.0, 64.0) + 10.0;
 
+    final borderColor = cs.outlineVariant.withValues(alpha: 0.6);
     return BleedRight(
-      bottomBorder: cs.outlineVariant.withValues(alpha: 0.6),
-      child: Container(
-      height: FileDetailsTable.headerHeight,
-      // 1 px of row margin plus 12 px of row padding on each side.
-      padding: const EdgeInsets.symmetric(horizontal: 13),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: cs.outlineVariant.withValues(alpha: 0.6),
+      fill: cs.surfaceContainerLow,
+      bottomBorder: borderColor,
+      child: Material(
+        color: cs.surfaceContainerLow,
+        child: Container(
+          height: FileDetailsTable.headerHeight,
+          // 1 px of row margin plus 12 px of row padding on each side.
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: borderColor),
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(width: leadingWidth),
+              Expanded(
+                child: _HeaderCell(
+                  label: l10n.sortFieldName,
+                  sorted: sortBy == SortBy.name,
+                  ascending: sortAscending,
+                  alignEnd: false,
+                  onTap: () => onSortBy(SortBy.name),
+                ),
+              ),
+              for (final column in columns) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: FileDetailsTable.columnWidth(column) * factor,
+                  child: _HeaderCell(
+                    label: column.getLocalizedLabel(l10n),
+                    sorted: sortBy == FileDetailsTable.sortFor(column),
+                    ascending: sortAscending,
+                    alignEnd: FileDetailsTable.alignsEnd(column),
+                    onTap: () => onSortBy(FileDetailsTable.sortFor(column)),
+                  ),
+                ),
+              ],
+              SizedBox(width: trailingSlotWidth),
+            ],
           ),
         ),
-      ),
-      child: Row(
-        children: [
-          SizedBox(width: leadingWidth),
-          Expanded(
-            child: _HeaderCell(
-              label: l10n.sortFieldName,
-              sorted: sortBy == SortBy.name,
-              ascending: sortAscending,
-              alignEnd: false,
-              onTap: () => onSortBy(SortBy.name),
-            ),
-          ),
-          for (final column in columns) ...[
-            const SizedBox(width: 8),
-            SizedBox(
-              width: FileDetailsTable.columnWidth(column) * factor,
-              child: _HeaderCell(
-                label: column.getLocalizedLabel(l10n),
-                sorted: sortBy == FileDetailsTable.sortFor(column),
-                ascending: sortAscending,
-                alignEnd: FileDetailsTable.alignsEnd(column),
-                onTap: () => onSortBy(FileDetailsTable.sortFor(column)),
-              ),
-            ),
-          ],
-          SizedBox(width: trailingSlotWidth),
-        ],
-      ),
       ),
     );
   }
@@ -172,7 +175,10 @@ class _HeaderCell extends StatelessWidget {
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
-          if (alignEnd && arrow != null) arrow,
+          if (alignEnd && arrow != null) ...[
+            arrow,
+            const SizedBox(width: 2),
+          ],
           Flexible(
             child: Text(
               label,
@@ -182,7 +188,10 @@ class _HeaderCell extends StatelessWidget {
               softWrap: false,
             ),
           ),
-          if (!alignEnd && arrow != null) arrow,
+          if (!alignEnd && arrow != null) ...[
+            const SizedBox(width: 2),
+            arrow,
+          ],
         ],
       ),
     );

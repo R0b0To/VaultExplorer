@@ -56,6 +56,18 @@ Future<bool> _ensureAllFilesAccess(BuildContext context, WidgetRef ref) async {
   return false;
 }
 
+/// Whether the drawer's Vaults group shows its vault rows. Kept in a provider
+/// so it survives the drawer being rebuilt or reopened (not across restarts).
+class _VaultsExpandedNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void toggle() => state = !state;
+}
+
+final _vaultsExpandedProvider =
+    NotifierProvider<_VaultsExpandedNotifier, bool>(_VaultsExpandedNotifier.new);
+
 class AppNavigationDrawer extends ConsumerWidget {
   final int? currentVolId;
   final MountedContainer? primaryLocalContainer;
@@ -483,6 +495,7 @@ class AppNavigationDrawer extends ConsumerWidget {
       ),
     );
     final primary = primaryLocalContainer;
+    final vaultsExpanded = ref.watch(_vaultsExpandedProvider);
 
     final isDashboard = currentVolId == null && selectedTabIndex == 0;
     final isTools = currentVolId == null && selectedTabIndex == 1;
@@ -546,46 +559,65 @@ class AppNavigationDrawer extends ConsumerWidget {
                   vertical: 8,
                 ),
                 children: [
-                  // 1. Dashboard (Home)
-                  ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    selected: isDashboard,
-                    selectedTileColor: cs.secondaryContainer.withValues(
-                      alpha: 0.5,
-                    ),
-                    leading: Icon(
-                      Icons.dashboard_rounded,
-                      color: isDashboard ? cs.primary : cs.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      context.l10n.dashboardNavLabel,
-                      style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isDashboard
-                            ? FontWeight.bold
-                            : FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () => _navigateToTab(context, 0),
-                  ),
-
-                  // 2. Encrypted Vaults Section (Swipeable Rows with Lock Button)
-                  if (displayItems.isNotEmpty || onAddVault != null)
-                    DrawerGroup(children: [
+                  // Encrypted vaults (swipeable rows with lock button). The
+                  // "Vaults" header doubles as the Dashboard shortcut, like
+                  // "This PC" above the list of drives.
+                  DrawerGroup(children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 2, 2),
+                      padding: const EdgeInsets.fromLTRB(4, 4, 2, 4),
                       child: Row(
                         children: [
-                          Text(
-                            context.l10n.vaultsSectionTitle.toUpperCase(),
-                            style: textTheme.labelSmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
+                          Expanded(
+                            child: ListTile(
+                              dense: true,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              selected: isDashboard,
+                              selectedTileColor: cs.secondaryContainer
+                                  .withValues(alpha: 0.5),
+                              leading: Icon(
+                                Icons.shield_rounded,
+                                color: isDashboard
+                                    ? cs.primary
+                                    : cs.onSurfaceVariant,
+                              ),
+                              title: Text(
+                                context.l10n.vaultsSectionTitle,
+                                style: textTheme.bodyLarge?.copyWith(
+                                  fontWeight: isDashboard
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                              onTap: () => _navigateToTab(context, 0),
+                              // Expand / collapse inside the pill, so the
+                              // card's outer edges stay on the same rail as
+                              // the cards below.
+                              trailing: IconButton(
+                                tooltip: vaultsExpanded
+                                    ? MaterialLocalizations.of(
+                                        context,
+                                      ).expandedIconTapHint
+                                    : MaterialLocalizations.of(
+                                        context,
+                                      ).collapsedIconTapHint,
+                                visualDensity: VisualDensity.compact,
+                                iconSize: 20,
+                                icon: AnimatedRotation(
+                                  turns: vaultsExpanded ? 0.25 : 0,
+                                  duration: const Duration(milliseconds: 150),
+                                  child: Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                                onPressed: () => ref
+                                    .read(_vaultsExpandedProvider.notifier)
+                                    .toggle(),
+                              ),
                             ),
                           ),
-                          const Spacer(),
                           if (dashboardState.mounted.isNotEmpty)
                             PopupMenuButton<String>(
                               icon: Icon(
@@ -629,6 +661,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (vaultsExpanded)
                     for (final item in displayItems) ...[
                       (() {
                         final isMounted = item.isMounted;
@@ -639,7 +672,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                             volId != null && volId == currentVolId;
 
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
+                          padding: const EdgeInsets.only(left: 6, bottom: 4),
                           child: _DrawerVaultRow(
                             key: ValueKey('drawer_vault_${item.uri}'),
                             item: item,
@@ -704,10 +737,11 @@ class AppNavigationDrawer extends ConsumerWidget {
                         );
                       })(),
                     ],
-                    if (onAddVault != null)
+                    if (vaultsExpanded && onAddVault != null)
                       ListTile(
+                        contentPadding: const EdgeInsets.only(left: 22, right: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         leading: Icon(Icons.add, color: cs.primary),
                         title: Text(
@@ -764,8 +798,9 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   _showOpenInNewTabMenu(context, pos, primary)
                             : null,
                         child: ListTile(
+                        dense: true,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         selected: currentVolId == kDecoyLocalVolId,
                         selectedTileColor: cs.secondaryContainer.withValues(
@@ -779,7 +814,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                         ),
                         title: Text(
                           localStorageDisplayName(context.l10n.localStorageCardTitle),
-                          style: textTheme.bodyMedium?.copyWith(
+                          style: textTheme.bodyLarge?.copyWith(
                             fontWeight: currentVolId == kDecoyLocalVolId
                                 ? FontWeight.bold
                                 : FontWeight.w500,
@@ -826,7 +861,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 ),
                             child: ListTile(
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               selected: currentVolId == loc.volId,
                               selectedTileColor: cs.secondaryContainer
@@ -952,7 +987,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                     if (!PlatformFeatures.isDesktop)
                     ListTile(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       leading: Icon(Icons.add, color: cs.primary),
                       title: Text(
@@ -1013,7 +1048,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                   if (enableAuthenticator)
                     ListTile(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       leading: Icon(
                         Icons.verified_user_rounded,
@@ -1075,11 +1110,16 @@ class _ToolsStrip extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     Widget button(IconData icon, String tooltip, bool selected, VoidCallback onTap) {
       return IconButton(
-        icon: Icon(icon, size: 22),
+        icon: Icon(icon, size: 20),
         tooltip: tooltip,
         onPressed: onTap,
         isSelected: selected,
         style: IconButton.styleFrom(
+          fixedSize: const Size(36, 36),
+          minimumSize: const Size(36, 36),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           foregroundColor: selected ? cs.primary : cs.onSurfaceVariant,
           backgroundColor: selected
               ? cs.secondaryContainer.withValues(alpha: 0.5)
@@ -1092,8 +1132,20 @@ class _ToolsStrip extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+          child: SizedBox(
+            height: 46,
+            child: DecoratedBox(
+            // Same soft surface as the groups above, so the two buttons read
+            // as a footer of the menu rather than loose icons in the corner.
+            decoration: BoxDecoration(
+              color: cs.onSurface.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               button(
                 Icons.build_rounded,
@@ -1109,6 +1161,9 @@ class _ToolsStrip extends StatelessWidget {
                 onSettings,
               ),
             ],
+          ),
+            ),
+          ),
           ),
         ),
       ],
@@ -1236,16 +1291,17 @@ class _DrawerVaultRow extends ConsumerWidget {
       LockedVaultItem(:final record) => record.format,
     };
 
+    // No resting fill on locked vaults (a subtle one appears on hover); an
+    // unlocked vault gets a light tint and the open one a stronger fill.
     final tileColor = isCurrent
-        ? Color.alphaBlend(
-            cs.secondaryContainer.withValues(alpha: 0.6),
-            cs.surfaceContainerHigh,
-          )
-        : cs.surfaceContainerHigh;
+        ? cs.secondaryContainer.withValues(alpha: 0.7)
+        : isMounted
+        ? cs.secondaryContainer.withValues(alpha: 0.35)
+        : Colors.transparent;
 
     return Material(
       color: tileColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       clipBehavior: Clip.antiAlias,
       child: Builder(
         builder: (tileContext) {
@@ -1253,9 +1309,10 @@ class _DrawerVaultRow extends ConsumerWidget {
             onOpen: (pos) => _showContextMenu(context, pos),
             child: ListTile(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(10),
             ),
             contentPadding: const EdgeInsets.only(left: 12, right: 6),
+            hoverColor: cs.onSurface.withValues(alpha: 0.06),
             leading: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
@@ -1263,8 +1320,8 @@ class _DrawerVaultRow extends ConsumerWidget {
                     ? cs.primaryContainer
                     : (isMounted
                           ? cs.primaryContainer.withValues(alpha: 0.7)
-                          : cs.surfaceContainerHighest.withValues(alpha: 0.5)),
-                borderRadius: BorderRadius.circular(10),
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.9)),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: isUsb
                   ? Icon(
@@ -1272,14 +1329,14 @@ class _DrawerVaultRow extends ConsumerWidget {
                       size: 18,
                       color: isMounted
                           ? cs.primary
-                          : cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          : cs.onSurfaceVariant.withValues(alpha: 0.9),
                     )
                   : ContainerFormatIcon(
                       format: format,
                       size: 18,
                       color: isMounted
                           ? cs.primary
-                          : cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          : cs.onSurfaceVariant.withValues(alpha: 0.9),
                     ),
             ),
             title: FileNameLabel(
@@ -1303,7 +1360,14 @@ class _DrawerVaultRow extends ConsumerWidget {
                     visualDensity: VisualDensity.compact,
                     onPressed: onLock,
                   )
-                : null,
+                : Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Icon(
+                      Icons.lock_rounded,
+                      size: 16,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.8),
+                    ),
+                  ),
             onLongPress: touchOnlyLongPress(() {
               final box = tileContext.findRenderObject() as RenderBox?;
               final pos = box != null

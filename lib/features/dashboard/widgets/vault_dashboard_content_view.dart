@@ -61,11 +61,10 @@ class VaultDashboardContentView extends ConsumerWidget {
     // a phone-sized viewport keeps the single reorderable column.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final usable = constraints.maxWidth > AppBreakpoints.pageMaxWidth
-            ? AppBreakpoints.pageMaxWidth
-            : constraints.maxWidth;
+        final usable = constraints.maxWidth;
         final columns = ScreenInfo.cardColumnsFor(
           usable - _kGridSidePadding * 2,
+          maxColumns: null,
         );
         if (columns < 2) return _buildSingleColumn(context, ref);
         return _buildGrid(context, ref, usable, columns);
@@ -178,7 +177,7 @@ class VaultDashboardContentView extends ConsumerWidget {
     }
 
     return Align(
-      alignment: Alignment.topCenter,
+      alignment: Alignment.topLeft,
       child: SizedBox(
         width: width,
         child: SingleChildScrollView(

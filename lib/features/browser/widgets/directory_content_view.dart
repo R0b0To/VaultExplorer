@@ -2784,6 +2784,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   void _navigateUp() {
     if (_atRoot) return;
+    // The selection belongs to the folder being left; keeping it would leave
+    // the preview pane on an item that is no longer shown.
+    exitSelectionMode(ownPane: true);
     _rememberScrollOffset();
     final targetSegment = _pathStack.length >= 2
         ? _pathStack[_pathStack.length - 2]
@@ -3065,6 +3068,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
+    exitSelectionMode(ownPane: true);
     _rememberScrollOffset();
     final targetSegment = index >= 0 && index < _pathStack.length
         ? _pathStack[index]
@@ -7887,7 +7891,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               // not fit into its own "more" menu, so nothing
                                               // overlaps or needs scrolling to reach.
                                               const fixedToolbarWidth =
-                                                  3 * 40.0 + 1 + 48 + 4;
+                                                  3 * 40.0 + 9 + 1 + 48 + 4;
                                               const selectionWanted = 7 * 40.0;
                                               final actionsWanted = showActionBar
                                                   ? _visibleActions.length * 40.0
@@ -7947,6 +7951,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                           tooltip: context.l10n.refreshListButton,
                                                           onPressed: _refreshListing,
                                                         ),
+                                                        const VerticalDivider(width: 9, indent: 8, endIndent: 8),
                                                         if (toolbarActionWidth > 0)
                                                           SizedBox(
                                                             width: toolbarActionWidth,
@@ -8516,7 +8521,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               ? BrowserPreviewPane(
                                                   container: widget.container,
                                                   selectedItems: selectedItems,
-                                                  currentItems: _currentItems,
+                                                  currentItems: filteredItems,
                                                   folderName: _currentDirPath.isEmpty
                                                       ? widget.container.displayName
                                                       : _pathStack.last.label,

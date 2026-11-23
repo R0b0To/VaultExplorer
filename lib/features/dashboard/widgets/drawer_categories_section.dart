@@ -84,7 +84,7 @@ class DrawerCategoriesSection extends ConsumerWidget {
             dense: true,
             visualDensity: VisualDensity.compact,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(10),
             ),
             leading: Icon(category.icon, color: cs.onSurfaceVariant),
             title: Text(

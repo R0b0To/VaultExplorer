@@ -307,7 +307,7 @@ class _DrawerBookmarksSectionState
         ContextMenuRegion(
           onOpen: (_) => _manage(context, vault),
           child: InkWell(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(10),
           onTap: () => unawaited(
             ref
                 .read(fileManagerToolbarSettingsProvider(null).notifier)
@@ -363,7 +363,7 @@ class _DrawerBookmarksSectionState
                   ),
                   dense: true,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   contentPadding: const EdgeInsets.only(left: 28, right: 12),
                   leading: coverSettings != null && _showsCover(bookmark)

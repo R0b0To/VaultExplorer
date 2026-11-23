@@ -122,12 +122,13 @@ class ScreenInfo {
   static int cardColumnsFor(
     double availableWidth, {
     double minTileWidth = AppBreakpoints.cardGridMinTileWidth,
-    int maxColumns = 3,
+    int? maxColumns = 3,
   }) {
     if (availableWidth.isNaN || availableWidth <= 0) return 1;
     final fit = (availableWidth / minTileWidth).floor();
     if (fit < 1) return 1;
-    return fit > maxColumns ? maxColumns : fit;
+    if (maxColumns != null && fit > maxColumns) return maxColumns;
+    return fit;
   }
 
   /// Clamped width for a fixed-width secondary pane in a two-pane layout,

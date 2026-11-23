@@ -1,4 +1,4 @@
-import com.android.build.gradle.LibraryExtension
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 
 allprojects {
     repositories {
@@ -19,14 +19,15 @@ val targetAbi: String? = System.getenv("VAULTEXPLORER_TARGET_ABI")
         else            -> null
     }
 
-// ── Overrides ndkVersion & abiFilters AFTER subprojects evaluate ─────────────
+// ── Overrides ndkVersion & abiFilters AFTER library DSL evaluates ────────────
 subprojects {
-    afterEvaluate {
-        plugins.withId("com.android.library") {
-            val subprojectName = name
-            extensions.configure<LibraryExtension>("android") {
-                ndkVersion = ndkVersionPin
-                defaultConfig {
+    plugins.withId("com.android.library") {
+        val subprojectName = name
+        val subprojectDir = projectDir
+        extensions.configure<LibraryAndroidComponentsExtension>("androidComponents") {
+            finalizeDsl { android ->
+                android.ndkVersion = ndkVersionPin
+                android.defaultConfig {
                     // Restrict library plugin NDK & CMake builds (like :jni) to target ABI
                     targetAbi?.let { abi ->
                         ndk {
@@ -45,8 +46,8 @@ subprojects {
                         cmake {
                             arguments += "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--build-id=none,--hash-style=gnu"
                             arguments += "-DCMAKE_MODULE_LINKER_FLAGS=-Wl,--build-id=none,--hash-style=gnu"
-                            cFlags += listOf("-ffile-prefix-map=${projectDir}=/native-$subprojectName", "-fno-ident")
-                            cppFlags += listOf("-ffile-prefix-map=${projectDir}=/native-$subprojectName", "-fno-ident")
+                            cFlags += listOf("-ffile-prefix-map=$subprojectDir=/native-$subprojectName", "-fno-ident")
+                            cppFlags += listOf("-ffile-prefix-map=$subprojectDir=/native-$subprojectName", "-fno-ident")
                         }
                     }
                 }

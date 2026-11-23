@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/features/settings/widgets/settings_detail_frame.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -154,12 +155,14 @@ class AboutScreen extends ConsumerWidget {
 
     final body = SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: embedded ? Alignment.topLeft : Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: BoxConstraints(maxWidth: embedded ? 680 : 800),
             child: ListView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: embedded ? 24 : 16,
+                vertical: 12,
+              ),
               children: [
                 _buildHeader(ref, context),
                 const SizedBox(height: 24),
@@ -381,7 +384,12 @@ class AboutScreen extends ConsumerWidget {
       );
 
     if (embedded) {
-      return Scaffold(body: body);
+      return Scaffold(
+        body: SettingsDetailFrame(
+          title: context.l10n.aboutAppTitle,
+          child: body,
+        ),
+      );
     }
 
     return Scaffold(

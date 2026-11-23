@@ -1,6 +1,8 @@
 import 'package:vaultexplorer/core/utils/local_storage_name.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
+import 'package:vaultexplorer/core/widgets/inputs/compact_switch_list_tile.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -272,12 +274,16 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
           : SafeArea(
               child: Align(
-                alignment: Alignment.topCenter,
+                alignment: context.screen.useWideLayout
+                    ? Alignment.topLeft
+                    : Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
+                  constraints: BoxConstraints(
+                    maxWidth: context.screen.useWideLayout ? 680 : 800,
+                  ),
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: context.screen.useWideLayout ? 24 : 16,
                       vertical: 12,
                     ),
                     children: [
@@ -287,7 +293,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.browserTabsEnabledTitle),
                       SectionCard(
                         children: [
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -315,7 +321,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -350,7 +356,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                   : cs.onSurfaceVariant,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -398,7 +404,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.browserLayoutSectionHeader),
                       SectionCard(
                         children: [
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -426,7 +432,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -455,7 +461,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -484,7 +490,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -513,7 +519,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -542,7 +548,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -613,7 +619,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 )
                                 .setLongFileNameDisplayMode(v),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -642,7 +648,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -671,7 +677,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -700,7 +706,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -729,7 +735,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -836,7 +842,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -865,7 +871,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -904,7 +910,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.bookmarkBarSectionHeader),
                       SectionCard(
                         children: [
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -979,7 +985,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.listViewOptionsSectionHeader),
                       SectionCard(
                         children: [
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -1008,7 +1014,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -1037,7 +1043,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -1066,7 +1072,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -1137,7 +1143,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       SectionHeader(context.l10n.galleryGridViewSectionHeader),
                       SectionCard(
                         children: [
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -1473,7 +1479,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               );
                             },
                           ),
-                          SwitchListTile(
+                          CompactSwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),

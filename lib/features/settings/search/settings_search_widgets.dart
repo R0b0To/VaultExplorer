@@ -11,8 +11,11 @@ class SettingsSearchField extends StatelessWidget {
     required this.focusNode,
     required this.onChanged,
     required this.onSubmitted,
+    this.compact = false,
   });
 
+  /// A smaller (36px) rounded-rectangle field for the wide layout's rail.
+  final bool compact;
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
@@ -21,24 +24,32 @@ class SettingsSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final borderRadius = BorderRadius.circular(28);
+    final borderRadius = BorderRadius.circular(compact ? 10 : 28);
     const noBorder = BorderSide.none;
 
     return TextField(
       controller: controller,
       focusNode: focusNode,
+      style: compact ? Theme.of(context).textTheme.bodyMedium : null,
       textInputAction: TextInputAction.search,
       onChanged: onChanged,
       onSubmitted: (_) => onSubmitted(),
       decoration: InputDecoration(
         hintText: context.l10n.settingsSearchHint,
-        prefixIcon: const Icon(Icons.search_rounded),
+        isDense: compact,
+        prefixIcon: Icon(Icons.search_rounded, size: compact ? 18 : null),
+        prefixIconConstraints: compact
+            ? const BoxConstraints(minWidth: 36, minHeight: 36)
+            : null,
+        suffixIconConstraints: compact
+            ? const BoxConstraints(minWidth: 32, minHeight: 32)
+            : null,
         suffixIcon: ValueListenableBuilder<TextEditingValue>(
           valueListenable: controller,
           builder: (context, value, _) {
             if (value.text.isEmpty) return const SizedBox.shrink();
             return IconButton(
-              icon: const Icon(Icons.close_rounded),
+              icon: Icon(Icons.close_rounded, size: compact ? 16 : null),
               tooltip: context.l10n.settingsSearchClear,
               onPressed: () {
                 controller.clear();
@@ -50,7 +61,9 @@ class SettingsSearchField extends StatelessWidget {
         ),
         filled: true,
         fillColor: cs.surfaceContainerHigh,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        contentPadding: compact
+            ? const EdgeInsets.symmetric(vertical: 8, horizontal: 8)
+            : const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         border: OutlineInputBorder(borderRadius: borderRadius, borderSide: noBorder),
         enabledBorder:
             OutlineInputBorder(borderRadius: borderRadius, borderSide: noBorder),

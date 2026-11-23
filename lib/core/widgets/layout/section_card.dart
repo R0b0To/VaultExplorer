@@ -69,11 +69,17 @@ class SectionCard extends StatelessWidget {
           radius = BorderRadius.circular(4);
         }
 
+        // A faint hairline keeps grouped cards distinct against a dialog
+        // background in light mode without needing shadows.
+        final hairline = Theme.of(context).brightness == Brightness.light
+            ? BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4))
+            : BorderSide.none;
+
         return Padding(
           padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
           child: Material(
             color: cs.surfaceContainerHigh,
-            borderRadius: radius,
+            shape: RoundedRectangleBorder(borderRadius: radius, side: hairline),
             clipBehavior: Clip.antiAlias,
             child: ListTileTheme(
               tileColor: Colors.transparent,

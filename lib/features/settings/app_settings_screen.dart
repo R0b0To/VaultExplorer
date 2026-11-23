@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/inputs/compact_switch_list_tile.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
@@ -45,6 +46,7 @@ import 'package:vaultexplorer/features/settings/search/settings_search_target.da
 import 'package:vaultexplorer/features/settings/search/settings_search_widgets.dart';
 import 'package:vaultexplorer/features/settings/settings_live_refresh.dart';
 import 'package:vaultexplorer/features/settings/widgets/global_thumbnail_defaults_tiles.dart';
+import 'package:vaultexplorer/features/settings/widgets/settings_detail_frame.dart';
 import '../../app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -147,8 +149,9 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     return searchSettingsIndex(_searchQuery, _resolveSearchIndex(sdk));
   }
 
-  Widget _buildSearchField() {
+  Widget _buildSearchField({bool compact = false}) {
     return SettingsSearchField(
+      compact: compact,
       controller: _searchController,
       focusNode: _searchFocus,
       onChanged: (value) => setState(() => _searchQuery = value),
@@ -311,103 +314,106 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     );
   }
 
-  /// The persistent sidebar shown alongside the detail pane on
-  /// wide/landscape layouts -- same hubs as the narrow layout's list, but
-  /// selecting one swaps the detail pane in place instead of pushing a
-  /// full-screen route.
-  Widget _buildSidebar() {
+  /// Compact single-line navigation row for the wide layout's rail.
+  Widget _buildNavRow({
+    required IconData icon,
+    required String label,
+    required _SettingsSection section,
+  }) {
     final cs = Theme.of(context).colorScheme;
+    final selected = _selectedSection == section;
+    final fg = selected ? cs.onPrimaryContainer : cs.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: selected
+            ? cs.primaryContainer.withValues(alpha: 0.85)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => setState(() => _selectedSection = section),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Row(
+              children: [
+                Icon(icon, size: 19, color: fg),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Tooltip(
+                    message: label,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: selected ? cs.onPrimaryContainer : cs.onSurface,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The persistent navigation rail shown beside the detail pane on
+  /// wide/landscape layouts: compact single-line rows, a transparent resting
+  /// state and a clear tinted fill on the active row. Selecting one swaps the
+  /// detail pane in place instead of pushing a full-screen route.
+  Widget _buildSidebar() {
+    final l10n = context.l10n;
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(10, 14, 10, 16),
       children: [
-        _buildSearchField(),
+        _buildSearchField(compact: true),
         const SizedBox(height: 12),
         if (_isSearching)
           _buildSearchResults()
         else ...[
-          SectionCard(
-            children: [
-              _buildHubTile(
-                icon: Icons.shield_rounded,
-                iconColor: cs.primary,
-                title: context.l10n.sectionSecurityPrivacy,
-                subtitle: context.l10n.settingsHubSecuritySubtitle,
-                selected: _selectedSection == _SettingsSection.security,
-                showChevron: false,
-                onTap: () =>
-                    setState(() => _selectedSection = _SettingsSection.security),
-              ),
-              if (PlatformFeatures.storageIntegrationSettings)
-              _buildHubTile(
-                icon: Icons.settings_input_composite_rounded,
-                iconColor: cs.secondary,
-                title: context.l10n.sectionKeyStorageIntegration,
-                subtitle: context.l10n.settingsHubStorageSubtitle,
-                selected: _selectedSection == _SettingsSection.storage,
-                showChevron: false,
-                onTap: () =>
-                    setState(() => _selectedSection = _SettingsSection.storage),
-              ),
-              _buildHubTile(
-                icon: Icons.folder_copy_rounded,
-                iconColor: cs.tertiary,
-                title: context.l10n.sectionVaultFileHandling,
-                subtitle: context.l10n.settingsHubFileHandlingSubtitle,
-                selected: _selectedSection == _SettingsSection.fileHandling,
-                showChevron: false,
-                onTap: () => setState(
-                  () => _selectedSection = _SettingsSection.fileHandling,
-                ),
-              ),
-              _buildHubTile(
-                icon: Icons.tune_rounded,
-                iconColor: Colors.blueAccent,
-                title: context.l10n.fileManagerSettingsTitle,
-                subtitle: '${context.l10n.browserLayoutSectionHeader}, ${context.l10n.toolbarLayoutSectionHeader}',
-                selected: _selectedSection == _SettingsSection.fileManager,
-                showChevron: false,
-                onTap: () => setState(
-                  () => _selectedSection = _SettingsSection.fileManager,
-                ),
-              ),
-              _buildHubTile(
-                icon: Icons.palette_rounded,
-                iconColor: Colors.deepPurpleAccent,
-                title: context.l10n.sectionAppearanceInterface,
-                subtitle: context.l10n.settingsHubAppearanceSubtitle,
-                selected: _selectedSection == _SettingsSection.appearance,
-                showChevron: false,
-                onTap: () => setState(
-                  () => _selectedSection = _SettingsSection.appearance,
-                ),
-              ),
-              _buildHubTile(
-                icon: Icons.terminal_rounded,
-                iconColor: Colors.teal,
-                title:
-                    '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
-                subtitle: context.l10n.settingsHubAdvancedSubtitle,
-                selected: _selectedSection == _SettingsSection.advanced,
-                showChevron: false,
-                onTap: () =>
-                    setState(() => _selectedSection = _SettingsSection.advanced),
-              ),
-            ],
+          _buildNavRow(
+            icon: Icons.shield_rounded,
+            label: l10n.sectionSecurityPrivacy,
+            section: _SettingsSection.security,
           ),
-          const SizedBox(height: 16),
-          SectionCard(
-            children: [
-              _buildHubTile(
-                icon: Icons.info_outline_rounded,
-                iconColor: cs.primary,
-                title: context.l10n.aboutAppTitle,
-                subtitle: context.l10n.versionInfoSubtitle(appVersion),
-                selected: _selectedSection == _SettingsSection.about,
-                showChevron: false,
-                onTap: () =>
-                    setState(() => _selectedSection = _SettingsSection.about),
-              ),
-            ],
+          if (PlatformFeatures.storageIntegrationSettings)
+            _buildNavRow(
+              icon: Icons.settings_input_composite_rounded,
+              label: l10n.sectionKeyStorageIntegration,
+              section: _SettingsSection.storage,
+            ),
+          _buildNavRow(
+            icon: Icons.folder_copy_rounded,
+            label: l10n.sectionVaultFileHandling,
+            section: _SettingsSection.fileHandling,
+          ),
+          _buildNavRow(
+            icon: Icons.tune_rounded,
+            label: l10n.fileManagerSettingsTitle,
+            section: _SettingsSection.fileManager,
+          ),
+          _buildNavRow(
+            icon: Icons.palette_rounded,
+            label: l10n.sectionAppearanceInterface,
+            section: _SettingsSection.appearance,
+          ),
+          _buildNavRow(
+            icon: Icons.terminal_rounded,
+            label: '${l10n.sectionBackupRestore} & ${l10n.sectionDebug}',
+            section: _SettingsSection.advanced,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            child: Divider(height: 1),
+          ),
+          _buildNavRow(
+            icon: Icons.info_outline_rounded,
+            label: l10n.aboutAppTitle,
+            section: _SettingsSection.about,
           ),
         ],
       ],
@@ -495,12 +501,21 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SizedBox(
-                          width: context.screen.secondaryPaneWidth(),
+                        Container(
+                          width: (context.screen.width * 0.24).clamp(
+                            220.0,
+                            248.0,
+                          ),
+                          color: cs.surfaceContainerLow,
                           child: _buildSidebar(),
                         ),
-                        const VerticalDivider(width: 0.2),
-                        Expanded(child: _buildDetailPane()),
+                        const VerticalDivider(width: 1, thickness: 1),
+                        Expanded(
+                          child: ColoredBox(
+                            color: cs.surface,
+                            child: _buildDetailPane(),
+                          ),
+                        ),
                       ],
                     )
                   : _buildNarrowHubList(cs, textTheme),
@@ -1378,11 +1393,11 @@ class _SecuritySettingsScreenState
 
     final body = SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: widget.embedded ? Alignment.topLeft : Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: BoxConstraints(maxWidth: widget.embedded ? 680 : 800),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: widget.embedded ? 24 : 16, vertical: 12),
             children: [
               // 1. App Authentication
               SectionHeader(context.l10n.masterLockTitle),
@@ -1391,7 +1406,7 @@ class _SecuritySettingsScreenState
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SwitchListTile(
+                      CompactSwitchListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                         ),
@@ -1619,7 +1634,7 @@ class _SecuritySettingsScreenState
                     ),
                     if (PlatformFeatures.lockOnScreenOff &&
                         !state.settings.appLockScreenLockOnly)
-                      SwitchListTile(
+                      CompactSwitchListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                         ),
@@ -1651,7 +1666,7 @@ class _SecuritySettingsScreenState
               SectionHeader(context.l10n.autoLockContainersTitle),
               SectionCard(
                 children: [
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.autoLockContainersTitle,
@@ -1738,7 +1753,7 @@ class _SecuritySettingsScreenState
                       },
                     ),
                   if (PlatformFeatures.screenshotBlocking)
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.blockScreenshotsTitle,
@@ -1765,7 +1780,7 @@ class _SecuritySettingsScreenState
                     },
                   ),
                   if (PlatformFeatures.derivedKeyCache)
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.cacheDerivedKeysTitle,
@@ -1795,7 +1810,7 @@ class _SecuritySettingsScreenState
                 SectionHeader(context.l10n.sectionMaskMode),
                 SectionCard(
                   children: [
-                    SwitchListTile(
+                    CompactSwitchListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       title: Text(
                         context.l10n.discreteModeTitle,
@@ -1890,7 +1905,7 @@ class _SecuritySettingsScreenState
               SectionHeader(context.l10n.authenticatorSettingsTitle),
               SectionCard(
                 children: [
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.authenticatorEnableTitle,
@@ -1920,7 +1935,9 @@ class _SecuritySettingsScreenState
     );
 
     if (widget.embedded) {
-      return Scaffold(body: body);
+      return Scaffold(
+        body: SettingsDetailFrame(title: context.l10n.sectionSecurityPrivacy, child: body),
+      );
     }
 
     return Scaffold(
@@ -1994,15 +2011,15 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
 
     final body = SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: embedded ? Alignment.topLeft : Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: BoxConstraints(maxWidth: embedded ? 680 : 800),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: embedded ? 24 : 16, vertical: 12),
             children: [
               SectionCard(
                 children: [
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.fastStorageAccessTitle,
@@ -2022,7 +2039,7 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
                     onChanged: (v) =>
                         _toggleStoragePermission(context, ref, state, v),
                   ),
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.keepVaultsRunningInBackgroundTitle,
@@ -2062,7 +2079,7 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
                           );
                     },
                   ),
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.usbAttachPromptTitle,
@@ -2091,7 +2108,7 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
                       }
                     },
                   ),
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.androidFileProviderTitle,
@@ -2112,7 +2129,7 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
                           (s) => s.copyWith(defaultDocumentProvider: v),
                         ),
                   ),
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.shareSheetIntegrationTitle,
@@ -2142,7 +2159,7 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
                       }
                     },
                   ),
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.autoLockOnShareImportTitle,
@@ -2172,7 +2189,9 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
     );
 
     if (embedded) {
-      return Scaffold(body: body);
+      return Scaffold(
+        body: SettingsDetailFrame(title: context.l10n.sectionKeyStorageIntegration, child: body),
+      );
     }
 
     return Scaffold(
@@ -2216,15 +2235,15 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
 
     final body = SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: embedded ? Alignment.topLeft : Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: BoxConstraints(maxWidth: embedded ? 680 : 800),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: embedded ? 24 : 16, vertical: 12),
             children: [
               SectionCard(
                 children: [
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.autoOpenOnUnlockTitle,
@@ -2264,7 +2283,7 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
                         ),
                   ),
                   const GlobalThumbnailDefaultsTiles(),
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.enableJsHtmlTitle,
@@ -2395,7 +2414,9 @@ class FileHandlingSettingsScreen extends ConsumerWidget {
     );
 
     if (embedded) {
-      return Scaffold(body: body);
+      return Scaffold(
+        body: SettingsDetailFrame(title: context.l10n.sectionVaultFileHandling, child: body),
+      );
     }
 
     return Scaffold(
@@ -2450,11 +2471,11 @@ class AppearanceSettingsScreen extends ConsumerWidget {
 
     final body = SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: embedded ? Alignment.topLeft : Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: BoxConstraints(maxWidth: embedded ? 680 : 800),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: embedded ? 24 : 16, vertical: 12),
             children: [
               // Theme & Styling
               SectionHeader(context.l10n.appThemeLabel),
@@ -2485,7 +2506,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                     },
                   ),
                   if (state.androidSdkInt >= _kAndroidSdkS)
-                    SwitchListTile(
+                    CompactSwitchListTile(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                       ),
@@ -2590,7 +2611,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
               SectionHeader(context.l10n.navBarVaultsLabel),
               SectionCard(
                 children: [
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.showStorageLocationsTitle,
@@ -2636,7 +2657,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                 SectionHeader(context.l10n.sectionNavigation),
                 SectionCard(
                   children: [
-                    SwitchListTile(
+                    CompactSwitchListTile(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                       ),
@@ -2679,7 +2700,9 @@ class AppearanceSettingsScreen extends ConsumerWidget {
     );
 
     if (embedded) {
-      return Scaffold(body: body);
+      return Scaffold(
+        body: SettingsDetailFrame(title: context.l10n.sectionAppearanceInterface, child: body),
+      );
     }
 
     return Scaffold(
@@ -2870,11 +2893,11 @@ class AdvancedSettingsScreen extends ConsumerWidget {
 
     final body = SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: embedded ? Alignment.topLeft : Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: BoxConstraints(maxWidth: embedded ? 680 : 800),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: embedded ? 24 : 16, vertical: 12),
             children: [
               // Backup & Restore
               SectionHeader(context.l10n.sectionBackupRestore),
@@ -2940,7 +2963,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
               SectionHeader(context.l10n.sectionDebug),
               SectionCard(
                 children: [
-                  SwitchListTile(
+                  CompactSwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     title: Text(
                       context.l10n.debugLoggingTitle,
@@ -2993,7 +3016,13 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     );
 
     if (embedded) {
-      return Scaffold(body: body);
+      return Scaffold(
+        body: SettingsDetailFrame(
+          title:
+              '${context.l10n.sectionBackupRestore} & ${context.l10n.sectionDebug}',
+          child: body,
+        ),
+      );
     }
 
     return Scaffold(

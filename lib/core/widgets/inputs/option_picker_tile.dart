@@ -71,9 +71,15 @@ class OptionPickerTile<T> extends StatelessWidget {
           ),
         ),
       ),
+      // Always show a muted affordance so a picker row never reads as a
+      // static info label.
       trailing: showDropdownArrow
           ? Icon(Icons.arrow_drop_down_rounded, color: cs.onSurfaceVariant)
-          : null,
+          : Icon(
+              Icons.unfold_more_rounded,
+              size: 20,
+              color: cs.onSurfaceVariant.withValues(alpha: enabled ? 0.7 : 0.38),
+            ),
       onTap: enabled ? () => _showPicker(context) : null,
     );
   }

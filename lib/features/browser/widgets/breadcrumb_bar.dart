@@ -38,7 +38,11 @@ class _BreadcrumbDragGestureRecognizer
         final deltaX = (event.position.dx - startPosition.dx).abs();
         final deltaY = (event.position.dy - startPosition.dy).abs();
 
-        if (deltaX > 8.0 && deltaX > deltaY) {
+        // Claim early and without demanding a perfectly flat swipe: the
+        // drawer's recognizer accepts after one touch slop (about 8dp on
+        // Android) of horizontal travel however steep the swipe is, so a
+        // stricter test here let it win on slightly diagonal swipes.
+        if (deltaX > 6.0 && deltaX >= deltaY * 0.5) {
           resolve(GestureDisposition.accepted);
           _startPositions.remove(event.pointer);
         }
@@ -440,11 +444,11 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
         ? _archiveColor.withValues(alpha: 0.55)
         : (isArchive ? _archiveColor : color);
 
+    // Names are always shown in full; a long path scrolls instead.
     final text = Text(
       isRoot ? rootLabel! : segment.label,
       maxLines: 1,
-      // A long vault name must not push the rest of the path off the bar.
-      overflow: isRoot ? TextOverflow.ellipsis : null,
+      softWrap: false,
       style: textTheme.labelLarge?.copyWith(
         color: color,
         fontWeight: dimmed
@@ -461,51 +465,16 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
             padding: const EdgeInsets.only(right: 6),
             child: Icon(icon, color: iconColor, size: 16),
           ),
-        if (isRoot)
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 200),
-            child: text,
-          )
-        else
-          text,
+        text,
       ],
     );
   }
 
+  /// The crumbs themselves; horizontal scrolling is handled by
+  /// [_withDragScroll], which wraps the whole bar so that the margins around
+  /// the field scroll it too.
   Widget _buildCrumbs(ColorScheme cs, TextTheme textTheme) {
-    return Listener(
-      onPointerSignal: (event) {
-        if (event is PointerScrollEvent && _scrollController.hasClients) {
-          final delta = event.scrollDelta.dy != 0
-              ? event.scrollDelta.dy
-              : event.scrollDelta.dx;
-          final target = (_scrollController.offset + delta).clamp(
-            0.0,
-            _scrollController.position.maxScrollExtent,
-          );
-          if (target != _scrollController.offset) {
-            _scrollController.jumpTo(target);
-          }
-        }
-      },
-      child: RawGestureDetector(
-        behavior: HitTestBehavior.opaque,
-        gestures: <Type, GestureRecognizerFactory>{
-          _BreadcrumbDragGestureRecognizer:
-              GestureRecognizerFactoryWithHandlers<
-                  _BreadcrumbDragGestureRecognizer>(
-            () => _BreadcrumbDragGestureRecognizer(),
-            (_BreadcrumbDragGestureRecognizer instance) {
-              instance
-                ..onDown = _handleDragDown
-                ..onStart = _handleDragStart
-                ..onUpdate = _handleDragUpdate
-                ..onEnd = _handleDragEnd
-                ..onCancel = _handleDragCancel;
-            },
-          ),
-        },
-        child: SingleChildScrollView(
+    return SingleChildScrollView(
           controller: _scrollController,
           scrollDirection: Axis.horizontal,
           physics: const NeverScrollableScrollPhysics(),
@@ -595,7 +564,47 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
               ],
             ],
           ),
-        ),
+        );
+  }
+
+  /// Lets the crumbs be scrolled by dragging (and by the mouse wheel) from
+  /// anywhere on the bar, margins included. The bar sits under a side drawer
+  /// that opens on a horizontal drag from anywhere on screen, so a drag that
+  /// starts on a spot this does not cover would open the drawer instead.
+  Widget _withDragScroll(Widget child) {
+    return Listener(
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent && _scrollController.hasClients) {
+          final delta = event.scrollDelta.dy != 0
+              ? event.scrollDelta.dy
+              : event.scrollDelta.dx;
+          final target = (_scrollController.offset + delta).clamp(
+            0.0,
+            _scrollController.position.maxScrollExtent,
+          );
+          if (target != _scrollController.offset) {
+            _scrollController.jumpTo(target);
+          }
+        }
+      },
+      child: RawGestureDetector(
+        behavior: HitTestBehavior.opaque,
+        gestures: <Type, GestureRecognizerFactory>{
+          _BreadcrumbDragGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<
+                  _BreadcrumbDragGestureRecognizer>(
+            () => _BreadcrumbDragGestureRecognizer(),
+            (_BreadcrumbDragGestureRecognizer instance) {
+              instance
+                ..onDown = _handleDragDown
+                ..onStart = _handleDragStart
+                ..onUpdate = _handleDragUpdate
+                ..onEnd = _handleDragEnd
+                ..onCancel = _handleDragCancel;
+            },
+          ),
+        },
+        child: child,
       ),
     );
   }
@@ -723,24 +732,6 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
       content = _buildEditor(cs, textTheme, edit);
     } else {
       content = _buildCrumbs(cs, textTheme);
-      if (edit != null) {
-        // The empty part of the bar and the current folder (neither is a
-        // link) open the editor; a long press does from anywhere, which is
-        // the way in when the path fills the whole bar on a phone.
-        content = Semantics(
-          label: edit.tooltip.isEmpty ? null : edit.tooltip,
-          onTap: _startEditing,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.text,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _startEditing,
-              onLongPress: _startEditing,
-              child: content,
-            ),
-          ),
-        );
-      }
     }
 
     final pathField = Container(
@@ -757,29 +748,58 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
     );
 
     final trailing = widget.trailing;
-    return Container(
+    // The 4px above and below the field belong to the drag area too.
+    Widget field = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: pathField,
+    );
+    if (!editing) field = _withDragScroll(field);
+    final bar = Container(
       width: double.infinity,
       height: 40,
       padding: trailing == null
-          ? const EdgeInsets.symmetric(vertical: 4)
-          : const EdgeInsets.fromLTRB(8, 4, 8, 4),
+          ? null
+          : const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: widget.backgroundColor ?? cs.surface,
       ),
       child: trailing == null
-          ? pathField
+          ? field
           : LayoutBuilder(
               builder: (context, constraints) => Row(
                 children: [
-                  Expanded(child: pathField),
+                  Expanded(child: field),
                   const SizedBox(width: 8),
                   SizedBox(
                     width: math.min(260.0, constraints.maxWidth * 0.4),
-                    child: trailing,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: trailing,
+                    ),
                   ),
                 ],
               ),
             ),
+    );
+
+    if (edit == null || editing) return bar;
+    // Every part of the bar that is not a link opens the editor: the empty
+    // space after the path, the current folder, the margins around the field.
+    // Crumbs and the trailing search field handle their own taps first. A
+    // long press works from anywhere, which is the way in when the path fills
+    // the whole bar on a phone.
+    return Semantics(
+      label: edit.tooltip.isEmpty ? null : edit.tooltip,
+      onTap: _startEditing,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.text,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _startEditing,
+          onLongPress: _startEditing,
+          child: bar,
+        ),
+      ),
     );
   }
 }

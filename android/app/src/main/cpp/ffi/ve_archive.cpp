@@ -16,8 +16,10 @@
 #include "ve_engine.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -385,6 +387,269 @@ std::string trimSlashes(std::string s) {
 
 std::string passphraseOf(const char* p) { return p ? std::string(p) : std::string(); }
 
+// ── creating archives ────────────────────────────────────────────────────
+
+constexpr int32_t kLastFormat = 9;  // ArchiveFormat::Cpio
+
+ArchiveCompressionMethod toCompressionMethod(int32_t code) {
+    switch (code) {
+        case 1: return ArchiveCompressionMethod::Deflate;
+        case 2: return ArchiveCompressionMethod::Lzma;
+        case 3: return ArchiveCompressionMethod::Lzma2;
+        default: return ArchiveCompressionMethod::Default;
+    }
+}
+
+bool hasDirectoryMarker(const std::string& name) { return !name.empty() && name.back() == '/'; }
+
+std::string withoutDirectoryMarker(std::string name) {
+    while (!name.empty() && name.back() == '/') name.pop_back();
+    return name;
+}
+
+// Seconds since the epoch of a host file's modification time, 0 when unknown. Computed from the distance to
+// "now" on both clocks, because converting between file_clock and system_clock is not portable across the
+// standard libraries this is built with.
+int64_t hostMtimeSeconds(const fs::path& p) {
+    std::error_code ec;
+    const auto ft = fs::last_write_time(p, ec);
+    if (ec) return 0;
+    const auto sysNow = std::chrono::system_clock::now();
+    const auto fileNow = fs::file_time_type::clock::now();
+    return std::chrono::duration_cast<std::chrono::seconds>((sysNow + (ft - fileNow)).time_since_epoch()).count();
+}
+
+// One file going into the archive, read only while the archive is working on it: a selection of thousands of
+// files never holds thousands of open files or vault streams.
+struct CreateSource {
+    bool vault = false;
+    int32_t vol = -1;
+    std::string path;  // vault path, or host path (UTF-8)
+    uint64_t size = 0;
+    uint64_t offset = 0;
+    bool opened = false;
+    bool finished = false;
+    std::unique_ptr<HostFile> host;
+    std::unique_ptr<VaultStream> stream;
+
+    int64_t read(uint8_t* dest, size_t length) {
+        if (finished) return 0;
+        if (!opened) {
+            opened = true;
+            if (vault) {
+                auto v = std::make_unique<VaultStream>();
+                if (!v->open(vol, path)) return -1;
+                stream = std::move(v);
+            } else {
+                auto h = std::make_unique<HostFile>();
+                if (!h->open(toPath(path))) return -1;
+                host = std::move(h);
+            }
+        }
+        const int64_t n = vault ? stream->readAt(offset, dest, length) : host->readAt(offset, dest, length);
+        if (n < 0) return -1;
+        offset += static_cast<uint64_t>(n);
+        if (n == 0 || offset >= size) release();
+        return n;
+    }
+
+    void release() {
+        finished = true;
+        stream.reset();
+        host.reset();
+    }
+};
+
+// Turns the caller's (source path, name in the archive, mtime) triples into engine entries. A name ending in '/'
+// is a folder entry, and so is any host source that is a directory.
+bool buildEntries(int32_t srcVol, const char* const* paths, const char* const* names, const int64_t* modified,
+                  int32_t count, std::vector<CreateSource>& sources, std::vector<ArchiveSourceEntry>& entries,
+                  uint64_t* totalBytes, std::string* error) {
+    sources.resize(static_cast<size_t>(count));
+    entries.assign(static_cast<size_t>(count), ArchiveSourceEntry());
+    *totalBytes = 0;
+    for (int32_t i = 0; i < count; ++i) {
+        if (!paths[i] || !names[i]) {
+            *error = "A source path or entry name is missing";
+            return false;
+        }
+        const std::string name = names[i];
+        CreateSource& src = sources[static_cast<size_t>(i)];
+        ArchiveSourceEntry& e = entries[static_cast<size_t>(i)];
+        src.vault = srcVol >= 0;
+        src.vol = srcVol;
+        src.path = paths[i];
+        e.modTimeEpochSeconds = modified ? modified[i] : 0;
+
+        bool isDir = hasDirectoryMarker(name);
+        if (!isDir && !src.vault) {
+            std::error_code ec;
+            isDir = fs::is_directory(toPath(src.path), ec);
+        }
+        if (isDir) {
+            e.pathInArchive = withoutDirectoryMarker(name);
+            e.isDirectory = true;
+            if (!src.vault && e.modTimeEpochSeconds <= 0) e.modTimeEpochSeconds = hostMtimeSeconds(toPath(src.path));
+            continue;
+        }
+
+        e.pathInArchive = name;
+        if (src.vault) {
+            const int64_t size = ve_get_file_size(srcVol, src.path.c_str());
+            if (size < 0) {
+                *error = "Source file not found in the vault: " + src.path;
+                return false;
+            }
+            src.size = static_cast<uint64_t>(size);
+        } else {
+            std::error_code ec;
+            const auto size = fs::file_size(toPath(src.path), ec);
+            if (ec) {
+                *error = "Source file not found: " + src.path;
+                return false;
+            }
+            src.size = static_cast<uint64_t>(size);
+            if (e.modTimeEpochSeconds <= 0) e.modTimeEpochSeconds = hostMtimeSeconds(toPath(src.path));
+        }
+        e.uncompressedSize = src.size;
+        e.readData = [s = &src](uint8_t* dest, size_t length) -> int64_t { return s->read(dest, length); };
+        *totalBytes += src.size;
+    }
+    return true;
+}
+
+// The archive's own spooling folder: 7z and ISO are assembled in a temporary file located through $TMPDIR (TEMP
+// and TMP on Windows). The caller picks a private folder; it is process-wide state, so it is set under a lock.
+void setSpoolFolder(const char* dir) {
+    if (!dir || !*dir) return;
+    static std::mutex mu;
+    std::lock_guard<std::mutex> g(mu);
+#ifdef _WIN32
+    _putenv_s("TMP", dir);
+    _putenv_s("TEMP", dir);
+#else
+    setenv("TMPDIR", dir, 1);
+#endif
+}
+
+// Names of the parts of one split archive: 7z NAME.7z.001, NAME.7z.002, ...; ZIP NAME.z01, NAME.z02, ... and
+// the last part NAME.zip (it is written as NAME.z<n> and renamed when the archive is complete).
+struct SplitNaming {
+    bool zip = false;
+    std::string base;  // 7z: the archive path; zip: the path without ".zip"
+
+    static SplitNaming forArchive(const std::string& archivePath, bool zip) {
+        SplitNaming n;
+        n.zip = zip;
+        n.base = archivePath;
+        if (zip && archivePath.size() >= 4) {
+            std::string tail = archivePath.substr(archivePath.size() - 4);
+            for (auto& c : tail) c = static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+            if (tail == ".zip") n.base = archivePath.substr(0, archivePath.size() - 4);
+        }
+        return n;
+    }
+    std::string working(uint32_t index) const {
+        char suffix[24];
+        std::snprintf(suffix, sizeof suffix, zip ? ".z%02u" : ".%03u", index + 1);
+        return base + suffix;
+    }
+    std::string finalName(uint32_t index, bool isLast) const { return (zip && isLast) ? base + ".zip" : working(index); }
+};
+
+// Parts written as host files next to each other. A part never replaces an existing file.
+class HostPartFiles {
+public:
+    explicit HostPartFiles(SplitNaming naming) : naming_(std::move(naming)) {}
+
+    bool open(uint32_t index) {
+        current_ = toPath(naming_.working(index));
+        std::error_code ec;
+        if (fs::exists(current_, ec)) return false;
+        if (current_.has_parent_path()) fs::create_directories(current_.parent_path(), ec);
+        out_.open(current_, std::ios::binary);
+        if (!out_.is_open()) return false;
+        created_.push_back(current_);
+        return true;
+    }
+    int64_t write(const uint8_t* data, size_t len) {
+        out_.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(len));
+        return out_ ? static_cast<int64_t>(len) : -1;
+    }
+    bool close(uint32_t index, bool isLast) {
+        out_.close();
+        if (out_.fail()) return false;
+        const fs::path finalPath = toPath(naming_.finalName(index, isLast));
+        if (finalPath == current_) return true;
+        std::error_code ec;
+        if (fs::exists(finalPath, ec)) return false;  // never replace a file
+        fs::rename(current_, finalPath, ec);
+        if (ec) return false;
+        created_.back() = finalPath;
+        return true;
+    }
+    void abort() {
+        if (out_.is_open()) out_.close();
+        std::error_code ec;
+        for (const auto& p : created_) fs::remove(p, ec);
+        created_.clear();
+    }
+    uint32_t count() const { return static_cast<uint32_t>(created_.size()); }
+
+private:
+    SplitNaming naming_;
+    fs::path current_;
+    std::ofstream out_;
+    std::vector<fs::path> created_;
+};
+
+// Parts written into an unlocked vault, finished (folder vaults) and renamed like the host ones.
+class VaultPartFiles {
+public:
+    VaultPartFiles(int32_t vol, SplitNaming naming) : vol_(vol), naming_(std::move(naming)), writer_(vol) {}
+
+    bool open(uint32_t index) {
+        current_ = naming_.working(index);
+        if (ve_get_file_size(vol_, current_.c_str()) >= 0) return false;  // never replace a file
+        if (created_.empty()) writer_.makeParents(current_);
+        offset_ = 0;
+        if (!writer_.begin(current_)) {
+            writer_.discard();
+            return false;
+        }
+        created_.push_back(current_);
+        return true;
+    }
+    int64_t write(const uint8_t* data, size_t len) {
+        if (!writer_.write(offset_, data, len)) return -1;
+        offset_ += len;
+        return static_cast<int64_t>(len);
+    }
+    bool close(uint32_t index, bool isLast) {
+        if (!writer_.finish()) return false;
+        const std::string finalPath = naming_.finalName(index, isLast);
+        if (finalPath == current_) return true;
+        if (ve_get_file_size(vol_, finalPath.c_str()) >= 0) return false;
+        if (ve_rename_file(vol_, current_.c_str(), finalPath.c_str()) != VE_OK) return false;
+        created_.back() = finalPath;
+        return true;
+    }
+    void abort() {
+        writer_.finish();
+        for (const auto& p : created_) ve_delete_file(vol_, p.c_str());
+        created_.clear();
+    }
+    uint32_t count() const { return static_cast<uint32_t>(created_.size()); }
+
+private:
+    int32_t vol_;
+    SplitNaming naming_;
+    VaultFileWriter writer_;
+    std::string current_;
+    uint64_t offset_ = 0;
+    std::vector<std::string> created_;
+};
+
 }  // namespace
 
 // ── scan ─────────────────────────────────────────────────────────────────
@@ -577,6 +842,117 @@ extern "C" VE_API int32_t ve_archive_extract_all(int32_t src_vol, const char* sr
         }
         p.head(res.status, cancelled ? kFlagCancelled : 0u, static_cast<uint32_t>(std::max(res.extractedCount, 0)),
                res.errorMessage);
+        return finishWithRecord(p, out);
+    } catch (const std::bad_alloc&) {
+        return VE_ERR_FAILED;
+    } catch (...) {
+        return VE_ERR_EXCEPTION;
+    }
+}
+
+// ── create ───────────────────────────────────────────────────────────────
+
+extern "C" VE_API int32_t ve_archive_create(int32_t src_vol, const char* const* src_paths,
+                                            const char* const* entry_names, const int64_t* modified_secs,
+                                            int32_t count, int32_t dest_vol, const char* dest_path, int32_t format,
+                                            const char* passphrase, int32_t encrypt_filenames,
+                                            int32_t compression_level, int32_t compression_method,
+                                            uint64_t split_size, const char* temp_dir, int32_t op_id,
+                                            ve_buffer* out) {
+    if (!src_paths || !entry_names || count < 1 || !dest_path || !*dest_path || !out) return VE_ERR_INVALID_ARG;
+    if (format < 0 || format > kLastFormat) return VE_ERR_INVALID_ARG;
+    out->data = nullptr;
+    out->len = 0;
+    try {
+        Packer p;
+        std::vector<CreateSource> sources;
+        std::vector<ArchiveSourceEntry> entries;
+        uint64_t totalBytes = 0;
+        std::string error;
+        if (!buildEntries(src_vol, src_paths, entry_names, modified_secs, count, sources, entries, &totalBytes,
+                          &error)) {
+            p.head(ArchiveOpenStatus::IoError, 0, 0, error);
+            return finishWithRecord(p, out);
+        }
+
+        setSpoolFolder(temp_dir);
+        bool cancelled = false;
+        auto progress = [&](uint64_t processed) -> bool {
+            if (op_id > 0) {
+                reportSplitJoinProgress(op_id, processed, totalBytes);
+                if (isSplitJoinCancelled(op_id) || isCopyCancelled(op_id)) {
+                    cancelled = true;
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        const std::string pass = passphraseOf(passphrase);
+        const bool toVault = dest_vol >= 0;
+        const std::string destPath = toVault ? trimSlashes(dest_path) : std::string(dest_path);
+        ArchiveCreateResult res;
+        uint32_t written = 0;
+
+        if (split_size > 0) {
+            const SplitNaming naming = SplitNaming::forArchive(destPath, format == 0 /* Zip */);
+            HostPartFiles hostParts(naming);
+            VaultPartFiles vaultParts(dest_vol, naming);
+            ArchivePartTarget target;
+            if (toVault) {
+                target.openPart = [&](uint32_t i) { return vaultParts.open(i); };
+                target.writePart = [&](const uint8_t* d, size_t n) { return vaultParts.write(d, n); };
+                target.closePart = [&](uint32_t i, bool last) { return vaultParts.close(i, last); };
+                target.abort = [&]() { vaultParts.abort(); };
+            } else {
+                target.openPart = [&](uint32_t i) { return hostParts.open(i); };
+                target.writePart = [&](const uint8_t* d, size_t n) { return hostParts.write(d, n); };
+                target.closePart = [&](uint32_t i, bool last) { return hostParts.close(i, last); };
+                target.abort = [&]() { hostParts.abort(); };
+            }
+            res = archiveCreateSplit(target, split_size, static_cast<ArchiveFormat>(format), entries, pass,
+                                     encrypt_filenames != 0, progress, compression_level,
+                                     toCompressionMethod(compression_method));
+            written = res.partCount;
+        } else {
+            HostFileWriter host;
+            VaultFileWriter vault(dest_vol);
+            bool began = false;
+            if (toVault) {
+                vault.makeParents(destPath);
+                began = vault.begin(destPath);
+            } else {
+                began = host.begin(toPath(destPath));
+            }
+            if (!began) {
+                if (toVault) vault.discard(); else host.discard();
+                p.head(ArchiveOpenStatus::IoError, 0, 0, "Could not create the destination file");
+                return finishWithRecord(p, out);
+            }
+            uint64_t offset = 0;
+            ArchiveSink sink;
+            sink.write = [&](const uint8_t* d, size_t n) -> int64_t {
+                const bool ok = toVault ? vault.write(offset, d, n) : host.write(d, n);
+                if (!ok) return -1;
+                offset += n;
+                return static_cast<int64_t>(n);
+            };
+            res = archiveCreate(sink, static_cast<ArchiveFormat>(format), entries, pass, encrypt_filenames != 0,
+                                progress, compression_level, toCompressionMethod(compression_method));
+            bool committed = res.status == ArchiveOpenStatus::Ok;
+            if (committed) committed = toVault ? vault.finish() : host.close();
+            if (!committed) {
+                if (toVault) vault.discard(); else host.discard();  // a failed or cancelled archive leaves nothing
+                if (res.status == ArchiveOpenStatus::Ok) {
+                    res.status = ArchiveOpenStatus::IoError;
+                    res.errorMessage = "Could not write the archive";
+                }
+            }
+            written = committed ? 1 : 0;
+        }
+
+        // Whatever the archive stopped reading before the end (failure, cancel) is released with `sources`.
+        p.head(res.status, cancelled ? kFlagCancelled : 0u, written, res.errorMessage);
         return finishWithRecord(p, out);
     } catch (const std::bad_alloc&) {
         return VE_ERR_FAILED;

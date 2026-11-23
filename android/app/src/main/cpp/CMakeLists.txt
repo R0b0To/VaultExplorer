@@ -709,6 +709,7 @@ if(VAULTEXPLORER_DESKTOP)
             ffi/ve_foldervault.cpp
             ffi/ve_callbacks.cpp
             ffi/ve_archive.cpp
+            ffi/ve_repair.cpp
             ffi/ve_mount_fs.cpp
             ffi/ve_mount_fuse.cpp)
     if(WIN32)

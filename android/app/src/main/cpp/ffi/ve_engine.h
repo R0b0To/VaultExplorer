@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 10 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 11 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -452,6 +452,31 @@ VE_API int32_t ve_fv_finish_write(int32_t vol_id, const char* path);
 /* Brackets a burst of writes (kind 0) or deletes (kind 1) so the vault can defer index work. */
 VE_API int32_t ve_fv_batch(int32_t vol_id, int32_t kind, int32_t begin);
 
+/* Check & Repair for folder vaults (foldervault/fv_check.h). format: VE_FV_*; root: the vault folder. password
+ * (UTF-8, may be NULL/0 for a structure-only check; a repair needs credentials) or session_vol >= 0, the slot of
+ * the same vault unlocked in this process -- its keys are used instead of the password and never leave the process.
+ * op_id > 0 streams the step log as VE_EVENT_REPAIR_LOG. Returns VE_OK with a record (little-endian, a string is
+ * u32 length + UTF-8):
+ *     u32 outcome     0 ok, 1 wrong password, 2 not a vault / refused
+ *     string message  why, when outcome != 0
+ *   check, outcome 0:   u32 files scanned, u32 deep scan (0/1), issues
+ *   repair, outcome 0:  u32 fixed, u32 recovered (moved to /LOST+FOUND), u32 removed, issues (what is still wrong)
+ *   issues:             u32 count, then count x { u32 severity (0 info, 1 warning, 2 critical), string path,
+ *                       string message }
+ * Free the buffer with ve_buffer_free. */
+VE_API int32_t ve_fv_check(int32_t format, const char* root, const uint8_t* password, int32_t password_len,
+                           int32_t session_vol, const char* local_state_dir, const char* temp_dir, int32_t op_id,
+                           ve_buffer* out);
+VE_API int32_t ve_fv_repair(int32_t format, const char* root, const uint8_t* password, int32_t password_len,
+                            int32_t session_vol, const char* local_state_dir, const char* temp_dir, int32_t op_id,
+                            ve_buffer* out);
+/* The file that holds a folder vault's key material (gocryptfs.conf, masterkey.cryptomator, cryfs.config), UTF-8
+ * without a terminator. */
+VE_API int32_t ve_fv_config_file_name(int32_t format, ve_buffer* out);
+/* Password-free structural check of a config file's bytes: VE_OK when it parses as a genuine config of that
+ * format, VE_ERR_FAILED with the reason in *reason when it does not. */
+VE_API int32_t ve_fv_validate_config(int32_t format, const uint8_t* bytes, int32_t len, ve_buffer* reason);
+
 /* ---- random-access writes (block containers) ------------------------------------------------------
  * ve_write_file_chunk keeps its historical meaning (a write at offset 0 REPLACES the file). The two calls
  * below are for callers that need ordinary file semantics -- the OS mount layer.
@@ -464,6 +489,35 @@ VE_API int32_t ve_fv_batch(int32_t vol_id, int32_t kind, int32_t begin);
 VE_API int32_t ve_write_file_at(int32_t vol_id, const char* path, int64_t offset, const uint8_t* data, size_t len);
 VE_API int32_t ve_truncate(int32_t vol_id, const char* path, int64_t size);
 VE_API int32_t ve_create_empty_file(int32_t vol_id, const char* path);
+
+/* ---- Check & Repair, header backup (unmounted container files and mounted volumes) -------------
+ * Every fd is a descriptor from ve_open_file and is CLOSED by the call on every path (ownership transfers, like
+ * the keyfile fds of ve_unlock). op_id > 0 streams the step-by-step log as VE_EVENT_REPAIR_LOG; <= 0 skips it.
+ * Every call returns VE_OK when it ran and filled its outputs, VE_ERR_INVALID_ARG for bad arguments. */
+
+/* code_out: RepairDiagnosisCode (0 healthy, 1 header corrupted, 2 file system dirty). format_out: ContainerFormat
+ * (0 VeraCrypt, 1 LUKS1, 2 LUKS2, 3 BitLocker, 4 plain) or -1 when the file is not recognised. */
+VE_API int32_t ve_repair_diagnose_file(int32_t fd, int32_t op_id, int32_t* code_out, int32_t* format_out);
+/* LUKS2: restore the primary header from the checksum-verified secondary copy. VE_OK restored, VE_ERR_FAILED not. */
+VE_API int32_t ve_repair_restore_luks2(int32_t fd, int32_t op_id);
+/* VeraCrypt/TrueCrypt: restore the primary header from the backup header that verifies against the password.
+ * cipher_id / hash_id 255 auto-detect. result_out: 0 success, 1 wrong password, 2 already healthy, 3 I/O error. */
+VE_API int32_t ve_repair_restore_veracrypt(int32_t fd, const uint8_t* password, int32_t password_len, int32_t pim,
+                                           int32_t cipher_id, int32_t hash_id, int32_t op_id, int32_t* result_out);
+/* A mounted volume's file system: code_out as above (never 1); check: ok_out 1 when it is clean or was repaired. */
+VE_API int32_t ve_repair_diagnose_mounted(int32_t vol_id, int32_t op_id, int32_t* code_out);
+VE_API int32_t ve_repair_check_mounted(int32_t vol_id, int32_t op_id, int32_t* ok_out);
+/* Header backup export. Record (little-endian): u32 result (0 ok, 1 unrecognised file, 2 unsupported format,
+ * 3 header unreadable, 4 I/O error), u32 ContainerFormat (0xFFFFFFFF when not meaningful), u32 payload length,
+ * payload bytes. */
+VE_API int32_t ve_header_export(int32_t fd, int32_t op_id, ve_buffer* out);
+/* Header restore: format is ContainerFormat (0 VeraCrypt, 1 LUKS1, 2 LUKS2). password/keyfile_fds only matter for
+ * VeraCrypt (the keyfile fds are mixed into the password and closed). result_out: 0 success, 1 wrong password,
+ * 2 backup invalid, 3 target smaller than the backup, 4 I/O error. */
+VE_API int32_t ve_header_restore(int32_t fd, int32_t format, const uint8_t* payload, int32_t payload_len,
+                                 const uint8_t* password, int32_t password_len, int32_t pim, int32_t cipher_id,
+                                 int32_t hash_id, int32_t op_id, const int32_t* keyfile_fds, int32_t keyfile_count,
+                                 int32_t* result_out);
 
 /* ---- archives -----------------------------------------------------------------------------------
  * Reads zip, 7z, rar, tar.*, iso and cpio archives, including split sets (name.7z.001, name.z01 + name.zip --
@@ -498,6 +552,26 @@ VE_API int32_t ve_archive_extract_entry(int32_t src_vol, const char* src_path, i
 VE_API int32_t ve_archive_extract_all(int32_t src_vol, const char* src_path, const char* passphrase,
                                       const char* sub_path, int32_t dest_vol, const char* dest_dir,
                                       int32_t op_id, ve_buffer* out);
+
+/* Creates an archive (format = ArchiveFormat: 0 zip, 1 7z, 2 tar, 3 tar.gz, 4 tar.bz2, 5 tar.xz, 6 tar.zst,
+ * 7 tar.lzma, 8 iso, 9 cpio). `count` sources, each a path (src_paths[i]: a vault path when src_vol >= 0,
+ * otherwise a host path) stored under entry_names[i]; a name ending in '/' (or a host folder) is a folder entry.
+ * modified_secs may be NULL; a value <= 0 takes the host file's own modification time. The archive goes to
+ * dest_path: a host file (dest_vol < 0, replaced if it exists) or a vault file (dest_vol >= 0).
+ * split_size > 0 (zip and 7z only, 64 KiB .. 4 GiB - 2) writes parts instead -- 7z: <dest>.001, .002, ...;
+ * zip: <dest without .zip>.z01, .z02, ..., and the last part <dest without .zip>.zip -- and never replaces a file.
+ * compression_level -1 is the library default, 0 store, 1..9; compression_method 0 is the format's own codec
+ * (1 Deflate, 2 LZMA, 3 LZMA2). The 7z and ISO writers assemble the archive in a temporary file: temp_dir (NULL to
+ * leave the process setting alone) is where it goes ($TMPDIR, or TMP/TEMP on Windows), and it should be private.
+ * Progress is VE_EVENT_SPLITJOIN_PROGRESS in SOURCE bytes (n0 done, n1 total); ve_op_cancel(op_id) stops the run.
+ * A failed or cancelled run removes what it wrote. The record's count is the number of files written (1, or the
+ * number of parts); bit 2 of its flags is set when the run was cancelled. */
+VE_API int32_t ve_archive_create(int32_t src_vol, const char* const* src_paths, const char* const* entry_names,
+                                 const int64_t* modified_secs, int32_t count, int32_t dest_vol,
+                                 const char* dest_path, int32_t format, const char* passphrase,
+                                 int32_t encrypt_filenames, int32_t compression_level,
+                                 int32_t compression_method, uint64_t split_size, const char* temp_dir,
+                                 int32_t op_id, ve_buffer* out);
 
 /* ---- OS mounts (Linux: FUSE 3; Windows: WinFsp, not built yet) -------------------------------------
  * Exposes an unlocked slot as a real folder / drive so any application and the file manager can use it --

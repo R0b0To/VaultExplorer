@@ -109,23 +109,6 @@ const Set<String> desktopAndroidOnlyMethods = {
 /// Methods that SHOULD work on desktop and are planned, grouped by the phase that delivers them.
 /// Each one answers `null` today; when a phase lands, move its methods out of this set.
 const Set<String> desktopPendingMethods = {
-  // Phase 1a, second half -- creating archives. Browsing, extracting, staging and the pickers are done
-  // (ve_archive_* in ffi/ve_archive.cpp, desktop_archive.dart).
-  'archiveCreate',
-
-  // Phase 1b -- Check & Repair and header backup.
-  'checkFolderVault',
-  'diagnoseMountedVolumeFilesystem',
-  'diagnoseUnmountedContainerFile',
-  'exportContainerHeader',
-  'pickFolderVaultForRepair',
-  'repairFolderVault',
-  'resolveFolderVaultConfigFile',
-  'restoreBackupHeaderUnmounted',
-  'restoreContainerHeaderRegion',
-  'restoreFolderVaultConfig',
-  'runMountedVolumeFilesystemCheck',
-
   // Phase 1c -- container expansion and hidden volumes.
   'analyzeHiddenVolumeHost',
   'createHiddenVolumeInExisting',

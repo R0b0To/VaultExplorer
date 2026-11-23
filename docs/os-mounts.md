@@ -112,7 +112,7 @@ directories (`ve_mount_test places`, and through the real-mount test).
    sidebar shows nothing, check that `~/.local/share/user-places.xbel` (Dolphin) or
    `~/.config/gtk-3.0/bookmarks` exists -- they are only edited when they already exist.
 6. The app and the engine must agree on the ABI: `kVeAbiVersion` in `ve_native.dart` must equal
-   `VE_ABI_VERSION` in `ve_engine.h` (both 10).
+   `VE_ABI_VERSION` in `ve_engine.h` (both 11).
 
 ## Windows (WinFsp) specifics
 

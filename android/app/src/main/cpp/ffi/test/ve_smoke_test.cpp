@@ -17,6 +17,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -928,6 +930,80 @@ static void runFolderVaults() {
         CHECK_RC(ve_write_file_chunk(kFvVol, "/docs/nope.txt", 0, (const uint8_t*)"x", 1), VE_ERR_READ_ONLY);
         CHECK(readAll(kFvVol, "/docs/renamed.txt") == payload);
         ve_lock(kFvVol);
+
+        // Check & Repair and the config-file helpers through the ABI
+        {
+            struct FvCheck {
+                int32_t rc = -1;
+                uint32_t outcome = 99;
+                std::string message;
+                uint32_t scanned = 0, deep = 0, issues = 0;
+            };
+            auto runCheck = [&](const char* pw, int32_t session, bool repair) {
+                FvCheck r;
+                ve_buffer rec{};
+                const uint8_t* p = (const uint8_t*)pw;
+                const int32_t n = pw ? (int32_t)std::strlen(pw) : 0;
+                r.rc = repair ? ve_fv_repair(fmt, root.c_str(), p, n, session, stateDir.c_str(), tmpDir.c_str(), 0, &rec)
+                              : ve_fv_check(fmt, root.c_str(), p, n, session, stateDir.c_str(), tmpDir.c_str(), 0, &rec);
+                size_t pos = 0;
+                auto u32 = [&]() {
+                    uint32_t v = 0;
+                    for (int i = 0; i < 4 && pos < rec.len; ++i) v |= (uint32_t)rec.data[pos++] << (8 * i);
+                    return v;
+                };
+                if (r.rc == VE_OK && rec.data) {
+                    r.outcome = u32();
+                    const uint32_t len = u32();
+                    if (pos + len <= rec.len) r.message.assign((const char*)rec.data + pos, len);
+                    pos += len;
+                    if (r.outcome == 0 && !repair) {
+                        r.scanned = u32();
+                        r.deep = u32();
+                        r.issues = u32();
+                    }
+                }
+                ve_buffer_free(&rec);
+                return r;
+            };
+
+            FvCheck c = runCheck(nullptr, -1, false);  // structure only: no credentials
+            CHECK(c.rc == VE_OK && c.outcome == 0 && c.deep == 0);
+            c = runCheck("definitely wrong", -1, false);
+            CHECK(c.rc == VE_OK && c.outcome == 1);  // wrong password
+            c = runCheck(kPassword, -1, false);        // deep scan with the password
+            CHECK(c.rc == VE_OK && c.outcome == 0 && c.deep == 1 && c.scanned >= 1);
+            c = runCheck(nullptr, kFvVol, false);      // a session that is not open
+            CHECK(c.rc == VE_OK && c.outcome == 2 && !c.message.empty());
+            c = runCheck(nullptr, -1, true);           // a repair is refused without credentials
+            CHECK(c.rc == VE_OK && c.outcome == 1);
+
+            // the unlocked slot as the credential
+            CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                                  nullptr, 0, 1, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                     VE_OK);
+            ve_buffer_free(&msg);
+            c = runCheck(nullptr, kFvVol, false);
+            CHECK(c.rc == VE_OK && c.outcome == 0 && c.deep == 1);
+            ve_lock(kFvVol);
+
+            // config file name, and validation of the real file and of garbage
+            ve_buffer name{};
+            CHECK_RC(ve_fv_config_file_name(fmt, &name), VE_OK);
+            const std::string cfgName(name.data ? (const char*)name.data : "", name.len);
+            ve_buffer_free(&name);
+            CHECK(cfgName == (fmt == 0 ? "gocryptfs.conf" : fmt == 1 ? "masterkey.cryptomator" : "cryfs.config"));
+            std::ifstream cfg(root + "/" + cfgName, std::ios::binary);
+            const std::string cfgBytes((std::istreambuf_iterator<char>(cfg)), std::istreambuf_iterator<char>());
+            CHECK(!cfgBytes.empty());
+            ve_buffer why{};
+            CHECK_RC(ve_fv_validate_config(fmt, (const uint8_t*)cfgBytes.data(), (int32_t)cfgBytes.size(), &why), VE_OK);
+            ve_buffer_free(&why);
+            CHECK_RC(ve_fv_validate_config(fmt, (const uint8_t*)"not a config", 12, &why), VE_ERR_FAILED);
+            CHECK(why.len > 0);
+            ve_buffer_free(&why);
+            CHECK_RC(ve_fv_config_file_name(7, &name), VE_ERR_INVALID_ARG);
+        }
 
         // password change
         CHECK_RC(ve_fv_change_password(fmt, root.c_str(), (const uint8_t*)"nope nope", 9,

@@ -3,14 +3,31 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
-**Update for v1.66.0 (ABI 10).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
-library is at `VE_ABI_VERSION` 10 (`ffi/ve_engine.h`; ABI 10 adds the `ve_archive_*` calls). Method coverage is now measured, not counted by hand:
+**Update for v1.66.0 (ABI 11).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
+library is at `VE_ABI_VERSION` 11 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls). Method coverage is now measured, not counted by hand:
 `test/core/engine/desktop/desktop_method_coverage_test.dart` diffs `ChannelMethods` against the host, the crypto
 handler, the Android-only defaults and the two explicit lists in `lib/core/engine/desktop/desktop_method_support.dart`
 (see "Engine-channel coverage" under "Not yet"). CI (`ci.yml`, job `desktop_engine_linux`) now builds the Linux engine,
 runs `ve_smoke_test` and `ve_mount_test`, and builds the Linux app.
 
-**Archives (Phase 1a, browsing and extraction).** `ffi/ve_archive.cpp` exposes the archive engine that was already compiled
+**Check & Repair and header backup (Phase 1b).** `ffi/ve_repair.cpp` wraps `containers/container_repair.cpp` (diagnose and
+restore an unmounted container file, diagnose and check a mounted volume's file system, export and restore the header
+region) and `ffi/ve_foldervault.cpp` gains `ve_fv_check` / `ve_fv_repair` over `foldervault/fv_check.cpp` plus
+`ve_fv_config_file_name` / `ve_fv_validate_config`. The fd-taking calls close the descriptor they are given, exactly like
+the JNI layer; the worker isolate opens the files (so no descriptor crosses an isolate or leaks) and keyfile descriptors are
+opened before the target's. `DesktopRepair` (`desktop_repair.dart`) is what `RepairHandlers.kt`,
+`HeaderBackupHandlers.kt` and `FolderVaultChecker.kt` do around the native calls: argument mapping, the outcome-to-error-code
+mapping (`PASSWORD_INCORRECT`, `PASSWORD_REQUIRED`, `INVALID_VAULT`, `BACKUP_INVALID`, `SIZE_MISMATCH`,
+`UNRECOGNIZED_FILE`, `HEADER_UNREADABLE`, ...), the report maps, and the config-file restore (validated, then written beside
+the vault's copy and renamed over it). The live repair log is `VE_EVENT_REPAIR_LOG`, forwarded to Dart as `onRepairLog`.
+A mounted folder vault is used as the credential by slot (`session_vol`), so its keys never leave the process. The folder
+vault is addressed by path and CryFS gets the same `localStateDir` / `tempDir` as unlock. Tested by
+`desktop_repair_test.dart` (fake engine) and the folder-vault section of `ve_smoke_test` (check structure-only / wrong password
+/ deep / slot credential, refused repair without credentials, config name and validation, for all three formats). Not yet
+exercised here: the container-file calls against real VeraCrypt/LUKS files (the engine's own tests cover container_repair),
+and Windows (`container_repair.cpp` uses `pread` on a CRT descriptor; Phase 3 verifies that path).
+
+**Archives (Phase 1a).** `ffi/ve_archive.cpp` exposes the archive engine that was already compiled
 into the desktop library: `ve_archive_scan`, `ve_archive_extract_entry` (to memory, a host file or a vault file) and
 `ve_archive_extract_all` (to a host folder or a vault folder, with progress and cancel). A source is a vault file or a host
 file; split sets (`.7z.001`, `.z01` + `.zip`) are found next to the opened file with `std::filesystem` or `ve_list_directory`.
@@ -22,9 +39,19 @@ place a plaintext file exists: a private, owner-only directory under `$XDG_RUNTI
 `archive_browse_*` files directly inside it can be discarded, removed when the vault locks and at shutdown, purged after a
 crash. Tested by `ve_archive_test` (CMake host test, real libarchive, fake vault: short stream reads, split sets,
 folder-vault finish semantics, cancel and failure cleanup; also clean under ASan/UBSan) and
-`desktop_archive_test.dart`. Not done yet: `archiveCreate` (vault/local to file, split), and per-filesystem name
-sanitising when extracting to Windows (reserved names, `?*"<>|`) -- the engine rejects `..` and `:` but the host
-refuses a name its file system cannot hold, which fails that extraction.
+`desktop_archive_test.dart`.
+
+`ve_archive_create` writes archives from vault or host sources into a host file or a vault file, or as split parts
+(zip `name.z01 ... name.zip`, 7z `name.7z.001 ...`; a part never replaces an existing file, and a failed or cancelled
+run removes what it wrote). Sources are opened only while the archive is working on them. The 7z and ISO writers assemble
+their output in a temporary file found through `$TMPDIR` (`TMP`/`TEMP` on Windows), so the call takes a `temp_dir`:
+`DesktopArchive.createArchive` makes a private folder under the system temp directory for the duration of the call and
+removes it afterwards (Android points the same variable at its app cache). Progress is in source bytes, as on Android.
+Known gaps: per-filesystem name sanitising when extracting to Windows (reserved names, `?*"<>|`) -- the engine rejects
+`..` and `:`, but a name the host file system cannot hold fails that extraction; and, observed with libarchive 3.7.2 under
+LeakSanitizer, a cancelled ZIP creation leaks about 280 KB inside the engine's cancel path (`archive_write_fail` followed
+by `archive_write_free` in `archiveCreate`; the vendored libarchive was not checked, and the engine is shared with
+Android, so it is not changed here).
 
 **Rebased onto the latest v1.50.0 main** (the second 1.50.0 snapshot, which adds in-place ext/NTFS grow, Cryptomator
 symlinks, the Cryptomator key-file backup option and the format probe). The port was first written against v1.39.0;
@@ -323,11 +350,11 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 
 ## Not yet
 
-- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 130 of them (including the
+- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 142 of them (including the
   crypto primitives), gives 42 more an Android-only default (`_androidOnlyDefaults`), lists 66 as Android-only
   (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, USB, SAF, APK install, Jetpack PDF, ...)
-  and 43 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them: archive creation, repair and header
-  backup, expansion and hidden volumes, composite/split containers, AVIF, PDF, comic/EPUB, image probing, audio/video
+  and 31 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them:
+  expansion and hidden volumes, composite/split containers, AVIF, PDF, comic/EPUB, image probing, audio/video
   editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
   stays true; run it to see the current numbers. These counts cover the one engine channel only. Camera, Media3,
   picture-in-picture, brightness, panorama, disguise mode and the platform views use their own channels, which the
@@ -343,7 +370,7 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
   ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.
 - Windows: folder vaults on a real Windows machine (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
   MinGW, and re-running the engine smoke test after the rebase.
-- Archive creation, PDF, camera, video/audio editing -- need their
+- PDF, camera, video/audio editing -- need their
   desktop backends (they are platform code on Android). Video **playback** and **thumbnails** are done (below);
   scrub-preview frames, picture-in-picture and background playback / media session are not.
 - Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification

@@ -22,8 +22,11 @@
 #include <set>
 
 #include "crypto/user_entropy.h"
+#include "foldervault/fv_check.h"
+#include "foldervault/fv_formats.h"
 #include "foldervault/fv_storage.h"
 #include "foldervault/fv_vault.h"
+#include "platform/engine_hooks.h"
 #include "jni_callbacks.h"
 
 extern "C" int ve_log_enabled(void);
@@ -647,6 +650,149 @@ extern "C" VE_API int32_t ve_fv_batch(int32_t vol_id, int32_t kind, int32_t begi
     FV_CATCH(VE_ERR_EXCEPTION, nullptr)
 }
 
+// ── check & repair ─────────────────────────────────────────────────────────────────────────────
+
+namespace {
+
+bool wireToVaultFormat(int32_t wire, fv::VaultFormat& out) {
+    switch (wire) {
+        case VE_FV_GOCRYPTFS: out = fv::VaultFormat::Gocryptfs; return true;
+        case VE_FV_CRYPTOMATOR: out = fv::VaultFormat::Cryptomator; return true;
+        case VE_FV_CRYFS: out = fv::VaultFormat::Cryfs; return true;
+    }
+    return false;
+}
+
+void putString(std::vector<uint8_t>& out, const std::string& s) {
+    putU32(out, static_cast<uint32_t>(s.size()));
+    out.insert(out.end(), s.begin(), s.end());
+}
+
+void putIssues(std::vector<uint8_t>& out, const std::vector<fv::check::Issue>& issues) {
+    putU32(out, static_cast<uint32_t>(issues.size()));
+    for (const auto& i : issues) {
+        putU32(out, static_cast<uint32_t>(i.severity));
+        putString(out, i.path);
+        putString(out, i.message);
+    }
+}
+
+int32_t outcomeCode(fv::check::Outcome o) {
+    return o == fv::check::Outcome::Ok ? 0 : o == fv::check::Outcome::WrongPassword ? 1 : 2;
+}
+
+// Shared body of ve_fv_check / ve_fv_repair: build the storage and credentials, run, pack the record.
+int32_t checkOrRepair(bool repair, int32_t format, const char* root, const uint8_t* password, int32_t password_len,
+                      int32_t session_vol, const char* local_state_dir, const char* temp_dir, int32_t op_id,
+                      ve_buffer* out) {
+    if (!out) return VE_ERR_INVALID_ARG;
+    out->data = nullptr;
+    out->len = 0;
+    if (!root || password_len < 0 || (password_len > 0 && !password)) return VE_ERR_INVALID_ARG;
+
+    std::vector<uint8_t> rec;
+    auto refuse = [&](const std::string& message) {
+        putU32(rec, 2);
+        putString(rec, message);
+        return emitBuffer(rec.data(), rec.size(), out) ? VE_OK : VE_ERR_FAILED;
+    };
+
+    fv::VaultFormat vf;
+    if (!wireToVaultFormat(format, vf)) return refuse("Unsupported folder vault format.");
+    try {
+        ensureInit();
+
+        // The unlocked vault of this same folder, when the caller has one: its keys are used inside the process
+        // instead of the password. A session of another format is ignored (the password path is used).
+        std::shared_ptr<fv::Vault> session;
+        if (session_vol >= 0) {
+            session = vaultOf(session_vol);
+            if (!session) {
+                return refuse(repair ? "This vault isn't open anymore -- pick it again and enter its password to repair."
+                                     : "This vault isn't open anymore -- pick it again and enter its password for a deep scan.");
+            }
+            if (session->format() != vf) session.reset();
+        }
+
+        fv::PosixStorage st(root);
+        fv::check::Credentials cr;
+        if (password_len > 0) {
+            cr.password = password;
+            cr.passwordLen = static_cast<size_t>(password_len);
+        }
+        cr.session = session.get();
+        fv::check::Hooks hooks;
+        if (op_id > 0) hooks.log = [op_id](const std::string& m) { reportRepairLog(op_id, m.c_str()); };
+        const fv::HostEnv env = makeEnv(local_state_dir, temp_dir);
+
+        if (repair) {
+            const fv::check::RepairResult r = fv::check::repairVault(vf, st, cr, env, hooks);
+            st.close();
+            putU32(rec, static_cast<uint32_t>(outcomeCode(r.outcome)));
+            putString(rec, r.message);
+            if (r.outcome == fv::check::Outcome::Ok) {
+                putU32(rec, static_cast<uint32_t>(r.report.fixed));
+                putU32(rec, static_cast<uint32_t>(r.report.recovered));
+                putU32(rec, static_cast<uint32_t>(r.report.removed));
+                putIssues(rec, r.report.remaining);
+            }
+        } else {
+            const fv::check::CheckResult r = fv::check::checkVault(vf, st, cr, env, hooks);
+            st.close();
+            putU32(rec, static_cast<uint32_t>(outcomeCode(r.outcome)));
+            putString(rec, r.message);
+            if (r.outcome == fv::check::Outcome::Ok) {
+                putU32(rec, static_cast<uint32_t>(r.report.filesScanned));
+                putU32(rec, r.report.deepScan ? 1u : 0u);
+                putIssues(rec, r.report.issues);
+            }
+        }
+        return emitBuffer(rec.data(), rec.size(), out) ? VE_OK : VE_ERR_FAILED;
+    } catch (const std::exception& e) {
+        rec.clear();
+        return refuse(e.what());
+    } catch (...) {
+        rec.clear();
+        return refuse("unexpected error in the folder-vault core");
+    }
+}
+
+}  // namespace
+
+extern "C" VE_API int32_t ve_fv_check(int32_t format, const char* root, const uint8_t* password, int32_t password_len,
+                                      int32_t session_vol, const char* local_state_dir, const char* temp_dir,
+                                      int32_t op_id, ve_buffer* out) {
+    return checkOrRepair(false, format, root, password, password_len, session_vol, local_state_dir, temp_dir, op_id, out);
+}
+
+extern "C" VE_API int32_t ve_fv_repair(int32_t format, const char* root, const uint8_t* password, int32_t password_len,
+                                       int32_t session_vol, const char* local_state_dir, const char* temp_dir,
+                                       int32_t op_id, ve_buffer* out) {
+    return checkOrRepair(true, format, root, password, password_len, session_vol, local_state_dir, temp_dir, op_id, out);
+}
+
+extern "C" VE_API int32_t ve_fv_config_file_name(int32_t format, ve_buffer* out) {
+    if (!out) return VE_ERR_INVALID_ARG;
+    out->data = nullptr;
+    out->len = 0;
+    fv::VaultFormat vf;
+    if (!wireToVaultFormat(format, vf)) return VE_ERR_INVALID_ARG;
+    const std::string name = fv::configFileName(vf);
+    return emitBuffer(reinterpret_cast<const uint8_t*>(name.data()), name.size(), out) ? VE_OK : VE_ERR_FAILED;
+}
+
+extern "C" VE_API int32_t ve_fv_validate_config(int32_t format, const uint8_t* bytes, int32_t len, ve_buffer* reason) {
+    if (reason) { reason->data = nullptr; reason->len = 0; }
+    fv::VaultFormat vf;
+    if (!wireToVaultFormat(format, vf) || len < 0 || (len > 0 && !bytes)) return VE_ERR_INVALID_ARG;
+    FV_TRY
+    std::string why;
+    if (fv::validateConfigFile(vf, fv::Bytes(bytes, bytes + len), why)) return VE_OK;
+    setMessage(reason, why.empty() ? "This isn't a valid config file for this vault format." : why);
+    return VE_ERR_FAILED;
+    FV_CATCH(VE_ERR_EXCEPTION, reason)
+}
+
 #else  // VE_NO_FOLDERVAULT ─────────────────────────────────────────────────────────────────────
 // Windows (for now): no folder-vault storage backend. Slots are never folder vaults, and the
 // ve_fv_* entry points fail cleanly so the Dart side can say "not supported on this platform".
@@ -727,5 +873,24 @@ extern "C" VE_API int32_t ve_fv_probe_cryptomator(const char*, int32_t* code_out
 extern "C" VE_API int32_t ve_fv_hidden_entry_count(int32_t, const char*) { return -VE_ERR_NOT_UNLOCKED; }
 extern "C" VE_API int32_t ve_fv_finish_write(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
 extern "C" VE_API int32_t ve_fv_batch(int32_t, int32_t, int32_t) { return VE_ERR_NOT_UNLOCKED; }
+
+extern "C" VE_API int32_t ve_fv_check(int32_t, const char*, const uint8_t*, int32_t, int32_t, const char*, const char*,
+                                      int32_t, ve_buffer* out) {
+    clearBuf(out);
+    return VE_ERR_FAILED;
+}
+extern "C" VE_API int32_t ve_fv_repair(int32_t, const char*, const uint8_t*, int32_t, int32_t, const char*, const char*,
+                                       int32_t, ve_buffer* out) {
+    clearBuf(out);
+    return VE_ERR_FAILED;
+}
+extern "C" VE_API int32_t ve_fv_config_file_name(int32_t, ve_buffer* out) {
+    clearBuf(out);
+    return VE_ERR_FAILED;
+}
+extern "C" VE_API int32_t ve_fv_validate_config(int32_t, const uint8_t*, int32_t, ve_buffer* reason) {
+    unsupported(reason);
+    return VE_ERR_FAILED;
+}
 
 #endif  // VE_NO_FOLDERVAULT

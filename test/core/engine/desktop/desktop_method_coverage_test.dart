@@ -126,19 +126,37 @@ void main() {
       expect(phase0.where((m) => !answered.contains(m)), isEmpty);
     });
 
-    test('the Phase 1a browsing and extraction methods are really answered on desktop', () {
+    test('the Phase 1a archive methods are really answered on desktop', () {
       const archives = [
         'archiveScanVault',
         'archiveScanLocal',
         'archiveExtractVaultEntry',
         'archiveExtractLocalEntry',
         'archiveExtractVaultAll',
+        'archiveCreate',
         'archiveStageBrowseEntry',
         'archiveDiscardBrowseFile',
         'pickArchiveFile',
         'pickExtractFolder',
       ];
       expect(archives.where((m) => !handled.contains(m)), isEmpty);
+    });
+
+    test('the Phase 1b Check & Repair and header backup methods are really answered on desktop', () {
+      const repairs = [
+        'diagnoseUnmountedContainerFile',
+        'diagnoseMountedVolumeFilesystem',
+        'restoreBackupHeaderUnmounted',
+        'runMountedVolumeFilesystemCheck',
+        'checkFolderVault',
+        'repairFolderVault',
+        'pickFolderVaultForRepair',
+        'exportContainerHeader',
+        'restoreContainerHeaderRegion',
+        'resolveFolderVaultConfigFile',
+        'restoreFolderVaultConfig',
+      ];
+      expect(repairs.where((m) => !handled.contains(m)), isEmpty);
     });
 
     test('summary', () {

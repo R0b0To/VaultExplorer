@@ -34,6 +34,7 @@ import 'desktop_images.dart';
 import 'desktop_media_server.dart';
 import 'desktop_method_support.dart';
 import 'desktop_mounts.dart';
+import 'desktop_repair.dart';
 import 'desktop_secure_store.dart';
 import 'desktop_storage.dart';
 import 'desktop_split_join.dart';
@@ -84,6 +85,14 @@ class DesktopEngineHost {
     isFolderVault: (vol) => _meta[vol]?.isFolderVault ?? false,
     registerOp: (opId) => _nativeLocal.opRegister(opId, veOpCopy),
     unregisterOp: (opId) => _nativeLocal.opUnregister(opId),
+    withActivity: (body) => _withActivity<Object?>(body),
+  );
+
+  /// Check & Repair and the header backup tool (see desktop_repair.dart).
+  late final DesktopRepair _repair = DesktopRepair(
+    call: pool.call,
+    folderVaultStateDir: _folderVaultStateDir,
+    tempDir: Directory.systemTemp.path,
     withActivity: (body) => _withActivity<Object?>(body),
   );
 
@@ -223,6 +232,31 @@ class DesktopEngineHost {
         return _archive.discardBrowseFile(args['path']);
       case ChannelMethods.archiveExtractVaultAll:
         return _archive.extractAll(args);
+      case ChannelMethods.archiveCreate:
+        return _archive.createArchive(args);
+      case ChannelMethods.diagnoseUnmountedContainerFile:
+        return _repair.diagnoseUnmounted(args);
+      case ChannelMethods.diagnoseMountedVolumeFilesystem:
+        return _repair.diagnoseMounted(args);
+      case ChannelMethods.restoreBackupHeaderUnmounted:
+        return _repair.restoreBackupHeaderUnmounted(args);
+      case ChannelMethods.runMountedVolumeFilesystemCheck:
+        return _repair.runMountedCheck(args);
+      case ChannelMethods.checkFolderVault:
+        return _repair.checkFolderVault(args);
+      case ChannelMethods.repairFolderVault:
+        return _repair.repairFolderVault(args);
+      case ChannelMethods.pickFolderVaultForRepair:
+        return _repair.pickFolderVaultForRepair();
+      case ChannelMethods.exportContainerHeader:
+        return _repair.exportContainerHeader(args);
+      case ChannelMethods.restoreContainerHeaderRegion:
+        return _repair.restoreContainerHeaderRegion(args);
+      case ChannelMethods.resolveFolderVaultConfigFile:
+        return _repair.resolveFolderVaultConfigFile(args);
+      case ChannelMethods.restoreFolderVaultConfig:
+        await _repair.restoreFolderVaultConfig(args);
+        return null;
       case ChannelMethods.pickArchiveFile:
         return _archive.pickArchiveFile();
       case ChannelMethods.pickExtractFolder:
@@ -1476,6 +1510,9 @@ class DesktopEngineHost {
       }
       if (e.kind == veEventSplitJoinProgress) {
         emit('onSplitJoinProgress', {'opId': e.opId, 'bytesDone': e.n0, 'bytesTotal': e.n1});
+      }
+      if (e.kind == veEventRepairLog) {
+        emit('onRepairLog', {'opId': e.opId, 'message': e.text});
       }
       _transfers.onNativeEvent(e); // copy / import / export byte progress
     }

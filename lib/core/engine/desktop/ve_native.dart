@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 10;
+const int kVeAbiVersion = 11;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -47,6 +47,7 @@ const int veOpImport = 1;
 const int veOpExport = 2;
 const int veEventUnlockProgress = 1;
 const int veEventSplitJoinProgress = 2;
+const int veEventRepairLog = 3;
 const int veEventCopyProgress = 4;
 const int veEventImportProgress = 5;
 const int veEventExportProgress = 6;
@@ -447,6 +448,103 @@ class VeNative {
           Int32 Function(Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Int32, Pointer<Utf8>, Int32, Pointer<VeBuffer>),
           int Function(int, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, int, Pointer<Utf8>, int, Pointer<VeBuffer>)>(
         've_archive_extract_all',
+      );
+  late final int Function(
+    int,
+    Pointer<Pointer<Utf8>>,
+    Pointer<Pointer<Utf8>>,
+    Pointer<Int64>,
+    int,
+    int,
+    Pointer<Utf8>,
+    int,
+    Pointer<Utf8>,
+    int,
+    int,
+    int,
+    int,
+    Pointer<Utf8>,
+    int,
+    Pointer<VeBuffer>,
+  ) _archiveCreate = _lib.lookupFunction<
+      Int32 Function(
+        Int32,
+        Pointer<Pointer<Utf8>>,
+        Pointer<Pointer<Utf8>>,
+        Pointer<Int64>,
+        Int32,
+        Int32,
+        Pointer<Utf8>,
+        Int32,
+        Pointer<Utf8>,
+        Int32,
+        Int32,
+        Int32,
+        Uint64,
+        Pointer<Utf8>,
+        Int32,
+        Pointer<VeBuffer>,
+      ),
+      int Function(
+        int,
+        Pointer<Pointer<Utf8>>,
+        Pointer<Pointer<Utf8>>,
+        Pointer<Int64>,
+        int,
+        int,
+        Pointer<Utf8>,
+        int,
+        Pointer<Utf8>,
+        int,
+        int,
+        int,
+        int,
+        Pointer<Utf8>,
+        int,
+        Pointer<VeBuffer>,
+      )>('ve_archive_create');
+
+  // Check & Repair, header backup, folder-vault check/repair (ABI 11; ve_engine.h).
+  late final int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, int, Pointer<VeBuffer>)
+      _fvCheck = _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Int32, Pointer<Utf8>, Pointer<Utf8>, Int32, Pointer<VeBuffer>),
+          int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, int, Pointer<VeBuffer>)>(
+        've_fv_check',
+      );
+  late final int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, int, Pointer<VeBuffer>)
+      _fvRepair = _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Int32, Pointer<Utf8>, Pointer<Utf8>, Int32, Pointer<VeBuffer>),
+          int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, int, Pointer<VeBuffer>)>(
+        've_fv_repair',
+      );
+  late final int Function(int, Pointer<VeBuffer>) _fvConfigFileName =
+      _lib.lookupFunction<Int32 Function(Int32, Pointer<VeBuffer>), int Function(int, Pointer<VeBuffer>)>('ve_fv_config_file_name');
+  late final int Function(int, Pointer<Uint8>, int, Pointer<VeBuffer>) _fvValidateConfig = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Uint8>, Int32, Pointer<VeBuffer>),
+      int Function(int, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_fv_validate_config');
+  late final int Function(int, int, Pointer<Int32>, Pointer<Int32>) _repairDiagnoseFile = _lib.lookupFunction<
+      Int32 Function(Int32, Int32, Pointer<Int32>, Pointer<Int32>),
+      int Function(int, int, Pointer<Int32>, Pointer<Int32>)>('ve_repair_diagnose_file');
+  late final int Function(int, int) _repairRestoreLuks2 =
+      _lib.lookupFunction<Int32 Function(Int32, Int32), int Function(int, int)>('ve_repair_restore_luks2');
+  late final int Function(int, Pointer<Uint8>, int, int, int, int, int, Pointer<Int32>) _repairRestoreVeracrypt =
+      _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Uint8>, Int32, Int32, Int32, Int32, Int32, Pointer<Int32>),
+          int Function(int, Pointer<Uint8>, int, int, int, int, int, Pointer<Int32>)>('ve_repair_restore_veracrypt');
+  late final int Function(int, int, Pointer<Int32>) _repairDiagnoseMounted = _lib.lookupFunction<
+      Int32 Function(Int32, Int32, Pointer<Int32>),
+      int Function(int, int, Pointer<Int32>)>('ve_repair_diagnose_mounted');
+  late final int Function(int, int, Pointer<Int32>) _repairCheckMounted = _lib.lookupFunction<
+      Int32 Function(Int32, Int32, Pointer<Int32>),
+      int Function(int, int, Pointer<Int32>)>('ve_repair_check_mounted');
+  late final int Function(int, int, Pointer<VeBuffer>) _headerExport = _lib.lookupFunction<
+      Int32 Function(Int32, Int32, Pointer<VeBuffer>),
+      int Function(int, int, Pointer<VeBuffer>)>('ve_header_export');
+  late final int Function(int, int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int, int, Pointer<Int32>, int, Pointer<Int32>)
+      _headerRestore = _lib.lookupFunction<
+          Int32 Function(Int32, Int32, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32, Int32, Int32, Int32, Int32, Pointer<Int32>, Int32, Pointer<Int32>),
+          int Function(int, int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int, int, Pointer<Int32>, int, Pointer<Int32>)>(
+        've_header_restore',
       );
   late final int Function(int) _format;
   late final int Function(int) _matchedCipher;
@@ -1616,6 +1714,229 @@ class VeNative {
           ),
         ),
       );
+
+  /// Creates an archive (`ve_archive_create`, ve_engine.h). [srcVol] < 0: [srcPaths] are host paths, otherwise
+  /// paths in that slot; [destVol] likewise for [destPath]. A name in [entryNames] ending in `/` is a folder
+  /// entry. [splitSize] > 0 writes parts (zip / 7z). [tempDir] is where 7z and ISO assemble their output.
+  (int, Uint8List?) archiveCreate({
+    required int srcVol,
+    required List<String> srcPaths,
+    required List<String> entryNames,
+    required List<int> modifiedSecs,
+    required int destVol,
+    required String destPath,
+    required int format,
+    String? passphrase,
+    bool encryptFilenames = false,
+    int compressionLevel = -1,
+    int compressionMethod = 0,
+    int splitSize = 0,
+    String? tempDir,
+    int opId = 0,
+  }) {
+    final count = srcPaths.length;
+    final paths = calloc<Pointer<Utf8>>(count);
+    final names = calloc<Pointer<Utf8>>(count);
+    final mtimes = calloc<Int64>(count);
+    final allocated = <Pointer<Utf8>>[];
+    try {
+      for (var i = 0; i < count; i++) {
+        final sp = srcPaths[i].toNativeUtf8();
+        final en = entryNames[i].toNativeUtf8();
+        allocated
+          ..add(sp)
+          ..add(en);
+        paths[i] = sp;
+        names[i] = en;
+        mtimes[i] = modifiedSecs[i];
+      }
+      return _withUtf8(
+        destPath,
+        (dst) => _withOptUtf8(
+          passphrase,
+          (pw) => _withOptUtf8(
+            tempDir,
+            (tmp) => _withBuffer(
+              (out) => _archiveCreate(
+                srcVol,
+                paths,
+                names,
+                mtimes,
+                count,
+                destVol,
+                dst,
+                format,
+                pw,
+                encryptFilenames ? 1 : 0,
+                compressionLevel,
+                compressionMethod,
+                splitSize,
+                tmp,
+                opId,
+                out,
+              ),
+            ),
+          ),
+        ),
+      );
+    } finally {
+      for (final p in allocated) {
+        calloc.free(p);
+      }
+      calloc.free(paths);
+      calloc.free(names);
+      calloc.free(mtimes);
+    }
+  }
+
+  // ── Check & Repair, header backup (ABI 11) ───────────────────────────────
+  // The fd-taking calls CLOSE the descriptor on every path (ve_engine.h); callers must not close it again.
+
+  /// Copies [bytes] into native memory for the duration of [body], then wipes and frees it (null/empty: no pointer).
+  T _withSecretBytes<T>(Uint8List? bytes, T Function(Pointer<Uint8> p, int len) body) {
+    if (bytes == null || bytes.isEmpty) return body(nullptr, 0);
+    final p = calloc<Uint8>(bytes.length);
+    try {
+      p.asTypedList(bytes.length).setAll(0, bytes);
+      return body(p, bytes.length);
+    } finally {
+      p.asTypedList(bytes.length).fillRange(0, bytes.length, 0);
+      calloc.free(p);
+    }
+  }
+
+  /// `ve_fv_check` / `ve_fv_repair`: the result record (ve_engine.h), decoded by `parseFolderVaultReport`.
+  /// [sessionVol] >= 0 uses that slot's unlocked vault as the credential instead of [password].
+  (int, Uint8List?) fvCheckOrRepair({
+    required bool repair,
+    required int format,
+    required String root,
+    Uint8List? password,
+    int sessionVol = -1,
+    String localStateDir = '',
+    String tempDir = '',
+    int opId = 0,
+  }) =>
+      _withUtf8(
+        root,
+        (r) => _withSecretBytes(
+          password,
+          (pw, n) => _withUtf8(
+            localStateDir,
+            (ls) => _withUtf8(
+              tempDir,
+              (td) => _withBuffer(
+                (out) => (repair ? _fvRepair : _fvCheck)(format, r, pw, n, sessionVol, ls, td, opId, out),
+              ),
+            ),
+          ),
+        ),
+      );
+
+  /// The file that holds a folder vault's key material (gocryptfs.conf, ...), or null for an unknown format.
+  String? fvConfigFileName(int format) {
+    final (rc, bytes) = _withBuffer((out) => _fvConfigFileName(format, out));
+    return rc == veOk && bytes != null ? utf8.decode(bytes, allowMalformed: true) : null;
+  }
+
+  /// Null when [bytes] parses as a genuine config for [format], else the reason it does not.
+  String? fvValidateConfig(int format, Uint8List bytes) {
+    final out = calloc<VeBuffer>();
+    try {
+      final rc = _withSecretBytes(bytes, (p, n) => _fvValidateConfig(format, p, n, out));
+      final reason = _takeMessage(out);
+      if (rc == veOk) return null;
+      return reason ?? 'This is not a valid config file for this vault format.';
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// `ve_repair_diagnose_file`: (rc, RepairDiagnosisCode, ContainerFormat ordinal or -1). Closes [fd].
+  (int, int, int) repairDiagnoseFile(int fd, int opId) {
+    final code = calloc<Int32>();
+    final format = calloc<Int32>();
+    try {
+      final rc = _repairDiagnoseFile(fd, opId, code, format);
+      return (rc, code.value, format.value);
+    } finally {
+      calloc.free(code);
+      calloc.free(format);
+    }
+  }
+
+  /// `ve_repair_restore_luks2`: VE_OK when the primary header was restored. Closes [fd].
+  int repairRestoreLuks2(int fd, int opId) => _repairRestoreLuks2(fd, opId);
+
+  /// `ve_repair_restore_veracrypt`: (rc, VeraCryptRestoreResult: 0 ok, 1 wrong password, 2 healthy, 3 I/O). Closes [fd].
+  (int, int) repairRestoreVeracrypt(int fd, Uint8List password, int pim, int cipherId, int hashId, int opId) {
+    final result = calloc<Int32>();
+    try {
+      final rc = _withSecretBytes(
+        password,
+        (p, n) => _repairRestoreVeracrypt(fd, p, n, pim, cipherId, hashId, opId, result),
+      );
+      return (rc, result.value);
+    } finally {
+      calloc.free(result);
+    }
+  }
+
+  (int, int) repairDiagnoseMounted(int volId, int opId) {
+    final code = calloc<Int32>();
+    try {
+      final rc = _repairDiagnoseMounted(volId, opId, code);
+      return (rc, code.value);
+    } finally {
+      calloc.free(code);
+    }
+  }
+
+  (int, bool) repairCheckMounted(int volId, int opId) {
+    final ok = calloc<Int32>();
+    try {
+      final rc = _repairCheckMounted(volId, opId, ok);
+      return (rc, ok.value != 0);
+    } finally {
+      calloc.free(ok);
+    }
+  }
+
+  /// `ve_header_export`: the result record (u32 result, u32 format, u32 length, payload). Closes [fd].
+  (int, Uint8List?) headerExport(int fd, int opId) => _withBuffer((out) => _headerExport(fd, opId, out));
+
+  /// `ve_header_restore`: (rc, HeaderRestoreResult: 0 ok, 1 wrong password, 2 invalid, 3 too small, 4 I/O).
+  /// Closes [fd] and every fd in [keyfileFds].
+  (int, int) headerRestore({
+    required int fd,
+    required int format,
+    required Uint8List payload,
+    Uint8List? password,
+    int pim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    int opId = 0,
+    List<int> keyfileFds = const [],
+  }) {
+    final result = calloc<Int32>();
+    final Pointer<Int32> kf = keyfileFds.isEmpty ? nullptr : calloc<Int32>(keyfileFds.length);
+    try {
+      for (var i = 0; i < keyfileFds.length; i++) {
+        kf[i] = keyfileFds[i];
+      }
+      final rc = _withSecretBytes(
+        payload,
+        (pl, plLen) => _withSecretBytes(
+          password,
+          (pw, pwLen) => _headerRestore(fd, format, pl, plLen, pw, pwLen, pim, cipherId, hashId, opId, kf, keyfileFds.length, result),
+        ),
+      );
+      return (rc, result.value);
+    } finally {
+      if (kf != nullptr) calloc.free(kf);
+      calloc.free(result);
+    }
+  }
   /// kind 0 = writes, 1 = deletes.
   int fvBatch(int volId, int kind, {required bool begin}) => _fvBatch(volId, kind, begin ? 1 : 0);
 

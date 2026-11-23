@@ -514,6 +514,113 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         );
         return [rc, record];
       }
+    // Check & Repair, header backup (ABI 11). The worker opens the files, so no descriptor crosses an isolate and
+    // none is left open: the engine closes every fd it is handed.
+    case 'repairDiagnoseFile':
+      {
+        final fd = n.openFile(a[0] as String);
+        if (fd < 0) return [veErrFailed, 1, -1];
+        final (rc, code, format) = n.repairDiagnoseFile(fd, a[1] as int);
+        return [rc, code, format];
+      }
+    case 'repairRestoreLuks2':
+      {
+        final fd = n.openFile(a[0] as String, writable: true);
+        if (fd < 0) return veErrFailed;
+        return n.repairRestoreLuks2(fd, a[1] as int);
+      }
+    case 'repairRestoreVeracrypt':
+      {
+        final fd = n.openFile(a[0] as String, writable: true);
+        if (fd < 0) return [veErrFailed, 3];
+        final (rc, result) = n.repairRestoreVeracrypt(fd, a[1] as Uint8List, a[2] as int, a[3] as int, a[4] as int, a[5] as int);
+        return [rc, result];
+      }
+    case 'repairDiagnoseMounted':
+      {
+        final (rc, code) = n.repairDiagnoseMounted(a[0] as int, a[1] as int);
+        return [rc, code];
+      }
+    case 'repairCheckMounted':
+      {
+        final (rc, ok) = n.repairCheckMounted(a[0] as int, a[1] as int);
+        return [rc, ok];
+      }
+    case 'headerExport':
+      {
+        final fd = n.openFile(a[0] as String);
+        if (fd < 0) return [veErrFailed, null];
+        final (rc, record) = n.headerExport(fd, a[1] as int);
+        return [rc, record];
+      }
+    case 'headerRestore':
+      {
+        // Keyfiles first, so a keyfile that fails to open cannot strand the (already opened) target descriptor.
+        final keyfileFds = <int>[];
+        for (final path in (a[8] as List).cast<String>()) {
+          final kfd = n.openFile(path);
+          if (kfd < 0) {
+            keyfileFds.forEach(n.closeFd);
+            return [veErrFailed, 4];
+          }
+          keyfileFds.add(kfd);
+        }
+        final fd = n.openFile(a[0] as String, writable: true);
+        if (fd < 0) {
+          keyfileFds.forEach(n.closeFd);
+          return [veErrFailed, 4];
+        }
+        final (rc, result) = n.headerRestore(
+          fd: fd,
+          format: a[1] as int,
+          payload: a[2] as Uint8List,
+          password: a[3] as Uint8List?,
+          pim: a[4] as int,
+          cipherId: a[5] as int,
+          hashId: a[6] as int,
+          opId: a[7] as int,
+          keyfileFds: keyfileFds,
+        );
+        return [rc, result];
+      }
+    case 'fvCheck':
+      {
+        final (rc, record) = n.fvCheckOrRepair(
+          repair: a[0] as bool,
+          format: a[1] as int,
+          root: a[2] as String,
+          password: a[3] as Uint8List?,
+          sessionVol: a[4] as int,
+          localStateDir: a[5] as String,
+          tempDir: a[6] as String,
+          opId: a[7] as int,
+        );
+        return [rc, record];
+      }
+    case 'fvConfigFileName':
+      return n.fvConfigFileName(a[0] as int);
+    case 'fvValidateConfig':
+      return n.fvValidateConfig(a[0] as int, a[1] as Uint8List);
+    case 'archiveCreate':
+      {
+        final (rc, record) = n.archiveCreate(
+          srcVol: a[0] as int,
+          srcPaths: (a[1] as List).cast<String>(),
+          entryNames: (a[2] as List).cast<String>(),
+          modifiedSecs: (a[3] as List).cast<int>(),
+          destVol: a[4] as int,
+          destPath: a[5] as String,
+          format: a[6] as int,
+          passphrase: a[7] as String?,
+          encryptFilenames: a[8] as bool,
+          compressionLevel: a[9] as int,
+          compressionMethod: a[10] as int,
+          splitSize: a[11] as int,
+          tempDir: a[12] as String?,
+          opId: a[13] as int,
+        );
+        return [rc, record];
+      }
     case 'opCancel':
       n.opCancel(a[0] as int);
       return null;

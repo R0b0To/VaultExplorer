@@ -115,6 +115,90 @@ void main() {
     expect(submitted.length, 2);
   });
 
+  testWidgets('tapping anywhere in the empty space opens the editor', (
+    tester,
+  ) async {
+    final bar = BreadcrumbBar(
+      stack: _stack(),
+      onTap: (_) {},
+      rootLabel: 'V',
+      edit: BreadcrumbEditConfig(
+        pathText: '/Docs/Taxes',
+        onSubmit: (_) async => true,
+      ),
+    );
+    final spots = <Offset Function(Rect)>[
+      (r) => Offset(r.right - 20, r.center.dy), // far right, middle
+      (r) => Offset(r.right - 200, r.top + 1), // top margin
+      (r) => Offset(r.right - 200, r.bottom - 1), // bottom margin
+    ];
+    for (final spot in spots) {
+      await tester.pumpWidget(_host(bar));
+      await tester.tapAt(spot(tester.getRect(find.byType(BreadcrumbBar))));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsOneWidget);
+    }
+  });
+
+  testWidgets('long names are shown in full, not ellipsized', (tester) async {
+    const long = 'A very long vault name that goes on and on and on.hc';
+    await tester.pumpWidget(
+      _host(BreadcrumbBar(stack: _stack(), onTap: (_) {}, rootLabel: long)),
+    );
+    final text = tester.widget<Text>(find.text(long));
+    expect(text.overflow, isNull);
+    expect(text.softWrap, isFalse);
+    expect(tester.getSize(find.text(long)).width, greaterThan(200));
+  });
+
+  testWidgets('dragging the bar never opens the side drawer', (tester) async {
+    final stack = [
+      PathSegment('Root', ''),
+      for (var i = 1; i <= 30; i++) PathSegment('Folder number $i', 'f$i'),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          drawer: const Drawer(child: Text('drawer content')),
+          // As in the app: the drawer opens on a drag from anywhere.
+          drawerEdgeDragWidth: double.maxFinite,
+          body: Column(
+            children: [
+              BreadcrumbBar(
+                stack: stack,
+                onTap: (_) {},
+                rootLabel: 'V',
+                edit: BreadcrumbEditConfig(
+                  pathText: '/x',
+                  onSubmit: (_) async => true,
+                ),
+              ),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ),
+      ),
+    );
+    final rect = tester.getRect(find.byType(BreadcrumbBar));
+    final starts = <Offset>[
+      Offset(rect.left + 100, rect.center.dy), // on the crumbs
+      Offset(rect.left + 100, rect.top + 1), // top margin
+      Offset(rect.left + 100, rect.bottom - 1), // bottom margin
+    ];
+    final moves = <Offset>[
+      const Offset(150, 0),
+      const Offset(-150, 0),
+      const Offset(120, 40), // slightly diagonal
+    ];
+    for (final start in starts) {
+      for (final move in moves) {
+        await tester.dragFrom(start, move);
+        await tester.pumpAndSettle();
+        expect(find.text('drawer content'), findsNothing);
+      }
+    }
+  });
+
   testWidgets('unchanged text closes without submitting', (tester) async {
     var calls = 0;
     final controller = BreadcrumbBarController();

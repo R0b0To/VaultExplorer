@@ -14,12 +14,16 @@
 //     run's directory is purged the next time the app starts.
 //   * Extracting into a vault goes through the vault's own write path (and the folder-vault write batch).
 //
-// Creating archives is a separate step (`archiveCreate` is still listed in desktop_method_support.dart).
+//   * Creating an archive (`archiveCreate`) reads its sources and writes its result the same way, so a folder
+//     vault source or destination needs no staging either. The one exception is the temporary file the 7z and ISO
+//     writers assemble their output in: it goes to a private folder under the system temp directory that exists
+//     only for the duration of the call.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
@@ -374,6 +378,96 @@ class DesktopArchive {
       }
     } finally {
       if (opId > 0) unregisterOp(opId);
+    }
+  }
+
+  // ── create ─────────────────────────────────────────────────────────────────
+
+  /// Formats whose writer assembles the archive in a temporary file before emitting it (7z, ISO).
+  static const Set<int> _spooledFormats = {1, 8};
+
+  /// `archiveCreate`. Sources are vault paths when `srcUri` is an unlocked container, otherwise host paths (a
+  /// relative one is taken against `srcUri` as a folder). The archive goes into the vault at `destVaultPath`
+  /// when `destUri` is an unlocked container, otherwise to the host file `destFilePath` (or `destUri` /
+  /// `destVaultPath`). Returns whether the archive was written.
+  Future<bool> createArchive(Map<Object?, Object?> args) async {
+    final rawPaths = args['srcPaths'];
+    if (rawPaths is! List || rawPaths.isEmpty) throw _invalid('srcPaths and matching entryNames required');
+    final srcPaths = rawPaths.cast<String>();
+    final rawNames = args['entryNames'];
+    final entryNames = rawNames is List
+        ? rawNames.cast<String>()
+        : [for (final s in srcPaths) s.split(RegExp(r'[\\/]')).last];
+    if (entryNames.length != srcPaths.length) throw _invalid('srcPaths and matching entryNames required');
+    final rawTimes = args['modifiedSecs'];
+    if (rawTimes is List && rawTimes.length != srcPaths.length) {
+      throw _invalid('modifiedSecs must match srcPaths when provided');
+    }
+    final modified = rawTimes is List ? [for (final t in rawTimes) (t as num).toInt()] : List<int>.filled(srcPaths.length, 0);
+
+    final srcUri = _nonEmpty(args['srcUri']);
+    final srcVol = srcUri == null ? null : volOrNull(srcUri);
+    final List<String> sources = srcVol != null
+        ? srcPaths
+        : [
+            for (final sp in srcPaths)
+              (srcUri != null && !p.isAbsolute(sp)) ? p.join(_localPath(srcUri), sp) : _localPath(sp),
+          ];
+
+    final destUri = _nonEmpty(args['destUri']);
+    final destVaultPath = _nonEmpty(args['destVaultPath']);
+    final destFilePath = _nonEmpty(args['destFilePath']);
+    final destVol = destUri == null ? null : volOrNull(destUri);
+    final String destPath;
+    if (destVol != null && destVaultPath != null) {
+      destPath = destVaultPath;
+    } else if (destFilePath != null) {
+      destPath = _localPath(destFilePath);
+    } else if (destUri != null && destVaultPath != null) {
+      destPath = p.join(_localPath(destUri), destVaultPath);
+    } else if (destUri != null && destVol == null) {
+      destPath = _localPath(destUri);
+    } else {
+      throw _invalid('A destination is required');
+    }
+    final intoVault = destVol != null && destVaultPath != null;
+
+    final format = (args['format'] as num?)?.toInt() ?? 0;
+    final opId = (args['opId'] as num?)?.toInt() ?? 0;
+    Directory? spool;
+    if (opId > 0) registerOp(opId);
+    try {
+      if (_spooledFormats.contains(format)) spool = await Directory.systemTemp.createTemp('${_stagingPrefix}spool-');
+      final raw = await withActivity(
+        () => call('archiveCreate', [
+          srcVol ?? -1,
+          sources,
+          entryNames,
+          modified,
+          intoVault ? destVol : -1,
+          destPath,
+          format,
+          _nonEmpty(args['passphrase']),
+          args['encryptFilenames'] == true,
+          (args['compressionLevel'] as num?)?.toInt() ?? -1,
+          (args['compressionMethod'] as num?)?.toInt() ?? 0,
+          (args['splitSizeBytes'] as num?)?.toInt() ?? 0,
+          spool?.path,
+          opId,
+        ]),
+      );
+      final rec = _record(raw);
+      if (kDebugMode && rec.status != 0) debugPrint('[desktop-archive] create failed (${rec.status}): ${rec.message}');
+      return rec.status == 0;
+    } finally {
+      if (opId > 0) unregisterOp(opId);
+      if (spool != null) {
+        try {
+          await spool.delete(recursive: true);
+        } on FileSystemException {
+          // already gone
+        }
+      }
     }
   }
 

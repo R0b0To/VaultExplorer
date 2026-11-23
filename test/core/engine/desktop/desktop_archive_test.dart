@@ -323,6 +323,170 @@ void main() {
       });
     });
 
+    group('createArchive', () {
+      Future<Object?> ok(String op, List<Object?> args) async => [veOk, _record(count: 1)];
+
+      test('vault sources into the same vault: slots, vault paths and entry names reach the engine', () async {
+        engine.handler = ok;
+        final created = await archive.createArchive({
+          'format': 0,
+          'srcPaths': ['/data/a.txt', '/data/dir'],
+          'entryNames': ['a.txt', 'dir/'],
+          'modifiedSecs': [5, 0],
+          'srcUri': _container,
+          'destUri': _container,
+          'destVaultPath': 'out/a.zip',
+          'passphrase': 'pw',
+          'compressionLevel': 6,
+          'opId': 7,
+        });
+        expect(created, isTrue);
+        final (op, args) = engine.calls.single;
+        expect(op, 'archiveCreate');
+        expect(args, [
+          _vol,
+          ['/data/a.txt', '/data/dir'],
+          ['a.txt', 'dir/'],
+          [5, 0],
+          _vol,
+          'out/a.zip',
+          0,
+          'pw',
+          false,
+          6,
+          0,
+          0,
+          null, // a zip is not spooled: no temp folder
+          7,
+        ]);
+        expect(registered, [7]);
+        expect(unregistered, [7]);
+      });
+
+      test('host sources: relative paths are taken against srcUri, the host file is destFilePath', () async {
+        engine.handler = ok;
+        await archive.createArchive({
+          'format': 3,
+          'srcPaths': ['sub/a.txt', '/abs/b.txt'],
+          'srcUri': '/home/me/docs',
+          'destFilePath': '/home/me/out.tar.gz',
+        });
+        final args = engine.calls.single.$2;
+        expect(args[0], -1);
+        expect(args[1], [p.join('/home/me/docs', 'sub/a.txt'), '/abs/b.txt']);
+        expect(args[2], ['a.txt', 'b.txt']); // default entry names: the last path segment
+        expect(args[3], [0, 0]);
+        expect(args[4], -1);
+        expect(args[5], '/home/me/out.tar.gz');
+      });
+
+      test('a non-vault destUri is a folder for destVaultPath', () async {
+        engine.handler = ok;
+        await archive.createArchive({
+          'format': 0,
+          'srcPaths': ['/a.txt'],
+          'destUri': '/home/me/dest',
+          'destVaultPath': 'x/y.zip',
+        });
+        final args = engine.calls.single.$2;
+        expect(args[4], -1);
+        expect(args[5], p.join('/home/me/dest', 'x/y.zip'));
+      });
+
+      test('host sources into a vault', () async {
+        engine.handler = ok;
+        await archive.createArchive({
+          'format': 0,
+          'srcPaths': ['/a.txt'],
+          'destUri': _container,
+          'destVaultPath': 'in/a.zip',
+        });
+        final args = engine.calls.single.$2;
+        expect(args[0], -1);
+        expect(args[4], _vol);
+        expect(args[5], 'in/a.zip');
+      });
+
+      test('split size, encrypted names and codec choice are passed on', () async {
+        engine.handler = ok;
+        await archive.createArchive({
+          'format': 0,
+          'srcPaths': ['/a.txt'],
+          'destFilePath': '/o.zip',
+          'splitSizeBytes': 65536,
+          'compressionMethod': 1,
+          'encryptFilenames': true,
+          'passphrase': '',
+        });
+        final args = engine.calls.single.$2;
+        expect(args.sublist(7, 12), [null, true, -1, 1, 65536]);
+      });
+
+      test('7z and ISO get a private spool folder for the call, removed afterwards', () async {
+        for (final format in [1, 8]) {
+          String? seen;
+          var existedDuringCall = false;
+          engine.handler = (op, args) async {
+            seen = args[12] as String?;
+            existedDuringCall = seen != null && Directory(seen!).existsSync();
+            return [veOk, _record(count: 1)];
+          };
+          await archive.createArchive({'format': format, 'srcPaths': ['/a.txt'], 'destFilePath': '/o.bin'});
+          expect(seen, isNotNull);
+          expect(p.basename(seen!), startsWith('vaultexplorer-archive-'));
+          expect(existedDuringCall, isTrue);
+          expect(Directory(seen!).existsSync(), isFalse);
+        }
+      });
+
+      test('the spool folder is removed and the op dropped even when the engine throws', () async {
+        String? seen;
+        engine.handler = (op, args) async {
+          seen = args[12] as String?;
+          throw StateError('worker died');
+        };
+        await expectLater(
+          archive.createArchive({'format': 1, 'srcPaths': ['/a.txt'], 'destFilePath': '/o.7z', 'opId': 4}),
+          throwsStateError,
+        );
+        expect(Directory(seen!).existsSync(), isFalse);
+        expect(unregistered, [4]);
+      });
+
+      test('a failed archive answers false; a locked vault is an error', () async {
+        engine.handler = (op, args) async => [veOk, _record(status: 4, message: 'no space')];
+        expect(await archive.createArchive({'format': 0, 'srcPaths': ['/a'], 'destFilePath': '/o.zip'}), isFalse);
+
+        engine.handler = (op, args) async => [veErrNotUnlocked, null];
+        await expectLater(
+          archive.createArchive({'format': 0, 'srcPaths': ['/a'], 'destFilePath': '/o.zip'}),
+          throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'NOT_UNLOCKED')),
+        );
+      });
+
+      test('argument checks', () {
+        void expectInvalid(Map<Object?, Object?> args) => expect(
+              () => archive.createArchive(args),
+              throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'INVALID_ARGS')),
+            );
+        expectInvalid({'format': 0, 'destFilePath': '/o.zip'}); // no sources
+        expectInvalid({'format': 0, 'srcPaths': [], 'destFilePath': '/o.zip'});
+        expectInvalid({
+          'format': 0,
+          'srcPaths': ['/a', '/b'],
+          'entryNames': ['a'],
+          'destFilePath': '/o.zip',
+        });
+        expectInvalid({
+          'format': 0,
+          'srcPaths': ['/a'],
+          'modifiedSecs': [1, 2],
+          'destFilePath': '/o.zip',
+        });
+        expectInvalid({'format': 0, 'srcPaths': ['/a']}); // no destination
+      });
+    });
+
     group('extractAll', () {
       test('into the same folder vault: write batch around the run, op registered, count returned', () async {
         engine.handler = (op, args) async => op == 'archiveExtractAll' ? [veOk, _record(count: 5)] : veOk;

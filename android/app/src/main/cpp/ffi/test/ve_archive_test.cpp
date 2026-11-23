@@ -126,7 +126,7 @@ VE_API int32_t ve_write_file_chunk(int32_t, const char* path, int64_t offset, co
     const std::string p = normalize(path);
     if (offset == 0) {
         V.files[p].clear();  // offset 0 replaces the file
-        V.unfinished.insert(p);
+        if (V.folderVault) V.unfinished.insert(p);  // a container's writes are complete as they land
     } else if (!V.files.count(p) || V.files[p].size() != static_cast<size_t>(offset)) {
         return VE_ERR_FAILED;  // a folder vault only accepts chunks in order
     }
@@ -145,6 +145,15 @@ VE_API int32_t ve_delete_file(int32_t, const char* path) {
     const std::string p = normalize(path);
     V.unfinished.erase(p);
     return V.files.erase(p) ? VE_OK : VE_ERR_FAILED;
+}
+
+VE_API int32_t ve_rename_file(int32_t, const char* from, const char* to) {
+    const std::string a = normalize(from), b = normalize(to);
+    if (!V.files.count(a) || V.files.count(b)) return VE_ERR_FAILED;  // never onto an existing file
+    V.files[b] = std::move(V.files[a]);
+    V.files.erase(a);
+    V.unfinished.erase(a);
+    return VE_OK;
 }
 
 VE_API int32_t ve_create_directory(int32_t, const char* path) {
@@ -541,6 +550,215 @@ void testSplitSet(const fs::path& tmp, const Fixture& fx) {
     CHECK(V.streamsOpened == V.streamsClosed);
 }
 
+// ── creating ─────────────────────────────────────────────────────────────
+
+Record create(int32_t srcVol, const std::vector<std::string>& paths, const std::vector<std::string>& names,
+              int32_t destVol, const std::string& dest, int32_t format = 0, const char* pass = nullptr,
+              bool encryptNames = false, uint64_t split = 0, const char* tempDir = nullptr, int32_t opId = 0,
+              const std::vector<int64_t>& mtimes = {}) {
+    std::vector<const char*> p, n;
+    for (const auto& x : paths) p.push_back(x.c_str());
+    for (const auto& x : names) n.push_back(x.c_str());
+    ve_buffer b{nullptr, 0};
+    CHECK(ve_archive_create(srcVol, p.data(), n.data(), mtimes.empty() ? nullptr : mtimes.data(),
+                            static_cast<int32_t>(paths.size()), destVol, dest.c_str(), format, pass,
+                            encryptNames ? 1 : 0, -1, 0, split, tempDir, opId, &b) == VE_OK);
+    return parseRecord(b, false);
+}
+
+// Host files under tmp/src: the fixture's files, plus a folder.
+std::vector<std::string> writeHostSources(const fs::path& tmp, const Fixture& fx, std::vector<std::string>& names) {
+    std::vector<std::string> paths;
+    for (const auto& [name, content] : fx.files) {
+        writeFile(tmp / "src" / name, content);
+        paths.push_back((tmp / "src" / name).string());
+        names.push_back(name);
+    }
+    fs::create_directories(tmp / "src" / "emptydir");
+    paths.push_back((tmp / "src" / "emptydir").string());
+    names.push_back("emptydir/");
+    return paths;
+}
+
+void checkRoundTripFromHost(const fs::path& archive, const Fixture& fx, const fs::path& out) {
+    Record scanned = scan(-1, archive.string());
+    CHECK(scanned.status == 0);
+    CHECK(find(scanned, "emptydir") && find(scanned, "emptydir")->isDir);
+    Record all = extractAll(-1, archive.string(), nullptr, -1, out.string());
+    CHECK(all.status == 0);
+    for (const auto& [name, content] : fx.files) CHECK(readFile(out / name) == content);
+    CHECK(fs::is_directory(out / "emptydir"));
+}
+
+void testCreateFromHost(const fs::path& tmp, const Fixture& fx) {
+    std::vector<std::string> names;
+    const auto paths = writeHostSources(tmp, fx, names);
+
+    // zip, host -> host; the file's own modification time is used when none is given
+    const fs::path zip = tmp / "created" / "one.zip";
+    Record r = create(-1, paths, names, -1, zip.string());
+    CHECK(r.status == 0 && r.count == 1);
+    checkRoundTripFromHost(zip, fx, tmp / "created_out");
+
+    // 7z with a private spool folder: the process setting follows temp_dir
+    const fs::path spool = tmp / "spool";
+    fs::create_directories(spool);
+    const fs::path sevenZ = tmp / "created" / "one.7z";
+    r = create(-1, paths, names, -1, sevenZ.string(), /*7z*/ 1, nullptr, false, 0, spool.string().c_str());
+    CHECK(r.status == 0 && r.count == 1);
+#ifndef _WIN32
+    const char* td = std::getenv("TMPDIR");
+    CHECK(td && spool == fs::path(td));
+#endif
+    checkRoundTripFromHost(sevenZ, fx, tmp / "created7_out");
+    CHECK(fs::is_empty(spool));  // the spooled temporary file is gone
+
+    // tar.gz
+    const fs::path tgz = tmp / "created" / "one.tar.gz";
+    CHECK(create(-1, paths, names, -1, tgz.string(), 3).status == 0);
+    checkRoundTripFromHost(tgz, fx, tmp / "created_tgz_out");
+}
+
+void testCreateFailures(const fs::path& tmp, const Fixture& fx) {
+    std::vector<std::string> names;
+    auto paths = writeHostSources(tmp, fx, names);
+
+    // a source that does not exist: reported, nothing written
+    std::vector<std::string> badPaths = paths;
+    badPaths[0] = (tmp / "src" / "no_such_file").string();
+    const fs::path dest = tmp / "failed" / "x.zip";
+    Record r = create(-1, badPaths, names, -1, dest.string());
+    CHECK(r.status == 4 && !r.message.empty());
+    CHECK(!fs::exists(dest));
+
+    // encrypted file names need 7z and a passphrase: refused, and the half-written destination is removed
+    r = create(-1, paths, names, -1, dest.string(), /*zip*/ 0, nullptr, /*encryptNames=*/true);
+    CHECK(r.status != 0);
+    CHECK(!fs::exists(dest));
+
+    // cancel
+    g_lastProgress = 0;
+    g_cancelAtFiles = 1;
+    r = create(-1, paths, names, -1, dest.string(), 0, nullptr, false, 0, nullptr, /*opId=*/3);
+    g_cancelAtFiles = -1;
+    CHECK(r.status != 0 && (r.flags & 4u) != 0);
+    CHECK(!fs::exists(dest));
+
+    // a vault destination that fails halfway through
+    V.reset();
+    V.failWriteAfter = 2;
+    r = create(-1, paths, names, kVol, "out/x.zip");
+    CHECK(r.status != 0);
+    CHECK(V.unfinished.empty() && !V.files.count("out/x.zip"));
+}
+
+void testCreateInVault(const Fixture& fx) {
+    for (const bool folderVault : {true, false}) {
+        V.reset();
+        V.folderVault = folderVault;
+        std::vector<std::string> paths, names;
+        for (const auto& [name, content] : fx.files) {
+            V.files["data/" + name] = content;
+            paths.push_back("/data/" + name);
+            names.push_back(name);
+        }
+        paths.push_back("/data");
+        names.push_back("data_dir/");
+
+        // vault -> vault
+        Record r = create(kVol, paths, names, kVol, "/out/a.zip");
+        CHECK(r.status == 0 && r.count == 1);
+        CHECK(V.unfinished.empty());
+        CHECK(V.dirs.count("out"));
+        const Record scanned = scan(kVol, "out/a.zip");
+        CHECK(scanned.status == 0 && scanned.entries.size() == fx.files.size() + 1);
+        CHECK(find(scanned, "data_dir") && find(scanned, "data_dir")->isDir);
+        Record all = extractAll(kVol, "out/a.zip", nullptr, kVol, "restored");
+        CHECK(all.status == 0);
+        for (const auto& [name, content] : fx.files) CHECK(V.files["restored/" + name] == content);
+        CHECK(V.streamsOpened == V.streamsClosed);
+
+        // vault -> host
+        // (the fake vault is not a file system: the source paths are read through the stream calls)
+        const fs::path hostOut = fs::temp_directory_path() / ("ve_archive_vault_to_host_" + std::to_string(std::rand()) + ".zip");
+        r = create(kVol, paths, names, -1, hostOut.string());
+        CHECK(r.status == 0);
+        CHECK(scan(-1, hostOut.string()).entries.size() == fx.files.size() + 1);
+        std::error_code ec;
+        fs::remove(hostOut, ec);
+        CHECK(V.streamsOpened == V.streamsClosed);
+
+        // a missing vault source
+        r = create(kVol, {"/data/missing"}, {"missing"}, kVol, "out/b.zip");
+        CHECK(r.status == 4);
+        CHECK(!V.files.count("out/b.zip"));
+    }
+}
+
+void testCreateSplit(const fs::path& tmp, const Fixture& fx) {
+    // enough stored data for at least three 64 KiB parts
+    Fixture big = fx;
+    big.files["dir/b.bin"] = pseudoRandom(260 * 1000, 11);
+    std::vector<std::string> names;
+    const auto paths = writeHostSources(tmp, big, names);
+
+    // zip -> host: name.z01, name.z02, ..., name.zip
+    const fs::path base = tmp / "splitout" / "set";
+    Record r = create(-1, paths, names, -1, (base.string() + ".zip"), 0, nullptr, false, 64 * 1024);
+    CHECK(r.status == 0 && r.count >= 4);
+    CHECK(fs::exists(base.string() + ".z01") && fs::exists(base.string() + ".z02") && fs::exists(base.string() + ".zip"));
+    CHECK(!fs::exists(base.string() + ".z" + (r.count < 10 ? "0" : "") + std::to_string(r.count)));  // the last part was renamed
+    checkRoundTripFromHost(base.string() + ".z01", big, tmp / "splitout_zip");
+
+    // 7z -> host: name.7z.001, ...
+    const fs::path base7 = tmp / "splitout" / "set7.7z";
+    r = create(-1, paths, names, -1, base7.string(), 1, nullptr, false, 64 * 1024);
+    CHECK(r.status == 0 && r.count >= 2);
+    CHECK(fs::exists(base7.string() + ".001") && fs::exists(base7.string() + ".002"));
+    checkRoundTripFromHost(base7.string() + ".001", big, tmp / "splitout_7z");
+
+    // a part that would replace an existing file stops the run and removes the parts already written
+    const fs::path base2 = tmp / "splitout2" / "set";
+    writeFile(base2.string() + ".z02", Bytes{1, 2, 3});
+    r = create(-1, paths, names, -1, base2.string() + ".zip", 0, nullptr, false, 64 * 1024);
+    CHECK(r.status != 0);
+    CHECK(!fs::exists(base2.string() + ".z01") && !fs::exists(base2.string() + ".zip"));
+    CHECK(readFile(base2.string() + ".z02") == (Bytes{1, 2, 3}));  // the file that was in the way is untouched
+
+    // zip -> vault
+    for (const bool folderVault : {true, false}) {
+        V.reset();
+        V.folderVault = folderVault;
+        r = create(-1, paths, names, kVol, "/parts/v.zip", 0, nullptr, false, 64 * 1024);
+        CHECK(r.status == 0 && r.count >= 4);
+        CHECK(V.files.count("parts/v.z01") && V.files.count("parts/v.z02") && V.files.count("parts/v.zip"));
+        CHECK(V.unfinished.empty());
+        Record vr = scan(kVol, "parts/v.z01");
+        CHECK(vr.status == 0 && vr.entries.size() == big.files.size() + 1);
+        Record vall = extractAll(kVol, "parts/v.zip", nullptr, -1, (tmp / "from_vault_parts").string());
+        CHECK(vall.status == 0 && readFile(tmp / "from_vault_parts" / "dir" / "b.bin") == big.files.at("dir/b.bin"));
+        fs::remove_all(tmp / "from_vault_parts");
+
+        // creating again into the same place must not replace the parts
+        const auto before = V.files;
+        r = create(-1, paths, names, kVol, "/parts/v.zip", 0, nullptr, false, 64 * 1024);
+        CHECK(r.status != 0);
+        CHECK(V.files == before);
+        CHECK(V.unfinished.empty());
+    }
+}
+
+void testCreateArguments() {
+    ve_buffer b{nullptr, 0};
+    const char* p[] = {"/a"};
+    const char* n[] = {"a"};
+    CHECK(ve_archive_create(-1, nullptr, n, nullptr, 1, -1, "d.zip", 0, nullptr, 0, -1, 0, 0, nullptr, 0, &b) == VE_ERR_INVALID_ARG);
+    CHECK(ve_archive_create(-1, p, n, nullptr, 0, -1, "d.zip", 0, nullptr, 0, -1, 0, 0, nullptr, 0, &b) == VE_ERR_INVALID_ARG);
+    CHECK(ve_archive_create(-1, p, n, nullptr, 1, -1, nullptr, 0, nullptr, 0, -1, 0, 0, nullptr, 0, &b) == VE_ERR_INVALID_ARG);
+    CHECK(ve_archive_create(-1, p, n, nullptr, 1, -1, "d.zip", 99, nullptr, 0, -1, 0, 0, nullptr, 0, &b) == VE_ERR_INVALID_ARG);
+    CHECK(ve_archive_create(-1, p, n, nullptr, 1, -1, "d.zip", 0, nullptr, 0, -1, 0, 0, nullptr, 0, nullptr) == VE_ERR_INVALID_ARG);
+}
+
 void testArguments() {
     ve_buffer b{nullptr, 0}, c{nullptr, 0};
     CHECK(ve_archive_scan(-1, nullptr, nullptr, &b) == VE_ERR_INVALID_ARG);
@@ -569,6 +787,11 @@ int main() {
     testFailureLeavesNothingBehind(zip);
     testCancel(tmp, fx, zip);
     testSplitSet(tmp, fx);
+    testCreateArguments();
+    testCreateFromHost(tmp, fx);
+    testCreateFailures(tmp, fx);
+    testCreateInVault(fx);
+    testCreateSplit(tmp, fx);
 
     std::error_code ec;
     fs::remove_all(tmp, ec);

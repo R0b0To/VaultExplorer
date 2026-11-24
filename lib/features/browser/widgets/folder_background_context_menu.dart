@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
@@ -48,7 +49,12 @@ class _FolderBackgroundContextMenuState
     setState(() => _entries = entries);
     // `position` is relative to the anchor's top-left corner, and the anchor
     // is exactly this detector's box, so the local position is the click.
-    _controller.open(position: details.localPosition);
+    final position = details.localPosition;
+    // Rebuild MenuAnchor with the latest children before opening its overlay.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.enabled) return;
+      _controller.open(position: position);
+    });
   }
 
   @override

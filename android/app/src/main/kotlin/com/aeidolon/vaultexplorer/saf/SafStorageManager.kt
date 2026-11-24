@@ -43,6 +43,126 @@ data class SafEntry(
 }
 
 /**
+ * Changes this app has just made to one folder through a document provider
+ * whose own listing cache may lag behind them.
+ *
+ * RSAF (SFTP/SMB/...) performs a server-side move or copy directly on the
+ * backend, bypassing the rclone VFS that answers its folder listings. That VFS
+ * keeps serving the old entries until its directory cache expires, so a
+ * listing taken right after a successful move still shows the moved item in
+ * the source folder and not in the destination. Instead of waiting for (and
+ * guessing) the provider's cache lifetime, the app remembers what it changed
+ * and applies that to the provider's answer until the provider catches up.
+ *
+ * Every record drops itself as soon as a provider listing agrees with it, and
+ * unconditionally after [PENDING_LISTING_TTL_MS].
+ */
+internal class PendingListingChanges {
+    private val removed = HashMap<String, Long>()
+    private val added = HashMap<String, Pair<SafEntry, Long>>()
+
+    // Names in [added] that nothing should wait on the provider for any more:
+    // it has answered for them once, or the wait ran out. They keep being
+    // injected into listings; only the waiting stops.
+    private val settled = HashSet<String>()
+
+    @Synchronized
+    fun expectRemoved(name: String, expiresAt: Long) {
+        added.remove(name)
+        settled.remove(name)
+        removed[name] = expiresAt
+    }
+
+    @Synchronized
+    fun expectAdded(entry: SafEntry, expiresAt: Long) {
+        removed.remove(entry.name)
+        settled.remove(entry.name)
+        added[entry.name] = entry to expiresAt
+    }
+
+    /** The app changed [name] again itself; whatever was expected is void. */
+    @Synchronized
+    fun forget(name: String) {
+        removed.remove(name)
+        added.remove(name)
+        settled.remove(name)
+    }
+
+    @Synchronized
+    fun isEmpty(): Boolean = removed.isEmpty() && added.isEmpty()
+
+    /** True while [name] is expected to be gone from the folder. */
+    @Synchronized
+    fun isRemoved(name: String, now: Long): Boolean {
+        val expiresAt = removed[name] ?: return false
+        return expiresAt > now
+    }
+
+    /** The entry this app put into the folder, while that is still expected. */
+    @Synchronized
+    fun addedEntry(name: String, now: Long): SafEntry? {
+        val record = added[name] ?: return null
+        return if (record.second > now) record.first else null
+    }
+
+    /**
+     * True while [name] was put into the folder by this app, the provider has
+     * not been seen to know it yet, and nobody has given up waiting for it.
+     * The provider can only be asked about such an entry (size, content,
+     * children) once it has caught up.
+     */
+    @Synchronized
+    fun awaitingProvider(name: String, now: Long): Boolean {
+        val record = added[name] ?: return false
+        return record.second > now && name !in settled
+    }
+
+    /** The provider answered for [name], or waiting for it any longer is pointless. */
+    @Synchronized
+    fun stopAwaiting(name: String) {
+        if (added.containsKey(name)) settled.add(name)
+    }
+
+    /**
+     * Waiting for one entry timed out, so the provider is not catching up for
+     * this folder at all: stop every other waiter here too rather than make
+     * each of them sit out the full wait in turn.
+     */
+    @Synchronized
+    fun stopAwaitingAll() {
+        settled.addAll(added.keys)
+    }
+
+    /** Names currently tracked, for diagnostics only. */
+    @Synchronized
+    fun describe(): String = "removed=${removed.size} added=${added.size}"
+
+    /** [listing] as the provider reported it, corrected for what is still pending. */
+    @Synchronized
+    fun reconcile(listing: List<SafEntry>, now: Long): List<SafEntry> {
+        removed.values.removeAll { it <= now }
+        added.values.removeAll { it.second <= now }
+        settled.retainAll(added.keys)
+        if (removed.isEmpty() && added.isEmpty()) return listing
+
+        val names = HashSet<String>(listing.size * 2)
+        for (entry in listing) names.add(entry.name)
+        // The provider has caught up with these: stop tracking them.
+        removed.keys.removeAll { it !in names }
+        added.keys.removeAll { it in names }
+        settled.retainAll(added.keys)
+        if (removed.isEmpty() && added.isEmpty()) return listing
+
+        val out = ArrayList<SafEntry>(listing.size + added.size)
+        for (entry in listing) {
+            if (!removed.containsKey(entry.name)) out.add(entry)
+        }
+        for ((entry, _) in added.values) out.add(entry)
+        return out
+    }
+}
+
+/**
  * High-performance SAF (Storage Access Framework) engine modeled after MaterialFiles'
  * DocumentResolver and DocumentFileSystemProvider.
  *
@@ -65,6 +185,22 @@ class SafStorageManager(private val context: Context) {
         private const val DOCUMENT_ID_PRIMARY_ANDROID = "primary:Android"
         private const val DOCUMENT_ID_PRIMARY_ANDROID_DATA = "primary:Android/data"
         private const val DOCUMENT_ID_PRIMARY_ANDROID_OBB = "primary:Android/obb"
+
+        // Upper bound for how long a provider's stale folder listing is
+        // corrected from what this app knows it changed (see
+        // PendingListingChanges). It normally ends sooner: the first listing
+        // that agrees with the change ends it.
+        private const val PENDING_LISTING_TTL_MS = 20_000L
+
+        // A file or folder this app has just moved/copied into a provider may
+        // not exist for that provider yet (see PendingListingChanges): asking
+        // it for the size/content/children fails until its cache catches up.
+        // Such an access waits for the provider, up to this long, polling.
+        private const val PROVIDER_CATCHUP_MAX_WAIT_MS = 12_000L
+        private const val PROVIDER_CATCHUP_POLL_MS = 250L
+
+        // Greppable prefix for the diagnostics of this mechanism.
+        private const val PENDING_TAG = "[pending]"
 
         private val PROJECTION_CHILDREN = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -90,6 +226,196 @@ class SafStorageManager(private val context: Context) {
     // Cache: "$treeUri|$cleanPath" -> List<SafEntry>
     private val dirListingCache = ConcurrentHashMap<String, List<SafEntry>>()
 
+    // Cache: "$treeUri|$cleanFolderPath" -> changes made there that the
+    // provider's own listing may not reflect yet.
+    private val pendingListingChanges = ConcurrentHashMap<String, PendingListingChanges>()
+
+    private fun nowMs(): Long = System.nanoTime() / 1_000_000L
+
+    /** Local device storage lists straight from the file system: never stale. */
+    private fun providerListingMayLag(treeUri: Uri): Boolean =
+        treeUri.authority != EXTERNAL_STORAGE_AUTHORITY
+
+    private fun withPending(
+        treeUri: Uri,
+        folderPath: String,
+        change: (PendingListingChanges) -> Unit,
+    ) {
+        val key = cacheKey(treeUri, normalizePath(folderPath))
+        pendingListingChanges.compute(key) { _, existing ->
+            (existing ?: PendingListingChanges()).also(change)
+        }
+        // Whatever listing the app cached for this folder predates the change.
+        dirListingCache.remove(key)
+    }
+
+    /**
+     * This app has just created or renamed something to [cleanPath]: whatever
+     * it expected about that name (typically "moved away") no longer applies.
+     */
+    private fun forgetPendingFor(treeUri: Uri, cleanPath: String) {
+        if (pendingListingChanges.isEmpty()) return
+        val parent = if (cleanPath.contains('/')) cleanPath.substringBeforeLast('/') else ""
+        pendingListingChanges[cacheKey(treeUri, parent)]?.forget(cleanPath.substringAfterLast('/'))
+    }
+
+    private fun hasPendingChanges(treeUri: Uri, cleanPath: String): Boolean =
+        pendingListingChanges[cacheKey(treeUri, cleanPath)]?.isEmpty() == false
+
+    /**
+     * True when this app has moved [cleanPath], or one of its ancestors, away
+     * and the provider may still claim it is there.
+     */
+    private fun isPendingRemovedAlong(treeUri: Uri, cleanPath: String): Boolean {
+        if (pendingListingChanges.isEmpty()) return false
+        val now = nowMs()
+        var parent = ""
+        for (segment in cleanPath.split('/')) {
+            if (segment.isEmpty()) continue
+            val pending = pendingListingChanges[cacheKey(treeUri, parent)]
+            if (pending != null && pending.isRemoved(segment, now)) return true
+            parent = if (parent.isEmpty()) segment else "$parent/$segment"
+        }
+        return false
+    }
+
+    private fun isMainThread(): Boolean =
+        android.os.Looper.myLooper() == android.os.Looper.getMainLooper()
+
+    private fun waitForProvider(
+        pending: PendingListingChanges,
+        name: String,
+        entryUri: Uri,
+        where: String,
+    ) {
+        val startedAt = nowMs()
+        var polls = 0
+        while (true) {
+            polls++
+            if (documentExists(entryUri)) {
+                pending.stopAwaiting(name)
+                VeLog.i(TAG) {
+                    "$PENDING_TAG provider knows '$where' after ${nowMs() - startedAt}ms ($polls polls)"
+                }
+                return
+            }
+            val now = nowMs()
+            if (!pending.awaitingProvider(name, now)) {
+                // Another thread settled it, or the expectation ran out.
+                return
+            }
+            if (now - startedAt >= PROVIDER_CATCHUP_MAX_WAIT_MS) {
+                pending.stopAwaitingAll()
+                VeLog.w(TAG) {
+                    "$PENDING_TAG gave up waiting for provider on '$where' after ${now - startedAt}ms ($polls polls)"
+                }
+                return
+            }
+            try {
+                Thread.sleep(PROVIDER_CATCHUP_POLL_MS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return
+            }
+        }
+    }
+
+    /**
+     * Blocks (bounded) until the provider can answer for every entry along
+     * [cleanPath] that this app has just moved or copied in.
+     *
+     * Right after such an operation the provider's listing cache does not know
+     * the new entry, so a size/read/thumbnail/list request for it fails
+     * (zero size, no content) even though the entry is listed to the user from
+     * the pending changes. Failing fast here is what left placeholders that
+     * never loaded; waiting makes the first attempt succeed.
+     */
+    private fun awaitProviderCatchUp(treeUri: Uri, cleanPath: String) {
+        if (cleanPath.isEmpty() || pendingListingChanges.isEmpty()) return
+        // Never stall the UI thread; its callers retry or fail as before.
+        if (isMainThread()) return
+        var parent = ""
+        for (segment in cleanPath.split('/')) {
+            if (segment.isEmpty()) continue
+            val here = if (parent.isEmpty()) segment else "$parent/$segment"
+            val pending = pendingListingChanges[cacheKey(treeUri, parent)]
+            val now = nowMs()
+            if (pending != null && pending.awaitingProvider(segment, now)) {
+                val entry = pending.addedEntry(segment, now)
+                if (entry == null || entry.docId.isEmpty()) {
+                    pending.stopAwaiting(segment)
+                } else {
+                    val entryUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, entry.docId)
+                    waitForProvider(pending, segment, entryUri, here)
+                }
+            }
+            parent = here
+        }
+    }
+
+    /**
+     * Snapshot of one document's metadata, taken before an operation that
+     * leaves it unreadable at its old location. Null when it cannot be read.
+     */
+    private fun snapshotEntry(docUri: Uri, asName: String): SafEntry? = try {
+        context.contentResolver.query(docUri, PROJECTION_DOCUMENT, null, null, null)?.use { c ->
+            if (!c.moveToFirst()) return@use null
+            val idIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val mimeIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val sizeIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+            val modIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+            val mime = if (mimeIdx >= 0) c.getString(mimeIdx) ?: "" else ""
+            val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
+            SafEntry(
+                name = asName,
+                isDir = isDir,
+                size = if (isDir || sizeIdx < 0 || c.isNull(sizeIdx)) 0L else c.getLong(sizeIdx),
+                lastModified = if (modIdx >= 0 && !c.isNull(modIdx)) c.getLong(modIdx) / 1000L else 0L,
+                docId = if (idIdx >= 0) c.getString(idIdx) ?: "" else "",
+                mimeType = mime,
+            )
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun reconcileWithPendingChanges(
+        treeUri: Uri,
+        cleanPath: String,
+        listing: List<SafEntry>,
+    ): List<SafEntry> {
+        val key = cacheKey(treeUri, cleanPath)
+        val pending = pendingListingChanges[key] ?: return listing
+        val reconciled = pending.reconcile(listing, nowMs())
+        var finished = false
+        pendingListingChanges.computeIfPresent(key) { _, p ->
+            if (p.isEmpty()) {
+                finished = true
+                null
+            } else {
+                p
+            }
+        }
+        // Nothing is cached for a folder while changes are pending for it; if
+        // a racing query cached a pre-change listing anyway, it must not
+        // outlive the pending record that was masking it.
+        if (finished) dirListingCache.remove(key)
+        VeLog.i(TAG) {
+            "$PENDING_TAG reconcile '$cleanPath': provider=${listing.size} shown=${reconciled.size} " +
+                "finished=$finished (${pending.describe()})"
+        }
+        return reconciled
+    }
+
+    /** Drops every cached id/listing at or below [cleanPath] (its paths no longer exist). */
+    private fun invalidateSubtree(treeUri: Uri, cleanPath: String) {
+        val base = cacheKey(treeUri, cleanPath)
+        val childPrefix = "$base/"
+        pathDocumentIdCache.keys.removeIf { it == base || it.startsWith(childPrefix) }
+        dirListingCache.keys.removeIf { it == base || it.startsWith(childPrefix) }
+        pendingListingChanges.keys.removeIf { it == base || it.startsWith(childPrefix) }
+    }
+
     private fun normalizePath(path: String): String =
         path.trim().trim('/').replace('\\', '/')
 
@@ -107,6 +433,9 @@ class SafStorageManager(private val context: Context) {
             dirListingCache.remove(cacheKey(treeUri, clean))
             val parentPath = if (clean.contains('/')) clean.substringBeforeLast('/') else ""
             dirListingCache.remove(cacheKey(treeUri, parentPath))
+            // This app has just changed that entry itself (create, delete,
+            // rename, write); an earlier expectation about it no longer holds.
+            pendingListingChanges[cacheKey(treeUri, parentPath)]?.forget(clean.substringAfterLast('/'))
         }
     }
 
@@ -129,6 +458,13 @@ class SafStorageManager(private val context: Context) {
                 }
                 null
             }
+        }
+
+        // This app moved it (or a parent) away; a stale provider listing or a
+        // cached id from before the move must not bring it back.
+        if (isPendingRemovedAlong(treeUri, clean)) {
+            VeLog.i(TAG) { "$PENDING_TAG resolve '$clean': moved away, treated as missing" }
+            return null
         }
 
         val key = cacheKey(treeUri, clean)
@@ -169,10 +505,20 @@ class SafStorageManager(private val context: Context) {
                 continue
             }
 
-            // Query children of current directory
-            val children = queryChildrenInternal(treeUri, currentDocId, currentPath)
+            // Query children of current directory. The provider's answer is
+            // corrected for what this app just moved/copied, exactly like a
+            // listing the user sees: otherwise an entry that is shown could not
+            // be found again to open, size or thumbnail it.
+            val children = reconcileWithPendingChanges(
+                treeUri,
+                currentPath,
+                queryChildrenInternal(treeUri, currentDocId, currentPath),
+            )
             val matched = children.firstOrNull { it.name.equals(segment, ignoreCase = true) }
             if (matched == null) {
+                if (pendingListingChanges.isNotEmpty()) {
+                    VeLog.i(TAG) { "$PENDING_TAG resolve '$clean': '$segment' not found in '$currentPath' (${children.size} entries)" }
+                }
                 return null
             }
             currentPath = nextPath
@@ -186,6 +532,7 @@ class SafStorageManager(private val context: Context) {
 
     fun getDocumentUri(treeUri: Uri, relativePath: String): Uri? {
         val docId = resolveDocumentId(treeUri, relativePath) ?: return null
+        awaitProviderCatchUp(treeUri, normalizePath(relativePath))
         return DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
     }
 
@@ -351,6 +698,7 @@ class SafStorageManager(private val context: Context) {
     fun canListDirectory(treeUri: Uri, relativePath: String): Boolean {
         return try {
             val docId = resolveDocumentId(treeUri, relativePath) ?: return false
+            awaitProviderCatchUp(treeUri, normalizePath(relativePath))
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
             context.contentResolver.query(
                 childrenUri,
@@ -378,12 +726,17 @@ class SafStorageManager(private val context: Context) {
      * to request that (the system picker's pull-to-refresh uses it). Providers
      * that do not support it return false, so this is best effort.
      */
-    private fun requestProviderRefresh(treeUri: Uri, folderDocId: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        runCatching {
+    private fun requestProviderRefresh(treeUri: Uri, folderDocId: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val accepted = runCatching {
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, folderDocId)
             context.contentResolver.refresh(childrenUri, null, null)
-        }
+        }.getOrDefault(false)
+        // false = the provider does not implement refresh (RSAF is expected to
+        // be one: it has no way to invalidate its directory cache on request),
+        // so the pending-change handling is what keeps the listing right.
+        VeLog.i(TAG) { "$PENDING_TAG provider refresh: authority=${treeUri.authority} accepted=$accepted" }
+        return accepted
     }
 
     fun listDirectory(treeUri: Uri, relativePath: String, refresh: Boolean = false): List<SafEntry> {
@@ -393,11 +746,23 @@ class SafStorageManager(private val context: Context) {
         }
         val docId = resolveDocumentId(treeUri, clean) ?: return emptyList()
         if (refresh) requestProviderRefresh(treeUri, docId)
-        return queryChildrenInternal(treeUri, docId, clean)
+        // A folder this app just moved/copied in has no children for the
+        // provider until it catches up: wait instead of listing it as empty.
+        awaitProviderCatchUp(treeUri, clean)
+        return reconcileWithPendingChanges(
+            treeUri,
+            clean,
+            queryChildrenInternal(treeUri, docId, clean),
+        )
     }
 
     private fun queryChildrenInternal(treeUri: Uri, parentDocId: String, currentPath: String): List<SafEntry> {
-        val cached = dirListingCache[cacheKey(treeUri, currentPath)]
+        // While this app has changes pending for the folder, the provider's
+        // answers are known to lag: never serve a cached one, and (below) never
+        // cache one -- it would resurface the stale state once the pending
+        // record that masks it is gone.
+        val pendingHere = hasPendingChanges(treeUri, currentPath)
+        val cached = if (pendingHere) null else dirListingCache[cacheKey(treeUri, currentPath)]
         if (cached != null && cached.isNotEmpty()) {
             return cached
         }
@@ -490,7 +855,11 @@ class SafStorageManager(private val context: Context) {
         }
 
         if (entries.isNotEmpty()) {
-            dirListingCache[cacheKey(treeUri, currentPath)] = entries
+            if (hasPendingChanges(treeUri, currentPath)) {
+                VeLog.d(TAG) { "$PENDING_TAG '$currentPath': ${entries.size} provider entries not cached (changes pending)" }
+            } else {
+                dirListingCache[cacheKey(treeUri, currentPath)] = entries
+            }
         }
         return entries
     }
@@ -526,15 +895,34 @@ class SafStorageManager(private val context: Context) {
     }
 
     fun getFileSize(treeUri: Uri, relativePath: String): Long {
-        val docUri = getDocumentUri(treeUri, relativePath) ?: return -1L
+        val docUri = getDocumentUri(treeUri, relativePath) ?: run {
+            // The caller sees -1 either way; this says whether the path could
+            // not be resolved at all (stale listing / unknown entry).
+            VeLog.w(TAG) { "getFileSize: '$relativePath' did not resolve to a document" }
+            return -1L
+        }
         return try {
             context.contentResolver.query(docUri, arrayOf(DocumentsContract.Document.COLUMN_SIZE), null, null, null)?.use { c ->
                 if (c.moveToFirst()) {
                     val idx = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                    if (idx >= 0 && !c.isNull(idx)) c.getLong(idx) else 0L
-                } else -1L
-            } ?: -1L
-        } catch (_: Exception) {
+                    if (idx >= 0 && !c.isNull(idx)) {
+                        c.getLong(idx).also { size ->
+                            if (size <= 0L) VeLog.w(TAG) { "getFileSize: provider reported size=$size for '$relativePath'" }
+                        }
+                    } else {
+                        VeLog.w(TAG) { "getFileSize: provider reported no size for '$relativePath'" }
+                        0L
+                    }
+                } else {
+                    VeLog.w(TAG) { "getFileSize: provider has no row for '$relativePath'" }
+                    -1L
+                }
+            } ?: run {
+                VeLog.w(TAG) { "getFileSize: provider returned no cursor for '$relativePath'" }
+                -1L
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "getFileSize: query failed for '$relativePath': ${e.javaClass.simpleName}: ${e.message}" }
             -1L
         }
     }
@@ -543,7 +931,10 @@ class SafStorageManager(private val context: Context) {
      * Reads a chunk using seekable FileChannel random access where possible.
      */
     fun readFileChunk(treeUri: Uri, relativePath: String, offset: Long, length: Int): ByteArray? {
-        val docUri = getDocumentUri(treeUri, relativePath) ?: return null
+        val docUri = getDocumentUri(treeUri, relativePath) ?: run {
+            VeLog.w(TAG) { "readFileChunk: '$relativePath' did not resolve to a document" }
+            return null
+        }
         return try {
             val pfd = context.contentResolver.openFileDescriptor(docUri, "r")
             if (pfd != null) {
@@ -637,6 +1028,7 @@ class SafStorageManager(private val context: Context) {
             val created = DocumentsContract.createDocument(context.contentResolver, parentUri, mime, fileName)
             if (created != null) {
                 invalidateCache(treeUri, parentPath)
+                forgetPendingFor(treeUri, clean)
                 val docId = DocumentsContract.getDocumentId(created)
                 pathDocumentIdCache[cacheKey(treeUri, clean)] = docId
                 true
@@ -688,6 +1080,7 @@ class SafStorageManager(private val context: Context) {
             )
             if (created != null) {
                 invalidateCache(treeUri, cleanParent)
+                forgetPendingFor(treeUri, newDirPath)
                 val docId = DocumentsContract.getDocumentId(created)
                 pathDocumentIdCache[cacheKey(treeUri, newDirPath)] = docId
                 true
@@ -710,6 +1103,7 @@ class SafStorageManager(private val context: Context) {
                 invalidateCache(treeUri, clean)
                 val parentPath = if (clean.contains('/')) clean.substringBeforeLast('/') else ""
                 val newPath = if (parentPath.isEmpty()) newName else "$parentPath/$newName"
+                forgetPendingFor(treeUri, newPath)
                 val newDocId = DocumentsContract.getDocumentId(renamedUri)
                 pathDocumentIdCache[cacheKey(treeUri, newPath)] = newDocId
                 true
@@ -739,9 +1133,13 @@ class SafStorageManager(private val context: Context) {
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
 
+        val startedAt = nowMs()
         val sourceUri = getDocumentUri(treeUri, source) ?: return false
         val sourceParentUri = getDocumentUri(treeUri, sourceParentPath) ?: return false
         val destParentUri = getDocumentUri(treeUri, destParentPath) ?: return false
+        val lags = providerListingMayLag(treeUri)
+        // Read before the move: afterwards the source no longer exists to ask.
+        val movedSnapshot = if (lags) snapshotEntry(sourceUri, destName) else null
         return try {
             val movedUri = DocumentsContract.moveDocument(
                 context.contentResolver,
@@ -749,15 +1147,38 @@ class SafStorageManager(private val context: Context) {
                 sourceParentUri,
                 destParentUri,
             ) ?: return false
-            // The provider's own listing of both folders is stale now. Ask it
-            // to re-read them before the app lists either folder again.
-            resolveDocumentId(treeUri, sourceParentPath)?.let { requestProviderRefresh(treeUri, it) }
-            resolveDocumentId(treeUri, destParentPath)?.let { requestProviderRefresh(treeUri, it) }
-            // Moving a directory changes paths for its cached descendants.
-            invalidateCache(treeUri)
-            runCatching {
-                pathDocumentIdCache[cacheKey(treeUri, dest)] =
-                    DocumentsContract.getDocumentId(movedUri)
+            val movedDocId = runCatching { DocumentsContract.getDocumentId(movedUri) }.getOrNull()
+
+            // Some providers (RSAF) move server-side behind their own listing
+            // cache, which keeps answering with the old folders for a few
+            // seconds. Remember the outcome so every lookup -- listing and
+            // path resolution alike -- reflects it until the provider agrees.
+            if (lags) {
+                val expiresAt = nowMs() + PENDING_LISTING_TTL_MS
+                withPending(treeUri, sourceParentPath) { it.expectRemoved(sourceName, expiresAt) }
+                if (movedSnapshot != null) {
+                    val entry = if (movedDocId != null) movedSnapshot.copy(docId = movedDocId) else movedSnapshot
+                    withPending(treeUri, destParentPath) { it.expectAdded(entry, expiresAt) }
+                }
+            }
+
+            // Only the old location is invalid now (for a directory, everything
+            // below it). Wiping the whole tree's cache here would also drop the
+            // ids of files moved just before this one in the same batch, which
+            // could then no longer be found at their new path.
+            invalidateSubtree(treeUri, source)
+            dirListingCache.remove(cacheKey(treeUri, sourceParentPath))
+            dirListingCache.remove(cacheKey(treeUri, destParentPath))
+            if (movedDocId != null) pathDocumentIdCache[cacheKey(treeUri, dest)] = movedDocId
+
+            // Providers that support it re-read both folders; ones that do not
+            // (the call returns false) rely on the pending changes above.
+            val sourceRefresh = resolveDocumentId(treeUri, sourceParentPath)?.let { requestProviderRefresh(treeUri, it) }
+            val destRefresh = resolveDocumentId(treeUri, destParentPath)?.let { requestProviderRefresh(treeUri, it) }
+            VeLog.i(TAG) {
+                "$PENDING_TAG moveFile '$source' -> '$dest': lags=$lags snapshot=${movedSnapshot != null} " +
+                    "size=${movedSnapshot?.size} movedDocId=${movedDocId != null} " +
+                    "refresh(src=$sourceRefresh,dest=$destRefresh) in ${nowMs() - startedAt}ms"
             }
             true
         } catch (e: Exception) {
@@ -835,7 +1256,35 @@ class SafStorageManager(private val context: Context) {
         framePosition: Double = 0.12,
         explicitTimeUs: Long? = null,
     ): Map<String, Any>? {
-        val docUri = getDocumentUri(treeUri, relativePath) ?: return null
+        val startedAt = nowMs()
+        val thumb = extractThumbnail(
+            treeUri, relativePath, targetSize, quality, isVideo, preserveAlpha,
+            strategy, framePosition, explicitTimeUs,
+        )
+        if (thumb == null) {
+            VeLog.w(TAG) {
+                "getThumbnail: nothing for '$relativePath' (video=$isVideo) after ${nowMs() - startedAt}ms, " +
+                    "folders with pending changes=${pendingListingChanges.size}"
+            }
+        }
+        return thumb
+    }
+
+    private fun extractThumbnail(
+        treeUri: Uri,
+        relativePath: String,
+        targetSize: Int,
+        quality: Int,
+        isVideo: Boolean,
+        preserveAlpha: Boolean,
+        strategy: String,
+        framePosition: Double,
+        explicitTimeUs: Long?,
+    ): Map<String, Any>? {
+        val docUri = getDocumentUri(treeUri, relativePath) ?: run {
+            VeLog.w(TAG) { "getThumbnail: '$relativePath' did not resolve to a document" }
+            return null
+        }
 
         if (isVideo) {
             return try {
@@ -1192,14 +1641,34 @@ class SafStorageManager(private val context: Context) {
             val destParentUri = getDocumentUri(destTreeUri, destParentPath)
             if (srcDocUri != null && destParentUri != null) {
                 try {
+                    val destName = destPath.substringAfterLast('/')
+                    val copiedSnapshot =
+                        if (providerListingMayLag(destTreeUri)) snapshotEntry(srcDocUri, destName) else null
                     val copied = DocumentsContract.copyDocument(context.contentResolver, srcDocUri, destParentUri)
                     if (copied != null) {
-                        val destName = destPath.substringAfterLast('/')
+                        // A rename can change the document id: keep the Uri it returns.
+                        var finalUri: Uri = copied
                         val copiedName = getFileNameFromUri(copied)
                         if (copiedName != null && copiedName != destName) {
                             DocumentsContract.renameDocument(context.contentResolver, copied, destName)
+                                ?.let { finalUri = it }
                         }
                         invalidateCache(destTreeUri, destPath)
+                        val copiedDocId = runCatching { DocumentsContract.getDocumentId(finalUri) }.getOrNull()
+                        if (copiedDocId != null) {
+                            pathDocumentIdCache[cacheKey(destTreeUri, normalizePath(destPath))] = copiedDocId
+                        }
+                        // A server-side copy can leave the provider's folder
+                        // listing stale, like a move (see moveFile).
+                        if (copiedSnapshot != null) {
+                            val entry = copiedSnapshot.copy(docId = copiedDocId ?: copiedSnapshot.docId)
+                            val expiresAt = nowMs() + PENDING_LISTING_TTL_MS
+                            withPending(destTreeUri, destParentPath) { it.expectAdded(entry, expiresAt) }
+                        }
+                        VeLog.i(TAG) {
+                            "$PENDING_TAG copyFile -> '$destPath': snapshot=${copiedSnapshot != null} " +
+                                "size=${copiedSnapshot?.size} copiedDocId=${copiedDocId != null}"
+                        }
                         return true
                     }
                 } catch (_: UnsupportedOperationException) {}

@@ -13,7 +13,7 @@ import 'package:path/path.dart' as p;
 ///
 /// Must equal the version name in pubspec.yaml; test/core/engine/desktop/desktop_method_coverage_test.dart
 /// fails when they drift, so bumping the version in pubspec.yaml means bumping it here too.
-const String desktopAppVersion = '1.66.0';
+const String desktopAppVersion = '1.67.1';
 
 /// Free bytes on the volume holding [path], or null when it cannot be determined. Best effort: a null
 /// only means "unknown", and every caller treats it that way.

@@ -154,115 +154,150 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
       ),
       onOpen: () => setState(() => _menuIsOpen = true),
       onClose: () => setState(() => _menuIsOpen = false),
-      menuChildren: [
-        MenuItemButton(
-          leadingIcon: Icon(
-            Icons.create_new_folder_outlined,
-            color: cs.primary,
-          ),
-          child: Text(context.l10n.newFolderTitle),
-          onPressed: () {
-            BrowserDialogs.showCreateFolder(
-              context,
-              container: widget.container,
-              currentDirPath: widget.currentDirPath,
-              existingEntries: widget.currentItems,
-              onSuccess: () {},
-              readOnly: widget.isReadOnly,
-            );
-          },
-        ),
-        MenuItemButton(
-          leadingIcon: Icon(
-            Icons.insert_drive_file_outlined,
-            color: cs.primary,
-          ),
-          child: Text(context.l10n.newTextFileTitle),
-          onPressed: () {
-            BrowserDialogs.showCreateFile(
-              context,
-              container: widget.container,
-              currentDirPath: widget.currentDirPath,
-              existingEntries: widget.currentItems,
-              onSuccess: () {},
-              readOnly: widget.isReadOnly,
-            );
-          },
-        ),
-        // Cryptomator stores encrypted virtual links; ext/NTFS disk-image
-        // filesystems store native links. FAT/exFAT and unknown filesystems
-        // deliberately do not expose this action.
-        if (!widget.hideImportAndSecureItemActions &&
-            supportsVaultSymbolicLinks(widget.container))
-          MenuItemButton(
-            leadingIcon: Icon(Icons.add_link, color: cs.primary),
-            child: Text(context.l10n.newSymbolicLinkTitle),
-            onPressed: () {
-              BrowserDialogs.showCreateSymlink(
-                context,
-                container: widget.container,
-                currentDirPath: widget.currentDirPath,
-                existingEntries: widget.currentItems,
-                onSuccess: () {},
-                readOnly: widget.isReadOnly,
-              );
-            },
-          ),
-        if (PlatformFeatures.camera)
-        MenuItemButton(
-          leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-          // The callback awaits the camera route. Holding lock suppression
-          // around it would disable screen-off auto-lock for the whole time
-          // the camera is open.
-          onPressed: widget.onCaptureFromCamera,
-          child: Text(context.l10n.camera),
-        ),
-        if (PlatformFeatures.audioRecorder)
-        MenuItemButton(
-          leadingIcon: Icon(Icons.mic_none_rounded, color: cs.primary),
-          onPressed: () => ref
-              .read(sessionLockControllerProvider)
-              .withLockSuppression(widget.onRecordAudio),
-          child: Text(context.l10n.audioRecorder),
-        ),
-        if (!widget.hideImportAndSecureItemActions) ...[
-          const PopupMenuDivider(),
-          MenuItemButton(
-            leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-            onPressed: () => ref
-                .read(sessionLockControllerProvider)
-                .withLockSuppression(widget.onImportFilesFromDevice),
-            child: Text(context.l10n.importFiles),
-          ),
-          MenuItemButton(
-            leadingIcon: Icon(
-              Icons.drive_folder_upload_outlined,
-              color: cs.secondary,
-            ),
-            onPressed: () => ref
-                .read(sessionLockControllerProvider)
-                .withLockSuppression(widget.onImportFolderFromDevice),
-            child: Text(context.l10n.importFolder),
-          ),
-          const PopupMenuDivider(),
-          SubmenuButton(
-            leadingIcon: Icon(Icons.lock_rounded, color: cs.primary),
-            menuChildren: [
-              ...VaultItemType.values.map(
-                (type) => MenuItemButton(
-                  leadingIcon: Icon(
-                    vaultIconForExt(type.name) ?? Icons.lock_rounded,
-                    color: vaultColorForExt(type.name) ?? cs.primary,
-                  ),
-                  child: Text(type.label(context.l10n)),
-                  onPressed: () => widget.onAddVaultItem(type),
-                ),
-              ),
-            ],
-            child: Text(context.l10n.secureItem),
-          ),
-        ],
-      ],
+      menuChildren: buildAddItemMenuChildren(
+        context: context,
+        ref: ref,
+        container: widget.container,
+        currentDirPath: widget.currentDirPath,
+        currentItems: widget.currentItems,
+        isReadOnly: widget.isReadOnly,
+        hideImportAndSecureItemActions: widget.hideImportAndSecureItemActions,
+        onCaptureFromCamera: widget.onCaptureFromCamera,
+        onRecordAudio: widget.onRecordAudio,
+        onImportFilesFromDevice: widget.onImportFilesFromDevice,
+        onImportFolderFromDevice: widget.onImportFolderFromDevice,
+        onAddVaultItem: widget.onAddVaultItem,
+      ),
     );
   }
+}
+
+/// The entries of the "new item" menu: new folder/file/symlink, camera and
+/// audio capture, import files/folder and the "Secure Item" submenu. Shared by
+/// the app-bar/FAB [AddItemMenuButton] and the right-click menu of the empty
+/// area of a folder, so both always offer the same actions.
+List<Widget> buildAddItemMenuChildren({
+  required BuildContext context,
+  required WidgetRef ref,
+  required MountedContainer container,
+  required String currentDirPath,
+  required List<RawEntry> currentItems,
+  required bool isReadOnly,
+  required bool hideImportAndSecureItemActions,
+  required Future<void> Function() onCaptureFromCamera,
+  required Future<void> Function() onRecordAudio,
+  required Future<void> Function() onImportFilesFromDevice,
+  required Future<void> Function() onImportFolderFromDevice,
+  required Future<void> Function(VaultItemType type) onAddVaultItem,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  return [
+    MenuItemButton(
+      leadingIcon: Icon(
+        Icons.create_new_folder_outlined,
+        color: cs.primary,
+      ),
+      child: Text(context.l10n.newFolderTitle),
+      onPressed: () {
+        BrowserDialogs.showCreateFolder(
+          context,
+          container: container,
+          currentDirPath: currentDirPath,
+          existingEntries: currentItems,
+          onSuccess: () {},
+          readOnly: isReadOnly,
+        );
+      },
+    ),
+    MenuItemButton(
+      leadingIcon: Icon(
+        Icons.insert_drive_file_outlined,
+        color: cs.primary,
+      ),
+      child: Text(context.l10n.newTextFileTitle),
+      onPressed: () {
+        BrowserDialogs.showCreateFile(
+          context,
+          container: container,
+          currentDirPath: currentDirPath,
+          existingEntries: currentItems,
+          onSuccess: () {},
+          readOnly: isReadOnly,
+        );
+      },
+    ),
+    // Cryptomator stores encrypted virtual links; ext/NTFS disk-image
+    // filesystems store native links. FAT/exFAT and unknown filesystems
+    // deliberately do not expose this action.
+    if (!hideImportAndSecureItemActions &&
+        supportsVaultSymbolicLinks(container))
+      MenuItemButton(
+        leadingIcon: Icon(Icons.add_link, color: cs.primary),
+        child: Text(context.l10n.newSymbolicLinkTitle),
+        onPressed: () {
+          BrowserDialogs.showCreateSymlink(
+            context,
+            container: container,
+            currentDirPath: currentDirPath,
+            existingEntries: currentItems,
+            onSuccess: () {},
+            readOnly: isReadOnly,
+          );
+        },
+      ),
+    if (PlatformFeatures.camera)
+    MenuItemButton(
+      leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
+      // The callback awaits the camera route. Holding lock suppression
+      // around it would disable screen-off auto-lock for the whole time
+      // the camera is open.
+      onPressed: onCaptureFromCamera,
+      child: Text(context.l10n.camera),
+    ),
+    if (PlatformFeatures.audioRecorder)
+    MenuItemButton(
+      leadingIcon: Icon(Icons.mic_none_rounded, color: cs.primary),
+      onPressed: () => ref
+          .read(sessionLockControllerProvider)
+          .withLockSuppression(onRecordAudio),
+      child: Text(context.l10n.audioRecorder),
+    ),
+    if (!hideImportAndSecureItemActions) ...[
+      const PopupMenuDivider(),
+      MenuItemButton(
+        leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
+        onPressed: () => ref
+            .read(sessionLockControllerProvider)
+            .withLockSuppression(onImportFilesFromDevice),
+        child: Text(context.l10n.importFiles),
+      ),
+      MenuItemButton(
+        leadingIcon: Icon(
+          Icons.drive_folder_upload_outlined,
+          color: cs.secondary,
+        ),
+        onPressed: () => ref
+            .read(sessionLockControllerProvider)
+            .withLockSuppression(onImportFolderFromDevice),
+        child: Text(context.l10n.importFolder),
+      ),
+      const PopupMenuDivider(),
+      SubmenuButton(
+        leadingIcon: Icon(Icons.lock_rounded, color: cs.primary),
+        menuChildren: [
+          ...VaultItemType.values.map(
+            (type) => MenuItemButton(
+              leadingIcon: Icon(
+                vaultIconForExt(type.name) ?? Icons.lock_rounded,
+                color: vaultColorForExt(type.name) ?? cs.primary,
+              ),
+              child: Text(type.label(context.l10n)),
+              onPressed: () => onAddVaultItem(type),
+            ),
+          ),
+        ],
+        child: Text(context.l10n.secureItem),
+      ),
+    ],
+  ];
 }

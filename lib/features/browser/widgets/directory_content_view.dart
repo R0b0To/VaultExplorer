@@ -55,6 +55,7 @@ import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
@@ -92,6 +93,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/folder_background_context_menu.dart';
 import 'package:vaultexplorer/features/browser/widgets/vault_listing_notices.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
@@ -1028,6 +1030,115 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     );
   }
 
+  /// Entries of the right-click menu on the empty area of the folder: paste,
+  /// "New" (the same actions as the add button), view mode, sort, select all
+  /// and refresh. Built when the menu opens so it reflects the current
+  /// clipboard, layout and sort.
+  List<Widget> _buildFolderBackgroundMenu(BuildContext menuContext) {
+    _signalActivity();
+    final cs = Theme.of(menuContext).colorScheme;
+    final l10n = menuContext.l10n;
+    final inArchive = _archiveContext != null;
+    final readOnly = _isReadOnly;
+    final hasClipboard = ref.read(crossContainerClipboardProvider).hasItems;
+    final sort = _getSortStateForFolder(_currentDirPath);
+
+    return <Widget>[
+      if (!inArchive)
+        MenuItemButton(
+          leadingIcon: Icon(Icons.content_paste_rounded, color: cs.primary),
+          onPressed: hasClipboard && !readOnly
+              ? () => unawaited(_paste())
+              : null,
+          child: Text(l10n.actionPaste),
+        ),
+      if (inArchive)
+        MenuItemButton(
+          leadingIcon: Icon(Icons.unarchive_rounded, color: cs.primary),
+          onPressed: () => ref
+              .read(sessionLockControllerProvider)
+              .withLockSuppression(_extractArchive),
+          child: Text(l10n.extractArchive),
+        )
+      else if (readOnly)
+        MenuItemButton(
+          leadingIcon: Icon(Icons.lock_outline_rounded, color: cs.primary),
+          onPressed: () => _setStatus(
+            l10n.readOnlyContainerWarning,
+            error: true,
+          ),
+          child: Text(l10n.newItemTooltip),
+        )
+      else
+        SubmenuButton(
+          leadingIcon: Icon(Icons.add_rounded, color: cs.primary),
+          menuChildren: buildAddItemMenuChildren(
+            context: menuContext,
+            ref: ref,
+            container: widget.container,
+            currentDirPath: _currentDirPath,
+            currentItems: _currentItems,
+            isReadOnly: readOnly,
+            hideImportAndSecureItemActions: widget.container.isLocalStorage,
+            onCaptureFromCamera: _captureFromCamera,
+            onRecordAudio: _recordAudio,
+            onImportFilesFromDevice: _importFilesFromDevice,
+            onImportFolderFromDevice: _importFolderFromDevice,
+            onAddVaultItem: _addVaultItem,
+          ),
+          child: Text(l10n.newItemTooltip),
+        ),
+      const PopupMenuDivider(),
+      SubmenuButton(
+        leadingIcon: Icon(Icons.view_module_rounded, color: cs.onSurfaceVariant),
+        menuChildren: buildLayoutModeMenuItems(
+          context: menuContext,
+          cs: cs,
+          layoutMode: _layoutMode,
+          onLayoutModeChanged: _onLayoutModeChanged,
+          gridAspectRatio: _toolbarConfig.getGridAspectRatioForFolder(
+            widget.container.uri,
+            _currentDirPath,
+          ),
+          onGridAspectRatioChanged: _onGridAspectRatioChanged,
+        ),
+        child: Text(l10n.viewModeAction),
+      ),
+      SubmenuButton(
+        leadingIcon: Icon(
+          sortIconFor(sort.sortBy),
+          color: cs.onSurfaceVariant,
+        ),
+        menuChildren: buildSortMenuItems(
+          context: menuContext,
+          cs: cs,
+          sortBy: sort.sortBy,
+          sortAscending: sort.sortAscending,
+          onSortChanged: _onSortChanged,
+        ),
+        child: Text(l10n.sortOptionsTooltip),
+      ),
+      const PopupMenuDivider(),
+      MenuItemButton(
+        leadingIcon: Icon(Icons.select_all_rounded, color: cs.onSurfaceVariant),
+        onPressed: () {
+          final displayed = _displayedItemsForScroll();
+          if (displayed.isEmpty) return;
+          setSelectedItems(displayed.toSet());
+          if (selectedFolderCount > 0) {
+            fetchFolderSizes(widget.container, _currentDirPath);
+          }
+        },
+        child: Text(l10n.actionSelectAll),
+      ),
+      MenuItemButton(
+        leadingIcon: Icon(Icons.refresh_rounded, color: cs.onSurfaceVariant),
+        onPressed: _refreshListing,
+        child: Text(l10n.refreshListButton),
+      ),
+    ];
+  }
+
   /// Covers the body of the directory view: hands tiles the drag lock and the
   /// reveal flash, and tints the whole pane (no border) while another pane's
   /// drag is over it. The tint is shown only for a pane the drag did not start in -- the
@@ -1047,7 +1158,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       child: Stack(
         fit: StackFit.passthrough,
         children: [
-          body,
+          FolderBackgroundContextMenu(
+            // Locked panes (a drag in flight) must not pop a menu.
+            enabled: !locked,
+            menuBuilder: _buildFolderBackgroundMenu,
+            child: body,
+          ),
           Positioned.fill(
             child: IgnorePointer(
               child: AnimatedOpacity(

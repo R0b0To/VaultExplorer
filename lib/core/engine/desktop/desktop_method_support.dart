@@ -87,6 +87,16 @@ const Set<String> desktopAndroidOnlyMethods = {
   'safShareFiles',
   'safWriteFileChunk',
 
+  // Android app-private vault storage and relocation. Desktop vaults use user-selected paths.
+  'createAppStorageContainer',
+  'createAppStorageFolderVault',
+  'deleteAppStorageVault',
+  'discardRelocationCopy',
+  'finalizeRelocation',
+  'getAppStorageInfo',
+  'relocateFromAppStorage',
+  'relocateToAppStorage',
+
   // Android system integration.
   'exportLogFile', // the in-app Logcat viewer's export
   'getApkIcon',

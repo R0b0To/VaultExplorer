@@ -22,6 +22,8 @@ val targetAbi: String? = System.getenv("VAULTEXPLORER_TARGET_ABI")
 // ── Overrides ndkVersion & abiFilters AFTER library DSL evaluates ────────────
 subprojects {
     plugins.withId("com.android.library") {
+        // Gradle 9 requires the launcher explicitly for library tests using JUnit Platform.
+        dependencies.add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher:1.11.4")
         val subprojectName = name
         val subprojectDir = projectDir
         extensions.configure<LibraryAndroidComponentsExtension>("androidComponents") {

@@ -36,6 +36,16 @@ class FlutterWindow : public Win32Window {
   // Looks up views other than the main one (secondary windows).
   FlutterDesktopPluginRegistrarRef window_registrar_ = nullptr;
 
+  // Whether closing this window hides it instead of destroying it.
+  //
+  // This window owns the Flutter engine and the widget tree that every
+  // secondary window is drawn into, so it cannot go while one of them is open.
+  // While the Dart side has a window that must outlive this one it sets this
+  // ("setHideOnClose"), and a close request then only hides the window. The
+  // Dart side ends the app (see "quitIfMainHidden") when the last such window
+  // has closed.
+  bool hide_on_close_ = false;
+
   // The top-level window a "vaultexplorer/window" call is about: the one that
   // hosts the Flutter view named by a "viewId" argument, or this window when
   // there is none. Null when the view is gone.

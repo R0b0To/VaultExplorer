@@ -44,6 +44,10 @@ int _fileManagerWindowSerial = 0;
 /// windows are not available, so the caller can open a tab instead. Menus go
 /// through `FileManagerEnvironment`, which ends up here.
 ///
+/// The window stands on its own: closing the window it was opened from (the
+/// main one included) does not close it, and the app ends when the last file
+/// manager window closes, as with the windows of a desktop file manager.
+///
 /// [title] is what the window is called until it has a location of its own;
 /// it defaults to the container's name.
 bool openFileManagerWindow({
@@ -54,6 +58,7 @@ bool openFileManagerWindow({
   return SecondaryWindows.instance.open(
     key: 'files:${++_fileManagerWindowSerial}',
     title: title ?? container?.displayName ?? '',
+    survivesMainClose: true,
     size: const Size(1100, 760),
     constraints: const BoxConstraints(minWidth: 560, minHeight: 400),
     builder: (_) =>

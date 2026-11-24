@@ -122,6 +122,40 @@ bool FlutterWindow::OnCreate() {
           ReleaseCapture();
           SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
           result->Success(flutter::EncodableValue());
+        } else if (method == "setHideOnClose") {
+          // Whether closing the main window hides it (see hide_on_close_).
+          // These three calls are about the main window, so they carry no
+          // "viewId" and TargetWindow() above resolved to it.
+          bool enabled = false;
+          if (const auto* arguments =
+                  std::get_if<flutter::EncodableMap>(call.arguments())) {
+            const auto it = arguments->find(flutter::EncodableValue("enabled"));
+            if (it != arguments->end()) {
+              if (const auto* value = std::get_if<bool>(&it->second)) {
+                enabled = *value;
+              }
+            }
+          }
+          hide_on_close_ = enabled;
+          result->Success(flutter::EncodableValue());
+        } else if (method == "revealMainWindow") {
+          // Brings the main window back if it was hidden on close, without
+          // taking the focus from the window the person is working in. A
+          // window that is merely minimized or behind others is left alone.
+          if (!IsWindowVisible(hwnd)) {
+            ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+          }
+          result->Success(flutter::EncodableValue());
+        } else if (method == "quitIfMainHidden") {
+          // The last window that could stand on its own has closed. A main
+          // window that was hidden for its sake has no reason left to exist,
+          // so close it for real, which ends the app. A main window that is on
+          // screen means the person never closed it: nothing to do.
+          if (!IsWindowVisible(hwnd)) {
+            hide_on_close_ = false;
+            PostMessage(hwnd, WM_CLOSE, 0, 0);
+          }
+          result->Success(flutter::EncodableValue());
         } else {
           result->NotImplemented();
         }
@@ -181,6 +215,17 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // Closing the main window while another window depends on it only hides it
+  // (see hide_on_close_). This comes before Flutter's own handling so that the
+  // engine never starts its "close the app" sequence for this request; it
+  // still hears about the window being hidden through WM_SHOWWINDOW. Every way
+  // of closing the window ends up here as WM_CLOSE: the title bar's close
+  // button (the "close" call above), Alt+F4 and the taskbar.
+  if (message == WM_CLOSE && hide_on_close_ && hwnd == GetHandle()) {
+    ShowWindow(hwnd, SW_HIDE);
+    return 0;
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

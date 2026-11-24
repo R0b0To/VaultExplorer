@@ -733,11 +733,6 @@ class _ToolRow extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      trailing: Icon(
-        Icons.chevron_right_rounded,
-        size: 20,
-        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-      ),
       onTap: onTap,
     );
   }

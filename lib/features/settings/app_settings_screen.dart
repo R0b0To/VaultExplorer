@@ -304,12 +304,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
               ),
             )
           : null,
-      trailing: showChevron
-          ? Icon(
-              Icons.chevron_right_rounded,
-              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-            )
-          : null,
       onTap: onTap,
     );
   }
@@ -652,10 +646,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                       style: textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
-                    ),
-                    trailing: Icon(
-                      Icons.chevron_right_rounded,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                     ),
                     onTap: () => Navigator.push(
                       context,
@@ -1854,7 +1844,6 @@ class _SecuritySettingsScreenState
                           color: cs.onSurfaceVariant,
                         ),
                       ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -1887,7 +1876,6 @@ class _SecuritySettingsScreenState
                           color: cs.onSurfaceVariant,
                         ),
                       ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -2555,7 +2543,6 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                         color: cs.onSurfaceVariant,
                       ),
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const AppSkinSettingsScreen()),
@@ -3001,7 +2988,6 @@ class AdvancedSettingsScreen extends ConsumerWidget {
                         color: cs.onSurfaceVariant,
                       ),
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => SkinAreaScope(area: SkinArea.settings, child: const LogcatScreen())),

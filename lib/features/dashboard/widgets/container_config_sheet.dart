@@ -144,10 +144,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
             context.l10n.indexesAndThumbnailsSubtitle,
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
-          trailing: Icon(
-            Icons.chevron_right_rounded,
-            color: cs.onSurfaceVariant,
-          ),
           onTap: _openIndexesAndThumbnails,
         ),
       ],
@@ -1071,10 +1067,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                trailing: Icon(
-                  Icons.chevron_right_rounded,
-                  color: cs.onSurfaceVariant,
-                ),
                 onTap: () async {
                   final rec = widget.existingRecord;
                   if (rec?.isCompositeSource == true) {
@@ -1310,10 +1302,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   color: cs.onSurfaceVariant,
                 ),
               ),
-              trailing: Icon(
-                Icons.chevron_right_rounded,
-                color: cs.onSurfaceVariant,
-              ),
               onTap: () {
                 final mountedVault = _effectiveMounted;
                 if (mountedVault != null) {
@@ -1387,7 +1375,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         inApp ? l10n.moveOutOfAppStorageSubtitle : l10n.moveToAppStorageSubtitle,
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       ),
-      trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
       onTap: _moveVault,
     );
   }
@@ -1421,10 +1408,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   color: cs.onSurfaceVariant,
                 ),
               ),
-              trailing: Icon(
-                Icons.chevron_right_rounded,
-                color: cs.onSurfaceVariant,
-              ),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1456,10 +1439,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 style: textTheme.bodySmall?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
-              ),
-              trailing: Icon(
-                Icons.chevron_right_rounded,
-                color: cs.onSurfaceVariant,
               ),
               onTap: () => Navigator.push(
                 context,

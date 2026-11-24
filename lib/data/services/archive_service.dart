@@ -672,7 +672,10 @@ class ArchiveService {
     if (epochSecs <= 0) return;
     try {
       await _fileIo.setLastModifiedTime(container, destPath, epochSecs);
-    } catch (_) {}
+    } catch (_) {
+      // Some storage providers (including SAF) cannot set timestamps. Extraction
+      // already succeeded, so keeping the destination's default time is safe.
+    }
   }
 
   /// Directly calls the archive creation API.

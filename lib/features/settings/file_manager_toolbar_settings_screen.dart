@@ -795,7 +795,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -829,7 +828,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -1122,7 +1120,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            trailing: const Icon(Icons.chevron_right_rounded),
+
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -1276,10 +1274,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            trailing: Icon(
-                              Icons.chevron_right_rounded,
-                              color: cs.onSurfaceVariant,
-                            ),
                             onTap: () =>
                                 _clearLocalThumbnailCache(context, ref),
                           ),
@@ -1361,10 +1355,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            trailing: Icon(
-                              Icons.chevron_right_rounded,
-                              color: cs.onSurfaceVariant,
-                            ),
                             onTap: () => _clearLocalGalleryIndex(context, ref),
                           ),
                           ListTile(
@@ -1383,10 +1373,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               style: textTheme.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),
-                            ),
-                            trailing: Icon(
-                              Icons.chevron_right_rounded,
-                              color: cs.onSurfaceVariant,
                             ),
                             onTap: () => _clearLocalMusicIndex(context, ref),
                           ),
@@ -1421,10 +1407,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               style: textTheme.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),
-                            ),
-                            trailing: Icon(
-                              Icons.chevron_right_rounded,
-                              color: cs.onSurfaceVariant,
                             ),
                             onTap: () => Navigator.push(
                               context,
@@ -1465,7 +1447,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            trailing: const Icon(Icons.chevron_right_rounded),
                             onTap: () {
                               Navigator.push(
                                 context,

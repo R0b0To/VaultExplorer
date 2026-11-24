@@ -962,7 +962,10 @@ class _TabItemState extends ConsumerState<_TabItem> {
         ? tab.category!.label(context.l10n)
         : tab.container?.displayName ?? context.l10n.vaultsSectionTitle;
     final label = folderLabel ?? name;
-    final fg = active ? cs.onSurface : cs.onSurfaceVariant;
+    // Background tabs are dimmed so the selected one stands out clearly.
+    final fg = active
+        ? cs.onSurface
+        : cs.onSurfaceVariant.withValues(alpha: 0.7);
 
     return Tooltip(
       message: tab.isCategory
@@ -989,6 +992,11 @@ class _TabItemState extends ConsumerState<_TabItem> {
                 },
                 child: InkWell(
                   borderRadius: shape,
+                  // No sparkle/pulse or pressed highlight when a tab is
+                  // selected; the active tab's background already shows it.
+                  splashFactory: NoSplash.splashFactory,
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
                   onTap: widget.onTap,
                   onSecondaryTap: widget.onSecondaryTap,
                   child: Container(

@@ -1198,6 +1198,7 @@ class _ToolsStrip extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               button(
@@ -1206,7 +1207,7 @@ class _ToolsStrip extends StatelessWidget {
                 toolsSelected,
                 onTools,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 16),
               button(
                 Icons.settings,
                 context.l10n.settingsMenuItem,

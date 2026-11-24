@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
 
@@ -173,6 +174,13 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
 
   Drag? _drag;
   ScrollHoldController? _hold;
+
+  /// The full-screen drawer's "ignore drags" switch, captured in [build] so it
+  /// can still be released from [dispose]. That drawer watches raw pointer
+  /// events and never enters the gesture arena, so winning the arena with the
+  /// crumbs' own drag recognizer does not stop it from opening.
+  ValueChanged<bool>? _setDrawerDragBlocked;
+  final Set<int> _blockingPointers = <int>{};
 
   // Editing the path as text.
   final TextEditingController _editController = TextEditingController();
@@ -387,6 +395,21 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
     _drag = null;
   }
 
+  /// A finger went down on the bar. When the crumbs overflow (so a swipe here
+  /// scrolls them), keep the full-screen drawer from treating the same swipe
+  /// as an open-drawer drag until every finger on the bar is lifted.
+  void _handleBarPointerDown(PointerDownEvent event) {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.maxScrollExtent <= 0) return;
+    _blockingPointers.add(event.pointer);
+    _setDrawerDragBlocked?.call(true);
+  }
+
+  void _handleBarPointerEnd(PointerEvent event) {
+    if (!_blockingPointers.remove(event.pointer)) return;
+    if (_blockingPointers.isEmpty) _setDrawerDragBlocked?.call(false);
+  }
+
   void _handleDragCancel() {
     _hold?.cancel();
     _hold = null;
@@ -397,6 +420,10 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
   @override
   void dispose() {
     if (widget.controller?._state == this) widget.controller?._state = null;
+    if (_blockingPointers.isNotEmpty) {
+      _blockingPointers.clear();
+      _setDrawerDragBlocked?.call(false);
+    }
     _editFocus.removeListener(_onEditFocusChanged);
     _editFocus.dispose();
     _editController.dispose();
@@ -572,7 +599,13 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
   /// that opens on a horizontal drag from anywhere on screen, so a drag that
   /// starts on a spot this does not cover would open the drawer instead.
   Widget _withDragScroll(Widget child) {
+    _setDrawerDragBlocked = FullScreenDragDrawerScope.maybeOf(
+      context,
+    )?.setDrawerDragBlocked;
     return Listener(
+      onPointerDown: _handleBarPointerDown,
+      onPointerUp: _handleBarPointerEnd,
+      onPointerCancel: _handleBarPointerEnd,
       onPointerSignal: (event) {
         if (event is PointerScrollEvent && _scrollController.hasClients) {
           final delta = event.scrollDelta.dy != 0

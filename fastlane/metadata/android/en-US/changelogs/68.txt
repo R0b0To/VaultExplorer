@@ -1,0 +1,19 @@
+### Storage and performance
+- BitLocker on USB drives is much faster: aligned transfers now use the USB read-ahead and write-combining cache, whole-sector overwrites skip a needless decrypt, and reads are batched.
+- Faster FAT writes on USB (mirrored FAT tables now coalesce) and faster directory-listing cache invalidation.
+- App storage vaults (Android): create a vault, container file or folder vault, inside the app's private storage, and move any vault in or out from its settings. Moves are copied and verified per file, carry over the vault's saved settings and unlock lockout, and delete the original only if you choose. Removing an app-storage vault asks first and offers "Move out instead".
+- Remote document providers (SFTP, SMB, cloud) are asked to refresh after moves and manual refresh, so moved items appear straight away.
+- Imported files are verified with a faster streaming read.
+
+### Archives
+- Extracted files and folders keep the modified dates stored in the archive (not applied on SAF locations, which can't set them).
+
+### Camera and photos
+- New panorama capture, in Wide mode (sweep) and Sphere mode (aim at each dot), with white-balance lock, on-screen guidance and in-app stitching. Needs the rear camera and a motion sensor.
+- Smoother gyro navigation in the 360° viewer.
+- Metadata editor: new "Modified from date taken" mode. It changes only the file's modified date and skips files with no date taken.
+
+### File manager
+- Editable path field in the address bar, with errors for missing paths or paths outside the storage.
+- New "Double-click to open" option.
+- Open a tab in a new window; search box on the Tools page; wide-layout settings with a navigation rail.

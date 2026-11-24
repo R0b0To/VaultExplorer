@@ -1,0 +1,3 @@
+• BitLocker on USB is much faster, with quicker FAT writes and directory caching.
+• App storage vaults: create vaults inside the app and move them in or out with byte-for-byte verification.
+• Panorama capture, archive extraction that keeps original dates, editable path bar.

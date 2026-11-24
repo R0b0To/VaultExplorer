@@ -358,13 +358,38 @@ void main() {
       expect(w.active, home);
     });
 
-    test('openNewDashboardTab focuses an existing Home', () {
+    test('openNewDashboardTab adds another Home even when one exists', () {
       final w = workspace(1, includeDashboardTab: true);
       final existing = w.state.tabs.first.tabId;
 
-      expect(w.tabs.openNewDashboardTab(), existing);
-      expect(w.active, existing);
+      final another = w.tabs.openNewDashboardTab();
+
+      expect(another, isNotNull);
+      expect(another, isNot(existing));
+      expect(w.active, another);
+      expect(homes(w), [true, false, true]);
+    });
+
+    test('closing one of several Home tabs leaves the others', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final second = w.tabs.openNewDashboardTab()!;
+
+      w.tabs.closeTab(second);
+
       expect(homes(w), [true, false]);
+    });
+
+    test('openDashboardTab focuses the Home nearest the active tab', () {
+      final w = workspace(1, includeDashboardTab: true);
+      w.tabs.openTab(_container(2));
+      w.tabs.openTab(_container(3));
+      final near = w.tabs.openNewDashboardTab()!;
+      expect(homes(w), [true, false, false, false, true]);
+      w.tabs.activate(w.state.tabs[3].tabId);
+
+      expect(w.tabs.openDashboardTab(), near);
+      expect(w.active, near);
+      expect(homes(w), [true, false, false, false, true]);
     });
 
     test('openNewDashboardTab at the cap does nothing', () {
@@ -433,6 +458,41 @@ void main() {
       expect(homes(w), [true]);
       expect(w.active, home);
       expect(w.tabs.previousTab(), isNull);
+    });
+
+    test('returnToDashboardAtRoot prefers the Home the person came from', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final first = w.state.tabs.first.tabId;
+      final folder = w.active;
+      w.tabs.activate(first);
+      final second = w.tabs.openNewDashboardTab()!;
+      expect(w.ids, [first, second, folder]);
+      // The second Home is the nearer one, but the first is where we came from.
+      w.tabs.activate(first);
+      w.tabs.activate(folder);
+      expect(w.tabs.previousTab()!.tabId, first);
+
+      expect(w.tabs.returnToDashboardAtRoot(folder), isTrue);
+
+      expect(w.active, first);
+      expect(w.ids, [first, second]);
+    });
+
+    test('returnToDashboardAtRoot otherwise goes to the nearest Home', () {
+      final w = workspace(1, includeDashboardTab: true);
+      final first = w.state.tabs.first.tabId;
+      final f1 = w.active;
+      final f2 = w.tabs.openTab(_container(2))!;
+      final second = w.tabs.openNewDashboardTab()!;
+      expect(w.ids, [first, f1, f2, second]);
+      w.tabs.activate(f1);
+      w.tabs.activate(f2);
+      expect(w.tabs.previousTab()!.tabId, f1);
+
+      expect(w.tabs.returnToDashboardAtRoot(f2), isTrue);
+
+      expect(w.active, second);
+      expect(w.ids, [first, f1, second]);
     });
 
     test('returnToDashboardAtRoot only acts for the active tab', () {

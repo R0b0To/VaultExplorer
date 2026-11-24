@@ -831,7 +831,7 @@ static void testCryptomatorSymlinks() {
         ro.vault->close();
     }
 
-    {   // --- gocryptfs / cryfs engines keep the defaults ---------------------------------------------------------
+    {   // --- gocryptfs keeps the no-symlink defaults -------------------------------------------------------------
         TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
         CHECK(createGocryptfs(*st, pw, 6, {}).status == OpenStatus::Ok);
         auto g = openGocryptfs(st, pw, 6, false, {}); CHECK(g.status == OpenStatus::Ok); if (!g.vault) return;

@@ -252,6 +252,9 @@ Deliberate, each one verified against the real client where one exists:
   official in one place: a target is limited to 32767 *bytes* (official checks 32767 characters when creating but
   refuses more than 32767 bytes when reading, so it can create a link it cannot read back), and an empty,
   NUL-containing or malformed-UTF-8 target is refused.
+* **CryFS symlinks**: link nodes are encrypted as ordinary CryFS blobs and are exposed through `listSymlinks` and
+  `readSymlink`, while remaining absent from `listDirectory`. They can be created, renamed and deleted. CryFS links
+  are not resolved when reading a file or traversing a directory; their targets are available to the caller as-is.
 * **Cryptomator `hiddenEntryCount`**: number of entries that exist on disk but are not listed (sync-conflict copies
   such as `name (1).c9r`, names that no longer authenticate, half-synced nodes). Dot-files, the internal
   `dir.c9r`/`dirid.c9r` and foreign files are not counted, like official ignores them. Counted during the normal

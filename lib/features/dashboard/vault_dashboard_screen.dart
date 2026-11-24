@@ -24,6 +24,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/external_file_drop_zone.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/dashboard/dashboard_toolbar_actions.dart';
@@ -53,6 +54,11 @@ class VaultDashboard extends ConsumerStatefulWidget {
   final ValueNotifier<MountedContainer?>? localStorageNotifier;
   final ValueChanged<int>? onNavigateTab;
   final BrowserTabsConfig? workspaceConfig;
+
+  /// The workspace tab this dashboard is the page of. Several Vaults tabs can
+  /// be open at once, so a hosted dashboard needs to know which one it is for
+  /// its own search text, toolbar actions and "am I the focused tab" checks.
+  final TabId? tabId;
   final bool embedded;
   final ValueChanged<Widget?>? onFloatingActionChanged;
   final ValueChanged<Widget?>? onBottomBarChanged;
@@ -69,6 +75,7 @@ class VaultDashboard extends ConsumerStatefulWidget {
     this.localStorageNotifier,
     this.onNavigateTab,
     this.workspaceConfig,
+    this.tabId,
     this.embedded = false,
     this.onFloatingActionChanged,
     this.onBottomBarChanged,
@@ -82,6 +89,12 @@ class VaultDashboard extends ConsumerStatefulWidget {
 
 class VaultDashboardState extends ConsumerState<VaultDashboard>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  // Every mounted (non-preview) dashboard, oldest first. Tab pages are kept
+  // alive, so with several Vaults tabs open each one observes the app
+  // lifecycle; the work that is only needed once per resume is left to the
+  // oldest one (see [didChangeAppLifecycleState]).
+  static final List<VaultDashboardState> _liveInstances = [];
+
   // Holds this tab's bottom bar for the chrome hub. See [ChromeBarSlot].
   final ChromeBarSlot _bottomBarSlot = ChromeBarSlot();
 
@@ -209,8 +222,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     // gate) lives in MainShell: Home is replaced by the vault's tab when a
     // vault is opened from it, so this widget is not always alive.
     WidgetsBinding.instance.addObserver(this);
+    _liveInstances.add(this);
     _checkStorageAccess();
-    _toolbarActions = _container.read(dashboardToolbarActionsProvider);
+    _toolbarActions = _container
+        .read(dashboardToolbarActionsProvider)
+        .forTab(widget.tabId);
     // Published after the first frame: notifying listeners while the tree is
     // still being built would throw.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -323,6 +339,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     }
     _dashboardAppBarAnimController.dispose();
     WidgetsBinding.instance.removeObserver(this);
+    _liveInstances.remove(this);
     super.dispose();
   }
 
@@ -330,7 +347,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     VeLog.d(_kLogTag, 'didChangeAppLifecycleState: $state');
     if (state == AppLifecycleState.resumed) {
-      ref.read(vaultDashboardControllerProvider.notifier).handleRefresh();
+      // The vault list is shared by every Vaults tab, so one of them
+      // refreshing it is enough. Each tab still re-checks its own storage
+      // permission flow below.
+      if (_liveInstances.firstOrNull == this) {
+        ref.read(vaultDashboardControllerProvider.notifier).handleRefresh();
+      }
       unawaited(_handleAppResume());
     }
   }
@@ -1004,14 +1026,18 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final double undoBarHeight = 64.0 + (bottomInset > 0 ? bottomInset : 16.0);
     final workspaceConfig = widget.workspaceConfig;
-    // Only whether Home is the focused tab matters here. Watching the whole
-    // workspace state rebuilt the Dashboard on every unrelated tab change.
+    // Only whether this Vaults tab is the focused one matters here. Watching
+    // the whole workspace state rebuilt the Dashboard on every unrelated tab
+    // change.
+    final ownTabId = widget.tabId;
     final dashboardIsActive = workspaceConfig == null
         ? true
         : ref.watch(
-            activeBrowserTabProvider(
-              workspaceConfig,
-            ).select((tab) => tab?.isDashboard ?? true),
+            activeBrowserTabProvider(workspaceConfig).select(
+              (tab) =>
+                  tab == null ||
+                  (ownTabId == null ? tab.isDashboard : tab.tabId == ownTabId),
+            ),
           );
     // In a hosted tab the shell owns a fixed app bar, so dashboard scrolling
     // never collapses or resizes it. Standalone mode retains its old behavior.

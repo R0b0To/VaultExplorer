@@ -32,8 +32,9 @@ sealed class BrowserTabKind {
   const BrowserTabKind();
 }
 
-/// The workspace's Dashboard page. The workspace keeps at most one instance
-/// because its view state is shared, but the tab can be closed and reopened.
+/// A Vaults page (the Dashboard). A workspace may hold several of them: the
+/// vault list itself is shared, while each tab keeps its own search text and
+/// scroll position. A Vaults tab can be closed and reopened like any other.
 final class HomeTab extends BrowserTabKind {
   const HomeTab();
 }
@@ -658,10 +659,13 @@ class BrowserTabs extends _$BrowserTabs {
     return tab.tabId;
   }
 
+  /// Goes to a Vaults tab: focuses the one nearest the active tab (see
+  /// [_nearestHome]) and only creates one when the workspace has none. This is
+  /// "take me to Vaults"; [openNewDashboardTab] is "give me another one".
   TabId openDashboardTab() {
-    final existing = state.tabs.where((tab) => tab.isDashboard).firstOrNull;
+    final existing = _nearestHome();
     if (existing != null) {
-      _activateSingleDashboard(existing);
+      activate(existing.tabId);
       return existing.tabId;
     }
     if (state.atLimit) {
@@ -682,68 +686,64 @@ class BrowserTabs extends _$BrowserTabs {
     return tab.tabId;
   }
 
-  /// Creates a Dashboard tab if none exists, otherwise activates the existing
-  /// one. Keeping Dashboard singular avoids mounting its shared view state in
-  /// multiple PageView children at once.
+  /// Opens one more Vaults tab, even when others are open, next to the active
+  /// tab like any new tab. Null at the tab limit.
   TabId? openNewDashboardTab() {
-    final existing = state.tabs.where((tab) => tab.isDashboard).firstOrNull;
-    if (existing != null) {
-      _activateSingleDashboard(existing);
-      return existing.tabId;
-    }
     if (state.atLimit) return null;
-    final tab = BrowserTabState.home(
-      tabId: TabId.allocate(),
-      pane: state.focusedPane ?? TabPane.primary,
-    );
+    final target = _paneForNewTab();
+    final tab = BrowserTabState.home(tabId: TabId.allocate(), pane: target);
     final tabs = [...state.tabs];
-    tabs.insert(tabs.isEmpty ? 0 : state.activeIndex + 1, tab);
+    tabs.insert(
+      tabs.isEmpty
+          ? 0
+          : _insertionIndex(tabs, target, state.activeTabIdOfPane(target)),
+      tab,
+    );
+    final current = state.activeTab;
+    // The pane being left keeps showing the tab that was active in it.
+    final leftBehind = current != null && current.pane != target
+        ? current.tabId
+        : null;
     _commit(
       state.copyWith(
         tabs: List.unmodifiable(tabs),
         previousTabId: state.activeTabId,
         activeTabId: tab.tabId,
+        unfocusedPaneTabId: leftBehind,
       ),
     );
     return tab.tabId;
   }
 
-  void _activateSingleDashboard(BrowserTabState dashboard) {
-    final duplicateIds = state.tabs
-        .where((tab) => tab.isDashboard && tab.tabId != dashboard.tabId)
-        .map((tab) => tab.tabId)
-        .toSet();
-    if (duplicateIds.isEmpty) {
-      activate(dashboard.tabId);
-      return;
+  /// The Vaults tab closest to the active tab, preferring the active tab's own
+  /// pane. [preferred] wins when it is a Vaults tab itself (the one the person
+  /// came from). Null when the workspace has no Vaults tab.
+  BrowserTabState? _nearestHome({TabId? preferred}) {
+    final homes = state.tabs.where((tab) => tab.isDashboard).toList();
+    if (homes.isEmpty) return null;
+    final active = state.activeTab;
+    if (preferred != null) {
+      for (final home in homes) {
+        if (home.tabId == preferred &&
+            (active == null || home.pane == active.pane)) {
+          return home;
+        }
+      }
     }
-
-    final previousCandidate = state.activeTabId == dashboard.tabId
-        ? state.previousTabId
-        : state.activeTabId;
-    final previousTabId =
-        previousCandidate != null &&
-            previousCandidate != dashboard.tabId &&
-            !duplicateIds.contains(previousCandidate)
-        ? previousCandidate
-        : null;
-    final current = state.activeTab;
-    final leftBehind =
-        current != null &&
-            current.pane != dashboard.pane &&
-            !duplicateIds.contains(current.tabId)
-        ? current.tabId
-        : null;
-    _commit(
-      BrowserTabsState(
-        tabs: List.unmodifiable(
-          state.tabs.where((tab) => !duplicateIds.contains(tab.tabId)),
-        ),
-        activeTabId: dashboard.tabId,
-        previousTabId: previousTabId,
-        unfocusedPaneTabId: leftBehind ?? state.unfocusedPaneTabId,
-      ),
-    );
+    if (active == null) return homes.first;
+    final samePane = homes.where((tab) => tab.pane == active.pane).toList();
+    final pool = samePane.isEmpty ? homes : samePane;
+    final from = state.activeIndex;
+    var best = pool.first;
+    var bestDistance = (state.tabs.indexOf(best) - from).abs();
+    for (final tab in pool.skip(1)) {
+      final distance = (state.tabs.indexOf(tab) - from).abs();
+      if (distance < bestDistance) {
+        best = tab;
+        bestDistance = distance;
+      }
+    }
+    return best;
   }
 
   void replaceActive(
@@ -804,10 +804,12 @@ class BrowserTabs extends _$BrowserTabs {
   /// into the Home pane if it was the last one).
   bool returnToDashboardAtRoot(TabId tabId) {
     if (tabId != state.activeTabId) return false;
-    final home = state.tabs.where((tab) => tab.isDashboard).firstOrNull;
+    // Already on a Vaults tab: nothing to leave behind.
+    if (state.activeTab?.isDashboard == true) return true;
+    // With several Vaults tabs, back goes to the one the person came from
+    // when that is still open in this pane, otherwise to the nearest.
+    final home = _nearestHome(preferred: state.previousTabId);
     if (home == null) return false;
-    // Already on Home: nothing to leave behind.
-    if (home.tabId == tabId) return true;
     if (home.pane != state.activeTab?.pane) {
       closeTab(tabId);
       return true;
@@ -824,16 +826,18 @@ class BrowserTabs extends _$BrowserTabs {
     return true;
   }
 
+  /// Turns the active tab into a Vaults tab in place, closing every other
+  /// Vaults tab, so that a workspace that hides its tab strip (single-tab
+  /// mode) never ends up with a stack of hidden ones. With tabs on, callers
+  /// that find a Vaults tab already open use [openDashboardTab] instead.
   void replaceActiveWithDashboard() {
     final activeTab = state.activeTab;
     if (activeTab == null) {
       if (state.tabs.isEmpty) openDashboardTab();
       return;
     }
-    if (activeTab.isDashboard) {
-      _activateSingleDashboard(activeTab);
-      return;
-    }
+    // Already on a Vaults tab: nothing to turn into one.
+    if (activeTab.isDashboard) return;
 
     final removedDashboardIds = state.tabs
         .where((tab) => tab.isDashboard)

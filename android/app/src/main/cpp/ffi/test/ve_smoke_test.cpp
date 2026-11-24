@@ -896,7 +896,24 @@ static void runFolderVaults() {
             CHECK_RC(ve_delete_file(kFvVol, "/docs/sublink"), VE_OK);
             CHECK(readAll(kFvVol, "/docs/renamed.txt") == payload);
         } else {
-            CHECK(ve_create_symlink(kFvVol, "/docs/link.txt", "renamed.txt") != VE_OK);  // not supported by these formats
+            if (fmt == VE_FV_CRYFS) {
+                // CryFS stores symlink nodes, but does not resolve them for file reads.
+                CHECK_RC(ve_create_symlink(kFvVol, "/docs/link.txt", "renamed.txt"), VE_OK);
+                ve_buffer cryfsLinks{};
+                CHECK_RC(ve_list_symlinks(kFvVol, "/docs", &cryfsLinks), VE_OK);
+                uint32_t linkCount = 0;
+                if (cryfsLinks.data && cryfsLinks.len >= sizeof(linkCount))
+                    std::memcpy(&linkCount, cryfsLinks.data, sizeof(linkCount));
+                CHECK(linkCount == 1);
+                ve_buffer_free(&cryfsLinks);
+                ve_buffer target{};
+                CHECK_RC(ve_read_symlink(kFvVol, "/docs/link.txt", &target), VE_OK);
+                CHECK(target.len == 11 && std::memcmp(target.data, "renamed.txt", 11) == 0);
+                ve_buffer_free(&target);
+                CHECK_RC(ve_delete_file(kFvVol, "/docs/link.txt"), VE_OK);
+            } else {
+                CHECK(ve_create_symlink(kFvVol, "/docs/link.txt", "renamed.txt") != VE_OK);  // gocryptfs does not expose symlinks
+            }
         }
         // Cryptomator key-file probe: a current (format 8) vault
         if (fmt == VE_FV_CRYPTOMATOR) {
@@ -975,8 +992,13 @@ static void runFolderVaults() {
             CHECK(c.rc == VE_OK && c.outcome == 0 && c.deep == 1 && c.scanned >= 1);
             c = runCheck(nullptr, kFvVol, false);      // a session that is not open
             CHECK(c.rc == VE_OK && c.outcome == 2 && !c.message.empty());
-            c = runCheck(nullptr, -1, true);           // a repair is refused without credentials
-            CHECK(c.rc == VE_OK && c.outcome == 1);
+            c = runCheck(nullptr, -1, true);
+            if (fmt == VE_FV_CRYFS) {
+                CHECK(c.rc == VE_OK && c.outcome == 2);  // CryFS repair is not implemented
+                CHECK(c.message.find("Automatic repair is currently supported") != std::string::npos);
+            } else {
+                CHECK(c.rc == VE_OK && c.outcome == 1);  // a repair is refused without credentials
+            }
 
             // the unlocked slot as the credential
             CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),

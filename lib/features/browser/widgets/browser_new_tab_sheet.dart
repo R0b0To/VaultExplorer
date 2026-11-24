@@ -147,7 +147,7 @@ class BrowserNewTabSheet extends ConsumerWidget {
             if (allowDashboard)
               ListTile(
                 leading: Icon(Icons.dashboard_rounded, color: cs.primary),
-                title: Text(context.l10n.dashboardNavLabel),
+                title: Text(context.l10n.vaultsSectionTitle),
                 onTap: pickDashboard,
               ),
             if (allowDashboard &&

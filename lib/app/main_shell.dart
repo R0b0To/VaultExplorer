@@ -34,6 +34,7 @@ import 'package:vaultexplorer/features/browser/controllers/browser_session_store
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
@@ -81,8 +82,29 @@ class _MainShellState extends ConsumerState<MainShell>
   final ValueNotifier<MountedContainer?> _localStorageNotifier = ValueNotifier(
     null,
   );
-  final GlobalKey<VaultDashboardState> _dashboardKey =
-      GlobalKey<VaultDashboardState>();
+  // One key per Vaults tab: several can be open at once, and a GlobalKey may
+  // only be mounted once.
+  final Map<TabId, GlobalKey<VaultDashboardState>> _dashboardKeys = {};
+
+  GlobalKey<VaultDashboardState> _dashboardKeyFor(TabId tabId) =>
+      _dashboardKeys.putIfAbsent(tabId, GlobalKey<VaultDashboardState>.new);
+
+  /// The state of the Vaults tab in front, or of any mounted one when none is.
+  /// The shell uses it for what is shared by all of them (the local-storage
+  /// container, resolving a vault, opening the Add sheet), so it does not
+  /// matter which one answers as long as the focused one is preferred.
+  VaultDashboardState? get _dashboard {
+    final active = _browserWorkspaceState?.activeTab;
+    if (active != null && active.isDashboard) {
+      final focused = _dashboardKeys[active.tabId]?.currentState;
+      if (focused != null) return focused;
+    }
+    for (final key in _dashboardKeys.values) {
+      final state = key.currentState;
+      if (state != null) return state;
+    }
+    return null;
+  }
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _scaffoldDrawerOpen = false;
   double _dockedSidebarWidth = AppBreakpoints.dockedSidebarWidth;
@@ -96,14 +118,14 @@ class _MainShellState extends ConsumerState<MainShell>
   MountedContainer? _cachedLocalStorageContainer;
 
   MountedContainer? get _primaryLocalStorageContainer {
-    final dashboard = _dashboardKey.currentState;
+    final dashboard = _dashboard;
     return dashboard == null
         ? _cachedLocalStorageContainer
         : dashboard.localStorageContainer;
   }
 
   void _cacheDashboardLocalStorageContainer() {
-    final dashboard = _dashboardKey.currentState;
+    final dashboard = _dashboard;
     if (dashboard != null) {
       _cachedLocalStorageContainer = dashboard.localStorageContainer;
     }
@@ -119,7 +141,7 @@ class _MainShellState extends ConsumerState<MainShell>
           .resolveContainer(volId);
       if (external != null) return external;
     }
-    final fromDashboard = _dashboardKey.currentState?.resolveAnyContainer(
+    final fromDashboard = _dashboard?.resolveAnyContainer(
       volId,
     );
     if (fromDashboard != null) return fromDashboard;
@@ -615,7 +637,15 @@ class _MainShellState extends ConsumerState<MainShell>
       final workspace = _browserWorkspaceState;
       returningToHome =
           _index != 0 || workspace?.activeTab?.isDashboard != true;
+      final tabsEnabled = ref
+          .read(appSettingsControllerProvider)
+          .settings
+          .useBrowserTabs;
       if (workspace?.activeTab == null) {
+        _browserWorkspaceActions?.openDashboardTab();
+      } else if (tabsEnabled && workspace!.tabs.any((tab) => tab.isDashboard)) {
+        // A Vaults tab is already open: go to it instead of turning the tab
+        // in front, which may hold a vault, into a second one.
         _browserWorkspaceActions?.openDashboardTab();
       } else {
         _browserWorkspaceActions?.replaceActiveWithDashboard();
@@ -627,7 +657,7 @@ class _MainShellState extends ConsumerState<MainShell>
         _builtTabs.add(newIndex);
       });
     }
-    if (returningToHome) _dashboardKey.currentState?.reloadDashboard();
+    if (returningToHome) _dashboard?.reloadDashboard();
   }
 
   void _showBrowserTabLimit() {
@@ -752,7 +782,7 @@ class _MainShellState extends ConsumerState<MainShell>
       return;
     }
 
-    var dashboard = _dashboardKey.currentState;
+    var dashboard = _dashboard;
     if (dashboard == null) {
       final actions = workspaceActions ?? _browserWorkspaceActions;
       if (actions == null) return;
@@ -761,7 +791,7 @@ class _MainShellState extends ConsumerState<MainShell>
       for (var frame = 0; frame < 5 && dashboard == null; frame++) {
         await WidgetsBinding.instance.endOfFrame;
         if (!mounted) return;
-        dashboard = _dashboardKey.currentState;
+        dashboard = _dashboard;
       }
     }
     await dashboard?.openLocalStorage(
@@ -961,7 +991,11 @@ class _MainShellState extends ConsumerState<MainShell>
     final container = tab.container;
     if (actions == null) return;
     if (tab.isDashboard) {
-      actions.openDashboardTab();
+      if (actions.openNewDashboardTab() == null) {
+        _showBrowserTabLimit();
+        return;
+      }
+      setState(() => _index = 0);
       return;
     }
     if (tab.isCategory) {
@@ -1031,6 +1065,14 @@ class _MainShellState extends ConsumerState<MainShell>
 
     final isHidden = _hideDashboard || _handlingQuickCapture;
 
+    // Forget the keys of Vaults tabs that have been closed.
+    final openTabs = _browserWorkspaceState?.tabs;
+    if (openTabs != null) {
+      _dashboardKeys.removeWhere(
+        (id, _) => !openTabs.any((tab) => tab.tabId == id),
+      );
+    }
+
     // Tablet landscape and desktop windows get the navigation menu as a
     // permanent sidebar; everything else keeps the modal drawer.
     final docked = AppBreakpoints.useDockedSidebarFor(
@@ -1041,12 +1083,14 @@ class _MainShellState extends ConsumerState<MainShell>
       bool backPreviewOnly = false,
       bool embedded = false,
       BrowserTabsConfig? workspaceConfig,
+      TabId? tabId,
       ValueChanged<Widget?>? onFloatingActionChanged,
       ValueChanged<Widget?>? onBottomBarChanged,
     }) => SkinAreaScope(
       area: SkinArea.dashboard,
       child: VaultDashboard(
-        key: backPreviewOnly ? null : _dashboardKey,
+        key: backPreviewOnly || tabId == null ? null : _dashboardKeyFor(tabId),
+        tabId: tabId,
         mountedNotifier: backPreviewOnly ? null : _mountedNotifier,
         localStorageNotifier: backPreviewOnly ? null : _localStorageNotifier,
         onNavigateTab: _onTabTap,
@@ -1062,7 +1106,7 @@ class _MainShellState extends ConsumerState<MainShell>
     final body = IndexedStack(
       index: _index,
       children: [
-        // The browser workspace owns the single Dashboard page. Keeping an
+        // The browser workspace owns the Vaults (Dashboard) pages. Keeping an
         // empty slot here preserves the app destination index without building
         // a second, hidden Dashboard route.
         const SizedBox.expand(),
@@ -1135,7 +1179,7 @@ class _MainShellState extends ConsumerState<MainShell>
         onAddVault: () {
           _onTabTap(0);
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _dashboardKey.currentState?.showAddOptionsSheet();
+            _dashboard?.showAddOptionsSheet();
           });
         },
       );
@@ -1171,11 +1215,13 @@ class _MainShellState extends ConsumerState<MainShell>
             homeBuilder:
                 ({
                   required workspace,
+                  required tabId,
                   required onFloatingActionChanged,
                   required onBottomBarChanged,
                 }) => buildDashboardTab(
                   embedded: true,
                   workspaceConfig: workspace,
+                  tabId: tabId,
                   onFloatingActionChanged: onFloatingActionChanged,
                   onBottomBarChanged: onBottomBarChanged,
                 ),

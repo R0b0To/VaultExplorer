@@ -435,7 +435,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.duplicate,
           Icons.copy_all_rounded,
           l10n.browserTabDuplicate,
-          enabled: !tab.isDashboard && !state.atLimit,
+          enabled: !state.atLimit,
         ),
         if (FileManagerEnvironment.instance.canOpenWindow)
           item(
@@ -953,7 +953,7 @@ class _TabItemState extends ConsumerState<_TabItem> {
           );
     final name = tab.isCategory
         ? tab.category!.label(context.l10n)
-        : tab.container?.displayName ?? context.l10n.dashboardNavLabel;
+        : tab.container?.displayName ?? context.l10n.vaultsSectionTitle;
     final label = folderLabel ?? name;
     final fg = active ? cs.onSurface : cs.onSurfaceVariant;
 

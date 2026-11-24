@@ -59,6 +59,8 @@ export 'package:vaultexplorer/features/browser/browser_tab_paths.dart'
 typedef BrowserHomeBuilder =
     Widget Function({
       required BrowserTabsConfig workspace,
+      // The Vaults tab being built. Several can be open at once.
+      required TabId tabId,
       required ValueChanged<Widget?> onFloatingActionChanged,
       required ValueChanged<Widget?> onBottomBarChanged,
     });
@@ -436,6 +438,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _musicHostKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _categoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    ref.read(dashboardToolbarActionsProvider).retainOnly(liveTabIds);
     if (next.tabs.isEmpty && !_popScheduled) {
       _popScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -539,95 +542,95 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     if (navigator.canPop()) navigator.pop();
   }
 
-  Widget _buildDesktopDashboardChrome(BuildContext context) => Column(
-    children: [
-      // `surfaceContainer`, like the breadcrumb row: the selected tab above
-      // flows into it.
-      Material(
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        child: SizedBox(
-          height: 36,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.dashboard_rounded,
-                  size: 17,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  context.l10n.dashboardNavLabel,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                // Same search box as the file manager's breadcrumb row.
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 260),
-                      child: _DashboardSearchBox(
-                        query: ref
-                            .read(dashboardToolbarActionsProvider)
-                            .searchQuery,
+  /// The chrome of a Vaults tab on desktop: two rows of 36 and 40 px, the same
+  /// heights as a storage's breadcrumb row and toolbar in the file manager, so
+  /// nothing shifts when going from one to the other.
+  ///
+  /// There is no location row, because the tab already says "Vaults". The
+  /// upper row holds what changes the list (order, refresh) and the search box,
+  /// which sits where the file manager's does; the lower row holds the actions
+  /// on the vaults themselves.
+  Widget _buildDesktopDashboardChrome(BuildContext context, TabId tabId) {
+    final scheme = Theme.of(context).colorScheme;
+    final toolbar = ref.read(dashboardToolbarActionsProvider).forTab(tabId);
+    // `surfaceContainer`, like the breadcrumb row: the selected tab above
+    // flows into it.
+    return IconButtonTheme(
+      data: const IconButtonThemeData(
+        style: ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minimumSize: WidgetStatePropertyAll(Size(36, 36)),
+        ),
+      ),
+      child: Column(
+        children: [
+          Material(
+            color: scheme.surfaceContainer,
+            child: SizedBox(
+              height: 36,
+              child: Row(
+                children: [
+                  const SizedBox(width: 6),
+                  const _DashboardSortButton(),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded),
+                    tooltip: context.l10n.refreshListButton,
+                    onPressed: () => unawaited(
+                      ref
+                          .read(vaultDashboardControllerProvider.notifier)
+                          .loadAll(),
+                    ),
+                  ),
+                  // Same search box, in the same place, as the file manager's
+                  // breadcrumb row. Each Vaults tab has its own text.
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 14),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 260),
+                          child: _DashboardSearchBox(
+                            key: ValueKey<TabId>(tabId),
+                            query: toolbar.searchQuery,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      Material(
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        child: SizedBox(
-          height: 40,
-          child: IconButtonTheme(
-            data: const IconButtonThemeData(
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                minimumSize: WidgetStatePropertyAll(Size(36, 36)),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                const SizedBox(width: 6),
-                // Same 40px row, same compact icon buttons as the file
-                // manager's toolbar, so Home and a storage share one chrome
-                // height and nothing shifts when switching between them.
-                // Opens the "Add a vault" prompt (mount existing, create new,
-                // USB) instead of jumping straight into one flow.
-                _DashboardToolbarButton(
-                  listenable: ref
-                      .read(dashboardToolbarActionsProvider)
-                      .addVault,
-                  icon: Icons.add_rounded,
-                  tooltip: context.l10n.addVaultFabLabel,
-                ),
-                const VerticalDivider(width: 1, indent: 8, endIndent: 8),
-                const _DashboardLockAllButton(),
-                const _DashboardSortButton(),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
-                  tooltip: context.l10n.refreshListButton,
-                  onPressed: () => unawaited(
-                    ref.read(vaultDashboardControllerProvider.notifier).loadAll(),
+          ),
+          Material(
+            color: scheme.surfaceContainer,
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  const SizedBox(width: 6),
+                  // Opens the "Add a vault" prompt (mount existing, create
+                  // new, USB) instead of jumping straight into one flow.
+                  _DashboardToolbarButton(
+                    listenable: toolbar.addVault,
+                    icon: Icons.add_rounded,
+                    tooltip: context.l10n.addVaultFabLabel,
                   ),
-                ),
-                const Spacer(),
-                const AppBarAuthenticatorButton(),
-                const AppBarTransferButton(),
-                const SizedBox(width: 8),
-              ],
+                  const VerticalDivider(width: 1, indent: 8, endIndent: 8),
+                  const _DashboardLockAllButton(),
+                  const Spacer(),
+                  const AppBarAuthenticatorButton(),
+                  const AppBarTransferButton(),
+                  const SizedBox(width: 8),
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
-    ],
-  );
+    );
+  }
 
   Widget _buildTabContent(
     BrowserTabState tab, {
@@ -638,6 +641,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       final dashboard =
           widget.homeBuilder?.call(
             workspace: _workspace,
+            tabId: tab.tabId,
             onFloatingActionChanged: (action) =>
                 _chrome.setFloatingAction(tab.tabId, action),
             onBottomBarChanged: (bar) => _chrome.setBottomBar(tab.tabId, bar),
@@ -648,7 +652,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         child: isDualPane && PlatformFeatures.isDesktop
             ? Column(
                 children: [
-                  _buildDesktopDashboardChrome(context),
+                  _buildDesktopDashboardChrome(context, tab.tabId),
                   Expanded(child: dashboard),
                 ],
               )
@@ -1410,7 +1414,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     final container = tab.container;
     if (tab.isDashboard) {
-      _workspaceActions.openDashboardTab();
+      if (_workspaceActions.openNewDashboardTab() == null) _showLimitReached();
       return;
     }
     if (container == null) return;
@@ -1779,14 +1783,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 ?windowsTitleBar,
                 if (!appBarAtBottom && !desktopFileManagerChrome)
                   appBarSlot,
-                if (dashboardChrome && !dualPaneForTabStrip)
-                  _buildDesktopDashboardChrome(context),
                 // Side by side, each pane carries its own strip instead.
                 if (tabsEnabled &&
                     tabs.isNotEmpty &&
                     !dualPaneForTabStrip &&
                     !windowsTabsAreInTitleBar)
                   tabStripSlot,
+                // Below the strip, where a storage's breadcrumb row sits.
+                if (dashboardChrome && !dualPaneForTabStrip)
+                  _buildDesktopDashboardChrome(context, activeTabId!),
                 Expanded(
                   child: NotificationListener<FastScrollbarDragNotification>(
                     onNotification: _onScrollbarDrag,
@@ -2348,10 +2353,10 @@ class _DashboardSortButton extends ConsumerWidget {
   }
 }
 
-/// The Home row's search box: the shared [AddressSearchField] bound to the
-/// dashboard's query. The dashboard does the filtering.
+/// The Vaults toolbar's search box: the shared [AddressSearchField] bound to
+/// the query of one Vaults tab. That tab's dashboard does the filtering.
 class _DashboardSearchBox extends StatelessWidget {
-  const _DashboardSearchBox({required this.query});
+  const _DashboardSearchBox({super.key, required this.query});
 
   final ValueNotifier<String> query;
 

@@ -92,12 +92,13 @@ public:
     virtual void endBatchDelete() = 0;
     virtual void invalidateCache(const std::string& path) = 0;
 
-    // ---- symlinks & hidden entries (Cryptomator; the other engines keep these defaults) ------------
+    // ---- symlinks & hidden entries (Cryptomator and CryFS) ----------------------------------------
     // Symbolic links are deliberately NOT part of listDirectory(): they are neither files nor folders, and
     // every existing consumer (export, sync, scanners, ...) would otherwise have to learn to skip them.
     // Cryptomator resolves relative link targets within the same vault for reads, writes and directory
-    // traversal (with a 40-link hop limit, so cycles fail closed); absolute targets are refused. deleteFile/renameFile unlink or
-    // rename the link node itself, as POSIX does.
+    // traversal (with a 40-link hop limit, so cycles fail closed); absolute targets are refused. CryFS stores
+    // and exposes link nodes but does not resolve them for reads. gocryptfs keeps the no-symlink defaults.
+    // deleteFile/renameFile unlink or rename a supported link node itself, as POSIX does.
     // Lists only the symbolic links of [path] (isSymlink = true; isDir reflects a directory target; size is
     // target length in bytes for file/broken links and 0 for directory links).
     virtual bool listSymlinks(const std::string& /*path*/, std::vector<DirEntry>& out) { out.clear(); return true; }

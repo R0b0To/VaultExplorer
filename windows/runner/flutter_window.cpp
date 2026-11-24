@@ -1,8 +1,55 @@
 #include "flutter_window.h"
 
+#include <commctrl.h>
+
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+constexpr UINT_PTR kCustomCaptionSubclassId = 1;
+
+// Hides the OS caption of a window the Flutter engine created (a secondary
+// window), the way Win32Window does for the main one: the window keeps its
+// overlapped style, so Aero Snap, the maximize animation and the DWM shadow
+// still work, and WM_NCCALCSIZE gives the caption's room to the client area.
+LRESULT CALLBACK CustomCaptionProc(HWND hwnd,
+                                   UINT message,
+                                   WPARAM wparam,
+                                   LPARAM lparam,
+                                   UINT_PTR subclass_id,
+                                   DWORD_PTR /*ref_data*/) {
+  switch (message) {
+    case WM_NCCALCSIZE: {
+      if (wparam != TRUE) break;
+      auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+      const LONG original_top = params->rgrc[0].top;
+      // Let Windows compute the left/right/bottom resize frame first.
+      const LRESULT result = DefSubclassProc(hwnd, message, wparam, lparam);
+      if (result != 0) return result;
+      if (IsZoomed(hwnd)) {
+        // A maximized window overhangs the monitor by the sizing-frame
+        // thickness, so push the client area back on screen.
+        const UINT dpi = GetDpiForWindow(hwnd);
+        params->rgrc[0].top = original_top +
+            GetSystemMetricsForDpi(SM_CYFRAME, dpi) +
+            GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+      } else {
+        // Drop the OS caption. Keep 1px so DWM still draws its border and
+        // the top edge stays grabbable.
+        params->rgrc[0].top = original_top + 1;
+      }
+      return 0;
+    }
+    case WM_NCDESTROY:
+      RemoveWindowSubclass(hwnd, CustomCaptionProc, subclass_id);
+      break;
+  }
+  return DefSubclassProc(hwnd, message, wparam, lparam);
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -26,6 +73,8 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  window_registrar_ =
+      flutter_controller_->engine()->GetRegistrarForPlugin("VaultExplorerWindow");
 
   window_channel_ = std::make_unique<
       flutter::MethodChannel<flutter::EncodableValue>>(
@@ -35,13 +84,30 @@ bool FlutterWindow::OnCreate() {
       [this](const auto& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) {
-        const HWND hwnd = GetHandle();
+        // Calls from a secondary window name their view; everything else is
+        // about the main window.
+        const HWND hwnd = TargetWindow(call.arguments());
         if (!hwnd) {
           result->Error("window_unavailable", "The window is unavailable.");
           return;
         }
         const auto& method = call.method_name();
-        if (method == "isMaximized") {
+        if (method == "useCustomCaption") {
+          // The Flutter title bar replaces the OS caption of a secondary
+          // window. The main window already runs without one.
+          if (hwnd != GetHandle()) {
+            if (!SetWindowSubclass(hwnd, CustomCaptionProc,
+                                   kCustomCaptionSubclassId, 0)) {
+              result->Error("subclass_failed",
+                            "The window caption could not be replaced.");
+              return;
+            }
+            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                         SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE |
+                             SWP_NOZORDER | SWP_NOACTIVATE);
+          }
+          result->Success(flutter::EncodableValue());
+        } else if (method == "isMaximized") {
           result->Success(flutter::EncodableValue(IsZoomed(hwnd) != FALSE));
         } else if (method == "minimize") {
           ShowWindow(hwnd, SW_MINIMIZE);
@@ -73,11 +139,37 @@ bool FlutterWindow::OnCreate() {
   return true;
 }
 
+HWND FlutterWindow::TargetWindow(const flutter::EncodableValue* arguments) {
+  if (arguments != nullptr) {
+    if (const auto* map = std::get_if<flutter::EncodableMap>(arguments)) {
+      const auto it = map->find(flutter::EncodableValue("viewId"));
+      if (it != map->end()) {
+        int64_t view_id = 0;
+        if (const auto* id32 = std::get_if<int32_t>(&it->second)) {
+          view_id = *id32;
+        } else if (const auto* id64 = std::get_if<int64_t>(&it->second)) {
+          view_id = *id64;
+        } else {
+          return nullptr;
+        }
+        if (window_registrar_ == nullptr) return nullptr;
+        FlutterDesktopViewRef view =
+            FlutterDesktopPluginRegistrarGetViewById(window_registrar_, view_id);
+        if (view == nullptr) return nullptr;
+        const HWND content = FlutterDesktopViewGetHWND(view);
+        return content != nullptr ? GetAncestor(content, GA_ROOT) : nullptr;
+      }
+    }
+  }
+  return GetHandle();
+}
+
 void FlutterWindow::OnDestroy() {
   if (window_channel_) {
     window_channel_->SetMethodCallHandler(nullptr);
   }
   window_channel_.reset();
+  window_registrar_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

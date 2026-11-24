@@ -35,7 +35,8 @@ class SecondaryWindowEntry {
   /// Closes this window.
   void close() => SecondaryWindows.instance.close(key);
 
-  /// Changes the title in the window's title bar.
+  /// Changes the window's title: what the taskbar and the window switcher
+  /// show, and the native title bar where the window has one.
   void setTitle(String value) {
     if (value == title) return;
     title = value;

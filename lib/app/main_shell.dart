@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/core/widgets/layout/docked_content_frame.dart';
 import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -37,9 +38,10 @@ import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
-import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_title_bar_tabs.dart';
 import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/features/browser/file_manager_window.dart';
+import 'package:vaultexplorer/features/dashboard/drawer_unlock_flow.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
@@ -49,10 +51,7 @@ import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
 import 'package:vaultexplorer/features/camera/quick_capture_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
-import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
-import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
-import 'package:vaultexplorer/core/widgets/layout/adaptive_page_route.dart';
 
 const _kLogTag = 'MainShell';
 
@@ -826,99 +825,13 @@ class _MainShellState extends ConsumerState<MainShell>
     }
   }
 
-  Future<void> _showDrawerUnlock(ContainerRecord record) async {
-    final state = ref.read(vaultDashboardControllerProvider);
-    if (state.mounted.any((container) => container.uri == record.uri)) {
-      showAppSnackBar(context, message: context.l10n.containerAlreadyMounted);
-      return;
-    }
-    if (state.actionInFlight) return;
-
-    final controller = ref.read(vaultDashboardControllerProvider.notifier);
-    final repository = ref.read(containerRepositoryProvider);
-    final navigator = Navigator.of(context);
-    controller.setActionInFlight(true);
-
-    MountedContainer? newlyMountedContainer;
-    try {
-      final rememberedPassword =
-          record.unlockMethod == ContainerUnlockMethod.rememberPassword
-          ? await repository.getPassword(record.uri)
-          : null;
-      if (!mounted) return;
-
-      // Deliberately ignores the Dashboard's "auto-open on unlock" setting:
-      // that setting means "stay on the Vaults page", which has no meaning
-      // when the unlock was started from the drawer (often while browsing
-      // another vault). Without this the unlock gave no visible feedback.
-      if (record.isUsbSource) {
-        await navigator.push<void>(
-          adaptivePageRoute<void>(
-            context,
-            builder: (_) => SkinAreaScope(
-              area: SkinArea.dashboard,
-              child: UsbUnlockSheet(
-                existingRecord: record,
-                prefillPassword: rememberedPassword,
-                documentProvider: record.documentProvider,
-                autoMountFolders: record.documentProviderFolders
-                    .where((folder) => folder.autoMount)
-                    .map((folder) => folder.path)
-                    .toList(),
-                onMounted: (container, {record}) {
-                  controller.onContainerMounted(container, record: record);
-                  newlyMountedContainer = container;
-                  if (mounted) _openBrowser(container);
-                },
-                onReconnected: (container, migratedRecord, oldUri) {
-                  controller.onUsbContainerReconnected(
-                    container,
-                    migratedRecord,
-                    oldUri,
-                  );
-                  newlyMountedContainer = container;
-                },
-              ),
-            ),
-          ),
-        );
-      } else {
-        await navigator.push<void>(
-          adaptivePageRoute<void>(
-            context,
-            builder: (_) => SkinAreaScope(
-              area: SkinArea.dashboard,
-              child: UnlockSheet(
-                initialUri: record.uri,
-                initialName: record.label,
-                prefillPassword: rememberedPassword,
-                documentProvider: record.documentProvider,
-                autoMountFolders: record.documentProviderFolders
-                    .where((folder) => folder.autoMount)
-                    .map((folder) => folder.path)
-                    .toList(),
-                mountedUris: state.mounted
-                    .map((container) => container.uri)
-                    .toList(),
-                onMounted: (container, {record}) {
-                  controller.onContainerMounted(container, record: record);
-                  newlyMountedContainer = container;
-                  if (mounted) _openBrowser(container);
-                },
-              ),
-            ),
-          ),
-        );
-      }
-
-      await controller.loadAll();
-      if (newlyMountedContainer != null) {
-        await controller.refreshContainerSpace(newlyMountedContainer!.volId);
-      }
-    } finally {
-      controller.setActionInFlight(false);
-    }
-  }
+  Future<void> _showDrawerUnlock(ContainerRecord record) => showDrawerUnlock(
+    context: context,
+    ref: ref,
+    record: record,
+    isMounted: () => mounted,
+    onOpen: _openBrowser,
+  );
 
   void _onBrowserWorkspaceChanged(BrowserTabsConfig? workspace) {
     _browserWorkspace = workspace;
@@ -1275,7 +1188,7 @@ class _MainShellState extends ConsumerState<MainShell>
               currentVolId: dockedVolId,
               workspace: _browserWorkspace,
             ),
-            second: _DockedContentFrame(
+            second: DockedContentFrame(
               consumedWidth: _dockedSidebarWidth + 8,
               child: appBody,
             ),
@@ -1287,13 +1200,6 @@ class _MainShellState extends ConsumerState<MainShell>
     final browserTabsState = workspace == null
         ? null
         : ref.watch(browserTabsProvider(workspace));
-    Widget buildShellTabStrip({TabPane? pane}) => BrowserTabStrip(
-      workspaceConfig: workspace!,
-      onNewTab: _openNewBrowserTab,
-      onDuplicate: _duplicateBrowserTab,
-      pane: pane,
-      height: 32,
-    );
     final showWorkspaceTabs = browserContentVisible &&
         tabsEnabled &&
         workspace != null &&
@@ -1301,44 +1207,13 @@ class _MainShellState extends ConsumerState<MainShell>
     final titleBarLeadingWidth = docked ? _dockedSidebarWidth + 8 : 48.0;
     final Widget shellTitleTabs = !showWorkspaceTabs
         ? const SizedBox.shrink()
-        : browserTabsState.isSplit
-        ? LayoutBuilder(
-            builder: (context, constraints) => ValueListenableBuilder<double>(
-              valueListenable: _dualPaneSplitFraction,
-              builder: (context, fraction, _) {
-                final paneSplitInset = docked ? 0.0 : 48.0;
-                final pageWidth =
-                    constraints.maxWidth +
-                    kDesktopTitleBarTrailingWidth +
-                    paneSplitInset;
-                final firstExtent = (fraction * (pageWidth - 8) -
-                        paneSplitInset)
-                    .clamp(
-                      0.0,
-                      (constraints.maxWidth - 8).clamp(0.0, double.infinity),
-                    )
-                    .toDouble();
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(
-                      width: firstExtent,
-                      child: buildShellTabStrip(pane: TabPane.primary),
-                    ),
-                    Container(
-                      width: 8,
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      alignment: Alignment.center,
-                    ),
-                    Expanded(
-                      child: buildShellTabStrip(pane: TabPane.secondary),
-                    ),
-                  ],
-                );
-              },
-            ),
-          )
-        : buildShellTabStrip();
+        : BrowserTitleBarTabs(
+            workspace: workspace,
+            docked: docked,
+            splitFraction: _dualPaneSplitFraction,
+            onNewTab: _openNewBrowserTab,
+            onDuplicate: _duplicateBrowserTab,
+          );
     final Widget? windowsTitleBar = PlatformFeatures.isWindows
         ? DesktopWindowTitleBar(
             height: 32,
@@ -1441,37 +1316,6 @@ class _MainShellState extends ConsumerState<MainShell>
         _onTabTap(0);
       },
       child: content,
-    );
-  }
-}
-
-/// Frames the content that sits beside the docked sidebar.
-///
-/// The content only has the width beside the sidebar. Telling it so keeps
-/// every width-based decision inside (dual pane, grid columns, two-column
-/// pages) honest instead of counting the sidebar's room as its own. The
-/// sidebar already consumed the left system inset. This is its own widget so
-/// that depending on the full `MediaQuery` (keyboard, insets) rebuilds only
-/// this thin frame, never the whole shell.
-class _DockedContentFrame extends StatelessWidget {
-  const _DockedContentFrame({
-    required this.consumedWidth,
-    required this.child,
-  });
-
-  final double consumedWidth;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    return MediaQuery(
-      data: mq.copyWith(
-        size: Size(mq.size.width - consumedWidth, mq.size.height),
-        padding: mq.padding.copyWith(left: 0),
-        viewPadding: mq.viewPadding.copyWith(left: 0),
-      ),
-      child: DockedSidebarScope(child: child),
     );
   }
 }

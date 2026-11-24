@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/windowing/window_caption.dart';
 
 const double kDesktopTitleBarHeight = 32;
 const double kDesktopTitleBarCaptionButtonWidth = 46;
@@ -115,14 +116,28 @@ class DesktopWindowTitleBar extends StatefulWidget {
 }
 
 class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
-  static const _channel = MethodChannel('vaultexplorer/window');
+  static const _channel = kWindowChannel;
   bool _maximized = false;
   DesktopCaptionClaims? _claims;
+
+  /// Names this window to the runner (null in the main window). Looked up in
+  /// [didChangeDependencies], where an inherited lookup is allowed, and kept
+  /// for the calls that come from event handlers.
+  Map<String, Object?>? _windowArgs;
+  bool _refreshedMaximized = false;
 
   @override
   void initState() {
     super.initState();
     _claims = DesktopCaptionClaimsScope.maybeOf(context)?..claim();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _windowArgs = windowChannelArgsFor(context);
+    if (_refreshedMaximized) return;
+    _refreshedMaximized = true;
     _refreshMaximized();
   }
 
@@ -134,7 +149,10 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
 
   Future<void> _refreshMaximized() async {
     try {
-      final value = await _channel.invokeMethod<bool>('isMaximized');
+      final value = await _channel.invokeMethod<bool>(
+        'isMaximized',
+        _windowArgs,
+      );
       if (mounted) setState(() => _maximized = value ?? false);
     } on MissingPluginException {
       // Non-Windows hosts keep their native title bar.
@@ -145,7 +163,10 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
 
   Future<void> _invoke(String method) async {
     try {
-      final value = await _channel.invokeMethod<bool>(method);
+      final value = await _channel.invokeMethod<bool>(
+        method,
+        _windowArgs,
+      );
       if (method == 'toggleMaximize' && mounted && value != null) {
         setState(() => _maximized = value);
       }

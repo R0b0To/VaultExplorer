@@ -8,8 +8,11 @@ import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
+import 'package:vaultexplorer/core/windowing/window_caption.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 
@@ -23,9 +26,14 @@ import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart
 /// window.
 ///
 /// What the main window's `MaterialApp` adds and this one deliberately does
-/// not: the skin editor overlay, the picture-in-picture layer, the Flutter
-/// drawn caption row (this window has a native title bar, see
-/// [NativeWindowChrome]) and the disguise-mode gate.
+/// not: the skin editor overlay, the picture-in-picture layer and the
+/// disguise-mode gate.
+///
+/// The title bar is the main window's too. On Windows the runner hides the
+/// window's OS caption and the page draws the same Flutter caption row (see
+/// `DesktopCaptionFrame`), so every window looks alike. Where that is not
+/// possible (Linux, or a runner that refuses) the window keeps its native
+/// title bar and is marked [NativeWindowChrome].
 class SecondaryWindowApp extends ConsumerStatefulWidget {
   const SecondaryWindowApp({super.key, required this.entry});
 
@@ -41,6 +49,25 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
     widget.entry.close,
   );
   int? _viewId;
+
+  /// Whether this window keeps its OS title bar. Windows tries to replace it
+  /// with the Flutter caption row first and falls back to the native one when
+  /// the runner cannot.
+  bool _nativeCaption = !PlatformFeatures.isWindows;
+
+  Future<void> _replaceNativeCaption(int viewId) async {
+    if (!PlatformFeatures.isWindows) return;
+    try {
+      await useCustomWindowCaption(viewId);
+    } catch (error) {
+      VeLog.w(
+        'SecondaryWindowApp',
+        'Could not replace the window caption; keeping the native one',
+        error,
+      );
+      if (mounted) setState(() => _nativeCaption = true);
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -58,6 +85,7 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
         viewId,
         widget.entry.navigatorKey,
       );
+      unawaited(_replaceNativeCaption(viewId));
     }
   }
 
@@ -112,14 +140,17 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
               localizationsDelegates: appLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               localeResolutionCallback: appResolveLocale,
-              builder: (context, child) => SecondaryWindowScope(
-                entry: widget.entry,
-                child: NativeWindowChrome(
-                  child: _SecondaryWindowShell(
-                    child: child ?? const SizedBox.shrink(),
-                  ),
-                ),
-              ),
+              builder: (context, child) {
+                final content = _SecondaryWindowShell(
+                  child: child ?? const SizedBox.shrink(),
+                );
+                return SecondaryWindowScope(
+                  entry: widget.entry,
+                  child: _nativeCaption
+                      ? NativeWindowChrome(child: content)
+                      : content,
+                );
+              },
               home: _SecondaryWindowRoot(entry: widget.entry),
             );
           },
@@ -174,7 +205,11 @@ class _SecondaryWindowRootState extends State<_SecondaryWindowRoot> {
           opaque: true,
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
-          pageBuilder: (context, _, _) => widget.entry.contentBuilder(context),
+          // The same caption row as the main window's pages get. A page that
+          // draws its own (the file manager window) claims it, and the frame
+          // adds nothing.
+          pageBuilder: (context, _, _) =>
+              DesktopCaptionFrame(child: widget.entry.contentBuilder(context)),
         ),
       );
     });

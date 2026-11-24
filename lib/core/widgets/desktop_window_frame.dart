@@ -8,13 +8,13 @@ import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 
 enum _FrameSlot { bar, page }
 
-/// Marks a window that has its own native title bar (a secondary window made
-/// by the windowing API), as opposed to the main Windows window whose caption
-/// is drawn by Flutter.
+/// Marks a window that keeps its native title bar (a secondary window on
+/// Linux, or on Windows when the runner could not hide the OS caption), as
+/// opposed to a Windows window whose caption is drawn by Flutter: the main one
+/// and, normally, the secondary ones.
 ///
-/// Inside it [DesktopCaptionFrame] draws nothing: its minimize / maximize /
-/// close buttons talk to the main window through the runner, so in another
-/// window they would act on the wrong one.
+/// Inside it [DesktopCaptionFrame] draws nothing: a second row of caption
+/// buttons would sit under the native ones.
 class NativeWindowChrome extends InheritedWidget {
   const NativeWindowChrome({super.key, required super.child});
 

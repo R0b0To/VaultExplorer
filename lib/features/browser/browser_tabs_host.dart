@@ -1532,10 +1532,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final appBarAtBottom = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.appBarAtBottom),
     );
-    // The main Windows window draws its own caption row (with the tabs in
-    // it). A window that has a native title bar, like a file manager window
-    // opened from this one, does not, and keeps the tab strip below its app
-    // bar as on Linux.
+    // A Windows window draws its own caption row (with the tabs in it). A
+    // window that kept its native title bar does not, and keeps the tab strip
+    // below its app bar as on Linux.
     final windowsCaption =
         PlatformFeatures.isWindows && !NativeWindowChrome.of(context);
     final desktopFileManagerChrome =

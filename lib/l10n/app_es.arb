@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "¿Eliminar esta bóveda?",
   "deleteAppStorageVaultBody": "«{name}» está guardada dentro de la app, así que quitarla la elimina de forma permanente. No hay otra copia salvo que hayas hecho una copia de seguridad.",
   "deleteAppStorageVaultMoveOut": "Sacarla en su lugar",
-  "deleteAppStorageVaultFailed": "No se pudo eliminar la bóveda."
+  "deleteAppStorageVaultFailed": "No se pudo eliminar la bóveda.",
+  "dateModeToModified": "Modificación desde la fecha de captura",
+  "dateToModifiedNote": "Establece la fecha de modificación de cada archivo con la fecha de captura guardada en él. Los archivos sin fecha de captura se omiten. Los archivos en sí no se modifican."
 }

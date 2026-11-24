@@ -13232,4 +13232,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => 'تعذّر حذف الخزنة.';
+
+  @override
+  String get dateModeToModified => 'تاريخ التعديل من تاريخ الالتقاط';
+
+  @override
+  String get dateToModifiedNote =>
+      'يضبط تاريخ تعديل كل ملف على تاريخ الالتقاط المخزّن داخله. تُتخطى الملفات التي لا تحتوي على تاريخ التقاط. لا تتغير الملفات نفسها.';
 }

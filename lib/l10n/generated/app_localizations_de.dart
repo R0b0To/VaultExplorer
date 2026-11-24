@@ -13168,4 +13168,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get deleteAppStorageVaultFailed =>
       'Der Tresor konnte nicht gelöscht werden.';
+
+  @override
+  String get dateModeToModified => 'Änderungsdatum aus Aufnahmedatum';
+
+  @override
+  String get dateToModifiedNote =>
+      'Setzt das Änderungsdatum jeder Datei auf das darin gespeicherte Aufnahmedatum. Dateien ohne Aufnahmedatum werden übersprungen. Die Dateien selbst werden nicht verändert.';
 }

@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "حذف هذه الخزنة؟",
   "deleteAppStorageVaultBody": "«{name}» مخزّنة داخل التطبيق، لذا فإزالتها تحذفها نهائيًا. لا توجد نسخة أخرى ما لم تكن قد أنشأت نسخة احتياطية.",
   "deleteAppStorageVaultMoveOut": "نقلها إلى الخارج بدلاً من ذلك",
-  "deleteAppStorageVaultFailed": "تعذّر حذف الخزنة."
+  "deleteAppStorageVaultFailed": "تعذّر حذف الخزنة.",
+  "dateModeToModified": "تاريخ التعديل من تاريخ الالتقاط",
+  "dateToModifiedNote": "يضبط تاريخ تعديل كل ملف على تاريخ الالتقاط المخزّن داخله. تُتخطى الملفات التي لا تحتوي على تاريخ التقاط. لا تتغير الملفات نفسها."
 }

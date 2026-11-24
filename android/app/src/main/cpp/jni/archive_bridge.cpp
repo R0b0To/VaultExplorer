@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <memory>
 #include <mutex>
 
@@ -43,6 +44,27 @@ static void ensureParentDirs(int volId, const std::string& path) {
         }
         pos++;
     }
+}
+
+// Gives an extracted entry the time its archive records, instead of the time it was written. Neither helper
+// reports a failure: a destination that cannot hold the time (a read-only volume, a filesystem without
+// timestamps) must not make the extraction fail.
+static void setVaultEntryModified(int volId, const std::string& destDir, const std::string& relPath,
+                                  int64_t epochSeconds) {
+    if (epochSeconds <= 0) return;
+    const std::string fullDest = destDir.empty() ? relPath : (destDir + "/" + relPath);
+    std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+    fsSetLastModifiedTime(volId, fullDest, static_cast<uint64_t>(epochSeconds));
+}
+
+static void setLocalEntryModified(const std::string& destDir, const std::string& relPath, int64_t epochSeconds) {
+    if (epochSeconds <= 0) return;
+    const std::string fullDest = destDir + "/" + relPath;
+    struct timespec ts[2];
+    ts[0].tv_sec = static_cast<time_t>(epochSeconds);
+    ts[0].tv_nsec = 0;
+    ts[1] = ts[0];
+    utimensat(AT_FDCWD, fullDest.c_str(), ts, 0);
 }
 
 static bool readModifiedSecs(JNIEnv* env, jlongArray modifiedSecs, jsize count,
@@ -581,7 +603,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractVaultAllNative(
             res.status = ArchiveOpenStatus::IoError;
             res.errorMessage = partSetError;
         } else {
-            res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb);
+            auto setModified = [volId, targetDirPath](const std::string& relPath, int64_t epochSeconds) {
+                setVaultEntryModified(volId, targetDirPath, relPath, epochSeconds);
+            };
+            res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb, setModified);
         }
 
         {
@@ -657,7 +682,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdToVaultNative(
         return true;
     };
 
-    ArchiveBulkExtractResult res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb);
+    auto setModified = [destVolId, targetDirPath](const std::string& relPath, int64_t epochSeconds) {
+        setVaultEntryModified(destVolId, targetDirPath, relPath, epochSeconds);
+    };
+    ArchiveBulkExtractResult res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb,
+                                                     setModified);
 
     if (destDirPath && nativeDestDir) env->ReleaseStringUTFChars(destDirPath, nativeDestDir);
     if (subPath && nativeSubPath) env->ReleaseStringUTFChars(subPath, nativeSubPath);
@@ -737,7 +766,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdToLocalDirNative(
         return true;
     };
 
-    ArchiveBulkExtractResult res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb);
+    auto setModified = [targetDirPath](const std::string& relPath, int64_t epochSeconds) {
+        setLocalEntryModified(targetDirPath, relPath, epochSeconds);
+    };
+    ArchiveBulkExtractResult res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb,
+                                                     setModified);
 
     if (destDirPath && nativeDestDir) env->ReleaseStringUTFChars(destDirPath, nativeDestDir);
     if (subPath && nativeSubPath) env->ReleaseStringUTFChars(subPath, nativeSubPath);

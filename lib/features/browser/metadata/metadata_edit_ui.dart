@@ -340,7 +340,7 @@ class _TagsDialogState extends State<_TagsDialog> {
 
 // ── Date and time ──────────────────────────────────────────────────────────
 
-enum _DateMode { set, shift, fromModified, fromName }
+enum _DateMode { set, shift, fromModified, toModified, fromName }
 
 class _DateChoice {
   const _DateChoice(
@@ -376,6 +376,8 @@ Future<void> _editDate(
         wall = choice.wall;
       case _DateMode.fromModified:
         wall = wallClockOfEpochSecs(t.modifiedSecs);
+      case _DateMode.toModified:
+        return _modifiedFromDateTaken(service, t);
       case _DateMode.fromName:
         wall = dateFromFileName(t.name);
       case _DateMode.shift:
@@ -420,6 +422,25 @@ Future<void> _editDate(
     }
     return _stepOf(outcome);
   });
+}
+
+/// "Modified from date taken": the file's modified date takes the date taken
+/// stored in the file (the opposite of "From modified date"). Only the
+/// modified date changes: nothing is written into the file, so this works for
+/// every file whose date taken can be read, and it cannot damage one.
+Future<_Step> _modifiedFromDateTaken(
+  MetadataEditService service,
+  MetadataEditTarget t,
+) async {
+  if (t.sizeBytes <= 0) return _Step.skipped;
+  final source = await service.openSource(t.container, t.path);
+  if (source == null) return _Step.failed;
+  final taken = (await GalleryMetaParser.parseSource(source)).takenWallClock;
+  if (taken == null) return _Step.skipped;
+  final modified = epochSecsOfWallClock(taken);
+  if (modified == t.modifiedSecs) return _Step.unchanged;
+  final ok = await service.setModifiedTime(t.container, t.path, modified);
+  return ok ? _Step.changed : _Step.failed;
 }
 
 class _DateDialog extends StatefulWidget {
@@ -485,6 +506,7 @@ class _DateDialogState extends State<_DateDialog> {
       _DateMode.set: l10n.dateModeSet,
       _DateMode.shift: l10n.dateModeShift,
       _DateMode.fromModified: l10n.dateModeFromModified,
+      _DateMode.toModified: l10n.dateModeToModified,
       _DateMode.fromName: l10n.dateModeFromName,
     };
     final matches = widget.targets
@@ -569,7 +591,9 @@ class _DateDialogState extends State<_DateDialog> {
               ],
               if (_mode == _DateMode.fromName)
                 Text(l10n.dateFromNameMatches(matches, widget.targets.length)),
-              if (_mode != _DateMode.fromModified)
+              if (_mode == _DateMode.toModified) Text(l10n.dateToModifiedNote),
+              if (_mode != _DateMode.fromModified &&
+                  _mode != _DateMode.toModified)
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(l10n.dateAlsoSetModified),

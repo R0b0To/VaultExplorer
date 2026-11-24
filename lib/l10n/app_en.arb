@@ -15168,5 +15168,13 @@
   "deleteAppStorageVaultFailed": "The vault could not be deleted.",
   "@deleteAppStorageVaultFailed": {
     "description": "Error shown when a vault in app storage could not be deleted"
+  },
+  "dateModeToModified": "Modified from date taken",
+  "@dateModeToModified": {
+    "description": "Option in Edit date & time to set each file's modified date from the date taken stored inside the file"
+  },
+  "dateToModifiedNote": "Sets each file's modified date to the date taken stored inside it. Files without a date taken are skipped. The files themselves are not changed.",
+  "@dateToModifiedNote": {
+    "description": "Explains the 'Modified from date taken' option: only the modified date changes, files without a date taken are skipped, file contents are untouched"
   }
 }

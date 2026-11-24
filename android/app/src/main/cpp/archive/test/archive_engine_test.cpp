@@ -715,6 +715,105 @@ int main() {
         printf("iso extract-all skips the root record: ok\n");
     }
 
+    // --- Extract-all reports each entry's recorded modification time, so a destination can keep it instead of
+    // stamping "now": files once complete (after the progress callback accepted them), folders last and deepest
+    // first. Nothing is reported for a cancelled run. ---
+    {
+        const std::string aText = "alpha";
+        const std::string bText = "bravo";
+        std::vector<ArchiveSourceEntry> srcEntries(4);
+        const struct {
+            const char* path;
+            bool dir;
+            int64_t mtime;
+        } layout[] = {
+            {"docs", true, 1000000000},
+            {"docs/sub", true, 1100000000},
+            {"docs/a.txt", false, 1200000000},
+            {"docs/sub/b.txt", false, 1300000000},
+        };
+        std::vector<size_t> offs(4, 0);
+        for (size_t i = 0; i < 4; ++i) {
+            srcEntries[i].pathInArchive = layout[i].path;
+            srcEntries[i].isDirectory = layout[i].dir;
+            srcEntries[i].modTimeEpochSeconds = layout[i].mtime;
+            if (layout[i].dir) continue;
+            const std::string& text = i == 2 ? aText : bText;
+            srcEntries[i].uncompressedSize = text.size();
+            srcEntries[i].readData = [&text, &offs, i](uint8_t* dest, size_t length) -> int64_t {
+                const size_t n = std::min(length, text.size() - offs[i]);
+                std::memcpy(dest, text.data() + offs[i], n);
+                offs[i] += n;
+                return static_cast<int64_t>(n);
+            };
+        }
+        std::vector<uint8_t> tarBytes;
+        ArchiveSink tarSink;
+        tarSink.write = [&tarBytes](const uint8_t* data, size_t length) -> int64_t {
+            tarBytes.insert(tarBytes.end(), data, data + length);
+            return static_cast<int64_t>(length);
+        };
+        assert(archiveCreate(tarSink, ArchiveFormat::Tar, srcEntries).status == ArchiveOpenStatus::Ok);
+
+        std::vector<std::string> events;
+        std::vector<std::pair<std::string, int64_t>> timed;
+        const auto run = [&](bool cancelAtFirstFile) {
+            events.clear();
+            timed.clear();
+            return archiveExtractAll(
+                sourceOver(tarBytes), "", "",
+                [&events](const std::string& dir) {
+                    events.push_back("dir " + dir);
+                    return true;
+                },
+                [&events](const std::string& path, uint64_t offset, const uint8_t*, size_t length) {
+                    if (offset == 0 && length == 0) events.push_back("open " + path);
+                    return true;
+                },
+                [&events, cancelAtFirstFile](int32_t, const std::string& path) {
+                    events.push_back("done " + path);
+                    return !cancelAtFirstFile;
+                },
+                [&events, &timed](const std::string& path, int64_t mtime) {
+                    events.push_back("time " + path);
+                    timed.emplace_back(path, mtime);
+                });
+        };
+        const auto indexOf = [&events](const std::string& e) {
+            return std::find(events.begin(), events.end(), e) - events.begin();
+        };
+
+        assert(run(false).status == ArchiveOpenStatus::Ok);
+        assert(timed.size() == 4);
+        const auto timeOf = [&timed](const std::string& path) {
+            for (const auto& t : timed) {
+                if (t.first == path) return t.second;
+            }
+            return int64_t(-1);
+        };
+        assert(timeOf("docs") == 1000000000);
+        assert(timeOf("docs/sub") == 1100000000);
+        assert(timeOf("docs/a.txt") == 1200000000);
+        assert(timeOf("docs/sub/b.txt") == 1300000000);
+        // A file is timed only once it is complete.
+        assert(indexOf("time docs/a.txt") > indexOf("done docs/a.txt"));
+        assert(indexOf("time docs/sub/b.txt") > indexOf("done docs/sub/b.txt"));
+        // Folders come after every file, the deeper one first.
+        assert(indexOf("time docs/sub") > indexOf("time docs/sub/b.txt"));
+        assert(indexOf("time docs/sub") < indexOf("time docs"));
+
+        // Cancelled at the first finished file: no time is reported, for files or folders.
+        run(true);
+        assert(timed.empty());
+
+        // The hook is optional: extraction without it behaves as before.
+        const auto plain = archiveExtractAll(
+            sourceOver(tarBytes), "", "", [](const std::string&) { return true; },
+            [](const std::string&, uint64_t, const uint8_t*, size_t) { return true; });
+        assert(plain.status == ArchiveOpenStatus::Ok);
+        printf("extract-all reports entry modification times (files after completion, folders last): ok\n");
+    }
+
     // --- zstd: libarchive pads the last 10 KiB block with zeros, even after a
     // compression filter. Its zstd reader can't skip that padding, so
     //  (a) archiveCreate() must not write it for compressed tars, and

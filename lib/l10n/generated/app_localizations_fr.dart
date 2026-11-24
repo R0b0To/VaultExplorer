@@ -13267,4 +13267,12 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get deleteAppStorageVaultFailed =>
       'Impossible de supprimer le coffre.';
+
+  @override
+  String get dateModeToModified =>
+      'Modification d’après la date de prise de vue';
+
+  @override
+  String get dateToModifiedNote =>
+      'Définit la date de modification de chaque fichier d’après la date de prise de vue qu’il contient. Les fichiers sans date de prise de vue sont ignorés. Les fichiers eux-mêmes ne sont pas modifiés.';
 }

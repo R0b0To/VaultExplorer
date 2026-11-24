@@ -8,6 +8,7 @@
 #include <cctype>
 #include <ctime>
 #include <cstring>
+#include <utility>
 
 namespace {
 
@@ -514,7 +515,8 @@ ArchiveBulkExtractResult archiveExtractAll(
     const std::string& subPathPrefix,
     std::function<bool(const std::string& dirPath)> makeDir,
     std::function<bool(const std::string& filePath, uint64_t offset, const uint8_t* data, size_t length)> writeFileChunk,
-    std::function<bool(int32_t count, const std::string& currentPath)> progressCallback
+    std::function<bool(int32_t count, const std::string& currentPath)> progressCallback,
+    std::function<void(const std::string& relPath, int64_t modTimeEpochSeconds)> setModifiedTime
 ) {
     ArchiveBulkExtractResult result;
     CallbackState state(source);
@@ -534,10 +536,15 @@ ArchiveBulkExtractResult archiveExtractAll(
     std::vector<uint8_t> chunk(kSequentialChunkSize);
     struct archive_entry* entry = nullptr;
 
+    // Folders with a recorded time, applied after the last entry (see the header).
+    std::vector<std::pair<std::string, int64_t>> dirTimes;
+    bool reachedEnd = false;
+
     for (;;) {
         const int r = archive_read_next_header(a, &entry);
         if (r == ARCHIVE_EOF) {
             result.status = ArchiveOpenStatus::Ok;
+            reachedEnd = true;
             break;
         }
         if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
@@ -583,10 +590,18 @@ ArchiveBulkExtractResult archiveExtractAll(
             }
         }
 
+        // The time the archive records for this entry, 0 when it records none.
+        const int64_t entryMtime = archive_entry_mtime_is_set(entry)
+            ? static_cast<int64_t>(archive_entry_mtime(entry))
+            : 0;
+
         const bool isDir = archive_entry_filetype(entry) == AE_IFDIR;
         if (isDir) {
             if (makeDir && !relPath.empty()) {
                 makeDir(relPath);
+                // Recorded even when makeDir answered false: the folder may already exist (a file entry listed
+                // before it created the path), and a time that cannot be set is ignored anyway.
+                if (setModifiedTime && entryMtime > 0) dirTimes.emplace_back(relPath, entryMtime);
             }
             archive_read_data_skip(a);
             continue;
@@ -636,6 +651,17 @@ ArchiveBulkExtractResult archiveExtractAll(
                 break;
             }
         }
+        // The file is complete here, so its time is not overwritten by a later write.
+        if (setModifiedTime && entryMtime > 0) setModifiedTime(relPath, entryMtime);
+    }
+
+    // Deepest folder first: a child's time is set before its parent's.
+    if (reachedEnd && setModifiedTime && !dirTimes.empty()) {
+        const auto depth = [](const std::string& p) { return std::count(p.begin(), p.end(), '/'); };
+        std::stable_sort(dirTimes.begin(), dirTimes.end(), [&](const auto& x, const auto& y) {
+            return depth(x.first) > depth(y.first);
+        });
+        for (const auto& d : dirTimes) setModifiedTime(d.first, d.second);
     }
 
     archive_read_free(a);

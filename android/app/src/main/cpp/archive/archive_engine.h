@@ -62,13 +62,22 @@ struct ArchiveBulkExtractResult {
     std::string errorMessage;
 };
 
+/// [setModifiedTime], when given, is how an extracted entry gets the modification time stored in the archive
+/// instead of the time it was written. [relPath] is the same path that [makeDir] / [writeFileChunk] received.
+///  - A file: called once it is complete (after [progressCallback] accepted it), so a destination that only makes a
+///    file valid when the writer is told it is finished has already done so.
+///  - A folder: called after the last entry has been extracted, deepest folder first, because adding files to a
+///    folder moves its own modification time.
+/// Only entries whose archive records a time (> 0) are reported. Nothing is reported for a cancelled or failed run.
+/// Its result is ignored: a destination that cannot hold the time must not make the extraction fail.
 ArchiveBulkExtractResult archiveExtractAll(
     const ArchiveStreamSource& source,
     const std::string& passphrase,
     const std::string& subPathPrefix,
     std::function<bool(const std::string& dirPath)> makeDir,
     std::function<bool(const std::string& filePath, uint64_t offset, const uint8_t* data, size_t length)> writeFileChunk,
-    std::function<bool(int32_t count, const std::string& currentPath)> progressCallback = nullptr
+    std::function<bool(int32_t count, const std::string& currentPath)> progressCallback = nullptr,
+    std::function<void(const std::string& relPath, int64_t modTimeEpochSeconds)> setModifiedTime = nullptr
 );
 
 // ── Archive Creation (Compression / Packaging) ──────────────────────────

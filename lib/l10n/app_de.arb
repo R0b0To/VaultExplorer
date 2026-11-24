@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "Diesen Tresor löschen?",
   "deleteAppStorageVaultBody": "„{name}“ liegt in der App, daher wird er beim Entfernen endgültig gelöscht. Es gibt keine weitere Kopie, außer Sie haben eine Sicherung erstellt.",
   "deleteAppStorageVaultMoveOut": "Stattdessen herausverschieben",
-  "deleteAppStorageVaultFailed": "Der Tresor konnte nicht gelöscht werden."
+  "deleteAppStorageVaultFailed": "Der Tresor konnte nicht gelöscht werden.",
+  "dateModeToModified": "Änderungsdatum aus Aufnahmedatum",
+  "dateToModifiedNote": "Setzt das Änderungsdatum jeder Datei auf das darin gespeicherte Aufnahmedatum. Dateien ohne Aufnahmedatum werden übersprungen. Die Dateien selbst werden nicht verändert."
 }

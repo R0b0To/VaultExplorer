@@ -13165,4 +13165,11 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => 'Não foi possível excluir o cofre.';
+
+  @override
+  String get dateModeToModified => 'Modificação a partir da data da captura';
+
+  @override
+  String get dateToModifiedNote =>
+      'Define a data de modificação de cada arquivo como a data da captura armazenada nele. Arquivos sem data da captura são ignorados. Os próprios arquivos não são alterados.';
 }

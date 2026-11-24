@@ -12449,4 +12449,11 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => '保管庫を削除できませんでした。';
+
+  @override
+  String get dateModeToModified => '撮影日時から更新日時へ';
+
+  @override
+  String get dateToModifiedNote =>
+      '各ファイルの更新日時を、ファイル内に保存されている撮影日時に設定します。撮影日時のないファイルはスキップされます。ファイル自体は変更されません。';
 }

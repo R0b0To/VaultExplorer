@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "删除此保险库？",
   "deleteAppStorageVaultBody": "“{name}”存储在应用内，因此移除它会将其永久删除。除非您已做过备份，否则没有其他副本。",
   "deleteAppStorageVaultMoveOut": "改为移出",
-  "deleteAppStorageVaultFailed": "无法删除保险库。"
+  "deleteAppStorageVaultFailed": "无法删除保险库。",
+  "dateModeToModified": "修改日期来自拍摄日期",
+  "dateToModifiedNote": "将每个文件的修改日期设置为其内部保存的拍摄日期。没有拍摄日期的文件会被跳过。文件本身不会被更改。"
 }

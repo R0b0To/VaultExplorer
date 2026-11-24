@@ -12257,4 +12257,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => '无法删除保险库。';
+
+  @override
+  String get dateModeToModified => '修改日期来自拍摄日期';
+
+  @override
+  String get dateToModifiedNote =>
+      '将每个文件的修改日期设置为其内部保存的拍摄日期。没有拍摄日期的文件会被跳过。文件本身不会被更改。';
 }

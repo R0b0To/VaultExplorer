@@ -3620,5 +3620,7 @@
   "deleteAppStorageVaultTitle": "Bu kasa silinsin mi?",
   "deleteAppStorageVaultBody": "\"{name}\" uygulamanın içinde saklanıyor, bu yüzden kaldırmak onu kalıcı olarak siler. Yedek almadıysanız başka kopyası yoktur.",
   "deleteAppStorageVaultMoveOut": "Bunun yerine çıkar",
-  "deleteAppStorageVaultFailed": "Kasa silinemedi."
+  "deleteAppStorageVaultFailed": "Kasa silinemedi.",
+  "dateModeToModified": "Çekim tarihinden değiştirilme tarihine",
+  "dateToModifiedNote": "Her dosyanın değiştirilme tarihini, içinde saklanan çekim tarihine ayarlar. Çekim tarihi olmayan dosyalar atlanır. Dosyaların kendisi değiştirilmez."
 }

@@ -631,8 +631,11 @@ class ArchiveService {
         entry.uncompressedSize > 0 &&
         entry.uncompressedSize <= _maxEntryBytesInMemory) {
       final bytes = await archiveContext.extractEntry(entryPath);
-      return bytes != null &&
+      final written =
+          bytes != null &&
           await _fileIo.writeWholeFile(container, destPath, bytes);
+      if (written) await _restoreEntryModifiedTime(container, destPath, entry);
+      return written;
     }
 
     final staged = await archiveContext.stageEntryForBrowse(entryPath);
@@ -642,15 +645,34 @@ class ArchiveService {
     }
 
     try {
-      return await _fileIo.writeFileFromLocalPath(
+      final written = await _fileIo.writeFileFromLocalPath(
         container,
         destPath,
         stagedPath,
         opId: opId ?? 0,
       );
+      if (written) await _restoreEntryModifiedTime(container, destPath, entry);
+      return written;
     } finally {
       await _archive.discardBrowseFile(stagedPath);
     }
+  }
+
+  /// Gives an extracted file the modified time its archive records, rather
+  /// than the time it was written. A destination that cannot hold the time
+  /// (a SAF-backed storage has no way to set it) leaves the file as written:
+  /// that never fails the extraction.
+  static Future<void> _restoreEntryModifiedTime(
+    MountedContainer container,
+    String destPath,
+    ArchiveEntryInfo? entry,
+  ) async {
+    if (entry == null) return;
+    final epochSecs = entry.modTime.millisecondsSinceEpoch ~/ 1000;
+    if (epochSecs <= 0) return;
+    try {
+      await _fileIo.setLastModifiedTime(container, destPath, epochSecs);
+    } catch (_) {}
   }
 
   /// Directly calls the archive creation API.

@@ -368,12 +368,31 @@ class SafStorageManager(private val context: Context) {
     /**
      * Lists directory contents in a single cursor pass with full metadata.
      */
+    /**
+     * Asks the document provider to re-read a folder from its backing store.
+     *
+     * Remote providers (SFTP, SMB, cloud) keep their own listing cache, and a
+     * plain query after a move or a manual refresh is answered from it, so the
+     * moved item stays in the source and is missing from the destination until
+     * the provider happens to refresh. ContentResolver.refresh is the SAF way
+     * to request that (the system picker's pull-to-refresh uses it). Providers
+     * that do not support it return false, so this is best effort.
+     */
+    private fun requestProviderRefresh(treeUri: Uri, folderDocId: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        runCatching {
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, folderDocId)
+            context.contentResolver.refresh(childrenUri, null, null)
+        }
+    }
+
     fun listDirectory(treeUri: Uri, relativePath: String, refresh: Boolean = false): List<SafEntry> {
         val clean = normalizePath(relativePath)
         if (refresh) {
             dirListingCache.remove(cacheKey(treeUri, clean))
         }
         val docId = resolveDocumentId(treeUri, clean) ?: return emptyList()
+        if (refresh) requestProviderRefresh(treeUri, docId)
         return queryChildrenInternal(treeUri, docId, clean)
     }
 
@@ -730,6 +749,10 @@ class SafStorageManager(private val context: Context) {
                 sourceParentUri,
                 destParentUri,
             ) ?: return false
+            // The provider's own listing of both folders is stale now. Ask it
+            // to re-read them before the app lists either folder again.
+            resolveDocumentId(treeUri, sourceParentPath)?.let { requestProviderRefresh(treeUri, it) }
+            resolveDocumentId(treeUri, destParentPath)?.let { requestProviderRefresh(treeUri, it) }
             // Moving a directory changes paths for its cached descendants.
             invalidateCache(treeUri)
             runCatching {

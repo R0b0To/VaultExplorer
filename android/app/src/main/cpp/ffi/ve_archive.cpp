@@ -419,6 +419,18 @@ int64_t hostMtimeSeconds(const fs::path& p) {
     return std::chrono::duration_cast<std::chrono::seconds>((sysNow + (ft - fileNow)).time_since_epoch()).count();
 }
 
+// Sets a host file's or folder's modification time from seconds since the epoch. The inverse of hostMtimeSeconds,
+// with the same way of getting around the file_clock / system_clock conversion. False when it could not be set.
+bool setHostMtimeSeconds(const fs::path& p, int64_t epochSeconds) {
+    if (epochSeconds <= 0) return false;
+    std::error_code ec;
+    const auto sysNow = std::chrono::system_clock::now();
+    const auto fileNow = fs::file_time_type::clock::now();
+    const auto target = std::chrono::system_clock::time_point(std::chrono::seconds(epochSeconds));
+    fs::last_write_time(p, fileNow + std::chrono::duration_cast<fs::file_time_type::duration>(target - sysNow), ec);
+    return !ec;
+}
+
 // One file going into the archive, read only while the archive is working on it: a selection of thousands of
 // files never holds thousands of open files or vault streams.
 struct CreateSource {
@@ -829,8 +841,19 @@ extern "C" VE_API int32_t ve_archive_extract_all(int32_t src_vol, const char* sr
             return true;
         };
 
+        // Gives each extracted file and folder the time the archive records for it, instead of "now". Not being able
+        // to (a filesystem without timestamps, a folder vault that is read-only) never fails the extraction.
+        auto setModified = [&](const std::string& rel, int64_t epochSeconds) {
+            if (toVault) {
+                ve_set_last_modified(dest_vol, joinVaultPath(vaultDir, rel).c_str(), epochSeconds);
+            } else {
+                setHostMtimeSeconds(hostDir / toPath(rel), epochSeconds);
+            }
+        };
+
         ArchiveBulkExtractResult res = archiveExtractAll(src.source, passphraseOf(passphrase),
-                                                         passphraseOf(sub_path), makeDir, writeChunk, progress);
+                                                         passphraseOf(sub_path), makeDir, writeChunk, progress,
+                                                         setModified);
 
         // A file still open here was cut short (error, or the progress hook failed to finish it).
         if (!currentRel.empty()) {

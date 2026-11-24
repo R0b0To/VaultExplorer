@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "Eliminare questo vault?",
   "deleteAppStorageVaultBody": "\"{name}\" è archiviato nell'app, quindi rimuoverlo lo elimina in modo permanente. Non esiste un'altra copia, a meno che tu non abbia fatto un backup.",
   "deleteAppStorageVaultMoveOut": "Sposta fuori invece",
-  "deleteAppStorageVaultFailed": "Impossibile eliminare il vault."
+  "deleteAppStorageVaultFailed": "Impossibile eliminare il vault.",
+  "dateModeToModified": "Modifica dalla data scatto",
+  "dateToModifiedNote": "Imposta la data di modifica di ogni file sulla data scatto memorizzata al suo interno. I file senza data scatto vengono ignorati. I file stessi non vengono modificati."
 }

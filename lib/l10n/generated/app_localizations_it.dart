@@ -13186,4 +13186,11 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => 'Impossibile eliminare il vault.';
+
+  @override
+  String get dateModeToModified => 'Modifica dalla data scatto';
+
+  @override
+  String get dateToModifiedNote =>
+      'Imposta la data di modifica di ogni file sulla data scatto memorizzata al suo interno. I file senza data scatto vengono ignorati. I file stessi non vengono modificati.';
 }

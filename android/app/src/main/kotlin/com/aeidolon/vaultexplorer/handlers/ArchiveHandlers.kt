@@ -606,14 +606,20 @@ class ArchiveHandlers(
 
                     val targetBase = destDirPath.trim('/')
                     var importedCount = 0
+                    // The extracted entries carry the times their archive records (the native extractor sets them
+                    // on the temp copy); a folder vault only gets them if they are applied while importing.
+                    // Folders are done last, deepest first, because adding files to a folder moves its own time.
+                    val dirTimes = mutableListOf<Pair<String, Long>>()
                     ContainerFileSystem.beginBatchWrite(destVolId)
                     try {
                         for (file in extDir.walkTopDown()) {
                             if (file == extDir) continue
                             val rel = file.relativeTo(extDir).path.replace('\\', '/')
                             val targetPath = if (targetBase.isEmpty()) rel else "$targetBase/$rel"
+                            val modifiedSecs = file.lastModified() / 1000L
                             if (file.isDirectory) {
                                 ContainerFileSystem.createDirectory(destVolId, targetPath)
+                                if (modifiedSecs > 0) dirTimes.add(targetPath to modifiedSecs)
                             } else {
                                 val parent = targetPath.substringBeforeLast('/', "")
                                 if (parent.isNotEmpty()) {
@@ -626,9 +632,15 @@ class ArchiveHandlers(
                                 }
                                 if (ContainerFileSystem.writeBackFile(destVolId, targetPath, file.absolutePath, opId)) {
                                     ContainerFileSystem.finishWrite(destVolId, targetPath)
+                                    if (modifiedSecs > 0) {
+                                        ContainerFileSystem.setLastModifiedTime(destVolId, targetPath, modifiedSecs)
+                                    }
                                     importedCount++
                                 }
                             }
+                        }
+                        for ((dirPath, dirSecs) in dirTimes.sortedByDescending { it.first.count { c -> c == '/' } }) {
+                            ContainerFileSystem.setLastModifiedTime(destVolId, dirPath, dirSecs)
                         }
                     } finally {
                         ContainerFileSystem.endBatchWrite(destVolId)

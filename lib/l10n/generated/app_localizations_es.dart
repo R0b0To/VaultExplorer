@@ -13194,4 +13194,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => 'No se pudo eliminar la bóveda.';
+
+  @override
+  String get dateModeToModified => 'Modificación desde la fecha de captura';
+
+  @override
+  String get dateToModifiedNote =>
+      'Establece la fecha de modificación de cada archivo con la fecha de captura guardada en él. Los archivos sin fecha de captura se omiten. Los archivos en sí no se modifican.';
 }

@@ -12451,4 +12451,11 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => '볼트를 삭제하지 못했습니다.';
+
+  @override
+  String get dateModeToModified => '촬영 날짜에서 수정 날짜로';
+
+  @override
+  String get dateToModifiedNote =>
+      '각 파일의 수정 날짜를 파일 안에 저장된 촬영 날짜로 설정합니다. 촬영 날짜가 없는 파일은 건너뜁니다. 파일 자체는 변경되지 않습니다.';
 }

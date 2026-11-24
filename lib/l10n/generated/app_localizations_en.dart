@@ -12978,4 +12978,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => 'The vault could not be deleted.';
+
+  @override
+  String get dateModeToModified => 'Modified from date taken';
+
+  @override
+  String get dateToModifiedNote =>
+      'Sets each file\'s modified date to the date taken stored inside it. Files without a date taken are skipped. The files themselves are not changed.';
 }

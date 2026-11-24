@@ -13059,4 +13059,11 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => 'Kasa silinemedi.';
+
+  @override
+  String get dateModeToModified => 'Çekim tarihinden değiştirilme tarihine';
+
+  @override
+  String get dateToModifiedNote =>
+      'Her dosyanın değiştirilme tarihini, içinde saklanan çekim tarihine ayarlar. Çekim tarihi olmayan dosyalar atlanır. Dosyaların kendisi değiştirilmez.';
 }

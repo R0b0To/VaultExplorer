@@ -13271,4 +13271,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get deleteAppStorageVaultFailed => 'Не вдалося видалити сховище.';
+
+  @override
+  String get dateModeToModified => 'Дата змінення з дати знімання';
+
+  @override
+  String get dateToModifiedNote =>
+      'Встановлює дату змінення кожного файлу на дату знімання, збережену в ньому. Файли без дати знімання пропускаються. Самі файли не змінюються.';
 }

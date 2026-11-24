@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "Excluir este cofre?",
   "deleteAppStorageVaultBody": "\"{name}\" está armazenado dentro do app, então removê-lo o exclui permanentemente. Não há outra cópia, a menos que você tenha feito um backup.",
   "deleteAppStorageVaultMoveOut": "Tirar do app em vez disso",
-  "deleteAppStorageVaultFailed": "Não foi possível excluir o cofre."
+  "deleteAppStorageVaultFailed": "Não foi possível excluir o cofre.",
+  "dateModeToModified": "Modificação a partir da data da captura",
+  "dateToModifiedNote": "Define a data de modificação de cada arquivo como a data da captura armazenada nele. Arquivos sem data da captura são ignorados. Os próprios arquivos não são alterados."
 }

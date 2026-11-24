@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "この保管庫を削除しますか？",
   "deleteAppStorageVaultBody": "「{name}」はアプリ内に保存されているため、削除すると完全に消去されます。バックアップがない限り、他のコピーはありません。",
   "deleteAppStorageVaultMoveOut": "代わりに移動する",
-  "deleteAppStorageVaultFailed": "保管庫を削除できませんでした。"
+  "deleteAppStorageVaultFailed": "保管庫を削除できませんでした。",
+  "dateModeToModified": "撮影日時から更新日時へ",
+  "dateToModifiedNote": "各ファイルの更新日時を、ファイル内に保存されている撮影日時に設定します。撮影日時のないファイルはスキップされます。ファイル自体は変更されません。"
 }

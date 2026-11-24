@@ -3626,5 +3626,7 @@
   "deleteAppStorageVaultTitle": "이 볼트를 삭제할까요?",
   "deleteAppStorageVaultBody": "\"{name}\"은(는) 앱 안에 저장되어 있어 제거하면 영구적으로 삭제됩니다. 백업을 만들어 두지 않았다면 다른 사본은 없습니다.",
   "deleteAppStorageVaultMoveOut": "대신 꺼내기",
-  "deleteAppStorageVaultFailed": "볼트를 삭제하지 못했습니다."
+  "deleteAppStorageVaultFailed": "볼트를 삭제하지 못했습니다.",
+  "dateModeToModified": "촬영 날짜에서 수정 날짜로",
+  "dateToModifiedNote": "각 파일의 수정 날짜를 파일 안에 저장된 촬영 날짜로 설정합니다. 촬영 날짜가 없는 파일은 건너뜁니다. 파일 자체는 변경되지 않습니다."
 }

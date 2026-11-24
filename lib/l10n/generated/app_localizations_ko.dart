@@ -12327,4 +12327,128 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => '새 창에서 열기';
+
+  @override
+  String get storageLocationLabel => '저장 위치';
+
+  @override
+  String get storageLocationPicked => '위치 선택';
+
+  @override
+  String get storageLocationAppStorage => '앱 저장소';
+
+  @override
+  String get appStorageCreateNote =>
+      '앱의 비공개 저장소 안에 보관되며 이 앱만 접근할 수 있습니다. 앱을 삭제하거나 앱 데이터를 지우면 함께 삭제되므로 중요한 것은 백업해 두세요.';
+
+  @override
+  String get vaultNameLabel => '볼트 이름';
+
+  @override
+  String get vaultNameRequired => '볼트 이름이 필요합니다';
+
+  @override
+  String get moveToAppStorageTile => '앱 저장소로 이동';
+
+  @override
+  String get moveToAppStorageSubtitle => '이 볼트를 앱의 비공개 저장소 안에 보관합니다';
+
+  @override
+  String get moveOutOfAppStorageTile => '앱 저장소에서 꺼내기';
+
+  @override
+  String get moveOutOfAppStorageSubtitle => '이 볼트를 선택한 위치에 저장합니다';
+
+  @override
+  String get relocateSaveChangesFirst => '볼트를 이동하기 전에 변경 사항을 저장하거나 취소하세요.';
+
+  @override
+  String get relocateToAppStorageTitle => '앱 저장소로 이동할까요?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      '볼트를 앱의 비공개 저장소로 복사하고, 다른 작업을 하기 전에 바이트 단위로 확인합니다. 저장된 비밀번호와 설정도 함께 이동합니다.';
+
+  @override
+  String get relocateFromAppStorageTitle => '앱 저장소에서 꺼낼까요?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      '볼트를 저장할 위치를 선택합니다. 그곳으로 복사하고, 다른 작업을 하기 전에 바이트 단위로 확인합니다. 저장된 비밀번호와 설정도 함께 이동합니다.';
+
+  @override
+  String get appStorageRiskNote =>
+      '앱 저장소의 볼트는 앱을 삭제하거나, 앱 데이터를 지우거나, 긴급 삭제를 실행하면 삭제됩니다. 중요한 것은 백업해 두세요.';
+
+  @override
+  String get relocateDeleteOriginal => '복사본 확인 후 원본 삭제';
+
+  @override
+  String get relocateMoveButton => '이동';
+
+  @override
+  String get relocatePhaseCopying => '볼트를 복사하고 확인하는 중…';
+
+  @override
+  String get relocatePhaseSwitching => '새 위치로 전환하는 중…';
+
+  @override
+  String get relocatePhaseFinishing => '마무리하는 중…';
+
+  @override
+  String get relocatedToAppStorage => '볼트를 앱 저장소로 이동했습니다.';
+
+  @override
+  String get relocatedFromAppStorage => '볼트를 앱 저장소에서 꺼냈습니다.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      '생체 인식 잠금 해제를 옮기지 못했습니다. 비밀번호로 이 볼트를 열고 생체 인식을 다시 설정하세요.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      '이 볼트의 자동화 접근 권한이 초기화되었습니다. 볼트의 자동화 설정에서 다시 켜세요.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      '원본을 삭제하지 못해 이전 위치에 그대로 남아 있습니다. 직접 삭제할 수 있습니다.';
+
+  @override
+  String get relocateErrorUnlocked => '이동하기 전에 볼트를 잠그세요.';
+
+  @override
+  String get relocateErrorUnsupported => '이 종류의 볼트는 이동할 수 없습니다.';
+
+  @override
+  String get relocateErrorSplit => '분할된 컨테이너는 이동할 수 없습니다. 먼저 조각을 합치세요.';
+
+  @override
+  String get relocateErrorNotVaultFolder => '이 폴더에는 볼트 구성 파일이 없습니다.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      '복사본이 원본과 일치하지 않아 폐기했습니다. 아무것도 변경되지 않았습니다.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      '복사본은 만들었지만 앱이 전환하지 못해 삭제했습니다. 아무것도 변경되지 않았습니다.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return '볼트를 이동하지 못했습니다. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => '이 볼트를 삭제할까요?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '\"$name\"은(는) 앱 안에 저장되어 있어 제거하면 영구적으로 삭제됩니다. 백업을 만들어 두지 않았다면 다른 사본은 없습니다.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => '대신 꺼내기';
+
+  @override
+  String get deleteAppStorageVaultFailed => '볼트를 삭제하지 못했습니다.';
 }

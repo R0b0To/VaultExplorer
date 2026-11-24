@@ -453,6 +453,90 @@ class ContainerRepository {
     return _cache![uri];
   }
 
+  /// Re-registers the vault at [oldUri] as [newUri] after its files were moved
+  /// (see `VaultRelocationService`): the same record, in the same place in the
+  /// list, with everything that was kept under the old URI re-saved under the
+  /// new one -- the saved password, pattern/PIN hash, keyfiles, document-provider
+  /// folders, remembered PIM and the device-only bookmarks. Then the old URI's
+  /// state is removed, which also drops its cached derived key (and expiry) and
+  /// biometric key; both are re-created the next time the vault is unlocked, so
+  /// nothing stale is left behind keyed by a location that no longer holds the vault.
+  ///
+  /// Biometric unlock is *not* re-armed here: its sentinel key must be checked
+  /// before it is trusted again (see `BiometricEnrollmentGuard`), which is the
+  /// caller's job. The record keeps its unlock method, so the caller can do that
+  /// check after this returns, and fall back with [revertBiometricsToPassword].
+  ///
+  /// If saving the new record fails part-way it is removed again and the error
+  /// rethrown, leaving the old registration untouched. Returns the stored record
+  /// (without the transient secrets that [save] accepts).
+  Future<ContainerRecord> relocate({
+    required String oldUri,
+    required String newUri,
+  }) async {
+    await _ensureLoaded();
+    final old = _cache![oldUri];
+    if (old == null) throw StateError('No vault is registered at $oldUri');
+    if (oldUri == newUri) {
+      throw ArgumentError.value(newUri, 'newUri', 'must differ from oldUri');
+    }
+    if (_cache!.containsKey(newUri)) {
+      throw StateError('A vault is already registered at $newUri');
+    }
+
+    final method = old.unlockMethod;
+    final password = method == ContainerUnlockMethod.password
+        ? null
+        : await getPassword(oldUri);
+    final patternHash = method == ContainerUnlockMethod.pattern
+        ? await getPatternHash(oldUri)
+        : null;
+    final pinHash = method == ContainerUnlockMethod.pin
+        ? await getPinHash(oldUri)
+        : null;
+
+    try {
+      await save(
+        old.copyWith(
+          uri: newUri,
+          pendingPassword: password,
+          pendingPatternHash: patternHash,
+          pendingPinHash: pinHash,
+        ),
+      );
+      // `save` keeps the record it was given; keep only the non-secret part in memory.
+      _cache![newUri] = _cache![newUri]!.copyWith();
+      await _copySecureEntry(pimStorageKey(oldUri), pimStorageKey(newUri));
+      await _copySecureEntry(marksKey(oldUri), marksKey(newUri));
+    } catch (e) {
+      _logSwallowed('relocate/saveNew', e);
+      try {
+        await remove(newUri);
+      } catch (cleanup) {
+        _logSwallowed('relocate/rollback', cleanup);
+      }
+      rethrow;
+    }
+
+    // Put the new record where the old one was, so the vault keeps its place in the list.
+    final rebuilt = <String, ContainerRecord>{};
+    for (final entry in _cache!.entries) {
+      if (entry.key == newUri) continue;
+      rebuilt[entry.key] = entry.value;
+      if (entry.key == oldUri) rebuilt[newUri] = _cache![newUri]!;
+    }
+    _cache = rebuilt;
+
+    await remove(oldUri);
+    return _cache![newUri]!;
+  }
+
+  /// Copies one secure-storage entry to another key when it exists. A missing entry is not an error.
+  Future<void> _copySecureEntry(String fromKey, String toKey) async {
+    final value = await _secure.read(key: fromKey);
+    if (value != null) await _secure.write(key: toKey, value: value);
+  }
+
   /// Switches derived-key caching off for every record whose cached key was
   /// keyed by one of [keyPaths] (see [derivedKeyPathForUri]). Used after the
   /// platform layer purged keys whose lifetime ran out, so the vault stops
@@ -1161,6 +1245,7 @@ class ContainerRecord {
   }
 
   ContainerRecord copyWith({
+    String? uri,
     String? label,
     bool? rememberPassword,
     ContainerUnlockMethod? unlockMethod,
@@ -1187,7 +1272,7 @@ class ContainerRecord {
     List<Map<String, String>>? compositeCarriers,
   }) {
     return ContainerRecord(
-      uri: uri,
+      uri: uri ?? this.uri,
       label: label ?? this.label,
       rememberPassword: rememberPassword ?? this.rememberPassword,
       unlockMethod: unlockMethod ?? this.unlockMethod,

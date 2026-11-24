@@ -13052,4 +13052,138 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'Apri in una nuova finestra';
+
+  @override
+  String get storageLocationLabel => 'Posizione di archiviazione';
+
+  @override
+  String get storageLocationPicked => 'Scegli posizione';
+
+  @override
+  String get storageLocationAppStorage => 'Archivio dell\'app';
+
+  @override
+  String get appStorageCreateNote =>
+      'Viene conservato nell\'archivio privato dell\'app, accessibile solo a essa. Viene eliminato se disinstalli l\'app o cancelli i suoi dati, quindi tieni un backup di ciò che è importante.';
+
+  @override
+  String get vaultNameLabel => 'Nome del vault';
+
+  @override
+  String get vaultNameRequired => 'Il nome del vault è obbligatorio';
+
+  @override
+  String get moveToAppStorageTile => 'Sposta nell\'archivio dell\'app';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Tieni questo vault nell\'archivio privato dell\'app';
+
+  @override
+  String get moveOutOfAppStorageTile => 'Sposta fuori dall\'archivio dell\'app';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Salva questo vault in una posizione a tua scelta';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Salva o annulla le modifiche prima di spostare il vault.';
+
+  @override
+  String get relocateToAppStorageTitle => 'Spostare nell\'archivio dell\'app?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'Il vault viene copiato nell\'archivio privato dell\'app e controllato byte per byte prima di qualsiasi altra operazione. La password salvata e le impostazioni lo seguono.';
+
+  @override
+  String get relocateFromAppStorageTitle =>
+      'Spostare fuori dall\'archivio dell\'app?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'Sceglierai dove salvare il vault. Viene copiato lì e controllato byte per byte prima di qualsiasi altra operazione. La password salvata e le impostazioni lo seguono.';
+
+  @override
+  String get appStorageRiskNote =>
+      'I vault nell\'archivio dell\'app vengono eliminati se disinstalli l\'app, cancelli i suoi dati o esegui la cancellazione di emergenza. Tieni un backup di ciò che è importante.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Elimina l\'originale dopo la verifica della copia';
+
+  @override
+  String get relocateMoveButton => 'Sposta';
+
+  @override
+  String get relocatePhaseCopying => 'Copia e controllo del vault…';
+
+  @override
+  String get relocatePhaseSwitching => 'Passaggio alla nuova posizione…';
+
+  @override
+  String get relocatePhaseFinishing => 'Completamento…';
+
+  @override
+  String get relocatedToAppStorage =>
+      'Vault spostato nell\'archivio dell\'app.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'Vault spostato fuori dall\'archivio dell\'app.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'Non è stato possibile mantenere lo sblocco biometrico. Sblocca questo vault con la password e configura di nuovo la biometria.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'L\'accesso di automazione per questo vault è stato reimpostato. Riattivalo nelle impostazioni di automazione del vault.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'Non è stato possibile eliminare l\'originale, che si trova ancora nella posizione precedente. Puoi eliminarlo tu stesso.';
+
+  @override
+  String get relocateErrorUnlocked => 'Blocca il vault prima di spostarlo.';
+
+  @override
+  String get relocateErrorUnsupported =>
+      'Questo tipo di vault non può essere spostato.';
+
+  @override
+  String get relocateErrorSplit =>
+      'I contenitori suddivisi non possono essere spostati. Unisci prima le parti.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'Questa cartella non contiene il file di configurazione di un vault.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'La copia non corrispondeva all\'originale ed è stata scartata. Non è stato modificato nulla.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'La copia è stata creata, ma l\'app non è riuscita a passare a essa, quindi è stata rimossa. Non è stato modificato nulla.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'Impossibile spostare il vault. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'Eliminare questo vault?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '\"$name\" è archiviato nell\'app, quindi rimuoverlo lo elimina in modo permanente. Non esiste un\'altra copia, a meno che tu non abbia fatto un backup.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Sposta fuori invece';
+
+  @override
+  String get deleteAppStorageVaultFailed => 'Impossibile eliminare il vault.';
 }

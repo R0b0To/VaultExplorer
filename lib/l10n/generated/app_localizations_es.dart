@@ -13060,4 +13060,138 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'Abrir en una ventana nueva';
+
+  @override
+  String get storageLocationLabel => 'Ubicación de almacenamiento';
+
+  @override
+  String get storageLocationPicked => 'Elegir ubicación';
+
+  @override
+  String get storageLocationAppStorage => 'Almacenamiento de la app';
+
+  @override
+  String get appStorageCreateNote =>
+      'Se guarda en el almacenamiento privado de la app, al que solo ella puede acceder. Se elimina si desinstalas la app o borras sus datos, así que guarda una copia de seguridad de lo importante.';
+
+  @override
+  String get vaultNameLabel => 'Nombre de la bóveda';
+
+  @override
+  String get vaultNameRequired => 'El nombre de la bóveda es obligatorio';
+
+  @override
+  String get moveToAppStorageTile => 'Mover al almacenamiento de la app';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Mantén esta bóveda dentro del almacenamiento privado de la app';
+
+  @override
+  String get moveOutOfAppStorageTile => 'Sacar del almacenamiento de la app';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Guarda esta bóveda en una ubicación que elijas';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Guarda o descarta tus cambios antes de mover la bóveda.';
+
+  @override
+  String get relocateToAppStorageTitle => '¿Mover al almacenamiento de la app?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'La bóveda se copia al almacenamiento privado de la app y se comprueba byte a byte antes de hacer nada más. Tu contraseña guardada y tus ajustes se mueven con ella.';
+
+  @override
+  String get relocateFromAppStorageTitle =>
+      '¿Sacar del almacenamiento de la app?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'Elegirás dónde guardar la bóveda. Se copia allí y se comprueba byte a byte antes de hacer nada más. Tu contraseña guardada y tus ajustes se mueven con ella.';
+
+  @override
+  String get appStorageRiskNote =>
+      'Las bóvedas del almacenamiento de la app se eliminan si desinstalas la app, borras sus datos o ejecutas el borrado de emergencia. Guarda una copia de seguridad de lo importante.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Eliminar el original cuando se verifique la copia';
+
+  @override
+  String get relocateMoveButton => 'Mover';
+
+  @override
+  String get relocatePhaseCopying => 'Copiando y comprobando la bóveda…';
+
+  @override
+  String get relocatePhaseSwitching => 'Cambiando a la nueva ubicación…';
+
+  @override
+  String get relocatePhaseFinishing => 'Terminando…';
+
+  @override
+  String get relocatedToAppStorage =>
+      'Bóveda movida al almacenamiento de la app.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'Bóveda sacada del almacenamiento de la app.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'No se pudo trasladar el desbloqueo biométrico. Desbloquea esta bóveda con su contraseña y vuelve a configurar la biometría.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'Se restableció el acceso de automatización de esta bóveda. Vuelve a activarlo en los ajustes de automatización de la bóveda.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'No se pudo eliminar el original y sigue en su ubicación anterior. Puedes eliminarlo tú mismo.';
+
+  @override
+  String get relocateErrorUnlocked => 'Bloquea la bóveda antes de moverla.';
+
+  @override
+  String get relocateErrorUnsupported =>
+      'Este tipo de bóveda no se puede mover.';
+
+  @override
+  String get relocateErrorSplit =>
+      'Los contenedores divididos no se pueden mover. Une primero las partes.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'Esta carpeta no contiene el archivo de configuración de una bóveda.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'La copia no coincidía con el original, así que se descartó. No se cambió nada.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'Se hizo la copia, pero la app no pudo cambiar a ella, así que se eliminó. No se cambió nada.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'No se pudo mover la bóveda. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => '¿Eliminar esta bóveda?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '«$name» está guardada dentro de la app, así que quitarla la elimina de forma permanente. No hay otra copia salvo que hayas hecho una copia de seguridad.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Sacarla en su lugar';
+
+  @override
+  String get deleteAppStorageVaultFailed => 'No se pudo eliminar la bóveda.';
 }

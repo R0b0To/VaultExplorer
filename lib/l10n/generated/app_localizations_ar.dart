@@ -13103,4 +13103,133 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'فتح في نافذة جديدة';
+
+  @override
+  String get storageLocationLabel => 'موقع التخزين';
+
+  @override
+  String get storageLocationPicked => 'اختيار موقع';
+
+  @override
+  String get storageLocationAppStorage => 'مساحة تخزين التطبيق';
+
+  @override
+  String get appStorageCreateNote =>
+      'تُحفظ داخل مساحة التخزين الخاصة بالتطبيق، ولا يمكن لغيره الوصول إليها. تُحذف عند إلغاء تثبيت التطبيق أو مسح بياناته، لذا احتفظ بنسخة احتياطية من أي شيء مهم.';
+
+  @override
+  String get vaultNameLabel => 'اسم الخزنة';
+
+  @override
+  String get vaultNameRequired => 'اسم الخزنة مطلوب';
+
+  @override
+  String get moveToAppStorageTile => 'نقل إلى مساحة تخزين التطبيق';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'احتفظ بهذه الخزنة داخل مساحة التخزين الخاصة بالتطبيق';
+
+  @override
+  String get moveOutOfAppStorageTile => 'نقل خارج مساحة تخزين التطبيق';
+
+  @override
+  String get moveOutOfAppStorageSubtitle => 'احفظ هذه الخزنة في موقع تختاره';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'احفظ تغييراتك أو تجاهلها قبل نقل الخزنة.';
+
+  @override
+  String get relocateToAppStorageTitle => 'النقل إلى مساحة تخزين التطبيق؟';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'تُنسخ الخزنة إلى مساحة التخزين الخاصة بالتطبيق وتُفحص بايتًا ببايت قبل أي خطوة أخرى. تنتقل معها كلمة المرور المحفوظة والإعدادات.';
+
+  @override
+  String get relocateFromAppStorageTitle => 'النقل خارج مساحة تخزين التطبيق؟';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'ستختار مكان حفظ الخزنة. تُنسخ إليه وتُفحص بايتًا ببايت قبل أي خطوة أخرى. تنتقل معها كلمة المرور المحفوظة والإعدادات.';
+
+  @override
+  String get appStorageRiskNote =>
+      'تُحذف الخزائن الموجودة في مساحة تخزين التطبيق عند إلغاء تثبيت التطبيق أو مسح بياناته أو تنفيذ المسح الطارئ. احتفظ بنسخة احتياطية من أي شيء مهم.';
+
+  @override
+  String get relocateDeleteOriginal => 'حذف الأصل بعد التحقق من النسخة';
+
+  @override
+  String get relocateMoveButton => 'نقل';
+
+  @override
+  String get relocatePhaseCopying => 'جارٍ نسخ الخزنة وفحصها…';
+
+  @override
+  String get relocatePhaseSwitching => 'جارٍ التحويل إلى الموقع الجديد…';
+
+  @override
+  String get relocatePhaseFinishing => 'جارٍ الإنهاء…';
+
+  @override
+  String get relocatedToAppStorage => 'تم نقل الخزنة إلى مساحة تخزين التطبيق.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'تم نقل الخزنة خارج مساحة تخزين التطبيق.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'تعذّر نقل الفتح بالقياسات الحيوية. افتح هذه الخزنة بكلمة المرور ثم أعد إعداد القياسات الحيوية.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'أُعيد ضبط وصول الأتمتة لهذه الخزنة. فعّله من جديد في إعدادات الأتمتة الخاصة بها.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'تعذّر حذف الأصل وهو لا يزال في موقعه القديم. يمكنك حذفه بنفسك.';
+
+  @override
+  String get relocateErrorUnlocked => 'اقفل الخزنة قبل نقلها.';
+
+  @override
+  String get relocateErrorUnsupported => 'لا يمكن نقل هذا النوع من الخزائن.';
+
+  @override
+  String get relocateErrorSplit =>
+      'لا يمكن نقل الحاويات المقسّمة. ادمج الأجزاء أولاً.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'لا يحتوي هذا المجلد على ملف إعدادات خزنة.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'لم تطابق النسخة الأصل، لذا تم تجاهلها. لم يتغير شيء.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'تم إنشاء النسخة لكن التطبيق لم يتمكن من التحويل إليها، فأُزيلت. لم يتغير شيء.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'تعذّر نقل الخزنة. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'حذف هذه الخزنة؟';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '«$name» مخزّنة داخل التطبيق، لذا فإزالتها تحذفها نهائيًا. لا توجد نسخة أخرى ما لم تكن قد أنشأت نسخة احتياطية.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'نقلها إلى الخارج بدلاً من ذلك';
+
+  @override
+  String get deleteAppStorageVaultFailed => 'تعذّر حذف الخزنة.';
 }

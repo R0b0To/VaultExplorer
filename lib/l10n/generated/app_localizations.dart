@@ -21655,6 +21655,228 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open in new window'**
   String get browserTabOpenInNewWindow;
+
+  /// Heading above the choice of where a new vault is kept (a location the user picks, or the app's private storage)
+  ///
+  /// In en, this message translates to:
+  /// **'Storage location'**
+  String get storageLocationLabel;
+
+  /// Option: keep the new vault at a location the user chooses
+  ///
+  /// In en, this message translates to:
+  /// **'Choose location'**
+  String get storageLocationPicked;
+
+  /// Name of the app's private storage; also shown as a marker on vaults kept there
+  ///
+  /// In en, this message translates to:
+  /// **'App storage'**
+  String get storageLocationAppStorage;
+
+  /// Note shown when creating a vault in app storage: only this app can see it, and it is deleted with the app or its data
+  ///
+  /// In en, this message translates to:
+  /// **'Kept inside the app\'s private storage, where only this app can reach it. It is deleted if you uninstall the app or clear its data, so keep a backup of anything important.'**
+  String get appStorageCreateNote;
+
+  /// Text field label for the name of a new vault kept in app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Vault name'**
+  String get vaultNameLabel;
+
+  /// Error shown when the vault name field is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Vault name is required'**
+  String get vaultNameRequired;
+
+  /// Vault settings row title: move this vault into the app's private storage
+  ///
+  /// In en, this message translates to:
+  /// **'Move to app storage'**
+  String get moveToAppStorageTile;
+
+  /// Vault settings row subtitle for moving a vault into app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this vault inside the app\'s private storage'**
+  String get moveToAppStorageSubtitle;
+
+  /// Vault settings row title: move this vault out of the app's private storage
+  ///
+  /// In en, this message translates to:
+  /// **'Move out of app storage'**
+  String get moveOutOfAppStorageTile;
+
+  /// Vault settings row subtitle for moving a vault out of app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Save this vault to a location you choose'**
+  String get moveOutOfAppStorageSubtitle;
+
+  /// Shown when the user tries to move a vault while the settings screen has unsaved changes
+  ///
+  /// In en, this message translates to:
+  /// **'Save or discard your changes before moving the vault.'**
+  String get relocateSaveChangesFirst;
+
+  /// Title of the confirmation dialog for moving a vault into app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Move to app storage?'**
+  String get relocateToAppStorageTitle;
+
+  /// Body of the confirmation dialog for moving a vault into app storage; explains the copy is verified first
+  ///
+  /// In en, this message translates to:
+  /// **'The vault is copied into the app\'s private storage and checked byte for byte before anything else happens. Your saved password and settings move with it.'**
+  String get relocateToAppStorageBody;
+
+  /// Title of the confirmation dialog for moving a vault out of app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Move out of app storage?'**
+  String get relocateFromAppStorageTitle;
+
+  /// Body of the confirmation dialog for moving a vault out of app storage; explains the user picks the destination
+  ///
+  /// In en, this message translates to:
+  /// **'You will choose where to save the vault. It is copied there and checked byte for byte before anything else happens. Your saved password and settings move with it.'**
+  String get relocateFromAppStorageBody;
+
+  /// Warning that vaults in app storage are deleted by uninstalling, clearing app data, or the emergency wipe
+  ///
+  /// In en, this message translates to:
+  /// **'Vaults in app storage are deleted if you uninstall the app, clear its data, or run the emergency wipe. Keep a backup of anything important.'**
+  String get appStorageRiskNote;
+
+  /// Checkbox label: delete the original vault once the copy has been verified
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the original once the copy is verified'**
+  String get relocateDeleteOriginal;
+
+  /// Confirm button of the move-vault dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get relocateMoveButton;
+
+  /// Progress dialog text while the vault is being copied and verified
+  ///
+  /// In en, this message translates to:
+  /// **'Copying and checking the vault…'**
+  String get relocatePhaseCopying;
+
+  /// Progress dialog text while the app switches the vault over to its new location
+  ///
+  /// In en, this message translates to:
+  /// **'Switching to the new location…'**
+  String get relocatePhaseSwitching;
+
+  /// Progress dialog text while the original is being deleted and cleanup is done
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing up…'**
+  String get relocatePhaseFinishing;
+
+  /// Snackbar/dialog title after a vault was moved into app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Vault moved to app storage.'**
+  String get relocatedToAppStorage;
+
+  /// Snackbar/dialog title after a vault was moved out of app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Vault moved out of app storage.'**
+  String get relocatedFromAppStorage;
+
+  /// Note after a move: biometric unlock could not be carried over and the password is needed again
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric unlock could not be carried over. Unlock this vault with its password and set up biometrics again.'**
+  String get relocateNoteBiometricsDropped;
+
+  /// Note after a move: automation access was reset and must be turned on again
+  ///
+  /// In en, this message translates to:
+  /// **'Automation access for this vault was reset. Turn it on again in the vault\'s automation settings.'**
+  String get relocateNoteAutomationReset;
+
+  /// Note after a move: the original could not be deleted and is still at its old location
+  ///
+  /// In en, this message translates to:
+  /// **'The original could not be deleted and is still at its old location. You can delete it yourself.'**
+  String get relocateNoteOriginalLeftBehind;
+
+  /// Error: the vault must be locked before it can be moved
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the vault before moving it.'**
+  String get relocateErrorUnlocked;
+
+  /// Error: this kind of vault (USB drive or composite) cannot be moved
+  ///
+  /// In en, this message translates to:
+  /// **'This kind of vault cannot be moved.'**
+  String get relocateErrorUnsupported;
+
+  /// Error: split containers cannot be moved until their parts are joined
+  ///
+  /// In en, this message translates to:
+  /// **'Split containers cannot be moved. Join the parts first.'**
+  String get relocateErrorSplit;
+
+  /// Error: the folder does not contain a vault configuration file
+  ///
+  /// In en, this message translates to:
+  /// **'This folder does not contain a vault\'s configuration file.'**
+  String get relocateErrorNotVaultFolder;
+
+  /// Error: the copy did not match the original and was discarded
+  ///
+  /// In en, this message translates to:
+  /// **'The copy did not match the original, so it was discarded. Nothing was changed.'**
+  String get relocateErrorVerifyFailed;
+
+  /// Error: the copy was made but the app could not switch to it, so it was removed
+  ///
+  /// In en, this message translates to:
+  /// **'The copy was made but the app could not switch to it, so it was removed. Nothing was changed.'**
+  String get relocateErrorSwitchFailed;
+
+  /// Generic error for a failed vault move; details is the technical reason and may be empty
+  ///
+  /// In en, this message translates to:
+  /// **'Could not move the vault. {details}'**
+  String relocateErrorGeneric(String details);
+
+  /// Title of the dialog confirming deletion of a vault stored in app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this vault?'**
+  String get deleteAppStorageVaultTitle;
+
+  /// Body of the dialog confirming deletion of a vault stored in app storage; name is the vault's name
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" is stored inside the app, so removing it deletes it permanently. There is no other copy unless you made a backup.'**
+  String deleteAppStorageVaultBody(String name);
+
+  /// Dialog button: move the vault out of app storage instead of deleting it
+  ///
+  /// In en, this message translates to:
+  /// **'Move out instead'**
+  String get deleteAppStorageVaultMoveOut;
+
+  /// Error shown when a vault in app storage could not be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'The vault could not be deleted.'**
+  String get deleteAppStorageVaultFailed;
 }
 
 class _AppLocalizationsDelegate

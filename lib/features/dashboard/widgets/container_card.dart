@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/data/models/app_storage_vault_uri.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -315,6 +316,7 @@ class SavedContainerCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isUsb = uri.startsWith('usb:');
+    final inAppStorage = AppStorageVaultUri.isAppStorage(uri);
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onSurfaceVariant)
         : ContainerFormatIcon(
@@ -329,7 +331,9 @@ class SavedContainerCard extends StatelessWidget {
         Text(
           isUsb
               ? context.l10n.usbDriveLockedLabel
-              : context.l10n.lockedContainerLabel,
+              : inAppStorage
+                  ? '${context.l10n.lockedContainerLabel} · ${context.l10n.storageLocationAppStorage}'
+                  : context.l10n.lockedContainerLabel,
           style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
             fontSize: 11.5,
@@ -357,9 +361,16 @@ class SavedContainerCard extends StatelessWidget {
               onEdit: onEdit,
               onDelete: onDelete,
               isMounted: false,
+              deletesFiles: inAppStorage,
             ),
       onContextMenu: (pos) =>
-          showVaultCardMenu(context, pos, onEdit: onEdit, onDelete: onDelete),
+          showVaultCardMenu(
+            context,
+            pos,
+            onEdit: onEdit,
+            onDelete: onDelete,
+            deletesFiles: inAppStorage,
+          ),
       // Inside the Dashboard scope this role *is* the page's card color.
       backgroundColor: cs.surfaceContainerHigh,
       borderRadius: borderRadius,
@@ -531,7 +542,10 @@ class _LockButtonState extends ConsumerState<_LockButton> {
   }
 }
 
-List<PopupMenuEntry<String>> _vaultCardMenuItems(BuildContext context) {
+List<PopupMenuEntry<String>> _vaultCardMenuItems(
+  BuildContext context, {
+  bool deletesFiles = false,
+}) {
   final cs = Theme.of(context).colorScheme;
   return [
     PopupMenuItem(
@@ -550,7 +564,10 @@ List<PopupMenuEntry<String>> _vaultCardMenuItems(BuildContext context) {
         children: [
           Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
           const SizedBox(width: 12),
-          Text(context.l10n.remove, style: TextStyle(color: cs.error)),
+          Text(
+            deletesFiles ? context.l10n.delete : context.l10n.remove,
+            style: TextStyle(color: cs.error),
+          ),
         ],
       ),
     ),
@@ -563,6 +580,7 @@ Future<void> showVaultCardMenu(
   Offset position, {
   required VoidCallback onEdit,
   required VoidCallback onDelete,
+  bool deletesFiles = false,
 }) async {
   final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
   if (overlay == null) return;
@@ -573,7 +591,7 @@ Future<void> showVaultCardMenu(
       Offset.zero & overlay.size,
     ),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    items: _vaultCardMenuItems(context),
+    items: _vaultCardMenuItems(context, deletesFiles: deletesFiles),
   );
   if (action == 'edit') {
     onEdit();
@@ -587,10 +605,14 @@ class _VaultMoreMenuButton extends StatelessWidget {
   final VoidCallback onDelete;
   final bool isMounted;
 
+  /// The vault lives in app storage, so "remove" deletes its files: say so instead of "Remove".
+  final bool deletesFiles;
+
   const _VaultMoreMenuButton({
     required this.onEdit,
     required this.onDelete,
     required this.isMounted,
+    this.deletesFiles = false,
   });
 
   @override
@@ -608,7 +630,8 @@ class _VaultMoreMenuButton extends StatelessWidget {
           onDelete();
         }
       },
-      itemBuilder: _vaultCardMenuItems,
+      itemBuilder: (context) =>
+          _vaultCardMenuItems(context, deletesFiles: deletesFiles),
     );
   }
 }

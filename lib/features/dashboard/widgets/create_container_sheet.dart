@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -144,6 +146,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                   confirmPassword: _folderVaultConfirmCtrl.text,
                   l10n: l10n,
                   userEntropy: userEntropy,
+                  appStorageName: _nameCtrl.text,
                 )
             : ref.read(createContainerProvider.notifier).createContainerFile(
                   nameText: _nameCtrl.text,
@@ -230,7 +233,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
       ];
 
   bool _canProceedBasicInfo(CreateContainerState state) => state.isFolderVault
-      ? state.folderVaultUri != null
+      ? (state.inAppStorage ? _nameCtrl.text.trim().isNotEmpty : state.folderVaultUri != null)
       : (_nameCtrl.text.trim().isNotEmpty && (double.tryParse(_sizeCtrl.text) ?? 0) > 0);
 
   bool _canProceedSecurity(CreateContainerState state) => state.isFolderVault
@@ -425,6 +428,10 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         state.isFolderVault
             ? _buildFolderVaultFormatCards(state)
             : _buildContainerFormatCards(state),
+        if (Platform.isAndroid) ...[
+          SizedBox(height: sectionGap),
+          _buildStorageLocationSection(state, cs, textTheme, rowGap),
+        ],
         SizedBox(height: sectionGap),
         state.isFolderVault
             ? _buildFolderVaultBasicInfo(state, cs, textTheme)
@@ -432,6 +439,65 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         if (!state.isFolderVault && state.format == CreateFormat.veracrypt) ...[
           const SizedBox(height: 16),
           _buildCompositeContainerHint(cs, textTheme),
+        ],
+      ],
+    );
+  }
+
+  /// Where the vault is kept: at a location the user picks, or inside the app's private storage.
+  Widget _buildStorageLocationSection(
+    CreateContainerState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    double rowGap,
+  ) {
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.storageLocationLabel,
+          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        SizedBox(height: rowGap),
+        Row(
+          children: [
+            Expanded(
+              child: WizardSelectionCard(
+                icon: Icons.folder_open_rounded,
+                title: l10n.storageLocationPicked,
+                selected: !state.inAppStorage,
+                enabled: !state.loading,
+                onTap: () => ref.read(createContainerProvider.notifier).setInAppStorage(false),
+              ),
+            ),
+            SizedBox(width: rowGap),
+            Expanded(
+              child: WizardSelectionCard(
+                icon: Icons.phone_android_rounded,
+                title: l10n.storageLocationAppStorage,
+                selected: state.inAppStorage,
+                enabled: !state.loading,
+                onTap: () => ref.read(createContainerProvider.notifier).setInAppStorage(true),
+              ),
+            ),
+          ],
+        ),
+        if (state.inAppStorage) ...[
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.appStorageCreateNote,
+                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );
@@ -599,7 +665,24 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildFolderVaultPickerCard(state, cs, textTheme),
+        if (state.inAppStorage)
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _nameCtrl,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: l10n.vaultNameLabel,
+                    prefixIcon: const Icon(Icons.drive_file_rename_outline_rounded, size: 20),
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          _buildFolderVaultPickerCard(state, cs, textTheme),
         const SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,8 +877,9 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                 : [..._buildPasswordFields(cs, isShortScreen), _buildKeyfilesPicker(state)]),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              value: state.remember,
-              onChanged: state.loading
+              // A vault in app storage is always remembered: there is no file manager to find it in later.
+              value: state.inAppStorage || state.remember,
+              onChanged: (state.loading || state.inAppStorage)
                   ? null
                   : (val) => ref.read(createContainerProvider.notifier).setRemember(val),
               title: Text(l10n.rememberContainerLabel),
@@ -1310,8 +1394,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         WizardSummaryRow(
           icon: Icons.folder_rounded,
           label: l10n.vaultInfoLocationLabel,
-          value: state.folderVaultDisplayName ?? '—',
+          value: state.inAppStorage ? l10n.storageLocationAppStorage : (state.folderVaultDisplayName ?? '—'),
         ),
+        if (state.inAppStorage)
+          WizardSummaryRow(
+            icon: Icons.drive_file_rename_outline_rounded,
+            label: l10n.vaultNameLabel,
+            value: _nameCtrl.text.trim().isEmpty ? '—' : _nameCtrl.text.trim(),
+          ),
         if (state.folderVaultFormat == 'gocryptfs')
           WizardSummaryRow(
             icon: Icons.security_rounded,
@@ -1343,6 +1433,12 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
           label: l10n.fileNameLabel,
           value: _nameCtrl.text.isEmpty ? '—' : _nameCtrl.text,
         ),
+        if (state.inAppStorage)
+          WizardSummaryRow(
+            icon: Icons.phone_android_rounded,
+            label: l10n.vaultInfoLocationLabel,
+            value: l10n.storageLocationAppStorage,
+          ),
         WizardSummaryRow(
           icon: Icons.sd_card_rounded,
           label: l10n.containerSizeLabel,

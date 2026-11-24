@@ -12,6 +12,8 @@ import 'package:vaultexplorer/core/providers/external_storage_locations_provider
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/app_storage_vault_uri.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/vault_relocation_flow.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -981,9 +983,16 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       );
       return;
     }
+    final record = (item as LockedVaultItem).record;
+    if (AppStorageVaultUri.isAppStorage(record.uri)) {
+      // Forgetting the entry would strand the files where nothing can reach them: this deletes the
+      // vault (after asking) or moves it out instead.
+      unawaited(removeAppStorageVault(context, ref, record: record));
+      return;
+    }
     ref
         .read(vaultDashboardControllerProvider.notifier)
-        .handleSwipeToRemove(item.uri, (item as LockedVaultItem).record);
+        .handleSwipeToRemove(item.uri, record);
   }
 
   Widget _buildBody(

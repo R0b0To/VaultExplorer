@@ -86,6 +86,25 @@ class DerivedKeyHandlers(
         }
     }
 
+    /** Same fingerprint as [folderVaultFingerprint], for a folder vault that lives in a plain local directory. */
+    private fun localFolderVaultFingerprint(dir: java.io.File): String? {
+        return try {
+            val marker = FOLDER_VAULT_MARKER_FILES.map { java.io.File(dir, it) }.firstOrNull { it.isFile } ?: return null
+            marker.inputStream().use { stream ->
+                val digest = MessageDigest.getInstance("SHA-256")
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = stream.read(buffer)
+                    if (read <= 0) break
+                    digest.update(buffer, 0, read)
+                }
+                android.util.Base64.encodeToString(digest.digest(), android.util.Base64.NO_WRAP)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun containerFingerprint(filePath: String): String? {
         return try {
             val uri = Uri.parse(filePath)
@@ -112,6 +131,7 @@ class DerivedKeyHandlers(
                 }
                 "file" -> {
                     val file = java.io.File(uri.path ?: return null)
+                    if (file.isDirectory) return localFolderVaultFingerprint(file)
                     file.inputStream().use { stream ->
                         val digest = MessageDigest.getInstance("SHA-256")
                         val buffer = ByteArray(8192)

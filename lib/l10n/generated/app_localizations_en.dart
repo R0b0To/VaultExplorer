@@ -12848,4 +12848,134 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'Open in new window';
+
+  @override
+  String get storageLocationLabel => 'Storage location';
+
+  @override
+  String get storageLocationPicked => 'Choose location';
+
+  @override
+  String get storageLocationAppStorage => 'App storage';
+
+  @override
+  String get appStorageCreateNote =>
+      'Kept inside the app\'s private storage, where only this app can reach it. It is deleted if you uninstall the app or clear its data, so keep a backup of anything important.';
+
+  @override
+  String get vaultNameLabel => 'Vault name';
+
+  @override
+  String get vaultNameRequired => 'Vault name is required';
+
+  @override
+  String get moveToAppStorageTile => 'Move to app storage';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Keep this vault inside the app\'s private storage';
+
+  @override
+  String get moveOutOfAppStorageTile => 'Move out of app storage';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Save this vault to a location you choose';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Save or discard your changes before moving the vault.';
+
+  @override
+  String get relocateToAppStorageTitle => 'Move to app storage?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'The vault is copied into the app\'s private storage and checked byte for byte before anything else happens. Your saved password and settings move with it.';
+
+  @override
+  String get relocateFromAppStorageTitle => 'Move out of app storage?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'You will choose where to save the vault. It is copied there and checked byte for byte before anything else happens. Your saved password and settings move with it.';
+
+  @override
+  String get appStorageRiskNote =>
+      'Vaults in app storage are deleted if you uninstall the app, clear its data, or run the emergency wipe. Keep a backup of anything important.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Delete the original once the copy is verified';
+
+  @override
+  String get relocateMoveButton => 'Move';
+
+  @override
+  String get relocatePhaseCopying => 'Copying and checking the vault…';
+
+  @override
+  String get relocatePhaseSwitching => 'Switching to the new location…';
+
+  @override
+  String get relocatePhaseFinishing => 'Finishing up…';
+
+  @override
+  String get relocatedToAppStorage => 'Vault moved to app storage.';
+
+  @override
+  String get relocatedFromAppStorage => 'Vault moved out of app storage.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'Biometric unlock could not be carried over. Unlock this vault with its password and set up biometrics again.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'Automation access for this vault was reset. Turn it on again in the vault\'s automation settings.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'The original could not be deleted and is still at its old location. You can delete it yourself.';
+
+  @override
+  String get relocateErrorUnlocked => 'Lock the vault before moving it.';
+
+  @override
+  String get relocateErrorUnsupported => 'This kind of vault cannot be moved.';
+
+  @override
+  String get relocateErrorSplit =>
+      'Split containers cannot be moved. Join the parts first.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'This folder does not contain a vault\'s configuration file.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'The copy did not match the original, so it was discarded. Nothing was changed.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'The copy was made but the app could not switch to it, so it was removed. Nothing was changed.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'Could not move the vault. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'Delete this vault?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '\"$name\" is stored inside the app, so removing it deletes it permanently. There is no other copy unless you made a backup.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Move out instead';
+
+  @override
+  String get deleteAppStorageVaultFailed => 'The vault could not be deleted.';
 }

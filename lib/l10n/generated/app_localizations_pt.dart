@@ -13032,4 +13032,137 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'Abrir em nova janela';
+
+  @override
+  String get storageLocationLabel => 'Local de armazenamento';
+
+  @override
+  String get storageLocationPicked => 'Escolher local';
+
+  @override
+  String get storageLocationAppStorage => 'Armazenamento do app';
+
+  @override
+  String get appStorageCreateNote =>
+      'Fica no armazenamento privado do app, que só ele consegue acessar. É excluído se você desinstalar o app ou limpar os dados dele, então mantenha um backup do que for importante.';
+
+  @override
+  String get vaultNameLabel => 'Nome do cofre';
+
+  @override
+  String get vaultNameRequired => 'O nome do cofre é obrigatório';
+
+  @override
+  String get moveToAppStorageTile => 'Mover para o armazenamento do app';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Mantenha este cofre dentro do armazenamento privado do app';
+
+  @override
+  String get moveOutOfAppStorageTile => 'Tirar do armazenamento do app';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Salve este cofre em um local que você escolher';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Salve ou descarte suas alterações antes de mover o cofre.';
+
+  @override
+  String get relocateToAppStorageTitle => 'Mover para o armazenamento do app?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'O cofre é copiado para o armazenamento privado do app e verificado byte a byte antes de qualquer outra coisa. Sua senha salva e suas configurações vão junto.';
+
+  @override
+  String get relocateFromAppStorageTitle => 'Tirar do armazenamento do app?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'Você escolherá onde salvar o cofre. Ele é copiado para lá e verificado byte a byte antes de qualquer outra coisa. Sua senha salva e suas configurações vão junto.';
+
+  @override
+  String get appStorageRiskNote =>
+      'Os cofres no armazenamento do app são excluídos se você desinstalar o app, limpar os dados dele ou executar a limpeza de emergência. Mantenha um backup do que for importante.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Excluir o original depois que a cópia for verificada';
+
+  @override
+  String get relocateMoveButton => 'Mover';
+
+  @override
+  String get relocatePhaseCopying => 'Copiando e verificando o cofre…';
+
+  @override
+  String get relocatePhaseSwitching => 'Mudando para o novo local…';
+
+  @override
+  String get relocatePhaseFinishing => 'Finalizando…';
+
+  @override
+  String get relocatedToAppStorage =>
+      'Cofre movido para o armazenamento do app.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'Cofre retirado do armazenamento do app.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'Não foi possível manter o desbloqueio biométrico. Desbloqueie este cofre com a senha e configure a biometria novamente.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'O acesso de automação deste cofre foi redefinido. Ative-o novamente nas configurações de automação do cofre.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'Não foi possível excluir o original, que continua no local antigo. Você mesmo pode excluí-lo.';
+
+  @override
+  String get relocateErrorUnlocked => 'Bloqueie o cofre antes de movê-lo.';
+
+  @override
+  String get relocateErrorUnsupported =>
+      'Este tipo de cofre não pode ser movido.';
+
+  @override
+  String get relocateErrorSplit =>
+      'Contêineres divididos não podem ser movidos. Una as partes primeiro.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'Esta pasta não contém o arquivo de configuração de um cofre.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'A cópia não correspondia ao original e foi descartada. Nada foi alterado.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'A cópia foi feita, mas o app não conseguiu passar para ela, então ela foi removida. Nada foi alterado.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'Não foi possível mover o cofre. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'Excluir este cofre?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '\"$name\" está armazenado dentro do app, então removê-lo o exclui permanentemente. Não há outra cópia, a menos que você tenha feito um backup.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Tirar do app em vez disso';
+
+  @override
+  String get deleteAppStorageVaultFailed => 'Não foi possível excluir o cofre.';
 }

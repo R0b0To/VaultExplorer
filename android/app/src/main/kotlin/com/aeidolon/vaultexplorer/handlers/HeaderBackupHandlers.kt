@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.handlers
 
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.internalvault.InternalVaultStorage
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
@@ -228,6 +229,21 @@ class HeaderBackupHandlers(
 
         ioExecutor.execute {
             try {
+                val localRoot = InternalVaultStorage.localFile(activity, uriStr)
+                if (localRoot != null) {
+                    // Vault in app storage: a plain directory, no SAF.
+                    val cfg = java.io.File(localRoot, fileName)
+                    activity.runOnUiThread {
+                        result.success(
+                            mapOf(
+                                "fileName" to fileName,
+                                "uri" to (if (cfg.isFile) InternalVaultStorage.uriString(cfg) else null),
+                                "exists" to cfg.isFile,
+                            ),
+                        )
+                    }
+                    return@execute
+                }
                 val root = DocumentFile.fromTreeUri(activity, Uri.parse(uriStr))
                     ?: throw Exception("Cannot access the selected folder.")
                 val saf = SafDocumentOps(activity)
@@ -279,6 +295,28 @@ class HeaderBackupHandlers(
                     return@execute
                 }
 
+                val localRoot = InternalVaultStorage.localFile(activity, uriStr)
+                if (localRoot != null) {
+                    // Vault in app storage: stage next to the target and rename over it, so a failure
+                    // part-way can never leave the vault without its config file.
+                    val target = java.io.File(localRoot, fileName)
+                    val tmp = java.io.File(localRoot, ".$fileName.restore-tmp")
+                    try {
+                        java.io.FileOutputStream(tmp).use { out ->
+                            out.write(bytes)
+                            out.fd.sync()
+                        }
+                        java.nio.file.Files.move(
+                            tmp.toPath(), target.toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                            java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                        )
+                    } finally {
+                        tmp.delete()
+                    }
+                    activity.runOnUiThread { result.success(null) }
+                    return@execute
+                }
                 val root = DocumentFile.fromTreeUri(activity, Uri.parse(uriStr))
                     ?: throw Exception("Cannot access the selected folder.")
                 val saf = SafDocumentOps(activity)

@@ -13032,4 +13032,140 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'In neuem Fenster öffnen';
+
+  @override
+  String get storageLocationLabel => 'Speicherort';
+
+  @override
+  String get storageLocationPicked => 'Ort auswählen';
+
+  @override
+  String get storageLocationAppStorage => 'App-Speicher';
+
+  @override
+  String get appStorageCreateNote =>
+      'Wird im privaten Speicher der App abgelegt, auf den nur diese App zugreifen kann. Beim Deinstallieren der App oder beim Löschen ihrer Daten wird er gelöscht – sichern Sie daher alles Wichtige.';
+
+  @override
+  String get vaultNameLabel => 'Name des Tresors';
+
+  @override
+  String get vaultNameRequired => 'Der Name des Tresors ist erforderlich';
+
+  @override
+  String get moveToAppStorageTile => 'In den App-Speicher verschieben';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Diesen Tresor im privaten Speicher der App aufbewahren';
+
+  @override
+  String get moveOutOfAppStorageTile =>
+      'Aus dem App-Speicher herausverschieben';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Diesen Tresor an einem Ort Ihrer Wahl speichern';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Speichern oder verwerfen Sie Ihre Änderungen, bevor Sie den Tresor verschieben.';
+
+  @override
+  String get relocateToAppStorageTitle => 'In den App-Speicher verschieben?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'Der Tresor wird in den privaten Speicher der App kopiert und Byte für Byte geprüft, bevor irgendetwas anderes passiert. Ihr gespeichertes Passwort und Ihre Einstellungen wandern mit.';
+
+  @override
+  String get relocateFromAppStorageTitle =>
+      'Aus dem App-Speicher herausverschieben?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'Sie wählen, wo der Tresor gespeichert wird. Er wird dorthin kopiert und Byte für Byte geprüft, bevor irgendetwas anderes passiert. Ihr gespeichertes Passwort und Ihre Einstellungen wandern mit.';
+
+  @override
+  String get appStorageRiskNote =>
+      'Tresore im App-Speicher werden gelöscht, wenn Sie die App deinstallieren, ihre Daten löschen oder die Notfalllöschung ausführen. Sichern Sie alles Wichtige.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Original löschen, sobald die Kopie geprüft ist';
+
+  @override
+  String get relocateMoveButton => 'Verschieben';
+
+  @override
+  String get relocatePhaseCopying => 'Tresor wird kopiert und geprüft…';
+
+  @override
+  String get relocatePhaseSwitching => 'Wechsel zum neuen Speicherort…';
+
+  @override
+  String get relocatePhaseFinishing => 'Wird abgeschlossen…';
+
+  @override
+  String get relocatedToAppStorage => 'Tresor in den App-Speicher verschoben.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'Tresor aus dem App-Speicher herausverschoben.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'Die biometrische Entsperrung konnte nicht übernommen werden. Entsperren Sie diesen Tresor mit seinem Passwort und richten Sie die Biometrie erneut ein.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'Der Automatisierungszugriff für diesen Tresor wurde zurückgesetzt. Aktivieren Sie ihn in den Automatisierungseinstellungen des Tresors erneut.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'Das Original konnte nicht gelöscht werden und liegt weiterhin am alten Speicherort. Sie können es selbst löschen.';
+
+  @override
+  String get relocateErrorUnlocked =>
+      'Sperren Sie den Tresor, bevor Sie ihn verschieben.';
+
+  @override
+  String get relocateErrorUnsupported =>
+      'Diese Art von Tresor kann nicht verschoben werden.';
+
+  @override
+  String get relocateErrorSplit =>
+      'Geteilte Container können nicht verschoben werden. Fügen Sie zuerst die Teile zusammen.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'Dieser Ordner enthält keine Konfigurationsdatei eines Tresors.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'Die Kopie stimmte nicht mit dem Original überein und wurde verworfen. Es wurde nichts geändert.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'Die Kopie wurde erstellt, aber die App konnte nicht darauf umschalten; sie wurde entfernt. Es wurde nichts geändert.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'Der Tresor konnte nicht verschoben werden. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'Diesen Tresor löschen?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '„$name“ liegt in der App, daher wird er beim Entfernen endgültig gelöscht. Es gibt keine weitere Kopie, außer Sie haben eine Sicherung erstellt.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Stattdessen herausverschieben';
+
+  @override
+  String get deleteAppStorageVaultFailed =>
+      'Der Tresor konnte nicht gelöscht werden.';
 }

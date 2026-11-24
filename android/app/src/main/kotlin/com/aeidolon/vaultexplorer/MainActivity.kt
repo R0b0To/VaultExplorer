@@ -64,6 +64,7 @@ import com.aeidolon.vaultexplorer.handlers.SystemPermissionHandlers
 import com.aeidolon.vaultexplorer.handlers.ThumbnailHandlers
 import com.aeidolon.vaultexplorer.handlers.UsbContainerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
+import com.aeidolon.vaultexplorer.handlers.VaultRelocationHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
 import com.aeidolon.vaultexplorer.handlers.AudioEditHandlers
@@ -256,6 +257,14 @@ private object ChannelMethods {
     const val SPLIT_CONTAINER = "splitContainer"
     const val JOIN_CONTAINER = "joinContainer"
     const val CANCEL_SPLIT_JOIN = "cancelSplitJoin"
+    const val GET_APP_STORAGE_INFO = "getAppStorageInfo"
+    const val CREATE_APP_STORAGE_CONTAINER = "createAppStorageContainer"
+    const val CREATE_APP_STORAGE_FOLDER_VAULT = "createAppStorageFolderVault"
+    const val RELOCATE_TO_APP_STORAGE = "relocateToAppStorage"
+    const val RELOCATE_FROM_APP_STORAGE = "relocateFromAppStorage"
+    const val FINALIZE_RELOCATION = "finalizeRelocation"
+    const val DISCARD_RELOCATION_COPY = "discardRelocationCopy"
+    const val DELETE_APP_STORAGE_VAULT = "deleteAppStorageVault"
     const val VIDEO_EDIT_PROBE = "videoEditProbe"
     const val VIDEO_EDIT_EXPORT = "videoEditExport"
     const val CANCEL_VIDEO_EDIT = "cancelVideoEdit"
@@ -414,6 +423,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val usbHandlers = UsbContainerHandlers(this, ACTION_USB_PERMISSION, ioExecutor, nativeOps, derivedKeyHandlers)
     private val vaultPickerHandlers = VaultPickerHandlers(this, pendingResult, ioExecutor)
     private val vaultCreationHandlers = VaultCreationHandlers(this, pendingResult, ioExecutor, nativeOps)
+    private val vaultRelocationHandlers = VaultRelocationHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val vaultUnlockHandlers = VaultUnlockHandlers(this, ioExecutor, nativeOps, derivedKeyHandlers)
     private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
@@ -1532,6 +1542,14 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SPLIT_CONTAINER -> splitJoinHandlers.handleSplitContainer(call, result)
                 ChannelMethods.JOIN_CONTAINER -> splitJoinHandlers.handleJoinContainer(call, result)
                 ChannelMethods.CANCEL_SPLIT_JOIN -> splitJoinHandlers.handleCancelSplitJoin(call, result)
+                ChannelMethods.GET_APP_STORAGE_INFO -> vaultRelocationHandlers.handleGetAppStorageInfo(call, result)
+                ChannelMethods.CREATE_APP_STORAGE_CONTAINER -> vaultCreationHandlers.handleCreateAppStorageContainer(call, result)
+                ChannelMethods.CREATE_APP_STORAGE_FOLDER_VAULT -> vaultCreationHandlers.handleCreateAppStorageFolderVault(call, result)
+                ChannelMethods.RELOCATE_TO_APP_STORAGE -> vaultRelocationHandlers.handleRelocateToAppStorage(call, result)
+                ChannelMethods.RELOCATE_FROM_APP_STORAGE -> vaultRelocationHandlers.handleRelocateFromAppStorage(call, result)
+                ChannelMethods.FINALIZE_RELOCATION -> vaultRelocationHandlers.handleFinalizeRelocation(call, result)
+                ChannelMethods.DISCARD_RELOCATION_COPY -> vaultRelocationHandlers.handleDiscardRelocationCopy(call, result)
+                ChannelMethods.DELETE_APP_STORAGE_VAULT -> vaultRelocationHandlers.handleDeleteAppStorageVault(call, result)
                 ChannelMethods.VIDEO_EDIT_PROBE -> videoEditHandlers.handleProbe(call, result)
                 ChannelMethods.VIDEO_EDIT_EXPORT -> videoEditHandlers.handleExport(call, result)
                 ChannelMethods.CANCEL_VIDEO_EDIT -> videoEditHandlers.handleCancel(call, result)

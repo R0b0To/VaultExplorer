@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/app_storage_vault_uri.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
@@ -25,6 +26,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/pattern_pin_verify_cont
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/real_password_gate_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_info_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/vault_relocation_flow.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_rule_editor_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
@@ -1329,6 +1331,60 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     );
   }
 
+  /// Moves the vault between where it is now and app storage. Closes this screen on success: it still holds
+  /// the old location, and saving edits made here afterwards would register the old location again.
+  Future<void> _moveVault() async {
+    final record = widget.existingRecord;
+    if (record == null) return;
+    final l10n = context.l10n;
+    if (_effectiveMounted != null) {
+      showAppSnackBar(
+        context,
+        message: l10n.relocateErrorUnlocked,
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+    final configState = ref.read(containerConfigControllerProvider(_params));
+    if (configState.isModified(_passwordCtrl.text, _labelCtrl.text, _pimCtrl.text)) {
+      showAppSnackBar(
+        context,
+        message: l10n.relocateSaveChangesFirst,
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+    final moved = await runVaultRelocation(
+      context,
+      ref,
+      record: record,
+      toAppStorage: !AppStorageVaultUri.isAppStorage(record.uri),
+    );
+    if (moved && mounted) Navigator.of(context).pop();
+  }
+
+  Widget _buildMoveVaultTile(ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
+    final inApp = AppStorageVaultUri.isAppStorage(widget.uri);
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Icon(
+        inApp ? Icons.upload_file_rounded : Icons.phone_android_rounded,
+        color: cs.primary,
+      ),
+      title: Text(
+        inApp ? l10n.moveOutOfAppStorageTile : l10n.moveToAppStorageTile,
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        inApp ? l10n.moveOutOfAppStorageSubtitle : l10n.moveToAppStorageSubtitle,
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      ),
+      trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+      onTap: _moveVault,
+    );
+  }
+
   Widget _buildToolsSection(
     BuildContext context,
     ColorScheme cs,
@@ -1411,6 +1467,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 ),
               ),
             ),
+            if (widget.existingRecord != null &&
+                canRelocateVault(widget.existingRecord!))
+              _buildMoveVaultTile(cs, textTheme),
           ],
         ),
       ],

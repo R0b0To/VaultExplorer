@@ -101,6 +101,14 @@ abstract final class ChannelMethods {
   static const splitContainer = 'splitContainer';
   static const joinContainer = 'joinContainer';
   static const cancelSplitJoin = 'cancelSplitJoin';
+  static const getAppStorageInfo = 'getAppStorageInfo';
+  static const createAppStorageContainer = 'createAppStorageContainer';
+  static const createAppStorageFolderVault = 'createAppStorageFolderVault';
+  static const relocateToAppStorage = 'relocateToAppStorage';
+  static const relocateFromAppStorage = 'relocateFromAppStorage';
+  static const finalizeRelocation = 'finalizeRelocation';
+  static const discardRelocationCopy = 'discardRelocationCopy';
+  static const deleteAppStorageVault = 'deleteAppStorageVault';
   static const videoEditProbe = 'videoEditProbe';
   static const videoEditExport = 'videoEditExport';
   static const cancelVideoEdit = 'cancelVideoEdit';

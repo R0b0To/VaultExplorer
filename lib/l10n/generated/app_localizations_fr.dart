@@ -13129,4 +13129,142 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'Ouvrir dans une nouvelle fenêtre';
+
+  @override
+  String get storageLocationLabel => 'Emplacement de stockage';
+
+  @override
+  String get storageLocationPicked => 'Choisir un emplacement';
+
+  @override
+  String get storageLocationAppStorage => 'Stockage de l\'application';
+
+  @override
+  String get appStorageCreateNote =>
+      'Conservé dans le stockage privé de l\'application, auquel elle seule a accès. Il est supprimé si vous désinstallez l\'application ou effacez ses données ; conservez donc une sauvegarde de ce qui est important.';
+
+  @override
+  String get vaultNameLabel => 'Nom du coffre';
+
+  @override
+  String get vaultNameRequired => 'Le nom du coffre est obligatoire';
+
+  @override
+  String get moveToAppStorageTile =>
+      'Déplacer vers le stockage de l\'application';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Conserver ce coffre dans le stockage privé de l\'application';
+
+  @override
+  String get moveOutOfAppStorageTile => 'Sortir du stockage de l\'application';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Enregistrer ce coffre à l\'emplacement de votre choix';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Enregistrez ou annulez vos modifications avant de déplacer le coffre.';
+
+  @override
+  String get relocateToAppStorageTitle =>
+      'Déplacer vers le stockage de l\'application ?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'Le coffre est copié dans le stockage privé de l\'application et vérifié octet par octet avant toute autre action. Votre mot de passe enregistré et vos réglages le suivent.';
+
+  @override
+  String get relocateFromAppStorageTitle =>
+      'Sortir du stockage de l\'application ?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'Vous choisirez où enregistrer le coffre. Il y est copié et vérifié octet par octet avant toute autre action. Votre mot de passe enregistré et vos réglages le suivent.';
+
+  @override
+  String get appStorageRiskNote =>
+      'Les coffres du stockage de l\'application sont supprimés si vous désinstallez l\'application, effacez ses données ou lancez l\'effacement d\'urgence. Conservez une sauvegarde de ce qui est important.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Supprimer l\'original une fois la copie vérifiée';
+
+  @override
+  String get relocateMoveButton => 'Déplacer';
+
+  @override
+  String get relocatePhaseCopying => 'Copie et vérification du coffre…';
+
+  @override
+  String get relocatePhaseSwitching => 'Passage au nouvel emplacement…';
+
+  @override
+  String get relocatePhaseFinishing => 'Finalisation…';
+
+  @override
+  String get relocatedToAppStorage =>
+      'Coffre déplacé vers le stockage de l\'application.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'Coffre sorti du stockage de l\'application.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'Le déverrouillage biométrique n\'a pas pu être conservé. Déverrouillez ce coffre avec son mot de passe et reconfigurez la biométrie.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'L\'accès par automatisation de ce coffre a été réinitialisé. Réactivez-le dans les réglages d\'automatisation du coffre.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'L\'original n\'a pas pu être supprimé et reste à son ancien emplacement. Vous pouvez le supprimer vous-même.';
+
+  @override
+  String get relocateErrorUnlocked =>
+      'Verrouillez le coffre avant de le déplacer.';
+
+  @override
+  String get relocateErrorUnsupported =>
+      'Ce type de coffre ne peut pas être déplacé.';
+
+  @override
+  String get relocateErrorSplit =>
+      'Les conteneurs fractionnés ne peuvent pas être déplacés. Réunissez d\'abord les parties.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'Ce dossier ne contient pas le fichier de configuration d\'un coffre.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'La copie ne correspondait pas à l\'original et a été abandonnée. Rien n\'a été modifié.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'La copie a été créée, mais l\'application n\'a pas pu basculer dessus ; elle a été supprimée. Rien n\'a été modifié.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'Impossible de déplacer le coffre. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'Supprimer ce coffre ?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '« $name » est stocké dans l\'application ; le retirer le supprime définitivement. Il n\'existe aucune autre copie, sauf si vous avez fait une sauvegarde.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Le sortir à la place';
+
+  @override
+  String get deleteAppStorageVaultFailed =>
+      'Impossible de supprimer le coffre.';
 }

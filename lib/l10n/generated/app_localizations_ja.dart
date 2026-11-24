@@ -12325,4 +12325,128 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => '新しいウィンドウで開く';
+
+  @override
+  String get storageLocationLabel => '保存場所';
+
+  @override
+  String get storageLocationPicked => '場所を選択';
+
+  @override
+  String get storageLocationAppStorage => 'アプリ内ストレージ';
+
+  @override
+  String get appStorageCreateNote =>
+      'アプリ専用のストレージ内に保存され、このアプリ以外からはアクセスできません。アプリをアンインストールするかデータを消去すると削除されるため、重要なものはバックアップを取ってください。';
+
+  @override
+  String get vaultNameLabel => '保管庫の名前';
+
+  @override
+  String get vaultNameRequired => '保管庫の名前が必要です';
+
+  @override
+  String get moveToAppStorageTile => 'アプリ内ストレージに移動';
+
+  @override
+  String get moveToAppStorageSubtitle => 'この保管庫をアプリ専用ストレージ内に保管します';
+
+  @override
+  String get moveOutOfAppStorageTile => 'アプリ内ストレージから移動';
+
+  @override
+  String get moveOutOfAppStorageSubtitle => 'この保管庫を選択した場所に保存します';
+
+  @override
+  String get relocateSaveChangesFirst => '保管庫を移動する前に、変更を保存するか破棄してください。';
+
+  @override
+  String get relocateToAppStorageTitle => 'アプリ内ストレージに移動しますか？';
+
+  @override
+  String get relocateToAppStorageBody =>
+      '保管庫をアプリ専用ストレージにコピーし、他の処理の前に1バイトずつ照合します。保存済みのパスワードと設定も一緒に移ります。';
+
+  @override
+  String get relocateFromAppStorageTitle => 'アプリ内ストレージから移動しますか？';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      '保管庫の保存先を選びます。そこにコピーし、他の処理の前に1バイトずつ照合します。保存済みのパスワードと設定も一緒に移ります。';
+
+  @override
+  String get appStorageRiskNote =>
+      'アプリ内ストレージの保管庫は、アプリのアンインストール、データの消去、緊急消去の実行で削除されます。重要なものはバックアップを取ってください。';
+
+  @override
+  String get relocateDeleteOriginal => 'コピーの検証後に元のデータを削除する';
+
+  @override
+  String get relocateMoveButton => '移動';
+
+  @override
+  String get relocatePhaseCopying => '保管庫をコピーして確認しています…';
+
+  @override
+  String get relocatePhaseSwitching => '新しい場所に切り替えています…';
+
+  @override
+  String get relocatePhaseFinishing => '仕上げています…';
+
+  @override
+  String get relocatedToAppStorage => '保管庫をアプリ内ストレージに移動しました。';
+
+  @override
+  String get relocatedFromAppStorage => '保管庫をアプリ内ストレージから移動しました。';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      '生体認証によるロック解除を引き継げませんでした。この保管庫をパスワードで解除し、生体認証を設定し直してください。';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'この保管庫の自動化アクセスはリセットされました。保管庫の自動化設定で再度有効にしてください。';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      '元のデータを削除できず、以前の場所に残っています。ご自身で削除できます。';
+
+  @override
+  String get relocateErrorUnlocked => '移動する前に保管庫をロックしてください。';
+
+  @override
+  String get relocateErrorUnsupported => 'この種類の保管庫は移動できません。';
+
+  @override
+  String get relocateErrorSplit => '分割コンテナは移動できません。先にパーツを結合してください。';
+
+  @override
+  String get relocateErrorNotVaultFolder => 'このフォルダには保管庫の設定ファイルがありません。';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'コピーが元のデータと一致しなかったため破棄しました。何も変更されていません。';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'コピーは作成されましたが、アプリが切り替えられなかったため削除しました。何も変更されていません。';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return '保管庫を移動できませんでした。$details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'この保管庫を削除しますか？';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '「$name」はアプリ内に保存されているため、削除すると完全に消去されます。バックアップがない限り、他のコピーはありません。';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => '代わりに移動する';
+
+  @override
+  String get deleteAppStorageVaultFailed => '保管庫を削除できませんでした。';
 }

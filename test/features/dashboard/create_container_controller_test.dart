@@ -74,6 +74,31 @@ void main() {
       expect(container.read(createContainerProvider).isFolderVault, isFalse);
     });
 
+    test('app storage is off by default and switching location drops a picked folder', () {
+      final controller = container.read(createContainerProvider.notifier);
+      expect(container.read(createContainerProvider).inAppStorage, isFalse);
+
+      controller.setInAppStorage(true);
+      expect(container.read(createContainerProvider).inAppStorage, isTrue);
+
+      controller.setInAppStorage(false);
+      final state = container.read(createContainerProvider);
+      expect(state.inAppStorage, isFalse);
+      expect(state.folderVaultUri, isNull);
+      expect(state.folderVaultDisplayName, isNull);
+    });
+
+    test('the storage location survives switching between container and folder vault', () {
+      final controller = container.read(createContainerProvider.notifier);
+      controller.setInAppStorage(true);
+
+      controller.setVaultKind(true);
+      expect(container.read(createContainerProvider).inAppStorage, isTrue);
+
+      controller.setVaultKind(false);
+      expect(container.read(createContainerProvider).inAppStorage, isTrue);
+    });
+
     test('setEnableHiddenVolume toggles hidden volume state', () {
       final controller = container.read(createContainerProvider.notifier);
 

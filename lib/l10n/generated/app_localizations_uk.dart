@@ -13136,4 +13136,139 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'Відкрити в новому вікні';
+
+  @override
+  String get storageLocationLabel => 'Місце зберігання';
+
+  @override
+  String get storageLocationPicked => 'Вибрати місце';
+
+  @override
+  String get storageLocationAppStorage => 'Пам\'ять застосунку';
+
+  @override
+  String get appStorageCreateNote =>
+      'Зберігається у приватній пам\'яті застосунку, до якої має доступ лише він. Видаляється, якщо ви видалите застосунок або очистите його дані, тож зробіть резервну копію всього важливого.';
+
+  @override
+  String get vaultNameLabel => 'Назва сховища';
+
+  @override
+  String get vaultNameRequired => 'Потрібна назва сховища';
+
+  @override
+  String get moveToAppStorageTile => 'Перемістити в пам\'ять застосунку';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Зберігайте це сховище в приватній пам\'яті застосунку';
+
+  @override
+  String get moveOutOfAppStorageTile => 'Перемістити з пам\'яті застосунку';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Збережіть це сховище в обраному місці';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Збережіть або скасуйте зміни, перш ніж переміщувати сховище.';
+
+  @override
+  String get relocateToAppStorageTitle => 'Перемістити в пам\'ять застосунку?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'Сховище копіюється в приватну пам\'ять застосунку й перевіряється байт за байтом, перш ніж станеться щось інше. Збережений пароль і налаштування переносяться разом із ним.';
+
+  @override
+  String get relocateFromAppStorageTitle =>
+      'Перемістити з пам\'яті застосунку?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'Ви оберете, куди зберегти сховище. Його буде скопійовано туди й перевірено байт за байтом, перш ніж станеться щось інше. Збережений пароль і налаштування переносяться разом із ним.';
+
+  @override
+  String get appStorageRiskNote =>
+      'Сховища в пам\'яті застосунку видаляються, якщо ви видалите застосунок, очистите його дані або запустите екстрене стирання. Зробіть резервну копію всього важливого.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Видалити оригінал після перевірки копії';
+
+  @override
+  String get relocateMoveButton => 'Перемістити';
+
+  @override
+  String get relocatePhaseCopying => 'Копіювання та перевірка сховища…';
+
+  @override
+  String get relocatePhaseSwitching => 'Перехід на нове місце…';
+
+  @override
+  String get relocatePhaseFinishing => 'Завершення…';
+
+  @override
+  String get relocatedToAppStorage =>
+      'Сховище переміщено в пам\'ять застосунку.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'Сховище переміщено з пам\'яті застосунку.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'Не вдалося перенести біометричне розблокування. Розблокуйте це сховище паролем і налаштуйте біометрію знову.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'Доступ автоматизації для цього сховища скинуто. Увімкніть його знову в налаштуваннях автоматизації сховища.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'Не вдалося видалити оригінал, він досі на старому місці. Ви можете видалити його самостійно.';
+
+  @override
+  String get relocateErrorUnlocked =>
+      'Заблокуйте сховище, перш ніж переміщувати його.';
+
+  @override
+  String get relocateErrorUnsupported =>
+      'Цей тип сховища не можна перемістити.';
+
+  @override
+  String get relocateErrorSplit =>
+      'Розділені контейнери не можна переміщувати. Спершу об\'єднайте частини.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'У цій папці немає файлу конфігурації сховища.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'Копія не збігалася з оригіналом, тому її відхилено. Нічого не змінено.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'Копію створено, але застосунок не зміг на неї перейти, тому її видалено. Нічого не змінено.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'Не вдалося перемістити сховище. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'Видалити це сховище?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '«$name» зберігається всередині застосунку, тому вилучення остаточно його видалить. Іншої копії немає, якщо ви не зробили резервну.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Перемістити назовні';
+
+  @override
+  String get deleteAppStorageVaultFailed => 'Не вдалося видалити сховище.';
 }

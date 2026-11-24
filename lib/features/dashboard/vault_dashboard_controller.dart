@@ -1053,6 +1053,38 @@ class VaultDashboardController extends _$VaultDashboardController {
     });
   }
 
+  /// Removes a vault from the list straight away, with no undo bar. For a vault whose files were just
+  /// deleted (app storage): there is nothing left to bring back, so an undo would only restore a dead entry.
+  Future<void> removeVaultNow(String uri) async {
+    await ref.read(containerRepositoryProvider).remove(uri);
+    await ref.read(fileManagerToolbarServiceProvider).forgetMusicModeHint(uri);
+    if (!ref.mounted) return;
+
+    final newRecords = Map<String, ContainerRecord>.from(state.records)..remove(uri);
+    final newOrder = List<String>.from(state.recordsOrder)..remove(uri);
+    state = state._copy(
+      records: Map.unmodifiable(newRecords),
+      recordsOrder: List.unmodifiable(newOrder),
+    );
+    await ref.read(containerRepositoryProvider).saveOrder(newOrder);
+  }
+
+  /// A vault's files moved (see `VaultRelocationService`): its registration now lives under
+  /// [newRecord]`.uri`. Swaps it in at the same place in the list. The repository has already been updated.
+  void replaceVaultUri(String oldUri, ContainerRecord newRecord) {
+    final newRecords = Map<String, ContainerRecord>.from(state.records)
+      ..remove(oldUri)
+      ..[newRecord.uri] = newRecord;
+    final newOrder = [
+      for (final u in state.recordsOrder) u == oldUri ? newRecord.uri : u,
+    ];
+    state = state._copy(
+      records: Map.unmodifiable(newRecords),
+      recordsOrder: List.unmodifiable(newOrder),
+    );
+    _syncSecureScreen();
+  }
+
   void dismissUndo() {
     _undoTimer?.cancel();
     state = state._copy(showUndoBar: false);

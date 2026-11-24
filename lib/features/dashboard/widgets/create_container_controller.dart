@@ -1,11 +1,13 @@
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_storage_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/services/vault_relocation_providers.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -45,6 +47,10 @@ class CreateContainerState {
   // on the dashboard afterwards.
   final bool remember;
 
+  /// Create the vault inside the app's private storage instead of at a location the user picks
+  /// (Android only). A vault there is always remembered: there is no file manager to find it in later.
+  final bool inAppStorage;
+
   const CreateContainerState({
     this.currentStep = 0,
     this.isFolderVault = false,
@@ -74,6 +80,7 @@ class CreateContainerState {
     this.loading = false,
     this.error,
     this.remember = true,
+    this.inAppStorage = false,
   });
 
   CreateContainerState _copy({
@@ -108,6 +115,7 @@ class CreateContainerState {
     String? error,
     bool clearError = false,
     bool? remember,
+    bool? inAppStorage,
   }) => CreateContainerState(
     currentStep: currentStep ?? this.currentStep,
     isFolderVault: isFolderVault ?? this.isFolderVault,
@@ -137,6 +145,7 @@ class CreateContainerState {
     loading: loading ?? this.loading,
     error: clearError ? null : (error ?? this.error),
     remember: remember ?? this.remember,
+    inAppStorage: inAppStorage ?? this.inAppStorage,
   );
 }
 
@@ -151,6 +160,14 @@ class CreateContainer extends _$CreateContainer {
       state = state._copy(isFolderVault: folderVault, clearError: true);
 
   void setRemember(bool val) => state = state._copy(remember: val);
+
+  /// Switching location drops any folder picked for the other mode.
+  void setInAppStorage(bool inApp) => state = state._copy(
+    inAppStorage: inApp,
+    clearFolderVaultUri: true,
+    clearFolderVaultDisplayName: true,
+    clearError: true,
+  );
 
   void setFormat(CreateFormat format) {
     final defaultFs = (format == CreateFormat.luks1 || format == CreateFormat.luks2) ? 'ext4' : 'FAT';
@@ -288,8 +305,16 @@ class CreateContainer extends _$CreateContainer {
     required String confirmPassword,
     required AppLocalizations l10n,
     Uint8List? userEntropy,
+    String appStorageName = '',
   }) async {
-    if (state.folderVaultUri == null) {
+    final inApp = state.inAppStorage;
+    final appName = appStorageName.trim();
+    if (inApp) {
+      if (appName.isEmpty) {
+        state = state._copy(error: l10n.vaultNameRequired);
+        return false;
+      }
+    } else if (state.folderVaultUri == null) {
       state = state._copy(error: l10n.selectEmptyDestinationFolderFirst);
       return false;
     }
@@ -304,46 +329,79 @@ class CreateContainer extends _$CreateContainer {
 
     state = state._copy(loading: true, clearError: true);
     final lifecycle = ref.read(vaultLifecycleApiProvider);
+    // Held up front: a vault in app storage must be recorded even if this notifier is disposed
+    // (the sheet dismissed) while it is being created, or it would exist with no way to reach it.
+    final repository = ref.read(containerRepositoryProvider);
+    final storage = ref.read(vaultStorageApiProvider);
+    final folderVaultFormat = state.folderVaultFormat;
 
     try {
-      final success = state.folderVaultFormat == 'cryptomator'
-          ? await lifecycle.createCryptomatorVault(
-              state.folderVaultUri!,
-              password,
-              userEntropy: userEntropy,
-            )
-          : state.folderVaultFormat == 'gocryptfs'
-              ? await lifecycle.createGocryptfsVault(
-                  state.folderVaultUri!,
-                  password,
-                  cipher: state.gocryptfsCipher,
-                  userEntropy: userEntropy,
-                  deterministicNames: state.gocryptfsDeterministicNames,
-                )
-              : await lifecycle.createCryfsVault(
-                  state.folderVaultUri!,
-                  password,
-                  cipher: state.cryfsCipher,
-                  blockSize: state.cryfsBlockSize,
-                  userEntropy: userEntropy,
-                );
+      String? vaultUri = state.folderVaultUri;
+      final bool success;
+      if (inApp) {
+        vaultUri = await storage.createAppStorageFolderVault(
+          format: folderVaultFormat,
+          displayName: appName,
+          password: password,
+          cipher: folderVaultFormat == 'gocryptfs'
+              ? state.gocryptfsCipher
+              : folderVaultFormat == 'cryfs'
+                  ? state.cryfsCipher
+                  : '',
+          userEntropy: userEntropy,
+          deterministicNames: state.gocryptfsDeterministicNames,
+          blockSize: state.cryfsBlockSize,
+        );
+        success = vaultUri != null;
+      } else {
+        success = folderVaultFormat == 'cryptomator'
+            ? await lifecycle.createCryptomatorVault(
+                state.folderVaultUri!,
+                password,
+                userEntropy: userEntropy,
+              )
+            : folderVaultFormat == 'gocryptfs'
+                ? await lifecycle.createGocryptfsVault(
+                    state.folderVaultUri!,
+                    password,
+                    cipher: state.gocryptfsCipher,
+                    userEntropy: userEntropy,
+                    deterministicNames: state.gocryptfsDeterministicNames,
+                  )
+                : await lifecycle.createCryfsVault(
+                    state.folderVaultUri!,
+                    password,
+                    cipher: state.cryfsCipher,
+                    blockSize: state.cryfsBlockSize,
+                    userEntropy: userEntropy,
+                  );
+      }
 
-      if (!ref.mounted) return false;
+      if (!ref.mounted && !inApp) return false;
       if (success) {
-        if (state.remember) {
-          await ref.read(containerRepositoryProvider).save(ContainerRecord(
-                uri: state.folderVaultUri!,
-                label: state.folderVaultDisplayName ?? state.folderVaultUri!,
-                rememberPassword: false,
-                unlockMethod: ContainerUnlockMethod.password,
-                containerFormat: state.folderVaultFormat,
-              ));
-          if (!ref.mounted) return false;
+        final createdUri = vaultUri!;
+        if (inApp || state.remember) {
+          try {
+            await repository.save(ContainerRecord(
+                  uri: createdUri,
+                  label: inApp ? appName : (state.folderVaultDisplayName ?? createdUri),
+                  rememberPassword: false,
+                  unlockMethod: ContainerUnlockMethod.password,
+                  containerFormat: folderVaultFormat,
+                ));
+          } catch (_) {
+            // Never leave a vault in app storage that the list does not know about.
+            if (inApp) await _discardAppStorageVault(storage, createdUri);
+            rethrow;
+          }
         }
+        if (!ref.mounted) return true;
         state = state._copy(loading: false);
         return true;
       } else {
-        state = state._copy(loading: false, error: l10n.vaultCreationFailedEmptyFolder);
+        if (ref.mounted) {
+          state = state._copy(loading: false, error: l10n.vaultCreationFailedEmptyFolder);
+        }
         return false;
       }
     } on PlatformException catch (e) {
@@ -437,7 +495,14 @@ class CreateContainer extends _$CreateContainer {
       }
 
       final pim = clampPim(pimText.isEmpty ? 0 : int.tryParse(pimText) ?? 0);
-      final result = await ref.read(vaultLifecycleApiProvider).createContainer(
+      // Both take identical arguments; only where the file goes differs (a picked document, or app storage).
+      final inApp = state.inAppStorage;
+      final repository = ref.read(containerRepositoryProvider);
+      final storage = ref.read(vaultStorageApiProvider);
+      final createFn = inApp
+          ? storage.createAppStorageContainer
+          : ref.read(vaultLifecycleApiProvider).createContainer;
+      final result = await createFn(
         displayName: nameText,
         sizeBytes: sizeBytes,
         password: passwordText,
@@ -461,27 +526,35 @@ class CreateContainer extends _$CreateContainer {
         userEntropy: userEntropy,
       );
 
-      if (!ref.mounted) return false;
+      if (!ref.mounted && !inApp) return false;
       if (result.success) {
-        if (state.remember && result.uri != null) {
-          await ref.read(containerRepositoryProvider).save(ContainerRecord(
-                uri: result.uri!,
-                label: nameText,
-                rememberPassword: false,
-                unlockMethod: ContainerUnlockMethod.password,
-                cipherId: state.cipherId,
-                hashId: state.hashId,
-                containerFormat: state.format.name,
-                keyfiles: state.outerKeyfiles
-                    .map((k) => {'uri': k.uri, 'name': k.displayName})
-                    .toList(),
-              ));
-          if (!ref.mounted) return false;
+        if ((inApp || state.remember) && result.uri != null) {
+          try {
+            await repository.save(ContainerRecord(
+                  uri: result.uri!,
+                  label: nameText,
+                  rememberPassword: false,
+                  unlockMethod: ContainerUnlockMethod.password,
+                  cipherId: state.cipherId,
+                  hashId: state.hashId,
+                  containerFormat: state.format.name,
+                  keyfiles: state.outerKeyfiles
+                      .map((k) => {'uri': k.uri, 'name': k.displayName})
+                      .toList(),
+                ));
+          } catch (_) {
+            // Never leave a vault in app storage that the list does not know about.
+            if (inApp) await _discardAppStorageVault(storage, result.uri!);
+            rethrow;
+          }
         }
+        if (!ref.mounted) return true;
         state = state._copy(loading: false);
         return true;
       } else {
-        state = state._copy(loading: false, error: l10n.containerCreationCancelledOrFailed);
+        if (ref.mounted) {
+          state = state._copy(loading: false, error: l10n.containerCreationCancelledOrFailed);
+        }
         return false;
       }
     } on PlatformException catch (e) {
@@ -506,6 +579,15 @@ class CreateContainer extends _$CreateContainer {
         state = state._copy(loading: false, error: '$e');
       }
       return false;
+    }
+  }
+
+  /// Removes a vault just created in app storage whose record could not be saved.
+  Future<void> _discardAppStorageVault(VaultStorageApi storage, String uri) async {
+    try {
+      await storage.deleteAppStorageVault(uri);
+    } catch (_) {
+      // Best effort: the original failure is what gets reported.
     }
   }
 }

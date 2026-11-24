@@ -12927,4 +12927,136 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => 'Yeni pencerede aç';
+
+  @override
+  String get storageLocationLabel => 'Depolama konumu';
+
+  @override
+  String get storageLocationPicked => 'Konum seç';
+
+  @override
+  String get storageLocationAppStorage => 'Uygulama depolaması';
+
+  @override
+  String get appStorageCreateNote =>
+      'Uygulamanın özel depolamasında tutulur; yalnızca bu uygulama erişebilir. Uygulamayı kaldırırsanız veya verilerini temizlerseniz silinir, bu yüzden önemli olan her şeyin yedeğini alın.';
+
+  @override
+  String get vaultNameLabel => 'Kasa adı';
+
+  @override
+  String get vaultNameRequired => 'Kasa adı gerekli';
+
+  @override
+  String get moveToAppStorageTile => 'Uygulama depolamasına taşı';
+
+  @override
+  String get moveToAppStorageSubtitle =>
+      'Bu kasayı uygulamanın özel depolamasında tutun';
+
+  @override
+  String get moveOutOfAppStorageTile => 'Uygulama depolamasından çıkar';
+
+  @override
+  String get moveOutOfAppStorageSubtitle =>
+      'Bu kasayı seçtiğiniz bir konuma kaydedin';
+
+  @override
+  String get relocateSaveChangesFirst =>
+      'Kasayı taşımadan önce değişikliklerinizi kaydedin veya iptal edin.';
+
+  @override
+  String get relocateToAppStorageTitle => 'Uygulama depolamasına taşınsın mı?';
+
+  @override
+  String get relocateToAppStorageBody =>
+      'Kasa, uygulamanın özel depolamasına kopyalanır ve başka hiçbir şey yapılmadan önce bayt bayt doğrulanır. Kayıtlı parolanız ve ayarlarınız da onunla birlikte taşınır.';
+
+  @override
+  String get relocateFromAppStorageTitle =>
+      'Uygulama depolamasından çıkarılsın mı?';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      'Kasanın nereye kaydedileceğini seçersiniz. Buraya kopyalanır ve başka hiçbir şey yapılmadan önce bayt bayt doğrulanır. Kayıtlı parolanız ve ayarlarınız da onunla birlikte taşınır.';
+
+  @override
+  String get appStorageRiskNote =>
+      'Uygulama depolamasındaki kasalar, uygulamayı kaldırırsanız, verilerini temizlerseniz veya acil durum silmesini çalıştırırsanız silinir. Önemli olan her şeyin yedeğini alın.';
+
+  @override
+  String get relocateDeleteOriginal =>
+      'Kopya doğrulandıktan sonra orijinali sil';
+
+  @override
+  String get relocateMoveButton => 'Taşı';
+
+  @override
+  String get relocatePhaseCopying => 'Kasa kopyalanıp denetleniyor…';
+
+  @override
+  String get relocatePhaseSwitching => 'Yeni konuma geçiliyor…';
+
+  @override
+  String get relocatePhaseFinishing => 'Tamamlanıyor…';
+
+  @override
+  String get relocatedToAppStorage => 'Kasa uygulama depolamasına taşındı.';
+
+  @override
+  String get relocatedFromAppStorage =>
+      'Kasa uygulama depolamasından çıkarıldı.';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      'Biyometrik kilit açma aktarılamadı. Bu kasayı parolasıyla açın ve biyometriyi yeniden kurun.';
+
+  @override
+  String get relocateNoteAutomationReset =>
+      'Bu kasa için otomasyon erişimi sıfırlandı. Kasanın otomasyon ayarlarından yeniden açın.';
+
+  @override
+  String get relocateNoteOriginalLeftBehind =>
+      'Orijinal silinemedi ve eski konumunda duruyor. İsterseniz kendiniz silebilirsiniz.';
+
+  @override
+  String get relocateErrorUnlocked => 'Kasayı taşımadan önce kilitleyin.';
+
+  @override
+  String get relocateErrorUnsupported => 'Bu tür bir kasa taşınamaz.';
+
+  @override
+  String get relocateErrorSplit =>
+      'Bölünmüş kapsayıcılar taşınamaz. Önce parçaları birleştirin.';
+
+  @override
+  String get relocateErrorNotVaultFolder =>
+      'Bu klasörde bir kasanın yapılandırma dosyası yok.';
+
+  @override
+  String get relocateErrorVerifyFailed =>
+      'Kopya orijinaliyle eşleşmedi, bu yüzden atıldı. Hiçbir şey değiştirilmedi.';
+
+  @override
+  String get relocateErrorSwitchFailed =>
+      'Kopya oluşturuldu ancak uygulama ona geçemedi, bu yüzden kaldırıldı. Hiçbir şey değiştirilmedi.';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return 'Kasa taşınamadı. $details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => 'Bu kasa silinsin mi?';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '\"$name\" uygulamanın içinde saklanıyor, bu yüzden kaldırmak onu kalıcı olarak siler. Yedek almadıysanız başka kopyası yoktur.';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => 'Bunun yerine çıkar';
+
+  @override
+  String get deleteAppStorageVaultFailed => 'Kasa silinemedi.';
 }

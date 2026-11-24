@@ -753,6 +753,9 @@ class VaultUnlockHandlers(
                     } else {
                         DocumentFile.fromSingleUri(activity, uri)?.exists() == true
                     }
+                } else if (uri.scheme == "file") {
+                    // A vault in app storage is a plain file:// URI; File("file:///...") would never exist.
+                    uri.path?.let { File(it).exists() } == true
                 } else {
                     File(filePath).exists()
                 }

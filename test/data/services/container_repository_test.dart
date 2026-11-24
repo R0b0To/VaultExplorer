@@ -792,4 +792,274 @@ void main() {
       );
     });
   });
+
+  // ---- relocate ---------------------------------------------------------------
+  group('Relocating a vault (moving it between a picked location and app storage)', () {
+    const oldUri =
+        'content://com.android.externalstorage.documents/document/primary%3AVaults%2Fwork.hc';
+    const newUri =
+        'file:///data/user/0/com.aeidolon.vaultexplorer/files/vaults/work.hc';
+
+    ContainerRecord workRecord({
+      ContainerUnlockMethod method = ContainerUnlockMethod.password,
+      String? pendingPassword,
+      String? pendingPatternHash,
+      String? pendingPinHash,
+    }) => ContainerRecord(
+      uri: oldUri,
+      label: 'Work',
+      unlockMethod: method,
+      rememberPassword: method != ContainerUnlockMethod.password,
+      autoCloseMins: 7,
+      documentProvider: true,
+      documentProviderFolders: const [
+        DocumentProviderFolder(path: '/Docs', autoMount: true),
+      ],
+      cacheDerivedKey: true,
+      alwaysOpenReadOnly: true,
+      cipherId: 3,
+      hashId: 4,
+      containerFormat: 'luks',
+      keyfiles: const [
+        {'uri': 'content://kf/1', 'name': 'first.key'},
+      ],
+      pendingPassword: pendingPassword,
+      pendingPatternHash: pendingPatternHash,
+      pendingPinHash: pendingPinHash,
+    );
+
+    /// A second repository over the same storage, so what it reads was really persisted.
+    ContainerRepository freshRepo() =>
+        ContainerRepository.withCryptoApi(cryptoApi, secureStorage);
+
+    test('keeps every setting and re-keys the record to the new URI', () async {
+      await repo.save(workRecord());
+      final moved = await repo.relocate(oldUri: oldUri, newUri: newUri);
+
+      expect(moved.uri, newUri);
+      expect(moved.label, 'Work');
+      expect(moved.autoCloseMins, 7);
+      expect(moved.documentProvider, isTrue);
+      expect(moved.cacheDerivedKey, isTrue);
+      expect(moved.alwaysOpenReadOnly, isTrue);
+      expect(moved.cipherId, 3);
+      expect(moved.hashId, 4);
+      expect(moved.containerFormat, 'luks');
+
+      final all = await repo.loadAll();
+      expect(all.keys.toList(), [newUri]);
+    });
+
+    test('the move survives a restart: only the new URI is on disk', () async {
+      await repo.save(workRecord());
+      await repo.relocate(oldUri: oldUri, newUri: newUri);
+
+      final reloaded = await freshRepo().loadAll();
+      expect(reloaded.keys.toList(), [newUri]);
+      expect(reloaded[newUri]!.label, 'Work');
+      expect(reloaded[newUri]!.documentProviderFolders, const [
+        DocumentProviderFolder(path: '/Docs', autoMount: true),
+      ]);
+      expect(reloaded[newUri]!.keyfiles, [
+        {'uri': 'content://kf/1', 'name': 'first.key'},
+      ]);
+      final file = File('${tempDir.path}/containers_v2.json');
+      final json = file.readAsStringSync();
+      expect(json.contains(newUri), isTrue);
+      expect(json.contains(oldUri), isFalse);
+    });
+
+    test('the vault keeps its place in the list', () async {
+      await repo.save(const ContainerRecord(uri: uriA, label: 'First'));
+      await repo.save(workRecord());
+      await repo.save(const ContainerRecord(uri: uriC, label: 'Last'));
+      expect((await repo.loadOrder()), [uriA, oldUri, uriC]);
+
+      await repo.relocate(oldUri: oldUri, newUri: newUri);
+      expect((await repo.loadOrder()), [uriA, newUri, uriC]);
+      expect((await freshRepo().loadOrder()), [uriA, newUri, uriC]);
+    });
+
+    test('moves the saved password and drops it from the old URI', () async {
+      await repo.save(
+        workRecord(
+          method: ContainerUnlockMethod.rememberPassword,
+          pendingPassword: 'hunter2',
+        ),
+      );
+      final moved = await repo.relocate(oldUri: oldUri, newUri: newUri);
+
+      expect(moved.unlockMethod, ContainerUnlockMethod.rememberPassword);
+      expect(await repo.getPassword(newUri), 'hunter2');
+      expect(await repo.getPassword(oldUri), isNull);
+      expect(secureStorage.data.containsKey(ContainerRepository.keystoreKey(oldUri)), isFalse);
+      expect(await freshRepo().getPassword(newUri), 'hunter2');
+    });
+
+    test('the in-memory record never holds the password it re-saved', () async {
+      await repo.save(
+        workRecord(
+          method: ContainerUnlockMethod.rememberPassword,
+          pendingPassword: 'hunter2',
+        ),
+      );
+      final moved = await repo.relocate(oldUri: oldUri, newUri: newUri);
+      expect(moved.pendingPassword, isNull);
+      expect((await repo.loadAll())[newUri]!.pendingPassword, isNull);
+    });
+
+    test('moves a pattern hash', () async {
+      await repo.save(
+        workRecord(method: ContainerUnlockMethod.pattern, pendingPatternHash: 'pattern-hash', pendingPassword: 'pw'),
+      );
+      await repo.relocate(oldUri: oldUri, newUri: newUri);
+      expect(await repo.getPatternHash(newUri), 'pattern-hash');
+      expect(await repo.getPatternHash(oldUri), isNull);
+      expect(await repo.getPassword(newUri), 'pw');
+    });
+
+    test('moves a PIN hash', () async {
+      await repo.save(
+        workRecord(method: ContainerUnlockMethod.pin, pendingPinHash: 'pin-hash', pendingPassword: 'pw'),
+      );
+      await repo.relocate(oldUri: oldUri, newUri: newUri);
+      expect(await repo.getPinHash(newUri), 'pin-hash');
+      expect(await repo.getPinHash(oldUri), isNull);
+    });
+
+    test('a biometric vault stays on the biometric method, with its saved password', () async {
+      await repo.save(
+        workRecord(method: ContainerUnlockMethod.biometrics, pendingPassword: 'pw'),
+      );
+      final moved = await repo.relocate(oldUri: oldUri, newUri: newUri);
+      // Re-arming the sentinel key is the caller's job (BiometricEnrollmentGuard); the record only carries state.
+      expect(moved.unlockMethod, ContainerUnlockMethod.biometrics);
+      expect(await repo.getPassword(newUri), 'pw');
+    });
+
+    test('copies the remembered PIM and the device-only bookmarks, then forgets the old ones', () async {
+      await repo.save(workRecord());
+      secureStorage.data[pimStorageKey(oldUri)] = '485';
+      secureStorage.data[ContainerRepository.marksKey(oldUri)] = '{"bookmarks":["/a"]}';
+
+      await repo.relocate(oldUri: oldUri, newUri: newUri);
+
+      expect(await repo.getPim(newUri), '485');
+      expect(secureStorage.data[ContainerRepository.marksKey(newUri)], '{"bookmarks":["/a"]}');
+      expect(secureStorage.data.containsKey(pimStorageKey(oldUri)), isFalse);
+      expect(secureStorage.data.containsKey(ContainerRepository.marksKey(oldUri)), isFalse);
+    });
+
+    test('leaves nothing behind that is keyed by the old URI', () async {
+      await repo.save(
+        workRecord(method: ContainerUnlockMethod.rememberPassword, pendingPassword: 'pw'),
+      );
+      secureStorage.data[pimStorageKey(oldUri)] = '10';
+      await repo.relocate(oldUri: oldUri, newUri: newUri);
+
+      final leftovers = secureStorage.data.keys.where((k) => k.contains(oldUri) || k.contains(base64Url.encode(utf8.encode(oldUri))));
+      expect(leftovers, isEmpty);
+    });
+
+    test('clears the old cached derived key, the biometric key and the open options', () async {
+      final forgotten = <String>[];
+      repo.clearVaultOpenPreferences = (uri) async => forgotten.add(uri);
+      await repo.save(workRecord(method: ContainerUnlockMethod.biometrics, pendingPassword: 'pw'));
+
+      await repo.relocate(oldUri: oldUri, newUri: newUri);
+
+      expect(cryptoApi.clearedPaths, contains(derivedKeyPathForUri(oldUri)));
+      expect(cryptoApi.deletedBiometricIds, contains(vaultBiometricKeyId(oldUri)));
+      expect(cryptoApi.deletedBiometricIds, isNot(contains(vaultBiometricKeyId(newUri))));
+      expect(forgotten, [oldUri]);
+    });
+
+    test('works for a very long SAF tree URI that gets a truncated storage key', () async {
+      const longOld = '${sharedPrefix}CryptomatorVaultA_WithAVeryLongNameThatExceedsLimits';
+      await repo.save(
+        ContainerRecord(
+          uri: longOld,
+          label: 'Long',
+          containerFormat: 'cryptomator',
+          unlockMethod: ContainerUnlockMethod.rememberPassword,
+          pendingPassword: 'pw-long',
+        ),
+      );
+      await repo.save(
+        ContainerRecord(
+          uri: uriB,
+          label: 'Neighbour',
+          containerFormat: 'cryptomator',
+          unlockMethod: ContainerUnlockMethod.rememberPassword,
+          pendingPassword: 'pw-neighbour',
+        ),
+      );
+      await repo.relocate(oldUri: longOld, newUri: newUri);
+
+      expect(await repo.getPassword(newUri), 'pw-long');
+      expect(await repo.getPassword(uriB), 'pw-neighbour');
+    });
+
+    test('rejects a vault that is not registered', () async {
+      await expectLater(
+        repo.relocate(oldUri: oldUri, newUri: newUri),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('rejects a destination that is already registered, leaving both vaults untouched', () async {
+      await repo.save(workRecord(method: ContainerUnlockMethod.rememberPassword, pendingPassword: 'pw'));
+      await repo.save(
+        const ContainerRecord(uri: newUri, label: 'Other', unlockMethod: ContainerUnlockMethod.rememberPassword, pendingPassword: 'other-pw'),
+      );
+      await expectLater(
+        repo.relocate(oldUri: oldUri, newUri: newUri),
+        throwsA(isA<StateError>()),
+      );
+      expect(await repo.getPassword(oldUri), 'pw');
+      expect(await repo.getPassword(newUri), 'other-pw');
+      expect((await repo.loadAll()).keys, containsAll([oldUri, newUri]));
+    });
+
+    test('rejects moving a vault onto itself', () async {
+      await repo.save(workRecord());
+      await expectLater(
+        repo.relocate(oldUri: oldUri, newUri: oldUri),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect((await repo.loadAll()).keys.toList(), [oldUri]);
+    });
+
+    test('if saving the new registration fails, it is rolled back and the old one is untouched', () async {
+      final failing = _FailingWriteStorage(failOnKey: pimStorageKey(newUri));
+      final failingRepo = ContainerRepository.withCryptoApi(cryptoApi, failing);
+      await failingRepo.save(
+        workRecord(method: ContainerUnlockMethod.rememberPassword, pendingPassword: 'pw'),
+      );
+      failing.data[pimStorageKey(oldUri)] = '485';
+
+      await expectLater(
+        failingRepo.relocate(oldUri: oldUri, newUri: newUri),
+        throwsA(isA<StateError>()),
+      );
+
+      final all = await failingRepo.loadAll();
+      expect(all.keys.toList(), [oldUri]);
+      expect(await failingRepo.getPassword(oldUri), 'pw');
+      expect(failing.data[pimStorageKey(oldUri)], '485');
+      expect(failing.data.keys.where((k) => k.contains(newUri)), isEmpty);
+      expect(await failingRepo.getPassword(newUri), isNull);
+    });
+  });
+}
+
+class _FailingWriteStorage extends _MemorySecureStorage {
+  _FailingWriteStorage({required this.failOnKey});
+  final String failOnKey;
+
+  @override
+  Future<void> write({required String key, required String? value}) async {
+    if (key == failOnKey) throw StateError('simulated secure storage failure');
+    await super.write(key: key, value: value);
+  }
 }

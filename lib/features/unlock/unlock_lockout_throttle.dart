@@ -27,6 +27,40 @@ class _ThrottleOutageState {
   }
 }
 
+/// Moves one throttle's persisted counters, and its in-memory outage shadow, from
+/// [fromUri] to [toUri]. Used when a vault is relocated: the lockout belongs to
+/// the vault, so moving it must not hand the next attempt a clean slate.
+///
+/// Best-effort per entry, like the rest of this file: an entry that cannot be
+/// moved is left where it was (a write that fails never deletes its source).
+Future<void> _carryThrottleState({
+  required AppSecureStorage secure,
+  required _ThrottleOutageState outage,
+  required String tag,
+  required String fromUri,
+  required String toUri,
+  required String Function(String uri) attemptsKey,
+  required String Function(String uri) lockedUntilKey,
+}) async {
+  final shadowAttempts = outage.attempts[fromUri];
+  final shadowUntil = outage.lockedUntilMs[fromUri];
+  if (shadowAttempts != null) outage.attempts[toUri] = shadowAttempts;
+  if (shadowUntil != null) outage.lockedUntilMs[toUri] = shadowUntil;
+  outage.clear(fromUri);
+  for (final (from, to) in [
+    (attemptsKey(fromUri), attemptsKey(toUri)),
+    (lockedUntilKey(fromUri), lockedUntilKey(toUri)),
+  ]) {
+    try {
+      final value = await secure.read(key: from);
+      if (value != null) await secure.write(key: to, value: value);
+      await secure.delete(key: from);
+    } catch (e) {
+      VeLog.e(tag, 'carryOver: could not move a persisted lockout entry', e);
+    }
+  }
+}
+
 int? _laterOf(int? a, int? b) {
   if (a == null) return b;
   if (b == null) return a;
@@ -143,6 +177,18 @@ class PatternUnlockThrottle {
     return null;
   }
 
+  /// Moves the lockout state of [fromUri] to [toUri] (the same vault, relocated).
+  static Future<void> carryOver({required String fromUri, required String toUri}) =>
+      _carryThrottleState(
+        secure: _secure,
+        outage: _outage,
+        tag: _tag,
+        fromUri: fromUri,
+        toUri: toUri,
+        attemptsKey: _attemptsKey,
+        lockedUntilKey: _lockedUntilKey,
+      );
+
   /// Clears persisted lockout state for [uri] after a successful unlock.
   static Future<void> clear(String uri) async {
     _outage.clear(uri);
@@ -253,6 +299,18 @@ class PinUnlockThrottle {
     }
     return null;
   }
+
+  /// Moves the lockout state of [fromUri] to [toUri] (the same vault, relocated).
+  static Future<void> carryOver({required String fromUri, required String toUri}) =>
+      _carryThrottleState(
+        secure: _secure,
+        outage: _outage,
+        tag: _tag,
+        fromUri: fromUri,
+        toUri: toUri,
+        attemptsKey: _attemptsKey,
+        lockedUntilKey: _lockedUntilKey,
+      );
 
   /// Clears persisted lockout state for [uri] after a successful unlock.
   static Future<void> clear(String uri) async {

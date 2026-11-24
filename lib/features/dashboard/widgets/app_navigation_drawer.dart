@@ -20,6 +20,7 @@ import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
+import 'package:vaultexplorer/data/models/app_storage_vault_uri.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
@@ -27,6 +28,7 @@ import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/vault_relocation_flow.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
@@ -464,9 +466,14 @@ class AppNavigationDrawer extends ConsumerWidget {
       );
       return;
     }
+    final record = (item as LockedVaultItem).record;
+    if (AppStorageVaultUri.isAppStorage(record.uri)) {
+      unawaited(removeAppStorageVault(context, ref, record: record));
+      return;
+    }
     ref
         .read(vaultDashboardControllerProvider.notifier)
-        .handleSwipeToRemove(item.uri, (item as LockedVaultItem).record);
+        .handleSwipeToRemove(item.uri, record);
   }
 
   @override

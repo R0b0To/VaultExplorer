@@ -12137,4 +12137,124 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserTabOpenInNewWindow => '在新窗口中打开';
+
+  @override
+  String get storageLocationLabel => '存储位置';
+
+  @override
+  String get storageLocationPicked => '选择位置';
+
+  @override
+  String get storageLocationAppStorage => '应用存储';
+
+  @override
+  String get appStorageCreateNote =>
+      '保存在应用的私有存储中，只有本应用可以访问。卸载应用或清除其数据时会被删除，因此请为重要内容保留备份。';
+
+  @override
+  String get vaultNameLabel => '保险库名称';
+
+  @override
+  String get vaultNameRequired => '必须填写保险库名称';
+
+  @override
+  String get moveToAppStorageTile => '移到应用存储';
+
+  @override
+  String get moveToAppStorageSubtitle => '将此保险库保存在应用的私有存储中';
+
+  @override
+  String get moveOutOfAppStorageTile => '移出应用存储';
+
+  @override
+  String get moveOutOfAppStorageSubtitle => '将此保险库保存到您选择的位置';
+
+  @override
+  String get relocateSaveChangesFirst => '移动保险库之前，请先保存或放弃您的更改。';
+
+  @override
+  String get relocateToAppStorageTitle => '移到应用存储？';
+
+  @override
+  String get relocateToAppStorageBody =>
+      '保险库会被复制到应用的私有存储中，并在进行其他操作之前逐字节校验。已保存的密码和设置会随之迁移。';
+
+  @override
+  String get relocateFromAppStorageTitle => '移出应用存储？';
+
+  @override
+  String get relocateFromAppStorageBody =>
+      '您将选择保险库的保存位置。它会被复制到那里，并在进行其他操作之前逐字节校验。已保存的密码和设置会随之迁移。';
+
+  @override
+  String get appStorageRiskNote =>
+      '如果您卸载应用、清除其数据或执行紧急擦除，应用存储中的保险库将被删除。请为重要内容保留备份。';
+
+  @override
+  String get relocateDeleteOriginal => '副本校验通过后删除原件';
+
+  @override
+  String get relocateMoveButton => '移动';
+
+  @override
+  String get relocatePhaseCopying => '正在复制并校验保险库…';
+
+  @override
+  String get relocatePhaseSwitching => '正在切换到新位置…';
+
+  @override
+  String get relocatePhaseFinishing => '正在完成…';
+
+  @override
+  String get relocatedToAppStorage => '保险库已移到应用存储。';
+
+  @override
+  String get relocatedFromAppStorage => '保险库已移出应用存储。';
+
+  @override
+  String get relocateNoteBiometricsDropped =>
+      '无法迁移生物识别解锁。请使用密码解锁此保险库，然后重新设置生物识别。';
+
+  @override
+  String get relocateNoteAutomationReset => '此保险库的自动化访问权限已重置。请在保险库的自动化设置中重新开启。';
+
+  @override
+  String get relocateNoteOriginalLeftBehind => '无法删除原件，它仍在原位置。您可以自行删除。';
+
+  @override
+  String get relocateErrorUnlocked => '移动保险库之前请先将其锁定。';
+
+  @override
+  String get relocateErrorUnsupported => '无法移动此类保险库。';
+
+  @override
+  String get relocateErrorSplit => '无法移动已拆分的容器。请先合并各部分。';
+
+  @override
+  String get relocateErrorNotVaultFolder => '此文件夹中没有保险库的配置文件。';
+
+  @override
+  String get relocateErrorVerifyFailed => '副本与原件不一致，已被丢弃。未做任何更改。';
+
+  @override
+  String get relocateErrorSwitchFailed => '副本已创建，但应用无法切换到它，因此已将其删除。未做任何更改。';
+
+  @override
+  String relocateErrorGeneric(String details) {
+    return '无法移动保险库。$details';
+  }
+
+  @override
+  String get deleteAppStorageVaultTitle => '删除此保险库？';
+
+  @override
+  String deleteAppStorageVaultBody(String name) {
+    return '“$name”存储在应用内，因此移除它会将其永久删除。除非您已做过备份，否则没有其他副本。';
+  }
+
+  @override
+  String get deleteAppStorageVaultMoveOut => '改为移出';
+
+  @override
+  String get deleteAppStorageVaultFailed => '无法删除保险库。';
 }

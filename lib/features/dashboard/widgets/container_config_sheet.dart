@@ -115,8 +115,12 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               _pimCtrl.text,
             ),
             canSave: (state) => state.canSave(_passwordCtrl.text),
-            onSave: () =>
-                _save(ref.read(containerConfigControllerProvider(_params))),
+            // Saving from the sub page must close it and this page too,
+            // otherwise the user lands back here with a second save button.
+            onSave: () => _save(
+              ref.read(containerConfigControllerProvider(_params)),
+              popCount: 2,
+            ),
           ),
         ),
       ),
@@ -182,7 +186,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     super.dispose();
   }
 
-  Future<void> _save(ContainerConfigState state) async {
+  Future<void> _save(ContainerConfigState state, {int popCount = 1}) async {
     if (state.needsPatternSetup) {
       showAppSnackBar(
         context,
@@ -211,7 +215,10 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
 
     if (record != null && mounted) {
       widget.onSaved(record);
-      Navigator.pop(context);
+      final navigator = Navigator.of(context);
+      for (var i = 0; i < popCount; i++) {
+        navigator.pop();
+      }
     } else if (record == null && mounted) {
       // Only happens when biometric unlock could not be set up (no biometric
       // enrolled / no secure lock screen); nothing was saved.

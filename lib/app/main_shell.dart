@@ -300,6 +300,7 @@ class _MainShellState extends ConsumerState<MainShell>
       primaryLocalContainer: () => _primaryLocalStorageContainer,
       openWindow: (container, initialPath) =>
           openFileManagerWindow(container: container, initialPath: initialPath),
+      openVaultsWindow: (title) => openFileManagerWindow(title: title),
     );
     // Cached so asynchronous lock callbacks stay safe after this widget is
     // unmounted.

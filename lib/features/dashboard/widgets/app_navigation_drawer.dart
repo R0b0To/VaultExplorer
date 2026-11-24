@@ -86,6 +86,11 @@ class AppNavigationDrawer extends ConsumerWidget {
   final ValueChanged<VaultListItem>? onDeleteVault;
   final VoidCallback? onAddVault;
 
+  /// What the "Vaults" header does where the menu has no tab bar of its own to
+  /// switch (a file manager window): shows the Vaults page there. When null
+  /// the header goes through [onSelectTab] like Tools and Settings do.
+  final VoidCallback? onOpenVaults;
+
   /// Set only while the file manager is open with tabs: the long-press menus
   /// of vaults and storages then offer "Open in new tab".
   final ValueChanged<MountedContainer>? onOpenInNewTab;
@@ -112,6 +117,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     this.onEditVault,
     this.onDeleteVault,
     this.onAddVault,
+    this.onOpenVaults,
     this.onOpenInNewTab,
     this.onOpenCategory,
     this.keepBrowserTabsOnNavigate = false,
@@ -603,7 +609,15 @@ class AppNavigationDrawer extends ConsumerWidget {
                                       : FontWeight.w500,
                                 ),
                               ),
-                              onTap: () => _navigateToTab(context, 0),
+                              onTap: () {
+                                final openVaults = onOpenVaults;
+                                if (openVaults == null) {
+                                  _navigateToTab(context, 0);
+                                } else {
+                                  _closeDrawer(context);
+                                  openVaults();
+                                }
+                              },
                               // Expand / collapse inside the pill, so the
                               // card's outer edges stay on the same rail as
                               // the cards below.

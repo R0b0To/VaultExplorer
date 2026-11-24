@@ -36,13 +36,20 @@ class DashboardToolbarRegistry {
       ? _standalone
       : _byTab.putIfAbsent(tabId, DashboardToolbarActions.new);
 
-  /// Forgets the handles of tabs that are no longer open.
+  /// Forgets the handles of tabs that have been closed.
+  ///
+  /// The registry is shared by every window, so each workspace releases only
+  /// the tabs it knows to be gone; it cannot tell which handles belong to
+  /// another window's tabs.
   ///
   /// The notifiers are not disposed: a closing tab's dashboard and toolbar may
   /// still touch them while the tree is torn down, and a notifier nobody
   /// listens to any more holds nothing that needs releasing.
-  void retainOnly(Set<TabId> live) =>
-      _byTab.removeWhere((id, _) => !live.contains(id));
+  void release(Iterable<TabId> tabIds) {
+    for (final id in tabIds) {
+      _byTab.remove(id);
+    }
+  }
 }
 
 final dashboardToolbarActionsProvider = Provider<DashboardToolbarRegistry>(

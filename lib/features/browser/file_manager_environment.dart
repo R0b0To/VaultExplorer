@@ -23,6 +23,7 @@ class FileManagerEnvironment {
   List<MountedContainer> Function()? _mountedContainers;
   MountedContainer? Function()? _primaryLocalContainer;
   bool Function(MountedContainer container, String? initialPath)? _openWindow;
+  bool Function(String? title)? _openVaultsWindow;
 
   void attach({
     required MountedContainer? Function(int volId) resolveContainer,
@@ -30,11 +31,13 @@ class FileManagerEnvironment {
     required MountedContainer? Function() primaryLocalContainer,
     required bool Function(MountedContainer container, String? initialPath)
     openWindow,
+    required bool Function(String? title) openVaultsWindow,
   }) {
     _resolveContainer = resolveContainer;
     _mountedContainers = mountedContainers;
     _primaryLocalContainer = primaryLocalContainer;
     _openWindow = openWindow;
+    _openVaultsWindow = openVaultsWindow;
   }
 
   void detach() {
@@ -42,6 +45,7 @@ class FileManagerEnvironment {
     _mountedContainers = null;
     _primaryLocalContainer = null;
     _openWindow = null;
+    _openVaultsWindow = null;
   }
 
   /// Whether "open in new window" should be offered: a desktop platform with
@@ -53,6 +57,12 @@ class FileManagerEnvironment {
   /// false when that is not possible, so the caller can open a tab instead.
   bool openWindow(MountedContainer container, {String? initialPath}) =>
       canOpenWindow && _openWindow!(container, initialPath);
+
+  /// Opens the Vaults page (the dashboard) in a new window of its own, titled
+  /// [title]. Returns false when that is not possible, so the caller can open
+  /// a tab instead.
+  bool openVaultsWindow({String? title}) =>
+      canOpenWindow && (_openVaultsWindow?.call(title) ?? false);
 
   MountedContainer? resolveContainer(int volId) =>
       _resolveContainer?.call(volId);

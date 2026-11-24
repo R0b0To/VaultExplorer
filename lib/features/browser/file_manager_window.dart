@@ -23,29 +23,37 @@ import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
+import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_title_bar_tabs.dart';
 import 'package:vaultexplorer/features/dashboard/drawer_unlock_flow.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_navigation_drawer.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 int _fileManagerWindowSerial = 0;
 
-/// Opens [container] at [initialPath] in a new window of its own.
+/// Opens [container] at [initialPath] in a new window of its own, or, with no
+/// [container], the Vaults page.
 ///
 /// Each call opens another window, with its own tabs, its own location and
 /// its own selection; the vaults, the clipboard, transfers and settings are
 /// the app's, shared with every other window. Returns false when native
 /// windows are not available, so the caller can open a tab instead. Menus go
-/// through `FileManagerEnvironment.openWindow`, which ends up here.
+/// through `FileManagerEnvironment`, which ends up here.
+///
+/// [title] is what the window is called until it has a location of its own;
+/// it defaults to the container's name.
 bool openFileManagerWindow({
-  required MountedContainer container,
+  MountedContainer? container,
   String? initialPath,
+  String? title,
 }) {
   return SecondaryWindows.instance.open(
     key: 'files:${++_fileManagerWindowSerial}',
-    title: container.displayName,
+    title: title ?? container?.displayName ?? '',
     size: const Size(1100, 760),
     constraints: const BoxConstraints(minWidth: 560, minHeight: 400),
     builder: (_) =>
@@ -54,22 +62,22 @@ bool openFileManagerWindow({
 }
 
 /// The content of a file manager window: the main window's layout (the title
-/// row with the tabs in it, the sidebar beside the file browser) minus the
-/// dashboard, with a tab workspace of its own.
+/// row with the tabs in it, the sidebar beside the file browser), with a tab
+/// workspace of its own.
 ///
-/// What the sidebar opens, it opens in this window's tabs. Tools and Settings
-/// open as pages over the file manager, and "Add a vault" is not offered: both
-/// belong to the main window's dashboard.
+/// What the sidebar opens, it opens in this window's tabs. The Vaults page is
+/// a tab like any other here: a window can be opened on it (no [container]),
+/// and the sidebar's "Vaults" entry and the new-tab sheet open one in a window
+/// that started on a vault. Tools and Settings open as pages over the file
+/// manager, and the sidebar's "Add a vault" is not offered; adding a vault is
+/// done from a Vaults tab.
 ///
 /// Closing its last tab closes the window.
 class FileManagerWindow extends ConsumerStatefulWidget {
-  const FileManagerWindow({
-    super.key,
-    required this.container,
-    this.initialPath,
-  });
+  const FileManagerWindow({super.key, this.container, this.initialPath});
 
-  final MountedContainer container;
+  /// What the window opens on; null opens the Vaults page.
+  final MountedContainer? container;
   final String? initialPath;
 
   @override
@@ -82,6 +90,9 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   late final BrowserTabsConfig _workspace = BrowserTabsConfig.create(
     initialContainer: widget.container,
     initialPath: widget.initialPath,
+    // A window opened on the Vaults page starts with a Vaults tab, and going
+    // back from a vault's root returns to it, as in the main window.
+    includeDashboardTab: widget.container == null,
   );
 
   final FileManagerEnvironment _env = FileManagerEnvironment.instance;
@@ -117,7 +128,8 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   MountedContainer? _resolveContainer(int volId) {
     final resolved = _env.resolveContainer(volId);
     if (resolved != null) return resolved;
-    return volId == widget.container.volId ? widget.container : null;
+    final own = widget.container;
+    return own != null && volId == own.volId ? own : null;
   }
 
   /// Ctrl+W and Ctrl+Tab, as in the main window. They are global key
@@ -172,14 +184,52 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   /// A sidebar tap on a storage or vault: shown in the tab in front, like the
   /// main window's sidebar does. The long-press "open in new tab" is
   /// [_openInNewTab].
-  void _openContainer(MountedContainer container) {
+  ///
+  /// A Vaults tab gives way to the vault opened from it, like in the main
+  /// window ([origin] records that).
+  void _openContainer(
+    MountedContainer container, {
+    BrowserTabOrigin origin = BrowserTabOrigin.other,
+  }) {
     final active = _state.activeTab;
     if (active == null) {
-      if (_actions.openTab(container) == null) _showTabLimit();
-    } else if (active.volId != container.volId) {
-      _actions.replaceActive(container);
+      if (_actions.openTab(container, origin: origin) == null) _showTabLimit();
+    } else if (active.isDashboard || active.volId != container.volId) {
+      _actions.replaceActive(container, origin: origin);
     }
   }
+
+  /// The sidebar's "Vaults" entry: the Vaults tab when there is one, otherwise
+  /// the tab in front becomes one, as the main window's sidebar does. Without
+  /// tabs the window shows one page, so it turns into the Vaults page.
+  void _openVaults() {
+    final hasVaultsTab = _state.tabs.any((tab) => tab.isDashboard);
+    if (_tabsEnabled && hasVaultsTab) {
+      _actions.openDashboardTab();
+    } else {
+      _actions.replaceActiveWithDashboard();
+    }
+  }
+
+  /// The page of a Vaults tab: the main window's dashboard, in this window.
+  /// The vault list, lock state and settings are the app's, so it shows the
+  /// same vaults; what it opens goes to this window's tabs.
+  Widget _buildVaultsPage({
+    required BrowserTabsConfig workspace,
+    required TabId tabId,
+    required ValueChanged<Widget?> onFloatingActionChanged,
+    required ValueChanged<Widget?> onBottomBarChanged,
+  }) => SkinAreaScope(
+    area: SkinArea.dashboard,
+    child: VaultDashboard(
+      workspaceConfig: workspace,
+      tabId: tabId,
+      embedded: true,
+      onFloatingActionChanged: onFloatingActionChanged,
+      onBottomBarChanged: onBottomBarChanged,
+      onOpenBrowser: _openContainer,
+    ),
+  );
 
   void _openInNewTab(MountedContainer container) {
     if (_actions.openTab(container) == null) _showTabLimit();
@@ -231,11 +281,13 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
       currentContainer: _state.activeTab?.container,
       mountedVaults: _env.mountedContainers(),
       primaryLocalContainer: _env.primaryLocalContainer(),
-      // There is no dashboard in this window.
-      allowDashboard: false,
     );
-    final container = choice?.container;
-    if (!mounted || choice == null || container == null) return;
+    if (!mounted || choice == null) return;
+    final container = choice.container;
+    if (container == null) {
+      if (_actions.openNewDashboardTab() == null) _showTabLimit();
+      return;
+    }
     final path = choice.path;
     final tabId = _actions.openTab(
       container,
@@ -245,7 +297,11 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   }
 
   void _duplicateTab(BrowserTabState tab) {
-    if (!_tabsEnabled || tab.isDashboard) return;
+    if (!_tabsEnabled) return;
+    if (tab.isDashboard) {
+      if (_actions.openNewDashboardTab() == null) _showTabLimit();
+      return;
+    }
     if (tab.isCategory) {
       final tabId = _actions.openCategoryTab(
         tab.category!,
@@ -280,6 +336,7 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
       onOpenLocalStorage: _openLocalStorage,
       onUnlockVault: _unlockVault,
       onOpenCategory: _openCategory,
+      onOpenVaults: _openVaults,
     );
   }
 
@@ -290,8 +347,16 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
     final active = ref.watch(
       browserTabsProvider(_workspace).select((state) => state.activeTab),
     );
-    final container = active?.container;
-    if (active == null || container == null) return;
+    if (active == null) return;
+    if (active.isDashboard) {
+      final title = context.l10n.vaultsSectionTitle;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) entry.setTitle(title);
+      });
+      return;
+    }
+    final container = active.container;
+    if (container == null) return;
     final leaf = ref.watch(
       fileBrowserNavigationProvider(
         active.tabId,
@@ -343,6 +408,7 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
               ? null
               : (workspace, volId) => _buildSidebar(currentVolId: volId),
           closeRouteWhenEmpty: false,
+          homeBuilder: _buildVaultsPage,
           // The caption row below is where the tabs go, so that they line up
           // with the sidebar.
           externallyHostedTabStrip: customCaption,

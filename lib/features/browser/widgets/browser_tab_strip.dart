@@ -443,7 +443,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
             Icons.launch_rounded,
             l10n.browserTabOpenInNewWindow,
             enabled:
-                tab.container != null && !tab.isDashboard && !tab.isCategory,
+                tab.isDashboard || (tab.container != null && !tab.isCategory),
           ),
       ],
     );
@@ -478,6 +478,13 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   /// cannot be opened (the menu entry is then hidden, but a window can also
   /// fail to open) a duplicate tab is the next best thing.
   void _openInNewWindow(BrowserTabState tab) {
+    if (tab.isDashboard) {
+      final opened = FileManagerEnvironment.instance.openVaultsWindow(
+        title: context.l10n.vaultsSectionTitle,
+      );
+      if (!opened) widget.onDuplicate(tab);
+      return;
+    }
     final container = tab.container;
     if (container == null) return;
     final nav = ref.read(fileBrowserNavigationProvider(tab.tabId));

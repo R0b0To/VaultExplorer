@@ -437,8 +437,18 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _directoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _musicHostKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _categoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
-    _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
-    ref.read(dashboardToolbarActionsProvider).retainOnly(liveTabIds);
+    // The toolbar registry is shared by every window, so this workspace only
+    // lets go of the Vaults tabs it has itself shown, never of another
+    // window's.
+    final closedVaultsTabs = _dashboardViewKeys.keys
+        .where((id) => !liveTabIds.contains(id))
+        .toList();
+    for (final id in closedVaultsTabs) {
+      _dashboardViewKeys.remove(id);
+    }
+    if (closedVaultsTabs.isNotEmpty) {
+      ref.read(dashboardToolbarActionsProvider).release(closedVaultsTabs);
+    }
     if (next.tabs.isEmpty && !_popScheduled) {
       _popScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1368,7 +1378,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       context,
       mountedVaults: mountedVaults,
       primaryLocalContainer: widget.primaryLocalContainer(),
-      allowDashboard: widget.includeDashboardTab,
+      // A Vaults tab needs a page to show, which the host supplies.
+      allowDashboard: widget.includeDashboardTab || widget.homeBuilder != null,
     );
     if (!mounted || choice == null) return;
     if (choice.container == null) {

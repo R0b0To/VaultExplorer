@@ -165,6 +165,23 @@ extern "C" int ve_host_open(const char* path, int flags, int mode) {
     return _wopen(wpath.data(), flags | _O_BINARY | _O_NOINHERIT, _S_IREAD | _S_IWRITE);
 }
 
+// platform/file_identity.h: do two CRT descriptors refer to the same file? The CRT's st_ino is always 0, so
+// fstat() cannot answer; the volume serial number plus the 64-bit file index identify a file on Windows.
+// 1 same, 0 different (or a descriptor is not open), -1 the OS could not say (the caller then assumes "same").
+extern "C" int ve_win_same_file(int fdA, int fdB) {
+    if (fdA < 0 || fdB < 0) return 0;
+    const HANDLE a = reinterpret_cast<HANDLE>(_get_osfhandle(fdA));
+    const HANDLE b = reinterpret_cast<HANDLE>(_get_osfhandle(fdB));
+    if (a == INVALID_HANDLE_VALUE || b == INVALID_HANDLE_VALUE) return 0;
+    BY_HANDLE_FILE_INFORMATION ia;
+    BY_HANDLE_FILE_INFORMATION ib;
+    if (!GetFileInformationByHandle(a, &ia) || !GetFileInformationByHandle(b, &ib)) return -1;
+    return (ia.dwVolumeSerialNumber == ib.dwVolumeSerialNumber && ia.nFileIndexHigh == ib.nFileIndexHigh &&
+            ia.nFileIndexLow == ib.nFileIndexLow)
+               ? 1
+               : 0;
+}
+
 // Opens a host file from a UTF-8 path (declared in ffi/ve_engine.cpp). Returns a CRT descriptor or -1.
 // _O_BINARY is essential: the C runtime's default text mode would translate CR/LF and treat 0x1A
 // as EOF, silently corrupting a container.

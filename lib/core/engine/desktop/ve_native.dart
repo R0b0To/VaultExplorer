@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 11;
+const int kVeAbiVersion = 12;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -259,6 +259,46 @@ final class VeChangePasswordParams extends Struct {
   external Pointer<Int32> newKeyfileFds;
   @Int32()
   external int newKeyfileCount;
+}
+
+/// `ve_hidden_in_existing_params` (ABI 12): a hidden volume added to an existing standard volume.
+final class VeHiddenInExistingParams extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int fd;
+  external Pointer<Uint8> outerPassword;
+  @Int32()
+  external int outerPasswordLen;
+  @Int32()
+  external int outerPim;
+  @Int32()
+  external int outerCipherId;
+  @Int32()
+  external int outerHashId;
+  external Pointer<Int32> outerKeyfileFds;
+  @Int32()
+  external int outerKeyfileCount;
+  external Pointer<Uint8> hiddenPassword;
+  @Int32()
+  external int hiddenPasswordLen;
+  @Int32()
+  external int hiddenPim;
+  external Pointer<Utf8> hiddenFileSystem;
+  @Int64()
+  external int hiddenSizeBytes;
+  @Int32()
+  external int hiddenCipherId;
+  @Int32()
+  external int hiddenHashId;
+  external Pointer<Int32> hiddenKeyfileFds;
+  @Int32()
+  external int hiddenKeyfileCount;
+  @Int32()
+  external int quickFormat;
+  external Pointer<Uint8> userEntropy;
+  @Int32()
+  external int userEntropyLen;
 }
 
 final class VeSingleFileParams extends Struct {
@@ -546,6 +586,32 @@ class VeNative {
           int Function(int, int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int, int, Pointer<Int32>, int, Pointer<Int32>)>(
         've_header_restore',
       );
+  // Container tools: expand / grow / hidden volume in an existing container (ABI 12; ve_engine.h).
+  late final int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>, int, int, int, int, Pointer<Int32>) _expandVeracrypt =
+      _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Uint8>, Int32, Int32, Int32, Int32, Pointer<Int32>, Int32, Int64, Int32, Int32, Pointer<Int32>),
+          int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>, int, int, int, int, Pointer<Int32>)>('ve_expand_veracrypt');
+  late final int Function(int, Pointer<Uint8>, int, Pointer<Int32>, int, int, int, int, Pointer<Int32>) _expandLuks = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Uint8>, Int32, Pointer<Int32>, Int32, Int64, Int32, Int32, Pointer<Int32>),
+      int Function(int, Pointer<Uint8>, int, Pointer<Int32>, int, int, int, int, Pointer<Int32>)>('ve_expand_luks');
+  late final int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>) _expandBitlocker = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Uint8>, Int32, Int64, Int32, Int32, Pointer<Int32>),
+      int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>)>('ve_expand_bitlocker');
+  late final int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>, int, Pointer<Int32>) _growVeracryptFs = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Uint8>, Int32, Int32, Int32, Int32, Pointer<Int32>, Int32, Pointer<Int32>),
+      int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>, int, Pointer<Int32>)>('ve_grow_veracrypt_fs');
+  late final int Function(int, Pointer<Uint8>, int, Pointer<Int32>, int, Pointer<Int32>) _growLuksFs = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Uint8>, Int32, Pointer<Int32>, Int32, Pointer<Int32>),
+      int Function(int, Pointer<Uint8>, int, Pointer<Int32>, int, Pointer<Int32>)>('ve_grow_luks_fs');
+  late final int Function(int, Pointer<Uint8>, int, Pointer<Int32>) _growBitlockerFs = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Uint8>, Int32, Pointer<Int32>),
+      int Function(int, Pointer<Uint8>, int, Pointer<Int32>)>('ve_grow_bitlocker_fs');
+  late final int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>, int, Pointer<Int64>) _hiddenAnalyze = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Uint8>, Int32, Int32, Int32, Int32, Pointer<Int32>, Int32, Pointer<Int64>),
+      int Function(int, Pointer<Uint8>, int, int, int, int, Pointer<Int32>, int, Pointer<Int64>)>('ve_hidden_analyze');
+  late final int Function(Pointer<VeHiddenInExistingParams>, Pointer<Int32>) _hiddenCreateInExisting = _lib.lookupFunction<
+      Int32 Function(Pointer<VeHiddenInExistingParams>, Pointer<Int32>),
+      int Function(Pointer<VeHiddenInExistingParams>, Pointer<Int32>)>('ve_hidden_create_in_existing');
   late final int Function(int) _format;
   late final int Function(int) _matchedCipher;
   late final int Function(int) _matchedHash;
@@ -1937,6 +2003,242 @@ class VeNative {
       calloc.free(result);
     }
   }
+
+  // ── Container tools: expand, grow the file system, hidden volume in an existing volume (ABI 12) ──
+  // Every call CLOSES [fd] and every fd in its keyfile list on every path (ve_engine.h); callers must not close
+  // them again. Passwords are raw UTF-8 bytes, copied to native memory for the call and wiped afterwards.
+
+  /// Runs [body] with [fds] as a native int32 array (a null pointer when empty), freed afterwards.
+  T _withFdArray<T>(List<int> fds, T Function(Pointer<Int32> p, int n) body) {
+    if (fds.isEmpty) return body(nullptr, 0);
+    final p = calloc<Int32>(fds.length);
+    try {
+      for (var i = 0; i < fds.length; i++) {
+        p[i] = fds[i];
+      }
+      return body(p, fds.length);
+    } finally {
+      calloc.free(p);
+    }
+  }
+
+  /// The shared shape of the expand / grow calls: (rc, [outcome, fileSystemStep, fileSystemKind]). The defaults are
+  /// what the engine itself starts from (I/O error, file-system step not run, unknown kind).
+  (int, List<int>) _expandResult(int Function(Pointer<Int32> out) body) {
+    final out = calloc<Int32>(3);
+    out[0] = 4;
+    out[1] = -1;
+    out[2] = 0;
+    try {
+      final rc = body(out);
+      return (rc, [out[0], out[1], out[2]]);
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// `ve_expand_veracrypt`: (rc, [outcome, fsStep, fsKind]). [newSizeBytes] is rounded down to the format's unit.
+  (int, List<int>) expandVeracrypt({
+    required int fd,
+    required Uint8List password,
+    int pim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<int> keyfileFds = const [],
+    required int newSizeBytes,
+    bool initFreeSpace = false,
+    bool growFileSystem = true,
+  }) =>
+      _expandResult(
+        (out) => _withSecretBytes(
+          password,
+          (pw, n) => _withFdArray(
+            keyfileFds,
+            (kf, kfCount) => _expandVeracrypt(
+              fd, pw, n, pim, cipherId, hashId, kf, kfCount, newSizeBytes, initFreeSpace ? 1 : 0, growFileSystem ? 1 : 0, out),
+          ),
+        ),
+      );
+
+  /// `ve_expand_luks`: like [expandVeracrypt]. A keyfile REPLACES the password for LUKS.
+  (int, List<int>) expandLuks({
+    required int fd,
+    required Uint8List password,
+    List<int> keyfileFds = const [],
+    required int newSizeBytes,
+    bool initFreeSpace = false,
+    bool growFileSystem = true,
+  }) =>
+      _expandResult(
+        (out) => _withSecretBytes(
+          password,
+          (pw, n) => _withFdArray(
+            keyfileFds,
+            (kf, kfCount) =>
+                _expandLuks(fd, pw, n, kf, kfCount, newSizeBytes, initFreeSpace ? 1 : 0, growFileSystem ? 1 : 0, out),
+          ),
+        ),
+      );
+
+  /// `ve_expand_bitlocker`: like [expandVeracrypt]; the credential is a password or the 48-digit recovery key.
+  (int, List<int>) expandBitlocker({
+    required int fd,
+    required Uint8List password,
+    required int newSizeBytes,
+    bool initFreeSpace = false,
+    bool growFileSystem = true,
+  }) =>
+      _expandResult(
+        (out) => _withSecretBytes(
+          password,
+          (pw, n) => _expandBitlocker(fd, pw, n, newSizeBytes, initFreeSpace ? 1 : 0, growFileSystem ? 1 : 0, out),
+        ),
+      );
+
+  /// `ve_grow_veracrypt_fs`: only the file-system step, for a volume whose container was expanded earlier.
+  (int, List<int>) growVeracryptFs({
+    required int fd,
+    required Uint8List password,
+    int pim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<int> keyfileFds = const [],
+  }) =>
+      _expandResult(
+        (out) => _withSecretBytes(
+          password,
+          (pw, n) => _withFdArray(
+            keyfileFds,
+            (kf, kfCount) => _growVeracryptFs(fd, pw, n, pim, cipherId, hashId, kf, kfCount, out),
+          ),
+        ),
+      );
+
+  /// `ve_grow_luks_fs`.
+  (int, List<int>) growLuksFs({
+    required int fd,
+    required Uint8List password,
+    List<int> keyfileFds = const [],
+  }) =>
+      _expandResult(
+        (out) => _withSecretBytes(
+          password,
+          (pw, n) => _withFdArray(keyfileFds, (kf, kfCount) => _growLuksFs(fd, pw, n, kf, kfCount, out)),
+        ),
+      );
+
+  /// `ve_grow_bitlocker_fs`.
+  (int, List<int>) growBitlockerFs({required int fd, required Uint8List password}) => _expandResult(
+        (out) => _withSecretBytes(password, (pw, n) => _growBitlockerFs(fd, pw, n, out)),
+      );
+
+  /// `ve_hidden_analyze` (read-only): (rc, [outcome, fsKind, clusterSize, maxHiddenBytes]).
+  (int, List<int>) hiddenAnalyze({
+    required int fd,
+    required Uint8List password,
+    int pim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<int> keyfileFds = const [],
+  }) {
+    final out = calloc<Int64>(4);
+    out[0] = 4; // I/O error until the engine says otherwise
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    try {
+      final rc = _withSecretBytes(
+        password,
+        (pw, n) => _withFdArray(keyfileFds, (kf, kfCount) => _hiddenAnalyze(fd, pw, n, pim, cipherId, hashId, kf, kfCount, out)),
+      );
+      return (rc, [out[0], out[1], out[2], out[3]]);
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// `ve_hidden_create_in_existing`: (rc, outcome: 0 created, 1 wrong outer password, 2 unsupported outer file system,
+  /// 3 no room, 4 I/O error, 5 unreadable keyfile, 6 invalid). [hiddenFileSystem] is "FAT", "exFAT" or "NTFS".
+  (int, int) hiddenCreateInExisting({
+    required int fd,
+    required Uint8List outerPassword,
+    int outerPim = 0,
+    int outerCipherId = 255,
+    int outerHashId = 255,
+    List<int> outerKeyfileFds = const [],
+    required Uint8List hiddenPassword,
+    int hiddenPim = 0,
+    required String hiddenFileSystem,
+    required int hiddenSizeBytes,
+    int hiddenCipherId = 0,
+    int hiddenHashId = 0,
+    List<int> hiddenKeyfileFds = const [],
+    bool quickFormat = true,
+    Uint8List? userEntropy,
+  }) {
+    final allocated = <Pointer<NativeType>>[]; // freed in finally
+    final secrets = <(Pointer<Uint8>, int)>[]; // wiped, then freed
+    Pointer<Uint8> secretBytes(Uint8List? src) {
+      if (src == null) return nullptr;
+      final p = calloc<Uint8>(src.isEmpty ? 1 : src.length);
+      p.asTypedList(src.length).setAll(0, src);
+      secrets.add((p, src.length));
+      return p;
+    }
+
+    Pointer<Int32> fdArray(List<int> fds) {
+      if (fds.isEmpty) return nullptr;
+      final p = calloc<Int32>(fds.length);
+      for (var i = 0; i < fds.length; i++) {
+        p[i] = fds[i];
+      }
+      allocated.add(p);
+      return p;
+    }
+
+    final outcome = calloc<Int32>();
+    outcome.value = 4; // I/O error, which is what the engine starts from too
+    allocated.add(outcome);
+    try {
+      final params = calloc<VeHiddenInExistingParams>();
+      allocated.add(params);
+      final fsName = hiddenFileSystem.toNativeUtf8();
+      allocated.add(fsName);
+      final r = params.ref;
+      r.structSize = sizeOf<VeHiddenInExistingParams>();
+      r.fd = fd;
+      r.outerPassword = secretBytes(outerPassword);
+      r.outerPasswordLen = outerPassword.length;
+      r.outerPim = outerPim;
+      r.outerCipherId = outerCipherId;
+      r.outerHashId = outerHashId;
+      r.outerKeyfileFds = fdArray(outerKeyfileFds);
+      r.outerKeyfileCount = outerKeyfileFds.length;
+      r.hiddenPassword = secretBytes(hiddenPassword);
+      r.hiddenPasswordLen = hiddenPassword.length;
+      r.hiddenPim = hiddenPim;
+      r.hiddenFileSystem = fsName;
+      r.hiddenSizeBytes = hiddenSizeBytes;
+      r.hiddenCipherId = hiddenCipherId;
+      r.hiddenHashId = hiddenHashId;
+      r.hiddenKeyfileFds = fdArray(hiddenKeyfileFds);
+      r.hiddenKeyfileCount = hiddenKeyfileFds.length;
+      r.quickFormat = quickFormat ? 1 : 0;
+      r.userEntropy = secretBytes(userEntropy);
+      r.userEntropyLen = userEntropy?.length ?? 0;
+      final rc = _hiddenCreateInExisting(params, outcome);
+      return (rc, outcome.value);
+    } finally {
+      for (final (p, len) in secrets) {
+        p.asTypedList(len).fillRange(0, len, 0);
+        calloc.free(p);
+      }
+      for (final p in allocated) {
+        calloc.free(p);
+      }
+    }
+  }
+
   /// kind 0 = writes, 1 = deletes.
   int fvBatch(int volId, int kind, {required bool begin}) => _fvBatch(volId, kind, begin ? 1 : 0);
 

@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 11 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 12 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -518,6 +518,83 @@ VE_API int32_t ve_header_restore(int32_t fd, int32_t format, const uint8_t* payl
                                  const uint8_t* password, int32_t password_len, int32_t pim, int32_t cipher_id,
                                  int32_t hash_id, int32_t op_id, const int32_t* keyfile_fds, int32_t keyfile_count,
                                  int32_t* result_out);
+
+/* ---- container tools: expand, grow the file system, add a hidden volume to an existing volume ---------
+ * The engine side of the "Expand volume" and "Add hidden volume" tools (Android: VeraCryptToolsHandlers.kt).
+ * Every fd is a descriptor from ve_open_file -- opened read/write, except for ve_hidden_analyze which only reads --
+ * and is CLOSED by the call on every path (ownership transfers, like the keyfile fds of ve_unlock), so are the
+ * keyfile fds. Passwords are raw UTF-8 bytes (a BitLocker credential is a password or the 48-digit recovery key).
+ * Keyfiles follow each format's own rule: VeraCrypt mixes them into the password; for LUKS the first replaces it.
+ * A container file that is currently unlocked in a slot of this process is refused (outcome 8).
+ *
+ * Every call returns VE_OK when it ran and filled its output, VE_ERR_INVALID_ARG for bad arguments (the fds are
+ * closed first) or VE_ERR_EXCEPTION. What happened to the container is INSIDE the output.
+ *
+ * Expand and grow calls fill int32_t result_out[3]:
+ *     [0] outcome  0 ok, 1 wrong password or keyfile, 2 not expandable (not a plain standard volume that fills its
+ *                  file / unsupported layout), 3 new size not larger, 4 I/O error, 5 unreadable keyfile, 6 not LUKS,
+ *                  7 damaged or unsupported header / metadata, 8 container in use, 9 not BitLocker, 10 the virtual
+ *                  disk cannot be grown, 11 the BitLocker partition cannot be grown
+ *     [1] file-system step  -1 not run, else 0 grown, 1 already fills, 2 unsupported (FAT / exFAT / unknown),
+ *                  3 needs a check first, 4 busy, 5 failed
+ *     [2] file-system kind  0 unknown, 1 FAT12, 2 FAT16, 3 FAT32, 4 exFAT, 5 NTFS, 6 ext2, 7 ext3, 8 ext4
+ * The container expansion stands whatever the file-system step reports. new_size_bytes is rounded down to the
+ * format's unit; for a BitLocker VHD/VHDX it is the new virtual disk size. cipher_id / hash_id 255 auto-detect. */
+VE_API int32_t ve_expand_veracrypt(int32_t fd, const uint8_t* password, int32_t password_len, int32_t pim,
+                                   int32_t cipher_id, int32_t hash_id, const int32_t* keyfile_fds,
+                                   int32_t keyfile_count, int64_t new_size_bytes, int32_t init_free_space,
+                                   int32_t grow_file_system, int32_t* result_out);
+VE_API int32_t ve_expand_luks(int32_t fd, const uint8_t* password, int32_t password_len, const int32_t* keyfile_fds,
+                              int32_t keyfile_count, int64_t new_size_bytes, int32_t init_free_space,
+                              int32_t grow_file_system, int32_t* result_out);
+VE_API int32_t ve_expand_bitlocker(int32_t fd, const uint8_t* password, int32_t password_len, int64_t new_size_bytes,
+                                   int32_t init_free_space, int32_t grow_file_system, int32_t* result_out);
+/* Only the file-system step, for a volume whose container was expanded earlier. Same result_out. */
+VE_API int32_t ve_grow_veracrypt_fs(int32_t fd, const uint8_t* password, int32_t password_len, int32_t pim,
+                                    int32_t cipher_id, int32_t hash_id, const int32_t* keyfile_fds,
+                                    int32_t keyfile_count, int32_t* result_out);
+VE_API int32_t ve_grow_luks_fs(int32_t fd, const uint8_t* password, int32_t password_len, const int32_t* keyfile_fds,
+                               int32_t keyfile_count, int32_t* result_out);
+VE_API int32_t ve_grow_bitlocker_fs(int32_t fd, const uint8_t* password, int32_t password_len, int32_t* result_out);
+
+/* How large a hidden volume fits at the end of a standard VeraCrypt volume (read-only). Fills int64_t result_out[4]:
+ *     [0] outcome  0 ok, 1 wrong password, 2 unsupported file system (needs FAT / exFAT / NTFS), 4 I/O error,
+ *                  5 unreadable keyfile, 6 not a plain full-size standard volume
+ *     [1] file-system kind (as above, 1..5)   [2] cluster size in bytes   [3] largest hidden volume in bytes (0 = no room) */
+VE_API int32_t ve_hidden_analyze(int32_t fd, const uint8_t* password, int32_t password_len, int32_t pim,
+                                 int32_t cipher_id, int32_t hash_id, const int32_t* keyfile_fds,
+                                 int32_t keyfile_count, int64_t* result_out);
+
+/* Adds a hidden volume to the existing standard volume (VeraCrypt "direct mode"): the outer volume's own header and
+ * files are not touched. hidden_file_system: "FAT" | "exFAT" | "NTFS". hidden_password must differ from the outer one.
+ * *outcome_out: 0 created, 1 wrong outer password, 2 unsupported outer file system, 3 no room / size too large,
+ * 4 I/O error, 5 unreadable keyfile, 6 invalid (not a plain full-size standard volume, hidden password too long or
+ * equal to the outer one). */
+typedef struct ve_hidden_in_existing_params {
+    int32_t struct_size;               /* sizeof(ve_hidden_in_existing_params) */
+    int32_t fd;                        /* the standard volume's file, read/write; closed by the call */
+    const uint8_t* outer_password;
+    int32_t outer_password_len;
+    int32_t outer_pim;
+    int32_t outer_cipher_id;           /* 255 = auto-detect */
+    int32_t outer_hash_id;             /* 255 = auto-detect */
+    const int32_t* outer_keyfile_fds;  /* owned by the call */
+    int32_t outer_keyfile_count;
+    const uint8_t* hidden_password;
+    int32_t hidden_password_len;
+    int32_t hidden_pim;
+    const char* hidden_file_system;
+    int64_t hidden_size_bytes;
+    int32_t hidden_cipher_id;
+    int32_t hidden_hash_id;
+    const int32_t* hidden_keyfile_fds; /* owned by the call */
+    int32_t hidden_keyfile_count;
+    int32_t quick_format;
+    const uint8_t* user_entropy;       /* optional, mixed on top of the OS RNG */
+    int32_t user_entropy_len;
+} ve_hidden_in_existing_params;
+
+VE_API int32_t ve_hidden_create_in_existing(const ve_hidden_in_existing_params* params, int32_t* outcome_out);
 
 /* ---- archives -----------------------------------------------------------------------------------
  * Reads zip, 7z, rar, tar.*, iso and cpio archives, including split sets (name.7z.001, name.z01 + name.zip --

@@ -40,6 +40,7 @@ import 'desktop_storage.dart';
 import 'desktop_split_join.dart';
 import 'desktop_transfers.dart';
 import 'desktop_video_thumbnails.dart';
+import 'desktop_volume_tools.dart';
 import 'engine_worker_pool.dart';
 import 'mpv_frame_grabber.dart';
 import 've_native.dart';
@@ -95,6 +96,9 @@ class DesktopEngineHost {
     tempDir: Directory.systemTemp.path,
     withActivity: (body) => _withActivity<Object?>(body),
   );
+
+  /// Expand volume, grow the file system, hidden volume in an existing volume (see desktop_volume_tools.dart).
+  late final DesktopVolumeTools _volumeTools = DesktopVolumeTools(call: pool.call);
 
   /// Container splitter tool (see desktop_split_join.dart).
   late final DesktopSplitJoin _splitJoin = DesktopSplitJoin(emit: emit);
@@ -257,6 +261,22 @@ class DesktopEngineHost {
       case ChannelMethods.restoreFolderVaultConfig:
         await _repair.restoreFolderVaultConfig(args);
         return null;
+      case ChannelMethods.expandVeraCryptContainer:
+        return _volumeTools.expand(VolumeToolKind.veracrypt, args);
+      case ChannelMethods.expandLuksContainer:
+        return _volumeTools.expand(VolumeToolKind.luks, args);
+      case ChannelMethods.expandBitLockerContainer:
+        return _volumeTools.expand(VolumeToolKind.bitlocker, args);
+      case ChannelMethods.growVeraCryptFileSystem:
+        return _volumeTools.growFileSystem(VolumeToolKind.veracrypt, args);
+      case ChannelMethods.growLuksFileSystem:
+        return _volumeTools.growFileSystem(VolumeToolKind.luks, args);
+      case ChannelMethods.growBitLockerFileSystem:
+        return _volumeTools.growFileSystem(VolumeToolKind.bitlocker, args);
+      case ChannelMethods.analyzeHiddenVolumeHost:
+        return _volumeTools.analyzeHiddenHost(args);
+      case ChannelMethods.createHiddenVolumeInExisting:
+        return _volumeTools.createHiddenInExisting(args);
       case ChannelMethods.pickArchiveFile:
         return _archive.pickArchiveFile();
       case ChannelMethods.pickExtractFolder:

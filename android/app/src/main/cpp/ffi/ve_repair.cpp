@@ -10,6 +10,11 @@
 #include <cstring>
 #include <exception>
 #include <vector>
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 #include "../containers/container_repair.h"
 #include "../crypto/keyfile_mixing.h"
@@ -21,6 +26,17 @@ void clearBuf(ve_buffer* b) {
         b->data = nullptr;
         b->len = 0;
     }
+}
+
+// The container fd is owned by the engine too: a call refused before it reaches the engine closes it here, so the
+// caller never has a descriptor to track after any return.
+void closeFd(int32_t fd) {
+    if (fd < 0) return;
+#if defined(_WIN32)
+    _close(fd);
+#else
+    close(fd);
+#endif
 }
 
 // Keyfile fds are owned by the engine: close what a refused call never reached.
@@ -36,7 +52,10 @@ void putU32(std::vector<uint8_t>& out, uint32_t v) {
 }  // namespace
 
 extern "C" VE_API int32_t ve_repair_diagnose_file(int32_t fd, int32_t op_id, int32_t* code_out, int32_t* format_out) {
-    if (!code_out || !format_out) return VE_ERR_INVALID_ARG;
+    if (!code_out || !format_out) {
+        closeFd(fd);
+        return VE_ERR_INVALID_ARG;
+    }
     *code_out = 1;
     *format_out = -1;
     try {
@@ -62,7 +81,10 @@ extern "C" VE_API int32_t ve_repair_restore_luks2(int32_t fd, int32_t op_id) {
 extern "C" VE_API int32_t ve_repair_restore_veracrypt(int32_t fd, const uint8_t* password, int32_t password_len,
                                                       int32_t pim, int32_t cipher_id, int32_t hash_id, int32_t op_id,
                                                       int32_t* result_out) {
-    if (!result_out || password_len < 0 || (password_len > 0 && !password)) return VE_ERR_INVALID_ARG;
+    if (!result_out || password_len < 0 || (password_len > 0 && !password)) {
+        closeFd(fd);
+        return VE_ERR_INVALID_ARG;
+    }
     *result_out = static_cast<int32_t>(VeraCryptRestoreResult::kIoError);
     try {
         static const uint8_t kNone = 0;
@@ -97,7 +119,10 @@ extern "C" VE_API int32_t ve_repair_check_mounted(int32_t vol_id, int32_t op_id,
 }
 
 extern "C" VE_API int32_t ve_header_export(int32_t fd, int32_t op_id, ve_buffer* out) {
-    if (!out) return VE_ERR_INVALID_ARG;
+    if (!out) {
+        closeFd(fd);
+        return VE_ERR_INVALID_ARG;
+    }
     clearBuf(out);
     try {
         ContainerFormat format = ContainerFormat::kVeraCrypt;
@@ -126,11 +151,16 @@ extern "C" VE_API int32_t ve_header_restore(int32_t fd, int32_t format, const ui
                                             const uint8_t* password, int32_t password_len, int32_t pim,
                                             int32_t cipher_id, int32_t hash_id, int32_t op_id,
                                             const int32_t* keyfile_fds, int32_t keyfile_count, int32_t* result_out) {
-    if (!result_out) return VE_ERR_INVALID_ARG;
+    if (!result_out) {
+        closeAll(keyfile_fds, keyfile_count);
+        closeFd(fd);
+        return VE_ERR_INVALID_ARG;
+    }
     *result_out = static_cast<int32_t>(HeaderRestoreResult::kIoError);
     if (payload_len < 0 || (payload_len > 0 && !payload) || password_len < 0 || (password_len > 0 && !password) ||
         keyfile_count < 0 || (keyfile_count > 0 && !keyfile_fds)) {
         closeAll(keyfile_fds, keyfile_count);
+        closeFd(fd);
         return VE_ERR_INVALID_ARG;
     }
     try {
@@ -142,6 +172,7 @@ extern "C" VE_API int32_t ve_header_restore(int32_t fd, int32_t format, const ui
         if (mixedLen > 0) std::memcpy(mixed, password, mixedLen);
         if (keyfile_count > 0 &&
             !applyKeyfilesToPassword(keyfile_fds, keyfile_count, mixed, &mixedLen)) {
+            closeFd(fd);  // the engine never got the container, so it cannot close it
             return VE_OK;  // *result_out stays kIoError: a keyfile could not be read
         }
         *result_out = static_cast<int32_t>(restoreContainerHeaderRegion(

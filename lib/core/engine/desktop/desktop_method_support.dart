@@ -109,16 +109,6 @@ const Set<String> desktopAndroidOnlyMethods = {
 /// Methods that SHOULD work on desktop and are planned, grouped by the phase that delivers them.
 /// Each one answers `null` today; when a phase lands, move its methods out of this set.
 const Set<String> desktopPendingMethods = {
-  // Phase 1c -- container expansion and hidden volumes.
-  'analyzeHiddenVolumeHost',
-  'createHiddenVolumeInExisting',
-  'expandBitLockerContainer',
-  'expandLuksContainer',
-  'expandVeraCryptContainer',
-  'growBitLockerFileSystem',
-  'growLuksFileSystem',
-  'growVeraCryptFileSystem',
-
   // Phase 1d -- composite and split containers.
   'createCompositeContainer',
   'profileCarriers',

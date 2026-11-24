@@ -6,8 +6,12 @@
 //   create -> probe -> unlock -> mkdir/write/read/list/size/rename/copy/delete
 //   -> lock -> re-unlock (persistence) -> wrong password -> cancel path
 //
+// plus hidden volumes, password change, the container tools (expand, grow the file system, hidden volume in an
+// existing volume), folder vaults, crypto primitives, digests and the single-file tool.
+//
 // Usage: ve_smoke_test [filesystem ...]     (default: fat)
 //        e.g. ve_smoke_test fat exfat ntfs ext4
+//        ve_smoke_test tools | crypto | fv | chpw     (one section only)
 // Exit code 0 = every check passed.
 
 #include "ve_crypto_vectors.inc"
@@ -26,6 +30,7 @@
 #  include <io.h>
 #  include <windows.h>
 #else
+#  include <fcntl.h>
 #  include <unistd.h>
 #endif
 
@@ -1054,6 +1059,527 @@ static void runFolderVaults() {
 #endif
 }
 
+// ---- container tools: expand, grow the file system, hidden volume in an existing volume (Phase 1c) ----------
+// Drives ve_expand_* / ve_grow_*_fs / ve_hidden_*: the engine side of the Expand-volume and Add-hidden-volume
+// tools, over real containers. BitLocker cannot be created here, so for it only the refusal paths are covered
+// (the engine's own bl_expand / bl_disk_expand tests cover the layout work).
+
+static int64_t hostFileSize(const std::string& path) {
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return -1;
+#if defined(_WIN32)
+    _fseeki64(f, 0, SEEK_END);
+    const int64_t n = _ftelli64(f);
+#else
+    fseeko(f, 0, SEEK_END);
+    const int64_t n = static_cast<int64_t>(ftello(f));
+#endif
+    std::fclose(f);
+    return n;
+}
+
+// True when the descriptor number no longer refers to an open file (POSIX only; elsewhere assumed closed).
+static bool fdIsClosed(int fd) {
+#if defined(_WIN32)
+    (void)fd;
+    return true;
+#else
+    return fcntl(fd, F_GETFD) == -1;
+#endif
+}
+
+static bool makeContainer(const std::string& path, const char* password, int64_t size, const char* fs, int format,
+                          const std::vector<std::string>& keyfiles = {}) {
+    std::remove(path.c_str());
+    std::vector<int32_t> kf;
+    for (const auto& k : keyfiles) {
+        const int f = ve_open_file(k.c_str(), 0);
+        if (f < 0) return false;
+        kf.push_back(f);
+    }
+    const int fd = ve_create_file(path.c_str());
+    if (fd < 0) return false;
+    ve_create_params cp;
+    std::memset(&cp, 0, sizeof(cp));
+    cp.struct_size = sizeof(cp);
+    cp.fd = fd;
+    cp.password = reinterpret_cast<const uint8_t*>(password);
+    cp.password_len = static_cast<int32_t>(std::strlen(password));
+    cp.size_bytes = size;
+    cp.file_system = fs;
+    cp.container_format = format;
+    cp.cipher_id = cp.hash_id = format == 0 ? 255 : 0;  // LUKS creation takes concrete ids
+    cp.keyfile_fds = kf.empty() ? nullptr : kf.data();
+    cp.keyfile_count = static_cast<int32_t>(kf.size());
+    cp.quick_format = 1;
+    return ve_create_container(&cp) == VE_OK;
+}
+
+static int32_t unlockWithKeyfiles(const std::string& path, const char* password, int volId,
+                                  const std::vector<std::string>& keyfiles) {
+    std::vector<int32_t> kf;
+    for (const auto& k : keyfiles) {
+        const int f = ve_open_file(k.c_str(), 0);
+        if (f < 0) return -1000;
+        kf.push_back(f);
+    }
+    const int fd = ve_open_file(path.c_str(), 1);
+    if (fd < 0) return -1000;
+    ve_unlock_params p;
+    std::memset(&p, 0, sizeof(p));
+    p.struct_size = sizeof(p);
+    p.fd = fd;
+    p.password = reinterpret_cast<const uint8_t*>(password);
+    p.password_len = static_cast<int32_t>(std::strlen(password));
+    p.vol_id = volId;
+    p.cipher_id = p.hash_id = 255;
+    p.keyfile_fds = kf.empty() ? nullptr : kf.data();
+    p.keyfile_count = static_cast<int32_t>(kf.size());
+    return ve_unlock(&p);
+}
+
+struct ToolResult {
+    int32_t rc = -1000;       // the call's own return code
+    int32_t outcome = -1;     // result_out[0]
+    int32_t fsStep = -2;      // result_out[1]: -1 not run, else FsGrowStatus
+    int32_t fsKind = -1;      // result_out[2]
+};
+
+static ToolResult toolResultOf(int32_t rc, const int32_t* out) {
+    ToolResult r;
+    r.rc = rc;
+    r.outcome = out[0];
+    r.fsStep = out[1];
+    r.fsKind = out[2];
+    return r;
+}
+
+// Opens the keyfiles first, then the container (as the worker isolate does), and runs one tool call.
+template <typename Call>
+static ToolResult runTool(const std::string& path, const std::vector<std::string>& keyfiles, Call call) {
+    std::vector<int32_t> kf;
+    for (const auto& k : keyfiles) {
+        const int f = ve_open_file(k.c_str(), 0);
+        if (f < 0) {
+            for (int32_t x : kf) ve_close_fd(x);
+            return ToolResult{};
+        }
+        kf.push_back(f);
+    }
+    const int fd = ve_open_file(path.c_str(), 1);
+    if (fd < 0) {
+        for (int32_t x : kf) ve_close_fd(x);
+        return ToolResult{};
+    }
+    int32_t out[3] = {-9, -9, -9};
+    const int32_t rc = call(fd, kf.empty() ? nullptr : kf.data(), static_cast<int32_t>(kf.size()), out);
+    return toolResultOf(rc, out);
+}
+
+static ToolResult expandVc(const std::string& path, const char* pw, int64_t newSize, bool initFree, bool growFs,
+                           const std::vector<std::string>& keyfiles = {}) {
+    return runTool(path, keyfiles, [&](int fd, const int32_t* kf, int32_t kfCount, int32_t* out) {
+        return ve_expand_veracrypt(fd, (const uint8_t*)pw, (int32_t)std::strlen(pw), 0, 255, 255, kf, kfCount, newSize,
+                                   initFree ? 1 : 0, growFs ? 1 : 0, out);
+    });
+}
+
+static ToolResult growVc(const std::string& path, const char* pw, const std::vector<std::string>& keyfiles = {}) {
+    return runTool(path, keyfiles, [&](int fd, const int32_t* kf, int32_t kfCount, int32_t* out) {
+        return ve_grow_veracrypt_fs(fd, (const uint8_t*)pw, (int32_t)std::strlen(pw), 0, 255, 255, kf, kfCount, out);
+    });
+}
+
+static ToolResult expandLuks(const std::string& path, const char* pw, int64_t newSize, bool initFree, bool growFs) {
+    return runTool(path, {}, [&](int fd, const int32_t*, int32_t, int32_t* out) {
+        return ve_expand_luks(fd, (const uint8_t*)pw, (int32_t)std::strlen(pw), nullptr, 0, newSize, initFree ? 1 : 0,
+                              growFs ? 1 : 0, out);
+    });
+}
+
+static ToolResult growLuks(const std::string& path, const char* pw) {
+    return runTool(path, {}, [&](int fd, const int32_t*, int32_t, int32_t* out) {
+        return ve_grow_luks_fs(fd, (const uint8_t*)pw, (int32_t)std::strlen(pw), nullptr, 0, out);
+    });
+}
+
+static uint64_t spaceTotal(int vol) {
+    uint64_t total = 0, freeB = 0;
+    return ve_get_space_info(vol, &total, &freeB) == VE_OK ? total : 0;
+}
+
+// ExpandOutcome / FsGrowStatus values (ve_engine.h).
+enum { kOutOk = 0, kOutWrongPassword = 1, kOutNotExpandable = 2, kOutNotLarger = 3, kOutIoError = 4,
+       kOutInUse = 8, kOutNotBitLocker = 9 };
+enum { kFsGrown = 0, kFsAlreadyFills = 1, kFsUnsupported = 2, kFsNotRun = -1 };
+
+// [thorough] also runs the refusal paths (in use, wrong password, not larger); each wrong password costs a full
+// auto-detect key derivation, so the other file systems only repeat the success path.
+static void runExpandVeraCrypt(const char* fs, int expectedKind, bool canGrow, bool thorough) {
+    std::printf("== expand VeraCrypt (%s, 32 MiB -> 40 -> 48 MiB) ==\n", fs);
+    const std::string path = tempPath("ve_smoke_expand.hc");
+    const char* kPw = "expand me";
+    const int64_t kMiB = 1ll << 20;
+    CHECK(makeContainer(path, kPw, 32 * kMiB, fs, 0));
+
+    CHECK_RC(unlock(path, kPw, 0), VE_OK);
+    const std::string keep = "written before the expansion";
+    CHECK_RC(ve_write_file_chunk(0, "keep.txt", 0, (const uint8_t*)keep.data(), keep.size()), VE_OK);
+    const uint64_t total0 = spaceTotal(0);
+
+    // An unlocked container is never touched.
+    if (thorough) {
+        const ToolResult r = expandVc(path, kPw, 40 * kMiB, false, true);
+        CHECK(r.rc == VE_OK && r.outcome == kOutInUse);
+        CHECK(hostFileSize(path) == 32 * kMiB);
+        const ToolResult g = growVc(path, kPw);
+        CHECK(g.rc == VE_OK && g.outcome == kOutInUse);
+    }
+    ve_lock(0);
+
+    // Refusals leave the file exactly as it was.
+    if (thorough) {
+        const ToolResult wrong = expandVc(path, "wrong password", 40 * kMiB, false, true);
+        CHECK(wrong.rc == VE_OK && wrong.outcome == kOutWrongPassword && wrong.fsStep == kFsNotRun);
+        const ToolResult same = expandVc(path, kPw, 32 * kMiB, false, true);
+        CHECK(same.rc == VE_OK && same.outcome == kOutNotLarger);
+        const ToolResult smaller = expandVc(path, kPw, 16 * kMiB, false, true);
+        CHECK(smaller.rc == VE_OK && smaller.outcome == kOutNotLarger);
+        CHECK(hostFileSize(path) == 32 * kMiB);
+        CHECK_RC(unlock(path, kPw, 0), VE_OK);  // still opens
+        ve_lock(0);
+    }
+
+    // Expand and grow the file system in one go (new free space is encrypted zeroes).
+    {
+        const ToolResult r = expandVc(path, kPw, 40 * kMiB, true, true);
+        CHECK(r.rc == VE_OK && r.outcome == kOutOk);
+        CHECK(r.fsStep == (canGrow ? kFsGrown : kFsUnsupported));
+        CHECK(r.fsKind == expectedKind || (expectedKind == 3 && (r.fsKind == 1 || r.fsKind == 2 || r.fsKind == 3)));
+        CHECK(hostFileSize(path) == 40 * kMiB);
+        CHECK_RC(unlock(path, kPw, 0), VE_OK);
+        CHECK(readAll(0, "keep.txt") == keep);
+        if (canGrow) CHECK(spaceTotal(0) > total0);
+        const std::string after = "written after";
+        CHECK_RC(ve_write_file_chunk(0, "after.txt", 0, (const uint8_t*)after.data(), after.size()), VE_OK);
+        CHECK(readAll(0, "after.txt") == after);
+        ve_lock(0);
+    }
+
+    // Expand only; then grow the file system as a separate step (what "Grow file system only" does).
+    if (canGrow) {
+        CHECK_RC(unlock(path, kPw, 0), VE_OK);
+        const uint64_t before = spaceTotal(0);
+        ve_lock(0);
+        const ToolResult e = expandVc(path, kPw, 48 * kMiB, false, false);
+        CHECK(e.rc == VE_OK && e.outcome == kOutOk && e.fsStep == kFsNotRun);
+        CHECK(hostFileSize(path) == 48 * kMiB);
+        CHECK_RC(unlock(path, kPw, 0), VE_OK);
+        CHECK(spaceTotal(0) == before);  // the file system still ends where it did
+        ve_lock(0);
+
+        const ToolResult g = growVc(path, kPw);
+        CHECK(g.rc == VE_OK && g.outcome == kOutOk && g.fsStep == kFsGrown && g.fsKind == expectedKind);
+        CHECK_RC(unlock(path, kPw, 0), VE_OK);
+        CHECK(spaceTotal(0) > before);
+        CHECK(readAll(0, "keep.txt") == keep);
+        ve_lock(0);
+
+        const ToolResult again = growVc(path, kPw);
+        CHECK(again.rc == VE_OK && again.outcome == kOutOk && again.fsStep == kFsAlreadyFills);
+        if (thorough) {
+            const ToolResult wrong = growVc(path, "wrong password");
+            CHECK(wrong.rc == VE_OK && wrong.outcome == kOutWrongPassword);
+        }
+    }
+    std::remove(path.c_str());
+}
+
+// Keyfiles are mixed into the password: the call must accept them, refuse their absence, and close every fd.
+static void runExpandKeyfile() {
+    std::printf("== expand VeraCrypt with a keyfile ==\n");
+    const std::string path = tempPath("ve_smoke_expand_kf.hc");
+    const std::string keyfile = tempPath("ve_smoke_expand.key");
+    const char* kPw = "with keyfile";
+    const int64_t kMiB = 1ll << 20;
+    CHECK(writeHostFile(keyfile, seq(3, 300)));
+    CHECK(makeContainer(path, kPw, 8 * kMiB, "fat", 0, {keyfile}));
+
+    const ToolResult noKeyfile = expandVc(path, kPw, 12 * kMiB, false, false);
+    CHECK(noKeyfile.rc == VE_OK && noKeyfile.outcome == kOutWrongPassword);
+    CHECK(hostFileSize(path) == 8 * kMiB);
+
+    const ToolResult ok = expandVc(path, kPw, 12 * kMiB, false, false, {keyfile});
+    CHECK(ok.rc == VE_OK && ok.outcome == kOutOk);
+    CHECK(hostFileSize(path) == 12 * kMiB);
+    CHECK_RC(unlockWithKeyfiles(path, kPw, 0, {keyfile}), VE_OK);
+    ve_lock(0);
+    CHECK_RC(unlock(path, kPw, 0), VE_ERR_FAILED);  // the keyfile is still required
+
+    const ToolResult grow = growVc(path, kPw, {keyfile});
+    CHECK(grow.rc == VE_OK && grow.outcome == kOutOk && grow.fsStep == kFsUnsupported);  // FAT cannot grow in place
+    std::remove(path.c_str());
+    std::remove(keyfile.c_str());
+}
+
+static void runExpandLuks(int format, const char* fs, int expectedKind) {
+    std::printf("== expand LUKS%d (%s, 32 MiB -> 40 MiB) ==\n", format, fs);
+    const std::string path = tempPath("ve_smoke_expand_luks.img");
+    const char* kPw = "luks expand";
+    const int64_t kMiB = 1ll << 20;
+    CHECK(makeContainer(path, kPw, 32 * kMiB, fs, format));
+
+    CHECK_RC(unlock(path, kPw, 0), VE_OK);
+    const std::string keep = "luks data before";
+    CHECK_RC(ve_write_file_chunk(0, "keep.txt", 0, (const uint8_t*)keep.data(), keep.size()), VE_OK);
+    const uint64_t total0 = spaceTotal(0);
+    {
+        const ToolResult busy = expandLuks(path, kPw, 40 * kMiB, false, true);
+        CHECK(busy.rc == VE_OK && busy.outcome == kOutInUse);
+    }
+    ve_lock(0);
+
+    {
+        const ToolResult wrong = expandLuks(path, "wrong password", 40 * kMiB, false, true);
+        CHECK(wrong.rc == VE_OK && wrong.outcome == kOutWrongPassword);
+        const ToolResult smaller = expandLuks(path, kPw, 16 * kMiB, false, true);
+        CHECK(smaller.rc == VE_OK && smaller.outcome == kOutNotLarger);
+        CHECK(hostFileSize(path) == 32 * kMiB);
+    }
+    {
+        const ToolResult r = expandLuks(path, kPw, 40 * kMiB, true, true);
+        CHECK(r.rc == VE_OK && r.outcome == kOutOk && r.fsStep == kFsGrown && r.fsKind == expectedKind);
+        CHECK(hostFileSize(path) == 40 * kMiB);
+        CHECK_RC(unlock(path, kPw, 0), VE_OK);
+        CHECK(readAll(0, "keep.txt") == keep);
+        CHECK(spaceTotal(0) > total0);
+        ve_lock(0);
+        const ToolResult again = growLuks(path, kPw);
+        CHECK(again.rc == VE_OK && again.outcome == kOutOk && again.fsStep == kFsAlreadyFills);
+    }
+    // A VeraCrypt container is not LUKS (outcome 6) and a LUKS container is not VeraCrypt (wrong password).
+    {
+        const std::string vc = tempPath("ve_smoke_expand_notluks.hc");
+        CHECK(makeContainer(vc, kPw, 8 * kMiB, "fat", 0));
+        const ToolResult notLuks = expandLuks(vc, kPw, 12 * kMiB, false, false);
+        CHECK(notLuks.rc == VE_OK && notLuks.outcome == 6);
+        CHECK(hostFileSize(vc) == 8 * kMiB);
+        const ToolResult luksAsVc = expandVc(path, kPw, 48 * kMiB, false, false);
+        CHECK(luksAsVc.rc == VE_OK && luksAsVc.outcome == kOutWrongPassword);
+        std::remove(vc.c_str());
+    }
+    std::remove(path.c_str());
+}
+
+static void runHiddenInExisting() {
+    std::printf("== hidden volume in an existing volume (fat outer 16 MiB) ==\n");
+    const std::string path = tempPath("ve_smoke_hidden_direct.hc");
+    const char* kOuter = "outer password";
+    const char* kHidden = "hidden password";
+    const int64_t kMiB = 1ll << 20;
+    CHECK(makeContainer(path, kOuter, 16 * kMiB, "fat", 0));
+
+    CHECK_RC(unlock(path, kOuter, 0), VE_OK);
+    const std::string outerData = "outer data that must survive";
+    CHECK_RC(ve_write_file_chunk(0, "outer.txt", 0, (const uint8_t*)outerData.data(), outerData.size()), VE_OK);
+    ve_lock(0);
+
+    auto analyze = [&](const char* pw, int64_t out[4]) {
+        const int fd = ve_open_file(path.c_str(), 0);
+        if (fd < 0) return (int32_t)-1000;
+        return ve_hidden_analyze(fd, (const uint8_t*)pw, (int32_t)std::strlen(pw), 0, 255, 255, nullptr, 0, out);
+    };
+    auto create = [&](const char* outerPw, const char* hiddenPw, int64_t size, const char* fs, int32_t* outcome) {
+        const int fd = ve_open_file(path.c_str(), 1);
+        if (fd < 0) return (int32_t)-1000;
+        ve_hidden_in_existing_params p;
+        std::memset(&p, 0, sizeof(p));
+        p.struct_size = sizeof(p);
+        p.fd = fd;
+        p.outer_password = (const uint8_t*)outerPw;
+        p.outer_password_len = (int32_t)std::strlen(outerPw);
+        p.outer_cipher_id = p.outer_hash_id = 255;
+        p.hidden_password = (const uint8_t*)hiddenPw;
+        p.hidden_password_len = (int32_t)std::strlen(hiddenPw);
+        p.hidden_file_system = fs;
+        p.hidden_size_bytes = size;
+        p.hidden_cipher_id = p.hidden_hash_id = 0;
+        p.quick_format = 1;
+        return ve_hidden_create_in_existing(&p, outcome);
+    };
+
+    int64_t info[4] = {-1, -1, -1, -1};
+    CHECK_RC(analyze(kOuter, info), VE_OK);
+    std::printf("  analysis: outcome=%lld fsKind=%lld cluster=%lld max=%lld\n", (long long)info[0], (long long)info[1],
+                (long long)info[2], (long long)info[3]);
+    CHECK(info[0] == 0 && info[1] >= 1 && info[1] <= 3 && info[2] > 0);
+    const int64_t maxHidden = info[3];
+    CHECK(maxHidden >= 2 * kMiB && maxHidden < 16 * kMiB);
+    int64_t wrong[4] = {-1, -1, -1, -1};
+    CHECK_RC(analyze("not the password", wrong), VE_OK);
+    CHECK(wrong[0] == 1 && wrong[3] == 0);
+
+    int32_t outcome = -1;
+    CHECK_RC(create(kOuter, kHidden, maxHidden + (1 << 20), "FAT", &outcome), VE_OK);
+    CHECK(outcome == 3);  // no room
+    CHECK_RC(create(kOuter, kOuter, 2 * kMiB, "FAT", &outcome), VE_OK);
+    CHECK(outcome == 6);  // the same password could never be told apart
+    CHECK_RC(create("not the password", kHidden, 2 * kMiB, "FAT", &outcome), VE_OK);
+    CHECK(outcome == 1);
+    // None of the refusals touched the container.
+    CHECK_RC(unlock(path, kOuter, 0), VE_OK);
+    CHECK(readAll(0, "outer.txt") == outerData);
+    ve_lock(0);
+    CHECK_RC(unlock(path, kHidden, 0), VE_ERR_FAILED);
+
+    CHECK_RC(create(kOuter, kHidden, 2 * kMiB, "FAT", &outcome), VE_OK);
+    CHECK(outcome == 0);
+
+    CHECK_RC(unlock(path, kHidden, 0), VE_OK);  // the hidden volume opens with its own password...
+    CHECK(ve_get_file_size(0, "outer.txt") < 0);
+    const std::string hiddenData = "lives in the new hidden volume";
+    CHECK_RC(ve_write_file_chunk(0, "secret.txt", 0, (const uint8_t*)hiddenData.data(), hiddenData.size()), VE_OK);
+    ve_lock(0);
+    CHECK_RC(unlock(path, kOuter, 0), VE_OK);  // ...and the outer volume is exactly as it was
+    CHECK(readAll(0, "outer.txt") == outerData);
+    CHECK(ve_get_file_size(0, "secret.txt") < 0);
+    ve_lock(0);
+    CHECK_RC(unlock(path, kHidden, 0), VE_OK);
+    CHECK(readAll(0, "secret.txt") == hiddenData);
+    ve_lock(0);
+
+    // A volume that already holds a hidden volume is not a plain standard volume any more... but its outer header
+    // is unchanged, so the tool must not let a second one be stacked on top of the first.
+    {
+        const std::string keyfile = tempPath("ve_smoke_hidden_direct.key");
+        CHECK(writeHostFile(keyfile, seq(9, 200)));
+        const std::string kfPath = tempPath("ve_smoke_hidden_direct_kf.hc");
+        CHECK(makeContainer(kfPath, kOuter, 16 * kMiB, "fat", 0, {keyfile}));
+        const int fd = ve_open_file(kfPath.c_str(), 0);
+        const int kfd = ve_open_file(keyfile.c_str(), 0);
+        int64_t kfInfo[4] = {-1, -1, -1, -1};
+        const int32_t kfds[1] = {kfd};
+        CHECK_RC(ve_hidden_analyze(fd, (const uint8_t*)kOuter, (int32_t)std::strlen(kOuter), 0, 255, 255, kfds, 1, kfInfo),
+                 VE_OK);
+        CHECK(kfInfo[0] == 0 && kfInfo[3] > 0);  // keyfile-protected outer volume: the keyfile fd was accepted and closed
+        CHECK(fdIsClosed(fd) && fdIsClosed(kfd));
+        std::remove(kfPath.c_str());
+        std::remove(keyfile.c_str());
+    }
+    std::remove(path.c_str());
+}
+
+// Bad arguments: the call refuses, and still closes every descriptor it was given.
+static void runToolsInvalidArgs() {
+    std::printf("== container tools: invalid arguments and BitLocker refusals ==\n");
+    const std::string path = tempPath("ve_smoke_tools_args.hc");
+    const char* kPw = "args";
+    const int64_t kMiB = 1ll << 20;
+    CHECK(makeContainer(path, kPw, 8 * kMiB, "fat", 0));
+    int32_t out[3] = {0, 0, 0};
+    int64_t out4[4] = {0, 0, 0, 0};
+
+    {
+        const int fd = ve_open_file(path.c_str(), 1);
+        CHECK_RC(ve_expand_veracrypt(fd, nullptr, 5, 0, 255, 255, nullptr, 0, 12 * kMiB, 0, 0, out), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        const int fd = ve_open_file(path.c_str(), 1);
+        CHECK_RC(ve_expand_veracrypt(fd, (const uint8_t*)kPw, 4, 0, 255, 255, nullptr, 0, 12 * kMiB, 0, 0, nullptr),
+                 VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        const int fd = ve_open_file(path.c_str(), 1);
+        CHECK_RC(ve_expand_luks(fd, (const uint8_t*)kPw, 4, nullptr, 3, 12 * kMiB, 0, 0, out), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        const int fd = ve_open_file(path.c_str(), 0);
+        CHECK_RC(ve_hidden_analyze(fd, (const uint8_t*)kPw, -1, 0, 255, 255, nullptr, 0, out4), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    // The repair / header-backup calls hand the descriptor to the engine in the same way (ABI 11): a call refused
+    // before it reaches the engine still closes it.
+    {
+        const int fd = ve_open_file(path.c_str(), 0);
+        CHECK_RC(ve_repair_diagnose_file(fd, -1, nullptr, nullptr), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        const int fd = ve_open_file(path.c_str(), 0);
+        CHECK_RC(ve_header_export(fd, -1, nullptr), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        const int fd = ve_open_file(path.c_str(), 1);
+        CHECK_RC(ve_repair_restore_veracrypt(fd, nullptr, 3, 0, 255, 255, -1, out), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        const int fd = ve_open_file(path.c_str(), 1);
+        CHECK_RC(ve_header_restore(fd, 0, nullptr, -1, nullptr, 0, 0, 255, 255, -1, nullptr, 0, out), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        // a keyfile that cannot be read: the call reports it through the result, and the container is closed too
+        const int fd = ve_open_file(path.c_str(), 1);
+        const int badKeyfile = ve_open_file(path.c_str(), 0);
+        ve_close_fd(badKeyfile);  // an already-closed descriptor cannot be read
+        const int32_t kfds[1] = {badKeyfile};
+        const uint8_t payload[4] = {1, 2, 3, 4};
+        out[0] = -1;
+        CHECK_RC(ve_header_restore(fd, 0, payload, 4, nullptr, 0, 0, 255, 255, -1, kfds, 1, out), VE_OK);
+        CHECK(out[0] != 0);
+        CHECK(fdIsClosed(fd));
+    }
+    {
+        const int fd = ve_open_file(path.c_str(), 1);
+        ve_hidden_in_existing_params p;
+        std::memset(&p, 0, sizeof(p));
+        p.struct_size = sizeof(p);
+        p.fd = fd;
+        p.outer_password = (const uint8_t*)kPw;
+        p.outer_password_len = 4;
+        p.hidden_password = (const uint8_t*)"h";
+        p.hidden_password_len = 1;
+        p.hidden_file_system = "FAT";
+        p.hidden_size_bytes = 0;  // no size
+        int32_t outcome = -1;
+        CHECK_RC(ve_hidden_create_in_existing(&p, &outcome), VE_ERR_INVALID_ARG);
+        CHECK(fdIsClosed(fd));
+        CHECK_RC(ve_hidden_create_in_existing(nullptr, &outcome), VE_ERR_INVALID_ARG);
+        p.struct_size = 8;  // an old / foreign layout is refused without reading past it
+        CHECK_RC(ve_hidden_create_in_existing(&p, &outcome), VE_ERR_INVALID_ARG);
+    }
+
+    // BitLocker: a file that is not a BitLocker volume is reported as such and left alone.
+    {
+        const ToolResult r = runTool(path, {}, [&](int fd, const int32_t*, int32_t, int32_t* o) {
+            return ve_expand_bitlocker(fd, (const uint8_t*)kPw, 4, 12 * kMiB, 0, 1, o);
+        });
+        CHECK(r.rc == VE_OK && r.outcome == kOutNotBitLocker && r.fsStep == kFsNotRun);
+        const ToolResult g = runTool(path, {}, [&](int fd, const int32_t*, int32_t, int32_t* o) {
+            return ve_grow_bitlocker_fs(fd, (const uint8_t*)kPw, 4, o);
+        });
+        CHECK(g.rc == VE_OK && g.outcome == kOutNotBitLocker);
+        CHECK(hostFileSize(path) == 8 * kMiB);
+    }
+    std::remove(path.c_str());
+}
+
+static void runVolumeTools() {
+    runExpandVeraCrypt("ext4", 8, true, true);
+    runExpandVeraCrypt("ntfs", 5, true, false);
+    runExpandVeraCrypt("fat", 3, false, false);
+    runExpandKeyfile();
+    runExpandLuks(2, "ext4", 8);
+    runExpandLuks(1, "ntfs", 5);
+    runHiddenInExisting();
+    runToolsInvalidArgs();
+}
+
 int main(int argc, char** argv) {
     std::printf("ve abi %d, %d volume slots\n", ve_abi_version(), ve_max_volumes());
     CHECK(ve_abi_version() == VE_ABI_VERSION);
@@ -1068,6 +1594,12 @@ int main(int argc, char** argv) {
 
     if (argc == 2 && std::strcmp(argv[1], "fv") == 0) {  // fast path: folder vaults only
         runFolderVaults();
+        std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "tools") == 0) {  // fast path: expand / grow / hidden-in-existing only
+        runVolumeTools();
         std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
         return g_failures == 0 ? 0 : 1;
     }
@@ -1097,6 +1629,7 @@ int main(int argc, char** argv) {
     }
 
     runHidden();
+    runVolumeTools();
     runChangePassword(0, "fat", 8ll << 20);
     runChangePassword(1, "ext4", 16ll << 20);
     runFolderVaults();

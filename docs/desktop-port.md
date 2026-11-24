@@ -3,18 +3,40 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
-**Update for v1.66.0 (ABI 11).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
-library is at `VE_ABI_VERSION` 11 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls). Method coverage is now measured, not counted by hand:
+**Update for v1.66.0 (ABI 12).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
+library is at `VE_ABI_VERSION` 12 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls, ABI 12 the container tools: expand, grow the file system, hidden volume in an existing volume). Method coverage is now measured, not counted by hand:
 `test/core/engine/desktop/desktop_method_coverage_test.dart` diffs `ChannelMethods` against the host, the crypto
 handler, the Android-only defaults and the two explicit lists in `lib/core/engine/desktop/desktop_method_support.dart`
 (see "Engine-channel coverage" under "Not yet"). CI (`ci.yml`, job `desktop_engine_linux`) now builds the Linux engine,
 runs `ve_smoke_test` and `ve_mount_test`, and builds the Linux app.
 
+**Expand, grow and hidden volume in an existing volume (Phase 1c).** `ffi/ve_tools.cpp` exposes eight calls over the same
+`containers/container_create.cpp` / `container_expand_bitlocker.cpp` code Android's `container_lifecycle_bridge.cpp` calls:
+`ve_expand_veracrypt`, `ve_expand_luks`, `ve_expand_bitlocker`, `ve_grow_veracrypt_fs`, `ve_grow_luks_fs`,
+`ve_grow_bitlocker_fs`, `ve_hidden_analyze` and `ve_hidden_create_in_existing` (a params struct, like `ve_create`). The fd-taking
+calls close every descriptor they are given on every path, invalid-argument paths included (checked in the smoke test with
+`fcntl`); the worker isolate opens the container and the keyfiles itself, keyfiles first. Passwords cross as raw UTF-8 bytes and
+are wiped on every side. `DesktopVolumeTools` (`desktop_volume_tools.dart`) is what `VeraCryptToolsHandlers.kt` does around the
+native calls: argument validation, the outcome-to-error-code mapping with Android's messages (`PASSWORD_INCORRECT`,
+`NOT_EXPANDABLE`, `NOT_LARGER`, `KEYFILE_ERROR`, `NOT_LUKS`, `INVALID_HEADER`, `CONTAINER_IN_USE`, `NOT_BITLOCKER`,
+`DISK_UNSUPPORTED`, `PARTITION_UNSUPPORTED`, `UNSUPPORTED_FS`, `NO_SPACE`, `INVALID_VOLUME`, `IO_ERROR`) and the
+`fsStatus` / `fsName` result map. An unlocked container file is refused (`CONTAINER_IN_USE`) by file identity, not by path
+(`platform/file_identity.h`). Nothing here depends on mounting.
+Windows note: the CRT reports `st_ino` as 0, so the old `(st_dev, st_ino)` comparison would have called every file on one drive
+"the same file" and refused every expansion while any vault on that drive was unlocked; the Windows branch now asks the OS
+(`GetFileInformationByHandle`, `ve_win_same_file` in `ve_win_platform.cpp`) and fails closed. Tested by the "tools" section of
+`ve_smoke_test` (`./ve_smoke_test tools`: VeraCrypt expand + grow on ext4, NTFS and FAT, keyfile-only credential, LUKS1 and LUKS2,
+a hidden volume added to an existing volume and unlocked afterwards, refusal while unlocked, wrong password, not-larger,
+invalid arguments with descriptor-closing checks, BitLocker refusals) and `desktop_volume_tools_test.dart` (fake engine).
+Not exercised: the BitLocker *success* paths (no BitLocker fixture), containers over 2 GiB on Windows, the Windows file-identity
+call itself, and the Dart side (no Dart SDK where this was written; run `flutter test` and `flutter analyze`).
+
 **Check & Repair and header backup (Phase 1b).** `ffi/ve_repair.cpp` wraps `containers/container_repair.cpp` (diagnose and
 restore an unmounted container file, diagnose and check a mounted volume's file system, export and restore the header
 region) and `ffi/ve_foldervault.cpp` gains `ve_fv_check` / `ve_fv_repair` over `foldervault/fv_check.cpp` plus
 `ve_fv_config_file_name` / `ve_fv_validate_config`. The fd-taking calls close the descriptor they are given, exactly like
-the JNI layer; the worker isolate opens the files (so no descriptor crosses an isolate or leaks) and keyfile descriptors are
+the JNI layer (a call refused for bad arguments, or by an unreadable keyfile, closes the container descriptor too; the
+smoke test checks it); the worker isolate opens the files (so no descriptor crosses an isolate or leaks) and keyfile descriptors are
 opened before the target's. `DesktopRepair` (`desktop_repair.dart`) is what `RepairHandlers.kt`,
 `HeaderBackupHandlers.kt` and `FolderVaultChecker.kt` do around the native calls: argument mapping, the outcome-to-error-code
 mapping (`PASSWORD_INCORRECT`, `PASSWORD_REQUIRED`, `INVALID_VAULT`, `BACKUP_INVALID`, `SIZE_MISMATCH`,
@@ -350,12 +372,11 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 
 ## Not yet
 
-- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 142 of them (including the
+- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 150 of them (including the
   crypto primitives), gives 42 more an Android-only default (`_androidOnlyDefaults`), lists 66 as Android-only
   (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, USB, SAF, APK install, Jetpack PDF, ...)
-  and 31 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them:
-  expansion and hidden volumes, composite/split containers, AVIF, PDF, comic/EPUB, image probing, audio/video
-  editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
+  and 23 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them:
+  composite/split containers, AVIF, PDF, comic/EPUB, image probing, audio/video editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
   stays true; run it to see the current numbers. These counts cover the one engine channel only. Camera, Media3,
   picture-in-picture, brightness, panorama, disguise mode and the platform views use their own channels, which the
   desktop binding passes to Flutter (they throw `MissingPluginException` on desktop unless the Dart caller is guarded).
@@ -365,9 +386,6 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
   (`file_selector` dialogs), `writeBackFile` (the same `ve_import_file` call the import path uses), and explicit
   "unsupported" answers for the sensitive-clipboard pair (the Dart caller falls back to Flutter's clipboard) and
   `setKeepScreenOn`.
-- In-place growth (new in this main): `expandVeraCryptContainer`, `expandLuksContainer`, `growVeraCryptFileSystem`,
-  `growLuksFileSystem`. The engine already has `fsGrowToFit` (NTFS and ext2/3/4; FAT/exFAT report unsupported); it only needs
-  ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.
 - Windows: folder vaults on a real Windows machine (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
   MinGW, and re-running the engine smoke test after the rebase.
 - PDF, camera, video/audio editing -- need their

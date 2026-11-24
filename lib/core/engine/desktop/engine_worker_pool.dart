@@ -621,11 +621,199 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         );
         return [rc, record];
       }
+    // Container tools (ABI 12). Like the repair ops the worker opens the files itself and the engine closes every
+    // descriptor it is handed. Failures to open are reported as the tool outcomes they correspond to (container:
+    // 4 I/O error, keyfile: 5 unreadable keyfile) so the host maps them the way it maps an engine answer.
+    // toolExpand   [kind 0 VeraCrypt / 1 LUKS / 2 BitLocker, path, password, pim, cipherId, hashId, keyfilePaths,
+    //               newSizeBytes, initFreeSpace, growFileSystem] -> [rc, [outcome, fsStep, fsKind]]
+    case 'toolExpand':
+      {
+        final password = a[2] as Uint8List;
+        try {
+          final keyfileFds = _openKeyfiles(n, (a[6] as List).cast<String>());
+          if (keyfileFds == null) return [veErrFailed, _kToolKeyfileError];
+          final fd = n.openFile(a[1] as String, writable: true);
+          if (fd < 0) {
+            keyfileFds.forEach(n.closeFd);
+            return [veErrFailed, _kToolIoError];
+          }
+          if (a[0] == 2) {
+            // BitLocker takes no keyfile; release any the caller handed over rather than leave them open.
+            keyfileFds.forEach(n.closeFd);
+            keyfileFds.clear();
+          }
+          final (rc, result) = switch (a[0] as int) {
+            0 => n.expandVeracrypt(
+                fd: fd,
+                password: password,
+                pim: a[3] as int,
+                cipherId: a[4] as int,
+                hashId: a[5] as int,
+                keyfileFds: keyfileFds,
+                newSizeBytes: a[7] as int,
+                initFreeSpace: a[8] as bool,
+                growFileSystem: a[9] as bool,
+              ),
+            1 => n.expandLuks(
+                fd: fd,
+                password: password,
+                keyfileFds: keyfileFds,
+                newSizeBytes: a[7] as int,
+                initFreeSpace: a[8] as bool,
+                growFileSystem: a[9] as bool,
+              ),
+            2 => n.expandBitlocker(
+                fd: fd,
+                password: password,
+                newSizeBytes: a[7] as int,
+                initFreeSpace: a[8] as bool,
+                growFileSystem: a[9] as bool,
+              ),
+            _ => _closeAndRefuse(n, fd, keyfileFds),
+          };
+          return [rc, result];
+        } finally {
+          _wipe(password);
+        }
+      }
+    // toolGrowFs   [kind, path, password, pim, cipherId, hashId, keyfilePaths] -> [rc, [outcome, fsStep, fsKind]]
+    case 'toolGrowFs':
+      {
+        final password = a[2] as Uint8List;
+        try {
+          final keyfileFds = _openKeyfiles(n, (a[6] as List).cast<String>());
+          if (keyfileFds == null) return [veErrFailed, _kToolKeyfileError];
+          final fd = n.openFile(a[1] as String, writable: true);
+          if (fd < 0) {
+            keyfileFds.forEach(n.closeFd);
+            return [veErrFailed, _kToolIoError];
+          }
+          if (a[0] == 2) {
+            keyfileFds.forEach(n.closeFd);
+            keyfileFds.clear();
+          }
+          final (rc, result) = switch (a[0] as int) {
+            0 => n.growVeracryptFs(
+                fd: fd,
+                password: password,
+                pim: a[3] as int,
+                cipherId: a[4] as int,
+                hashId: a[5] as int,
+                keyfileFds: keyfileFds,
+              ),
+            1 => n.growLuksFs(fd: fd, password: password, keyfileFds: keyfileFds),
+            2 => n.growBitlockerFs(fd: fd, password: password),
+            _ => _closeAndRefuse(n, fd, keyfileFds),
+          };
+          return [rc, result];
+        } finally {
+          _wipe(password);
+        }
+      }
+    // toolHiddenAnalyze [path, password, pim, cipherId, hashId, keyfilePaths] -> [rc, [outcome, fsKind, cluster, maxHidden]]
+    case 'toolHiddenAnalyze':
+      {
+        final password = a[1] as Uint8List;
+        try {
+          final keyfileFds = _openKeyfiles(n, (a[5] as List).cast<String>());
+          if (keyfileFds == null) return [veErrFailed, _kToolAnalyzeKeyfileError];
+          final fd = n.openFile(a[0] as String); // analysis only reads
+          if (fd < 0) {
+            keyfileFds.forEach(n.closeFd);
+            return [veErrFailed, _kToolAnalyzeIoError];
+          }
+          final (rc, result) = n.hiddenAnalyze(
+            fd: fd,
+            password: password,
+            pim: a[2] as int,
+            cipherId: a[3] as int,
+            hashId: a[4] as int,
+            keyfileFds: keyfileFds,
+          );
+          return [rc, result];
+        } finally {
+          _wipe(password);
+        }
+      }
+    // toolHiddenCreate [path, outerPassword, outerPim, outerCipherId, outerHashId, outerKeyfilePaths, hiddenPassword,
+    //                   hiddenPim, hiddenFileSystem, hiddenSizeBytes, hiddenCipherId, hiddenHashId,
+    //                   hiddenKeyfilePaths, quickFormat, userEntropy?] -> [rc, outcome]
+    case 'toolHiddenCreate':
+      {
+        final outerPassword = a[1] as Uint8List;
+        final hiddenPassword = a[6] as Uint8List;
+        final userEntropy = a[14] as Uint8List?;
+        try {
+          final outerKeyfileFds = _openKeyfiles(n, (a[5] as List).cast<String>());
+          if (outerKeyfileFds == null) return [veErrFailed, 5];
+          final hiddenKeyfileFds = _openKeyfiles(n, (a[12] as List).cast<String>());
+          if (hiddenKeyfileFds == null) {
+            outerKeyfileFds.forEach(n.closeFd);
+            return [veErrFailed, 5];
+          }
+          final fd = n.openFile(a[0] as String, writable: true);
+          if (fd < 0) {
+            outerKeyfileFds.forEach(n.closeFd);
+            hiddenKeyfileFds.forEach(n.closeFd);
+            return [veErrFailed, 4];
+          }
+          final (rc, outcome) = n.hiddenCreateInExisting(
+            fd: fd,
+            outerPassword: outerPassword,
+            outerPim: a[2] as int,
+            outerCipherId: a[3] as int,
+            outerHashId: a[4] as int,
+            outerKeyfileFds: outerKeyfileFds,
+            hiddenPassword: hiddenPassword,
+            hiddenPim: a[7] as int,
+            hiddenFileSystem: a[8] as String,
+            hiddenSizeBytes: a[9] as int,
+            hiddenCipherId: a[10] as int,
+            hiddenHashId: a[11] as int,
+            hiddenKeyfileFds: hiddenKeyfileFds,
+            quickFormat: a[13] as bool,
+            userEntropy: userEntropy,
+          );
+          return [rc, outcome];
+        } finally {
+          _wipe(outerPassword);
+          _wipe(hiddenPassword);
+          _wipe(userEntropy);
+        }
+      }
     case 'opCancel':
       n.opCancel(a[0] as int);
       return null;
   }
   throw ArgumentError('unknown engine op: $op');
+}
+
+// Tool results for a file the worker could not open (ve_engine.h, "container tools": outcome 4 I/O error,
+// 5 unreadable keyfile; the analysis record is [outcome, fsKind, cluster size, largest hidden volume]).
+const List<int> _kToolIoError = [4, -1, 0];
+const List<int> _kToolKeyfileError = [5, -1, 0];
+const List<int> _kToolAnalyzeIoError = [4, 0, 0, 0];
+const List<int> _kToolAnalyzeKeyfileError = [5, 0, 0, 0];
+
+/// Opens every keyfile read-only. On the first failure the ones already open are closed and null comes back.
+List<int>? _openKeyfiles(VeNative n, List<String> paths) {
+  final fds = <int>[];
+  for (final path in paths) {
+    final fd = n.openFile(path);
+    if (fd < 0) {
+      fds.forEach(n.closeFd);
+      return null;
+    }
+    fds.add(fd);
+  }
+  return fds;
+}
+
+/// An expand / grow op whose kind the worker does not know: close what was opened, answer "invalid argument".
+(int, List<int>) _closeAndRefuse(VeNative n, int fd, List<int> keyfileFds) {
+  n.closeFd(fd);
+  keyfileFds.forEach(n.closeFd);
+  return (veErrInvalidArg, _kToolIoError);
 }
 
 /// Overwrites a secret's worker-side copy once the native call is done.

@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <vector>
 #include "platform/engine_log.h"
+#include "platform/file_identity.h"
 #include "mbedtls/platform_util.h"
 #include "container_format.h"
 #include "container_utils.h"
@@ -47,17 +48,15 @@ extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 // registered while the identity check and mutation are in progress.
 bool containerFileIsUnlocked(int fd) {
     if (fd < 0) return false;
-    struct stat candidate{};
-    if (fstat(fd, &candidate) != 0) return false;
     for (int i = 0; i < MAX_VOLUMES; ++i) {
         VolumeState& volume = volumes[i];
         std::shared_lock<std::shared_mutex> lock(volume.mutex);
         // Also catch an fd retained by an emergency purge / incomplete reset;
         // only VolumeState::reset() releases the backing descriptor.
         if (volume.fd < 0) continue;
-        struct stat active{};
-        if (fstat(volume.fd, &active) == 0 && active.st_dev == candidate.st_dev &&
-            active.st_ino == candidate.st_ino) return true;
+        // File identity (platform/file_identity.h): (st_dev, st_ino) on POSIX; on Windows st_ino is always 0, so
+        // the volume serial number + file index are used instead.
+        if (engineDescriptorsShareFile(volume.fd, fd)) return true;
     }
     return false;
 }

@@ -71,6 +71,7 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_navigati
 import 'package:vaultexplorer/features/browser/controllers/file_browser_operations_controller.dart';
 import 'package:vaultexplorer/data/models/vault_marks.dart';
 import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
+import 'package:vaultexplorer/features/browser/controllers/storage_root_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_paste_options_sheet.dart';
@@ -818,6 +819,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   // requested from the drawer waits for it. See _consumeBookmarkRequest.
   bool _initialLoadDone = false;
   ProviderSubscription<BookmarkNavigationRequest?>? _bookmarkRequestSub;
+  ProviderSubscription<StorageRootRequest?>? _storageRootRequestSub;
 
   bool get _atRoot => _nav.atRoot;
   String get _currentDirPath => _nav.currentDirPath;
@@ -1205,6 +1207,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if (next != null) _consumeBookmarkRequest();
       },
     );
+    _storageRootRequestSub = ref.listenManual<StorageRootRequest?>(
+      storageRootRequestsProvider,
+      (_, next) {
+        if (next != null) _consumeStorageRootRequest();
+      },
+    );
     _dropRevealSub = ref.listenManual<BrowserDropReveal?>(
       browserDropRevealProvider,
       (_, next) {
@@ -1231,6 +1239,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _music.removeListener(_onMusicChanged);
     _workspaceSubscription?.close();
     _bookmarkRequestSub?.close();
+    _storageRootRequestSub?.close();
     _dropRevealSub?.close();
     _pendingRevealExpiry?.cancel();
     _revealClearTimer?.cancel();
@@ -2898,6 +2907,19 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (request.revealName != null) _onFilterChosen(null);
     unawaited(_openBookmark(request.bookmark, revealName: request.revealName));
     return request.revealName != null;
+  }
+
+  /// Takes a "back to the root" the drawer asked for (a tap on the storage
+  /// this tab is already inside), if it is for this storage and this is the
+  /// tab in front. See [storageRootRequestsProvider].
+  void _consumeStorageRootRequest() {
+    if (_disposed || !mounted || !_initialLoadDone || !_isActiveTab) return;
+    final taken = ref
+        .read(storageRootRequestsProvider.notifier)
+        .take(widget.container.volId);
+    if (!taken) return;
+    _clearSearch();
+    _jumpTo(0);
   }
 
   /// Remembers where this folder was scrolled to, so walking forward into it

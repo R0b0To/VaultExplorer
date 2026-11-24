@@ -29,6 +29,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_relocation_flow.dart';
+import 'package:vaultexplorer/features/browser/controllers/storage_root_request.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
@@ -131,6 +132,13 @@ class AppNavigationDrawer extends ConsumerWidget {
   void _closeDrawer(BuildContext context) {
     if (docked) return;
     Navigator.pop(context);
+  }
+
+  /// A tap on the storage the browser is already inside: close the drawer and
+  /// take that browser back to the storage's root instead of doing nothing.
+  void _openCurrentStorageRoot(BuildContext context, WidgetRef ref, int volId) {
+    _closeDrawer(context);
+    ref.read(storageRootRequestsProvider.notifier).request(volId);
   }
 
   void _navigateToTab(BuildContext context, int tabIndex) {
@@ -712,8 +720,11 @@ class AppNavigationDrawer extends ConsumerWidget {
                             item: item,
                             isCurrent: isCurrent,
                             onTap: () {
+                              if (isCurrent) {
+                                _openCurrentStorageRoot(context, ref, volId!);
+                                return;
+                              }
                               _closeDrawer(context);
-                              if (isCurrent) return;
                               if (item is MountedVaultItem) {
                                 onSelectContainer?.call(item.container);
                               } else {
@@ -869,8 +880,15 @@ class AppNavigationDrawer extends ConsumerWidget {
                               })
                             : null,
                         onTap: () {
+                          final inLocalStorage =
+                              currentVolId != null &&
+                              (currentVolId == kDecoyLocalVolId ||
+                                  currentVolId == primary?.volId);
+                          if (inLocalStorage) {
+                            _openCurrentStorageRoot(context, ref, currentVolId!);
+                            return;
+                          }
                           _closeDrawer(context);
-                          if (currentVolId == kDecoyLocalVolId) return;
                           if (onOpenLocalStorage != null) {
                             onOpenLocalStorage!();
                           } else if (primary != null) {
@@ -971,7 +989,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               }),
                               onTap: () async {
                                 if (currentVolId == loc.volId) {
-                                  _closeDrawer(context);
+                                  _openCurrentStorageRoot(context, ref, loc.volId);
                                   return;
                                 }
                                 final container = buildExternalStorageContainer(

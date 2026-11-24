@@ -835,7 +835,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                   if (showStorageLocations)
                     DrawerGroup(children: [
                     // Keeps the drives' free space current while the list is on screen.
-                    if (PlatformFeatures.isDesktop) const _DriveListRefresher(),
+                    if (PlatformFeatures.isDesktop) const DriveListRefresher(),
                     Builder(
                       builder: (tileContext) => ContextMenuRegion(
                         onOpen: (onOpenInNewTab != null && primary != null)
@@ -956,7 +956,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                           loc.totalBytes != null) ...[
                                         const SizedBox(width: 8),
                                         Text(
-                                          _freeOfTotal(
+                                          driveFreeOfTotal(
                                             loc.freeBytes!,
                                             loc.totalBytes!,
                                           ),
@@ -968,7 +968,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                     ],
                                   ),
                                   if (loc.usedFraction != null)
-                                    _DriveUsageBar(fraction: loc.usedFraction!),
+                                    DriveUsageBar(fraction: loc.usedFraction!),
                                 ],
                               ),
                               onLongPress: touchOnlyLongPress(() {
@@ -1129,7 +1129,7 @@ class AppNavigationDrawer extends ConsumerWidget {
             // Tools and Settings are pinned to the bottom of the menu, outside
             // the scrolling list, so they are always visible: the same compact
             // icon strip whether the menu is docked or a modal drawer.
-            _ToolsStrip(
+            DrawerFooterStrip(
               toolsSelected: isTools,
               settingsSelected: isSettings,
               onTools: openTools,
@@ -1145,17 +1145,21 @@ class AppNavigationDrawer extends ConsumerWidget {
 
 /// Tools and Settings as two icon buttons along the bottom of the menu (docked
 /// sidebar or modal drawer). No divider above them: they continue the menu.
-class _ToolsStrip extends StatelessWidget {
-  const _ToolsStrip({
-    required this.toolsSelected,
-    required this.settingsSelected,
-    required this.onTools,
+///
+/// Shared with the decoy file manager's menu, which passes no [onTools] and so
+/// shows only the Settings button in the very same footer.
+class DrawerFooterStrip extends StatelessWidget {
+  const DrawerFooterStrip({
+    super.key,
+    this.toolsSelected = false,
+    this.settingsSelected = false,
+    this.onTools,
     required this.onSettings,
   });
 
   final bool toolsSelected;
   final bool settingsSelected;
-  final VoidCallback onTools;
+  final VoidCallback? onTools;
   final VoidCallback onSettings;
 
   @override
@@ -1201,13 +1205,15 @@ class _ToolsStrip extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              button(
-                Icons.build_rounded,
-                context.l10n.navBarToolsLabel,
-                toolsSelected,
-                onTools,
-              ),
-              const SizedBox(width: 16),
+              if (onTools != null) ...[
+                button(
+                  Icons.build_rounded,
+                  context.l10n.navBarToolsLabel,
+                  toolsSelected,
+                  onTools!,
+                ),
+                const SizedBox(width: 16),
+              ],
               button(
                 Icons.settings,
                 context.l10n.settingsMenuItem,
@@ -1440,7 +1446,7 @@ class _DrawerVaultRow extends ConsumerWidget {
 
 /// "171 / 999 GB": free space over total, with the unit written once when both
 /// use the same one.
-String _freeOfTotal(int free, int total) {
+String driveFreeOfTotal(int free, int total) {
   final f = formatBytes(free);
   final t = formatBytes(total);
   final fUnit = f.substring(f.lastIndexOf(' ') + 1);
@@ -1452,8 +1458,8 @@ String _freeOfTotal(int free, int total) {
 
 /// A thin bar showing how full a drive is; it turns to the error colour once
 /// the drive is nearly full.
-class _DriveUsageBar extends StatelessWidget {
-  const _DriveUsageBar({required this.fraction});
+class DriveUsageBar extends StatelessWidget {
+  const DriveUsageBar({required this.fraction});
 
   final double fraction;
 
@@ -1477,15 +1483,15 @@ class _DriveUsageBar extends StatelessWidget {
 
 /// Re-reads the drives (their free space changes as files are written) when the
 /// list first appears and every 30 seconds while it stays on screen.
-class _DriveListRefresher extends ConsumerStatefulWidget {
-  const _DriveListRefresher();
+class DriveListRefresher extends ConsumerStatefulWidget {
+  const DriveListRefresher();
 
   @override
-  ConsumerState<_DriveListRefresher> createState() =>
-      _DriveListRefresherState();
+  ConsumerState<DriveListRefresher> createState() =>
+      DriveListRefresherState();
 }
 
-class _DriveListRefresherState extends ConsumerState<_DriveListRefresher> {
+class DriveListRefresherState extends ConsumerState<DriveListRefresher> {
   Timer? _timer;
 
   @override

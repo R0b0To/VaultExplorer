@@ -91,6 +91,8 @@ struct IoContext {
     int64_t position = 0;
     // Total size for SEEK_END.
     uint64_t totalSize = 0;
+    // Reusable scratch buffer (guarded by VolumeState::ioBufMutex) for enlock().
+    std::vector<uint8_t> writeScratch;
 };
 
 // ── USB byte-level helpers (mirrors session_prepare.cpp's approach) ─────
@@ -120,6 +122,43 @@ bool usbWriteBytes(int volId, uint64_t byteOffset, const void* inData, size_t le
     return usbWriteSectors(volId, startSector, sectorCount, buf.data());
 }
 
+// ── Cached USB transfers ────────────────────────────────────────────────
+//
+// dislocker issues one virtual-I/O call per request, and each usbReadSectors/
+// usbWriteSectors is a full JNI + SCSI round trip. Going straight to the device
+// for every call (and, for writes, reading each sector back first) made
+// BitLocker-on-USB several times slower than VeraCrypt/LUKS/plain on the same
+// drive, which all go through the volume's UsbBlockCache (64 KB read-ahead,
+// 128 KB write combining). Sector-aligned transfers use that cache here too.
+// Anything not on a 512-byte boundary (rare: FVE metadata probing) keeps the
+// direct read-modify-write path, with the cache flushed around it so both
+// views of the device agree.
+
+bool usbCachedRead(int volId, uint64_t byteOffset, uint8_t* out, size_t len) {
+    if (len == 0) return true;
+    VolumeState& v = volumes[volId];
+    if (byteOffset % 512 == 0 && len % 512 == 0) {
+        return v.usbCache.read(volId, byteOffset, out, len);
+    }
+    // Pending buffered writes must reach the device before a direct read.
+    if (!v.usbCache.flush(volId)) return false;
+    return usbReadBytes(volId, byteOffset, out, len);
+}
+
+bool usbCachedWrite(int volId, uint64_t byteOffset, const uint8_t* in, size_t len) {
+    if (len == 0) return true;
+    VolumeState& v = volumes[volId];
+    if (byteOffset % 512 == 0 && len % 512 == 0) {
+        return v.usbCache.write(volId, byteOffset, in, len);
+    }
+    if (!v.usbCache.flush(volId)) return false;
+    const bool ok = usbWriteBytes(volId, byteOffset, in, len);
+    // The streams were just flushed; this only drops read-ahead chunks the
+    // direct write may have made stale.
+    v.usbCache.clear();
+    return ok;
+}
+
 // ── dis_virtual_io_t callback implementations ───────────────────────────
 
 ssize_t vioRead(void* user_data, uint8_t* buffer, size_t size) {
@@ -144,7 +183,7 @@ ssize_t vioRead(void* user_data, uint8_t* buffer, size_t size) {
     }
     // USB path
     const uint64_t absOffset = ctx->partitionStartSector * 512ULL + static_cast<uint64_t>(ctx->position);
-    if (!usbReadBytes(ctx->volId, absOffset, buffer, size)) return -1;
+    if (!usbCachedRead(ctx->volId, absOffset, buffer, size)) return -1;
     ctx->position += static_cast<int64_t>(size);
     return static_cast<ssize_t>(size);
 }
@@ -171,7 +210,7 @@ ssize_t vioWrite(void* user_data, const uint8_t* buffer, size_t size) {
     }
     // USB path
     const uint64_t absOffset = ctx->partitionStartSector * 512ULL + static_cast<uint64_t>(ctx->position);
-    if (!usbWriteBytes(ctx->volId, absOffset, buffer, size)) return -1;
+    if (!usbCachedWrite(ctx->volId, absOffset, buffer, size)) return -1;
     ctx->position += static_cast<int64_t>(size);
     return static_cast<ssize_t>(size);
 }
@@ -411,7 +450,7 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
         v.bitlockerIoCtx = static_cast<void*>(ioCtx);
     }
 
-    LOGI("prepareBitLockerSession(vol=%d): unlocked, partitionStartByte=%llu, volumeSize=%llu, readOnly=%d",
+     LOGI("prepareBitLockerSession(vol=%d): unlocked, partitionStartByte=%llu, volumeSize=%llu, readOnly=%d",
          volId, (unsigned long long)partitionStartByte, (unsigned long long)volumeSizeBytes, readOnly ? 1 : 0);
     return true;
 }
@@ -631,14 +670,25 @@ bool bitlockerWrite(int volumeId, uint64_t logicalOffset, const unsigned char* i
 
     std::lock_guard<std::mutex> lock(v.ioBufMutex);
     auto* ctx = static_cast<dis_context_t>(v.disContext);
+    auto* ioCtx = static_cast<IoContext*>(v.bitlockerIoCtx);
     // enlock() takes a non-const buffer because it encrypts in-place before
-    // writing. We must copy to honour our const-correct API.
+    // writing. Reuse writeScratch (guarded by ioBufMutex) to avoid per-write heap churn.
+    if (ioCtx) {
+        ioCtx->writeScratch.assign(inBuf, inBuf + byteCount);
+        const int ret = enlock(ctx, ioCtx->writeScratch.data(), static_cast<off_t>(logicalOffset), byteCount);
+        return ret == static_cast<int>(byteCount);
+    }
     std::vector<uint8_t> tmp(inBuf, inBuf + byteCount);
     const int ret = enlock(ctx, tmp.data(), static_cast<off_t>(logicalOffset), byteCount);
     return ret == static_cast<int>(byteCount);
 }
 
 void bitlockerCloseVolume(VolumeState& v) {
+    // Acknowledged USB writes may still sit in the write-combining cache.
+    if (v.bitlockerIoCtx) {
+        auto* io = static_cast<IoContext*>(v.bitlockerIoCtx);
+        if (io->kind == IoKind::kUsb) v.usbCache.flush(io->volId);
+    }
     if (v.disContext) {
         auto* ctx = static_cast<dis_context_t>(v.disContext);
         dis_destroy(ctx);

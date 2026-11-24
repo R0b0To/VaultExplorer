@@ -186,7 +186,7 @@ int read_decrypt_sectors(
 
 		arg.io_data       = io_data;
 
-		thread_decrypt(&arg);
+	thread_decrypt(&arg);
 	}
 #endif
 

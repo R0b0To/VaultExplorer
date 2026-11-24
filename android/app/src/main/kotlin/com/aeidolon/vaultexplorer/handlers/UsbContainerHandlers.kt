@@ -288,7 +288,7 @@ class UsbContainerHandlers(
                                 DocumentsContract.buildRootsUri(
                                     "com.aeidolon.vaultexplorer.documents"), null)
                         }
-                        val fmt = ContainerEngine.format(targetVolId).wireName
+                      val fmt = ContainerEngine.format(targetVolId).wireName
                         result.success(mapOf(
                             "volId" to targetVolId,
                             "files" to files.toList(),

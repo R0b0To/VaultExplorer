@@ -28,6 +28,20 @@ set(DISLOCKER_PATCHES ${CMAKE_CURRENT_SOURCE_DIR}/dislocker)
 # existing dislocker files (to route I/O through dis_virtual_io_t) and
 # add one new source file (virtual_io.c). Using file(COPY) during
 # configure means the patched versions are what actually get compiled.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    ${DISLOCKER_PATCHES}/common.c
+    ${DISLOCKER_PATCHES}/config.c
+    ${DISLOCKER_PATCHES}/dislocker.c
+    ${DISLOCKER_PATCHES}/sectors.c
+    ${DISLOCKER_PATCHES}/virtual_io.c
+    ${DISLOCKER_PATCHES}/encoding.c
+    ${DISLOCKER_PATCHES}/vmk_export.c
+    ${DISLOCKER_PATCHES}/common.h
+    ${DISLOCKER_PATCHES}/config.h
+    ${DISLOCKER_PATCHES}/config.priv.h
+    ${DISLOCKER_PATCHES}/virtual_io.h
+    ${DISLOCKER_PATCHES}/vmk_export.h
+)
 file(COPY ${DISLOCKER_PATCHES}/common.c    DESTINATION ${DISLOCKER_SRC})
 file(COPY ${DISLOCKER_PATCHES}/config.c    DESTINATION ${DISLOCKER_SRC})
 file(COPY ${DISLOCKER_PATCHES}/dislocker.c DESTINATION ${DISLOCKER_SRC})

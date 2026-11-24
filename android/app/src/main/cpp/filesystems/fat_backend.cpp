@@ -653,7 +653,9 @@ int32_t fatReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest
     FIL* f = reinterpret_cast<FIL*>(handle);
     auto& streams = v.openStreams;
     if (std::find(streams.begin(), streams.end(), f) == streams.end()) return -1;
-    f_lseek(f, static_cast<FSIZE_t>(offset));
+    if (f_tell(f) != static_cast<FSIZE_t>(offset)) {
+        if (f_lseek(f, static_cast<FSIZE_t>(offset)) != FR_OK) return -1;
+    }
     UINT br = 0;
     if (f_read(f, dest, static_cast<UINT>(length), &br) == FR_OK)
         return static_cast<int32_t>(br);

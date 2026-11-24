@@ -232,7 +232,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_readFileChunk(
     if (!requireActiveSession(volId, "readFileChunk")) {
         throwNotUnlocked(env, volId, "readFileChunk"); return nullptr;
     }
-    const char* targetName = env->GetStringUTFChars(fileName, nullptr);
+   const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyteArray retArray = nullptr;
     {
         std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
@@ -265,7 +265,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeFileChunk(
     if (isVolumeReadOnly(volId)) {
         throwReadOnly(env, volId, "writeFileChunk"); return JNI_FALSE;
     }
-    const char* targetName = env->GetStringUTFChars(fileName, nullptr);
+   const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyte* body = env->GetByteArrayElements(data, nullptr);
     bool success = false;
 
@@ -294,7 +294,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
     if (isVolumeReadOnly(volId)) {
         throwReadOnly(env, volId, "writeBackFile"); return JNI_FALSE;
     }
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
+     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
     bool success = false;
     {
@@ -445,7 +445,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
     if (isVolumeReadOnly(destVolId)) {
         throwReadOnly(env, destVolId, "copyFile"); return JNI_FALSE;
     }
-    const char* nativeSrc = env->GetStringUTFChars(srcPath, nullptr);
+      const char* nativeSrc = env->GetStringUTFChars(srcPath, nullptr);
     const char* nativeDest = env->GetStringUTFChars(destPath, nullptr);
     bool success = false;
     {

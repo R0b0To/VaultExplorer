@@ -10,11 +10,12 @@
 
 // Two-Stream Write-Combining Cache for USB Mass Storage:
 // - Coalesces data clusters into uninterrupted 128 KB bursts.
-// - Buffers FAT table/directory metadata updates separately so they never break the data burst.
+// - Buffers FAT table/directory metadata updates separately (2 slots so
+//   mirrored FAT1/FAT2 updates both coalesce) without breaking data bursts.
 // - Provides 64 KB read-ahead for fast folder browsing and smooth video playback.
 //
 // Coherence invariants (see io/test/usb_block_cache_test.cpp):
-//  1. The two write streams never overlap each other. A new write that only
+//  1. Buffered write streams never overlap each other. A new write that only
 //     partly overlaps a buffered stream drains that stream first; one fully
 //     inside a buffered stream is merged in place. Flush order between the
 //     streams therefore cannot reorder two writes to the same sector.
@@ -36,7 +37,8 @@ public:
 
     UsbBlockCache() {
         dataStream_.init(DATA_BURST_SECTORS);
-        metaStream_.init(META_BURST_SECTORS);
+        metaStreams_[0].init(META_BURST_SECTORS);
+        metaStreams_[1].init(META_BURST_SECTORS);
         readChunks_.resize(READ_CHUNK_COUNT);
         for (auto& c : readChunks_) {
             c.off = CHUNK_EMPTY;
@@ -56,8 +58,10 @@ public:
         if (dataStream_.overlaps(sector, count)) {
             if (!flushStreamLocked(volId, dataStream_)) return false;
         }
-        if (metaStream_.overlaps(sector, count)) {
-            if (!flushStreamLocked(volId, metaStream_)) return false;
+        for (int i = 0; i < 2; ++i) {
+            if (metaStreams_[i].overlaps(sector, count)) {
+                if (!flushStreamLocked(volId, metaStreams_[i])) return false;
+            }
         }
 
         // Streaming reads (>= 64 KB) bypass cache directly
@@ -100,14 +104,16 @@ public:
 
         invalidateReadCacheLocked(byteOffset, byteCount);
 
-        // 1. Large writes (>= 128 KB) bypass both buffers and stream straight to device
+        // 1. Large writes (>= 128 KB) bypass buffers and stream straight to device
         if (count >= dataStream_.maxSectors) {
             if (!flushStreamLocked(volId, dataStream_)) return false;
-            if (!flushStreamLocked(volId, metaStream_)) return false;
+            for (int i = 0; i < 2; ++i) {
+                if (!flushStreamLocked(volId, metaStreams_[i])) return false;
+            }
             return directWrite(volId, byteOffset, inBuf, byteCount);
         }
 
-        // Keep the streams disjoint (invariant 1). A write wholly inside a
+        // Keep all streams disjoint (invariant 1). A write wholly inside a
         // buffered stream replaces those bytes in place; one that only
         // partly overlaps a stream drains it first, so the data lands on the
         // device in write order whichever stream the new bytes go to.
@@ -115,15 +121,19 @@ public:
             dataStream_.updateInPlace(sector, count, inBuf);
             return true;
         }
-        if (metaStream_.contains(sector, count)) {
-            metaStream_.updateInPlace(sector, count, inBuf);
-            return true;
+        for (int i = 0; i < 2; ++i) {
+            if (metaStreams_[i].contains(sector, count)) {
+                metaStreams_[i].updateInPlace(sector, count, inBuf);
+                return true;
+            }
         }
         if (dataStream_.overlaps(sector, count)) {
             if (!flushStreamLocked(volId, dataStream_)) return false;
         }
-        if (metaStream_.overlaps(sector, count)) {
-            if (!flushStreamLocked(volId, metaStream_)) return false;
+        for (int i = 0; i < 2; ++i) {
+            if (metaStreams_[i].overlaps(sector, count)) {
+                if (!flushStreamLocked(volId, metaStreams_[i])) return false;
+            }
         }
 
         // 2. Extends current data stream: append without flushing
@@ -135,18 +145,31 @@ public:
             return true;
         }
 
-        // 3. Small metadata write (<= 4 sectors / 2 KB): route to metaStream_
-        // so it never breaks the contiguous dataStream_
+        // 3. Small metadata write (<= 4 sectors / 2 KB): route to metaStreams_
+        // so FAT1/FAT2 updates coalesce without breaking the contiguous dataStream_
         if (count <= 4) {
-            if (metaStream_.canAppend(sector, count)) {
-                metaStream_.append(sector, count, inBuf);
-                if (metaStream_.count == metaStream_.maxSectors) {
-                    return flushStreamLocked(volId, metaStream_);
+            for (int i = 0; i < 2; ++i) {
+                if (metaStreams_[i].canAppend(sector, count)) {
+                    metaStreams_[i].append(sector, count, inBuf);
+                    if (metaStreams_[i].count == metaStreams_[i].maxSectors) {
+                        return flushStreamLocked(volId, metaStreams_[i]);
+                    }
+                    return true;
                 }
-                return true;
             }
-            if (!flushStreamLocked(volId, metaStream_)) return false;
-            metaStream_.append(sector, count, inBuf);
+            int targetIdx = -1;
+            for (int i = 0; i < 2; ++i) {
+                if (!metaStreams_[i].active) {
+                    targetIdx = i;
+                    break;
+                }
+            }
+            if (targetIdx < 0) {
+                targetIdx = nextMetaEvict_;
+                nextMetaEvict_ ^= 1;
+                if (!flushStreamLocked(volId, metaStreams_[targetIdx])) return false;
+            }
+            metaStreams_[targetIdx].append(sector, count, inBuf);
             return true;
         }
 
@@ -159,8 +182,9 @@ public:
     bool flush(int volId) {
         std::lock_guard<std::mutex> lock(mutex_);
         bool ok1 = flushStreamLocked(volId, dataStream_);
-        bool ok2 = flushStreamLocked(volId, metaStream_);
-        return ok1 && ok2;
+        bool ok2 = flushStreamLocked(volId, metaStreams_[0]);
+        bool ok3 = flushStreamLocked(volId, metaStreams_[1]);
+        return ok1 && ok2 && ok3;
     }
 
     bool sync(int volId) {
@@ -171,7 +195,9 @@ public:
     void clear() {
         std::lock_guard<std::mutex> lock(mutex_);
         dataStream_.reset();
-        metaStream_.reset();
+        metaStreams_[0].reset();
+        metaStreams_[1].reset();
+        nextMetaEvict_ = 0;
         for (auto& c : readChunks_) {
             c.off = CHUNK_EMPTY;
         }
@@ -235,7 +261,8 @@ private:
 
     std::mutex mutex_;
     StreamBuffer dataStream_;
-    StreamBuffer metaStream_;
+    StreamBuffer metaStreams_[2];
+    int nextMetaEvict_ = 0;
     std::vector<ReadChunk> readChunks_;
     uint64_t clock_ = 0;
 

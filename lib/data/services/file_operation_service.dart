@@ -2702,7 +2702,7 @@ class FileOperationService extends ChangeNotifier {
         final totalMs = copyStopwatch.elapsedMilliseconds;
         final readMs = readMicros / 1000;
         final writeMs = writeMicros / 1000;
-        VeLog.d(
+      VeLog.d(
           'FileOperationService',
           'INTRA_VAULT_COPY dest=${VeLog.censorName(destPath.split('/').last)} '
               'chunks=$chunkCount chunkSize=$_chunkSize totalMs=$totalMs '

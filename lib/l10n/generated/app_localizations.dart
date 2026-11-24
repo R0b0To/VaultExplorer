@@ -72,7 +72,8 @@ import 'app_localizations_zh.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -80,7 +81,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -92,12 +94,13 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
@@ -112,7 +115,7 @@ abstract class AppLocalizations {
     Locale('pt'),
     Locale('tr'),
     Locale('uk'),
-    Locale('zh')
+    Locale('zh'),
   ];
 
   /// Settings toggle title for enabling or disabling VaultExplorer as an Android handler when a USB mass-storage device is connected
@@ -509,7 +512,13 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'This name is {length} {unit} long; {fsLabel} allows at most {maxLength} {unit} per {noun} name.'**
-  String validationNameTooLong(int length, String unit, String fsLabel, int maxLength, String noun);
+  String validationNameTooLong(
+    int length,
+    String unit,
+    String fsLabel,
+    int maxLength,
+    String noun,
+  );
 
   /// Validation error when the full joined path exceeds the filesystem's path length limit
   ///
@@ -527,7 +536,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'A {existingNoun} named \"{name}\" already exists here — it can\'t share a name with a {candidateNoun}.'**
-  String conflictCrossType(String existingNoun, String name, String candidateNoun);
+  String conflictCrossType(
+    String existingNoun,
+    String name,
+    String candidateNoun,
+  );
 
   /// Snackbar shown when trying to modify a read-only mounted container
   ///
@@ -8249,7 +8262,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{succeeded} of {total} files processed — {failed} failed'**
-  String singleFileCryptoPartialFailureMessage(Object succeeded, Object total, Object failed);
+  String singleFileCryptoPartialFailureMessage(
+    Object succeeded,
+    Object total,
+    Object failed,
+  );
 
   /// Button to open the multi-select file picker, adding to the current batch
   ///
@@ -8633,7 +8650,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Deleted {deleted}, but {failed} couldn\'t be deleted. Freed {size}.'**
-  String storageAnalyzerDeletePartial(String deleted, String failed, String size);
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  );
 
   /// Snackbar when none of the selected items could be deleted
   ///
@@ -9167,7 +9188,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Files scanned: {scanned} | Duplicates found: {groups} groups ({saved})'**
-  String duplicateFinderScanStatsLabel(Object scanned, Object groups, Object saved);
+  String duplicateFinderScanStatsLabel(
+    Object scanned,
+    Object groups,
+    Object saved,
+  );
 
   /// Summary card title showing how many duplicate groups were found
   ///
@@ -9191,7 +9216,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Group {groupIndex}: {size} ({count} copies found)'**
-  String duplicateFinderGroupTitleLabel(Object groupIndex, Object size, Object count);
+  String duplicateFinderGroupTitleLabel(
+    Object groupIndex,
+    Object size,
+    Object count,
+  );
 
   /// Subtitle of a duplicate group's expansion tile showing recoverable disk space
   ///
@@ -9617,7 +9646,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Not enough space on {side} — needs {required}, only {free} free.'**
-  String vaultSyncNotEnoughSpaceMessage(Object side, Object required, Object free);
+  String vaultSyncNotEnoughSpaceMessage(
+    Object side,
+    Object required,
+    Object free,
+  );
 
   /// Title of the dialog shown when removing the master password
   ///
@@ -12167,7 +12200,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Repair summary: {fixed} fixed, {recovered} recovered to /LOST+FOUND, {removed} cleaned up.'**
-  String repairFolderVaultSummary(Object fixed, Object recovered, Object removed);
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  );
 
   /// Button to trigger repair actions on an unhealthy folder vault
   ///
@@ -21854,7 +21891,8 @@ abstract class AppLocalizations {
   String get dateToModifiedNote;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -21863,35 +21901,58 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['ar', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pt', 'tr', 'uk', 'zh'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>[
+    'ar',
+    'de',
+    'en',
+    'es',
+    'fr',
+    'it',
+    'ja',
+    'ko',
+    'pt',
+    'tr',
+    'uk',
+    'zh',
+  ].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'ar': return AppLocalizationsAr();
-    case 'de': return AppLocalizationsDe();
-    case 'en': return AppLocalizationsEn();
-    case 'es': return AppLocalizationsEs();
-    case 'fr': return AppLocalizationsFr();
-    case 'it': return AppLocalizationsIt();
-    case 'ja': return AppLocalizationsJa();
-    case 'ko': return AppLocalizationsKo();
-    case 'pt': return AppLocalizationsPt();
-    case 'tr': return AppLocalizationsTr();
-    case 'uk': return AppLocalizationsUk();
-    case 'zh': return AppLocalizationsZh();
+    case 'ar':
+      return AppLocalizationsAr();
+    case 'de':
+      return AppLocalizationsDe();
+    case 'en':
+      return AppLocalizationsEn();
+    case 'es':
+      return AppLocalizationsEs();
+    case 'fr':
+      return AppLocalizationsFr();
+    case 'it':
+      return AppLocalizationsIt();
+    case 'ja':
+      return AppLocalizationsJa();
+    case 'ko':
+      return AppLocalizationsKo();
+    case 'pt':
+      return AppLocalizationsPt();
+    case 'tr':
+      return AppLocalizationsTr();
+    case 'uk':
+      return AppLocalizationsUk();
+    case 'zh':
+      return AppLocalizationsZh();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
+    'that was used.',
   );
 }

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <cstdlib>
@@ -274,10 +275,30 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     VolumeState& v = volumes[pdrv];
     const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
-    if (v.containerFormat == ContainerFormat::kBitLocker) {
-        const bool ok = bitlockerRead(pdrv, static_cast<uint64_t>(sector) * luksUnit,
-                                      buff, static_cast<size_t>(count) * luksUnit);
-        return ok ? RES_OK : RES_ERROR;
+  if (v.containerFormat == ContainerFormat::kBitLocker) {
+        constexpr size_t MAX_BL_BYTES_PER_BATCH = 4 * 1024 * 1024;
+        const uint32_t maxSectorsPerBatch = static_cast<uint32_t>(std::max<size_t>(1, MAX_BL_BYTES_PER_BATCH / luksUnit));
+        const auto batches = planSectorBatches(static_cast<uint32_t>(count), maxSectorsPerBatch);
+        for (const auto& batch : batches) {
+            const uint64_t batchStartSector = static_cast<uint64_t>(sector) + batch.startSector;
+            BYTE* curBuf = buff + static_cast<size_t>(batch.startSector) * luksUnit;
+            const uint64_t startByte = batchStartSector * luksUnit;
+            const size_t totalBytes = static_cast<size_t>(batch.count) * luksUnit;
+            {
+                std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+                if (v.decryptedBlockCache.getDirect(startByte, totalBytes, curBuf, 0, totalBytes)) {
+                    continue;
+                }
+            }
+            if (!bitlockerRead(pdrv, startByte, curBuf, totalBytes)) {
+                return RES_ERROR;
+            }
+            {
+                std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+                v.decryptedBlockCache.put(startByte, totalBytes, curBuf);
+            }
+        }
+        return RES_OK;
     }
 
     if (v.containerFormat == ContainerFormat::kPlain) {
@@ -378,9 +399,14 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     VolumeState& v = volumes[pdrv];
     const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
-    if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
-        const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * luksUnit,
-                                       buff, static_cast<size_t>(count) * luksUnit);
+     if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
+        const uint64_t startByte = static_cast<uint64_t>(sector) * luksUnit;
+        const size_t totalBytes = static_cast<size_t>(count) * luksUnit;
+        const bool ok = bitlockerWrite(pdrv, startByte, buff, totalBytes);
+        {
+            std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+            v.decryptedBlockCache.invalidateRange(startByte, totalBytes);
+        }
         return ok ? RES_OK : RES_ERROR;
     }
 
@@ -467,7 +493,7 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     auto& v = volumes[pdrv];
     const uint32_t sectorSize = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
-    switch (cmd) {
+     switch (cmd) {
         case CTRL_SYNC:
             // FatFs calls CTRL_SYNC from f_sync/f_close and trusts the result to mean
             // "everything written so far is durable". A failed USB flush/barrier, composite

@@ -35,9 +35,11 @@
 // for correctness are exactly the kind of thing worth testing without an
 // Android toolchain or real USB hardware in the loop.
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <list>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -51,7 +53,7 @@ public:
     // all (see put()), so one huge sequential read can't evict everything
     // else for a cache entry it will only ever hit once.
     explicit DecryptedBlockCache(size_t capacityBytes = 16 * 1024 * 1024)
-        : capacityBytes_(capacityBytes), currentBytes_(0) {}
+        : capacityBytes_(capacityBytes), currentBytes_(0), maxEntrySize_(0) {}
 
     // Returns true and fills `out` (exactly `length` bytes, caller-owned
     // buffer) if [physicalByteOffset, physicalByteOffset + length) is cached
@@ -100,14 +102,19 @@ public:
 
         while (currentBytes_ + length > capacityBytes_ && !lruOrder_.empty()) {
             const Entry& victim = lruOrder_.back();
+            const Key victimKey{victim.physicalByteOffset, victim.data.size()};
             currentBytes_ -= victim.data.size();
-            index_.erase(Key{victim.physicalByteOffset, victim.data.size()});
+            index_.erase(victimKey);
+            sortedIndex_.erase(victimKey);
             lruOrder_.pop_back();
         }
+        if (lruOrder_.empty()) maxEntrySize_ = 0;
 
+        maxEntrySize_ = std::max(maxEntrySize_, length);
         lruOrder_.push_front(Entry{physicalByteOffset,
                                     std::vector<unsigned char>(data, data + length)});
         index_[key] = lruOrder_.begin();
+        sortedIndex_[key] = lruOrder_.begin();
         currentBytes_ += length;
     }
 
@@ -117,25 +124,37 @@ public:
     // BEFORE any later disk_read can observe a stale cached plaintext range
     // for the same physical bytes.
     void invalidateRange(uint64_t firstByteOffset, uint64_t byteLength) {
-        const uint64_t writeEnd = firstByteOffset + byteLength;
-        for (auto it = lruOrder_.begin(); it != lruOrder_.end();) {
-            const uint64_t entryStart = it->physicalByteOffset;
-            const uint64_t entryEnd = entryStart + it->data.size();
-            const bool overlaps = entryStart < writeEnd && firstByteOffset < entryEnd;
-            if (overlaps) {
-                currentBytes_ -= it->data.size();
-                index_.erase(Key{entryStart, it->data.size()});
-                it = lruOrder_.erase(it);
+        if (lruOrder_.empty()) return;
+        const uint64_t writeEnd = (byteLength > UINT64_MAX - firstByteOffset)
+            ? UINT64_MAX : (firstByteOffset + byteLength);
+        const uint64_t lowerOffset = (maxEntrySize_ > 0 && firstByteOffset >= maxEntrySize_)
+            ? (firstByteOffset - maxEntrySize_ + 1) : 0;
+
+        for (auto it = sortedIndex_.lower_bound(Key{lowerOffset, 0});
+             it != sortedIndex_.end() && it->first.physicalByteOffset < writeEnd;) {
+            const auto listIt = it->second;
+            const uint64_t entryStart = listIt->physicalByteOffset;
+            const size_t entrySize = listIt->data.size();
+            const uint64_t entryEnd = (entrySize > UINT64_MAX - entryStart)
+                ? UINT64_MAX : (entryStart + entrySize);
+            if (entryStart < writeEnd && firstByteOffset < entryEnd) {
+                currentBytes_ -= entrySize;
+                index_.erase(it->first);
+                lruOrder_.erase(listIt);
+                it = sortedIndex_.erase(it);
             } else {
                 ++it;
             }
         }
+        if (lruOrder_.empty()) maxEntrySize_ = 0;
     }
 
     void clear() {
         lruOrder_.clear();
         index_.clear();
+        sortedIndex_.clear();
         currentBytes_ = 0;
+        maxEntrySize_ = 0;
     }
 
     size_t entryCount() const { return index_.size(); }
@@ -148,6 +167,12 @@ private:
         size_t length;
         bool operator==(const Key& o) const {
             return physicalByteOffset == o.physicalByteOffset && length == o.length;
+        }
+        bool operator<(const Key& o) const {
+            if (physicalByteOffset != o.physicalByteOffset) {
+                return physicalByteOffset < o.physicalByteOffset;
+            }
+            return length < o.length;
         }
     };
     struct KeyHash {
@@ -163,6 +188,8 @@ private:
 
     size_t capacityBytes_;
     size_t currentBytes_;
+    size_t maxEntrySize_;
     std::list<Entry> lruOrder_; // front = most-recent, back = least-recent
     std::unordered_map<Key, std::list<Entry>::iterator, KeyHash> index_;
+    std::map<Key, std::list<Entry>::iterator> sortedIndex_;
 };

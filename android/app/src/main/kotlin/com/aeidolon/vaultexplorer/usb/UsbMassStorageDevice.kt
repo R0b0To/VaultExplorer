@@ -49,7 +49,7 @@ class UsbMassStorageDevice private constructor(
     private var silentDevice = false      // INQUIRY and TEST UNIT READY both got no answer at all
 
     private val ioLock = Any()
-    // 128 KB per command is the proven maximum size for stable USB BOT transfers; re-derived from the
+   // 128 KB per command is the proven maximum size for stable USB BOT transfers; re-derived from the
     // real sector size once it is known (256 sectors @ 512 B, 32 @ 4 KiB).
     private var maxSectorsPerCommand: Int = INITIAL_MAX_SECTORS_PER_COMMAND
     private var minSectorsPerCommand: Int = MIN_SECTORS_PER_COMMAND
@@ -168,7 +168,7 @@ class UsbMassStorageDevice private constructor(
                             else "Failed to read USB device capacity [$detail]",
                         )
                     }
-                    VeLog.i(TAG) {
+                      VeLog.i(TAG) {
                         "open: ready device=${device.deviceName} sectorSize=${msd.sectorSize} " +
                             "sectorCount=${msd.sectorCount} totalCapacityBytes=${msd.sectorCount * msd.sectorSize} " +
                             "use16ByteCdb=${msd.use16ByteCdb} capacityTruncated=${msd.capacityTruncated} trace=${msd.openTrace}"
@@ -368,7 +368,7 @@ class UsbMassStorageDevice private constructor(
             )
         }
 
-        tag++
+      tag++
         val cbw = buildCbw(cdb, dataLen, dirIn)
         val cbwSent = connection.bulkTransfer(epOut, cbw, cbw.size, TIMEOUT_MS)
         if (cbwSent != cbw.size) {
@@ -849,7 +849,7 @@ class UsbMassStorageDevice private constructor(
             put(0.toByte())
         }.array()
 
-    fun close() {
+   fun close() {
         synchronized(ioLock) {
             connection.releaseInterface(intf)
             connection.close()

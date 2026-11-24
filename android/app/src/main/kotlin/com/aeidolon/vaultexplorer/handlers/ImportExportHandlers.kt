@@ -51,7 +51,7 @@ class ImportExportHandlers(
 ) {
     private data class ImportVerification(val path: String, val expectedSha256: ByteArray)
 
-    private data class ImportedItemReport(
+   private data class ImportedItemReport(
         val sourceName: String,
         val resolvedName: String,
         val isDir: Boolean,
@@ -419,7 +419,7 @@ class ImportExportHandlers(
                     ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
                     ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
                 }
-                val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
+                       val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
                 return try {
                     val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath, opId)
                     var written = 0
@@ -461,7 +461,7 @@ class ImportExportHandlers(
                     ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
                     ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
                 }
-                return try {
+               return try {
                     val target = File(dir, name)
                     if (target.exists()) target.delete()
                     val ok = ContainerFileSystem.extractToFile(volId, fatPath, target.absolutePath, opId)
@@ -647,7 +647,7 @@ class ImportExportHandlers(
      * duplicated control flow; each leaf-write body below is unchanged from
      * its original function.
      */
-    private sealed class ImportSource {
+   private sealed class ImportSource {
         abstract val name: String
         abstract val isDirectory: Boolean
         abstract val lastModifiedSeconds: Long
@@ -696,7 +696,7 @@ class ImportExportHandlers(
                         ContainerFileSystem.importStream(volId, targetFatPath, inp)
                     }
                 } else {
-                    var wroteDirectly = false
+                      var wroteDirectly = false
                     var pfd: android.os.ParcelFileDescriptor? = null
                     try {
                         pfd = activity.contentResolver.openFileDescriptor(doc.uri, "r")
@@ -784,7 +784,7 @@ class ImportExportHandlers(
                     // ImportProgressBridge.beginFileChunks. Without this,
                     // writeBackFile ran as one silent blocking call and the
                     // progress UI sat on a spinner for the file's entire transfer.
-                    ImportProgressBridge.reportProgress(
+                     ImportProgressBridge.reportProgress(
                         opId, doneCounter.get(), total, file.name,
                         counter.get(), totalBytes
                     )
@@ -822,7 +822,7 @@ class ImportExportHandlers(
         }
     }
 
-    /** Reads the committed vault file back and hashes its plaintext bytes. */
+     /** Reads the committed vault file back and hashes its plaintext bytes. */
     private fun sha256VaultFile(volId: Int, path: String): ByteArray {
         val parentPath = path.substringBeforeLast('/', "")
         val fileName = path.substringAfterLast('/')
@@ -840,16 +840,36 @@ class ImportExportHandlers(
 
         val digest = MessageDigest.getInstance("SHA-256")
         var offset = 0L
-        while (offset < size) {
-            val request = minOf(256 * 1024L, size - offset).toInt()
-            val chunk = ContainerFileSystem.readFileChunk(volId, path, offset, request)
-                ?: throw java.io.IOException("Imported file could not be verified")
-            if (chunk.isEmpty()) {
-                throw java.io.IOException("Imported file could not be verified")
+        // Note: check != 0L && != -1L (not > 0L) because ARM64 pointer-tagged handles can have the sign bit set.
+        val streamPtr = if (size > 0L) ContainerFileSystem.openStream(volId, path) else 0L
+        if (streamPtr != 0L && streamPtr != -1L) {
+            val buffer = ByteArray(1024 * 1024)
+            try {
+                while (offset < size) {
+                    val request = minOf(buffer.size.toLong(), size - offset).toInt()
+                    val read = ContainerFileSystem.readStream(volId, streamPtr, offset, buffer, request)
+                    if (read <= 0) {
+                        throw java.io.IOException("Imported file could not be verified")
+                    }
+                    digest.update(buffer, 0, read)
+                    offset += read
+                }
+            } finally {
+                buffer.fill(0)
+                ContainerFileSystem.closeStream(volId, streamPtr)
             }
-            digest.update(chunk)
-            offset += chunk.size
-            chunk.fill(0)
+        } else {
+            while (offset < size) {
+                val request = minOf(256 * 1024L, size - offset).toInt()
+                val chunk = ContainerFileSystem.readFileChunk(volId, path, offset, request)
+                    ?: throw java.io.IOException("Imported file could not be verified")
+                if (chunk.isEmpty()) {
+                    throw java.io.IOException("Imported file could not be verified")
+                }
+                digest.update(chunk)
+                offset += chunk.size
+                chunk.fill(0)
+            }
         }
         if (offset != size) throw java.io.IOException("Imported file could not be verified")
         return digest.digest()
@@ -1423,7 +1443,7 @@ class ImportExportHandlers(
                 }
                 val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                 val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
-                var successCount = 0
+                  var successCount = 0
                 val itemReports = mutableListOf<ImportedItemReport>()
                 val fsKind = FilesystemNameValidator.kindFor(picked.volId)
                 val destCaseSensitive = FilesystemNameValidator.destinationIsCaseSensitive(picked.volId)
@@ -1621,7 +1641,7 @@ class ImportExportHandlers(
                 }
                 val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                 val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
-                val destCaseSensitive = FilesystemNameValidator.destinationIsCaseSensitive(picked.volId)
+              val destCaseSensitive = FilesystemNameValidator.destinationIsCaseSensitive(picked.volId)
                 ContainerFileSystem.beginBatchWrite(picked.volId)
                 val count = try {
                     val src = if (picked.rawRoot != null) {

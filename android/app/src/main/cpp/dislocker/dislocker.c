@@ -640,20 +640,24 @@ int enlock(dis_context_t dis_ctx, uint8_t* buffer, off_t offset, size_t size)
 		return -ENOMEM;
 	}
 
-
-	if(!dis_ctx->io_data.decrypt_region(
-		&dis_ctx->io_data,
-		sector_count,
-		sector_size,
-		sector_start * sector_size,
-		buf
-	))
+	/* Skip read-modify-write when overwriting whole aligned sectors. */
+	const int full_sectors = ((offset % sector_size) == 0) && (((offset + (off_t)size) % sector_size) == 0);
+	if(!full_sectors)
 	{
-		free(buf);
-		dis_printf(L_ERROR, "Cannot decrypt sectors, abort.\n");
-		dis_printf(L_DEBUG,
-		       "-----------------------------------------------------------\n");
-		return -EIO;
+		if(!dis_ctx->io_data.decrypt_region(
+			&dis_ctx->io_data,
+			sector_count,
+			sector_size,
+			sector_start * sector_size,
+			buf
+		))
+		{
+			free(buf);
+			dis_printf(L_ERROR, "Cannot decrypt sectors, abort.\n");
+			dis_printf(L_DEBUG,
+			       "-----------------------------------------------------------\n");
+			return -EIO;
+		}
 	}
 
 

@@ -141,6 +141,12 @@ VE_API int32_t ve_fv_finish_write(int32_t, const char* path) {
     return VE_OK;
 }
 
+// The isolated fake-vault test does not link ffi/ve_engine.cpp. Simulate a
+// vault that cannot preserve modification times; extraction treats this as best-effort.
+VE_API int32_t ve_set_last_modified(int32_t, const char*, int64_t) {
+    return VE_ERR_UNSUPPORTED;
+}
+
 VE_API int32_t ve_delete_file(int32_t, const char* path) {
     const std::string p = normalize(path);
     V.unfinished.erase(p);

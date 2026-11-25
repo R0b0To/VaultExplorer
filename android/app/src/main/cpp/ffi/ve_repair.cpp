@@ -10,14 +10,10 @@
 #include <cstring>
 #include <exception>
 #include <vector>
-#if defined(_WIN32)
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
 
 #include "../containers/container_repair.h"
 #include "../crypto/keyfile_mixing.h"
+#include "ve_fd_util.h"
 
 namespace {
 
@@ -30,14 +26,7 @@ void clearBuf(ve_buffer* b) {
 
 // The container fd is owned by the engine too: a call refused before it reaches the engine closes it here, so the
 // caller never has a descriptor to track after any return.
-void closeFd(int32_t fd) {
-    if (fd < 0) return;
-#if defined(_WIN32)
-    _close(fd);
-#else
-    close(fd);
-#endif
-}
+using veffi::closeFd;
 
 // Keyfile fds are owned by the engine: close what a refused call never reached.
 void closeAll(const int32_t* fds, int32_t count) {

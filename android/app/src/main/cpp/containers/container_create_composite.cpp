@@ -94,6 +94,14 @@ CompositeCreateResult createCompositeContainer(
     LOGI("[Create] ENTER: volId=%d carriers=%zu extents=%zu fs=%s quickFormat=%d",
          volId, carriers.size(), extents.size(), fileSystem, quickFormat ? 1 : 0);
 
+    // The keyfile descriptors are owned by this call: applyKeyfilesToPassword() closes them when it runs, so every
+    // earlier refusal has to close them here or they leak (the callers never touch them again).
+    struct KeyfileFdGuard {
+        const int* fds;
+        int count;
+        ~KeyfileFdGuard() { if (fds) closeUnusedKeyfileFds(fds, count); }
+    } keyfileGuard{keyfileCount > 0 ? keyfileFds : nullptr, keyfileCount};
+
     if (volId < 0 || volId >= FF_VOLUMES) {
         return {false, "INVALID_VOLUME_ID", "Volume slot invalid", 0};
     }
@@ -169,6 +177,7 @@ CompositeCreateResult createCompositeContainer(
     std::memcpy(mixedPassword, password, mixedPasswordLen);
 
     if (keyfileCount > 0 && keyfileFds != nullptr) {
+        keyfileGuard.fds = nullptr;  // applyKeyfilesToPassword closes every descriptor, success or not
         if (!applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
             return {false, "KEYFILE_FAILED", "Failed to mix keyfiles", 0};
         }
@@ -378,6 +387,14 @@ CompositeUnlockResult prepareCompositeSession(
     int keyfileCount,
     bool readOnly
 ) {
+    // Same ownership rule as createCompositeContainer: close the keyfile descriptors on every return that comes
+    // before applyKeyfilesToPassword() takes them over.
+    struct KeyfileFdGuard {
+        const int* fds;
+        int count;
+        ~KeyfileFdGuard() { if (fds) closeUnusedKeyfileFds(fds, count); }
+    } keyfileGuard{keyfileCount > 0 ? keyfileFds : nullptr, keyfileCount};
+
     if (volId < 0 || volId >= FF_VOLUMES) return {false, "INVALID_VOLUME_ID"};
     clearUnlockCancellation(volId);
 
@@ -399,6 +416,7 @@ CompositeUnlockResult prepareCompositeSession(
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = std::min(passwordLen, sizeof(mixedPassword));
     std::memcpy(mixedPassword, password, mixedPasswordLen);
+    if (keyfileCount > 0) keyfileGuard.fds = nullptr;  // applyKeyfilesToPassword closes every descriptor
     if (keyfileCount > 0 && !applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
         return {false, "KEYFILE_FAILED"};
     }

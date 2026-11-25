@@ -26,6 +26,7 @@ import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 import 'desktop_archive.dart';
+import 'desktop_composite.dart';
 import 'desktop_crypto.dart';
 import 'desktop_external.dart';
 import 'desktop_hash.dart';
@@ -100,6 +101,21 @@ class DesktopEngineHost {
   /// Expand volume, grow the file system, hidden volume in an existing volume (see desktop_volume_tools.dart).
   late final DesktopVolumeTools _volumeTools = DesktopVolumeTools(call: pool.call);
 
+  /// Composite containers: one volume spread over several ordinary files (see desktop_composite.dart).
+  late final DesktopComposite _composite = DesktopComposite(
+    call: pool.call,
+    slotFor: _compositeSlot,
+    releaseSlot: _compositeBusy.remove,
+    register: (vol, key, displayName, format, readOnly, args) {
+      _volByUri[key] = vol;
+      _uriByVol[vol] = key;
+      _meta[vol] = _SessionMeta(displayName: displayName, format: format, readOnly: readOnly);
+      _exposeAfterUnlock(vol, key, args);
+    },
+    emit: emit,
+    withActivity: (body) => _withActivity<Object?>(body),
+  );
+
   /// Container splitter tool (see desktop_split_join.dart).
   late final DesktopSplitJoin _splitJoin = DesktopSplitJoin(emit: emit);
 
@@ -150,6 +166,8 @@ class DesktopEngineHost {
   final Map<String, int> _volByUri = {};
   final Map<int, String> _uriByVol = {};
   final Map<int, _SessionMeta> _meta = {};
+  /// Slots a composite create / unlock is working in right now, so two of them never pick the same free slot.
+  final Set<int> _compositeBusy = {};
   final Set<String> _warned = {};
   int? _maxVolumes;
 
@@ -277,6 +295,12 @@ class DesktopEngineHost {
         return _volumeTools.analyzeHiddenHost(args);
       case ChannelMethods.createHiddenVolumeInExisting:
         return _volumeTools.createHiddenInExisting(args);
+      case ChannelMethods.profileCarriers:
+        return _composite.profileCarriers(args);
+      case ChannelMethods.createCompositeContainer:
+        return _composite.create(args);
+      case ChannelMethods.unlockCompositeContainer:
+        return _composite.unlock(args);
       case ChannelMethods.pickArchiveFile:
         return _archive.pickArchiveFile();
       case ChannelMethods.pickExtractFolder:
@@ -1066,6 +1090,24 @@ class DesktopEngineHost {
 
   Future<int> _slotCount() async {
     return _maxVolumes ??= ((await pool.call('init') as Map)['maxVolumes'] as int);
+  }
+
+  /// The slot a composite call works in: [key]'s live session when there is one, else the first slot that is neither
+  /// in a session nor held by another composite call. The caller releases it through [_compositeBusy].
+  Future<int> _compositeSlot(String? key) async {
+    final slots = await _slotCount();
+    final live = key == null ? null : _volByUri[key];
+    if (live != null) {
+      _compositeBusy.add(live);
+      return live;
+    }
+    for (var i = 0; i < slots; i++) {
+      if (!_uriByVol.containsKey(i) && !_compositeBusy.contains(i)) {
+        _compositeBusy.add(i);
+        return i;
+      }
+    }
+    throw PlatformException(code: 'MAX_CONTAINERS', message: 'No free volume slots available');
   }
 
   Future<Object?> _unlock(Map<Object?, Object?> args) async {

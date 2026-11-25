@@ -1580,6 +1580,423 @@ static void runVolumeTools() {
     runToolsInvalidArgs();
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Composite containers (ABI 13): one VeraCrypt volume spread over several ordinary files.
+// ---------------------------------------------------------------------------------------------------------------------
+
+// Deterministic pseudo-random content (so every carrier's first 4 KiB differs, which is what orders them), with an
+// optional magic number on the front so the profiler sees a PNG / JPEG.
+static std::vector<uint8_t> carrierBytes(size_t size, uint64_t seed, const std::vector<uint8_t>& magic = {}) {
+    std::vector<uint8_t> v(size);
+    uint64_t s = seed * 0x9E3779B97F4A7C15ull + 1;
+    for (size_t i = 0; i < size; ++i) {
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        v[i] = static_cast<uint8_t>(s >> 24);
+    }
+    std::copy(magic.begin(), magic.end(), v.begin());
+    return v;
+}
+
+struct ProfileItem {
+    uint32_t fileIndex = 0, inputIndex = 0, tier = 0;
+    uint64_t fileSize = 0, payloadOffset = 0, allocatable = 0;
+    std::string format, path;
+};
+struct ProfileRec {
+    int32_t rc = -1000;
+    uint64_t total = 0;
+    std::vector<ProfileItem> items;
+    const ProfileItem* find(const std::string& path) const {
+        for (const auto& i : items) if (i.path == path) return &i;
+        return nullptr;
+    }
+};
+
+static std::vector<const char*> cstrs(const std::vector<std::string>& v) {
+    std::vector<const char*> out;
+    for (const auto& s : v) out.push_back(s.c_str());
+    return out;
+}
+
+static ProfileRec compositeProfile(const std::vector<std::string>& paths, int pct) {
+    ProfileRec rec;
+    ve_buffer out{};
+    const auto ptrs = cstrs(paths);
+    rec.rc = ve_composite_profile(ptrs.data(), static_cast<int32_t>(ptrs.size()), pct, &out);
+    if (rec.rc != VE_OK || !out.data) { ve_buffer_free(&out); return rec; }
+    size_t off = 0;
+    auto u32 = [&]() { uint32_t v = 0; for (int i = 0; i < 4; ++i) v |= static_cast<uint32_t>(out.data[off + i]) << (8 * i); off += 4; return v; };
+    auto u64 = [&]() { uint64_t v = 0; for (int i = 0; i < 8; ++i) v |= static_cast<uint64_t>(out.data[off + i]) << (8 * i); off += 8; return v; };
+    auto str = [&]() { const uint32_t n = u32(); std::string s(reinterpret_cast<const char*>(out.data) + off, n); off += n; return s; };
+    rec.total = u64();
+    const uint32_t count = u32();
+    for (uint32_t i = 0; i < count; ++i) {
+        ProfileItem it;
+        it.fileIndex = u32();
+        it.inputIndex = u32();
+        it.tier = u32();
+        it.fileSize = u64();
+        it.payloadOffset = u64();
+        it.allocatable = u64();
+        it.format = str();
+        it.path = str();
+        rec.items.push_back(it);
+    }
+    CHECK(off == out.len);  // the record is exactly what the header documents, nothing left over
+    ve_buffer_free(&out);
+    return rec;
+}
+
+struct CompositeOutcome {
+    int32_t rc = -1000;
+    std::string error;
+    std::vector<int> keyfileFds;  // what the call was handed: every one must be closed on return
+    bool keyfilesClosed() const {
+        for (int fd : keyfileFds) if (!fdIsClosed(fd)) return false;
+        return true;
+    }
+};
+
+static std::string takeText(ve_buffer& b) {
+    std::string s = b.data ? std::string(reinterpret_cast<const char*>(b.data), b.len) : std::string();
+    ve_buffer_free(&b);
+    return s;
+}
+
+static bool openKeyfiles(const std::vector<std::string>& keyfiles, std::vector<int>& fds) {
+    for (const auto& k : keyfiles) {
+        const int f = ve_open_file(k.c_str(), 0);
+        if (f < 0) return false;
+        fds.push_back(f);
+    }
+    return true;
+}
+
+static CompositeOutcome compositeCreate(const std::vector<std::string>& paths, int64_t requested, int pct,
+                                        const char* password, const std::vector<std::string>& keyfiles = {},
+                                        int volId = 2) {
+    CompositeOutcome r;
+    if (!openKeyfiles(keyfiles, r.keyfileFds)) return r;
+    const auto ptrs = cstrs(paths);
+    ve_composite_create_params p;
+    std::memset(&p, 0, sizeof(p));
+    p.struct_size = sizeof(p);
+    p.vol_id = volId;
+    p.carrier_paths = ptrs.data();
+    p.carrier_count = static_cast<int32_t>(ptrs.size());
+    p.requested_bytes = requested;
+    p.safety_margin_pct = pct;
+    p.password = reinterpret_cast<const uint8_t*>(password);
+    p.password_len = static_cast<int32_t>(std::strlen(password));
+    p.file_system = "fat";
+    p.cipher_id = p.hash_id = 255;
+    p.keyfile_fds = r.keyfileFds.empty() ? nullptr : reinterpret_cast<const int32_t*>(r.keyfileFds.data());
+    p.keyfile_count = static_cast<int32_t>(r.keyfileFds.size());
+    p.quick_format = 1;
+    ve_buffer err{};
+    r.rc = ve_composite_create(&p, &err);
+    r.error = takeText(err);
+    return r;
+}
+
+static CompositeOutcome compositeUnlock(const std::vector<std::string>& paths, const char* password,
+                                        const std::vector<std::string>& keyfiles = {}, int volId = 3,
+                                        bool readOnly = false) {
+    CompositeOutcome r;
+    if (!openKeyfiles(keyfiles, r.keyfileFds)) return r;
+    const auto ptrs = cstrs(paths);
+    ve_composite_unlock_params p;
+    std::memset(&p, 0, sizeof(p));
+    p.struct_size = sizeof(p);
+    p.vol_id = volId;
+    p.carrier_paths = ptrs.data();
+    p.carrier_count = static_cast<int32_t>(ptrs.size());
+    p.password = reinterpret_cast<const uint8_t*>(password);
+    p.password_len = static_cast<int32_t>(std::strlen(password));
+    p.cipher_id = p.hash_id = 255;
+    p.keyfile_fds = r.keyfileFds.empty() ? nullptr : reinterpret_cast<const int32_t*>(r.keyfileFds.data());
+    p.keyfile_count = static_cast<int32_t>(r.keyfileFds.size());
+    p.read_only = readOnly ? 1 : 0;
+    ve_buffer err{};
+    r.rc = ve_composite_unlock(&p, &err);
+    r.error = takeText(err);
+    return r;
+}
+
+static bool slotIsEmpty(int vol) {
+    uint64_t total = 0, freeB = 0;
+    return ve_get_space_info(vol, &total, &freeB) != VE_OK;
+}
+
+static void runComposite() {
+    std::printf("== composite containers ==\n");
+    const char* kPw = "composite vault pass";
+    const std::string a = tempPath("ve_smoke_comp_a.bin");
+    const std::string b = tempPath("ve_smoke_comp_b.png");
+    const std::string c = tempPath("ve_smoke_comp_c.jpg");
+    const std::string plain = tempPath("ve_smoke_comp_plain.bin");
+    const std::string zipLike = tempPath("ve_smoke_comp_x.zip");
+    const std::vector<uint8_t> origA = carrierBytes(6u << 20, 1);
+    const std::vector<uint8_t> origB = carrierBytes(8u << 20, 2, {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A});
+    const std::vector<uint8_t> origC = carrierBytes(6u << 20, 3, {0xFF, 0xD8, 0xFF, 0xE0});
+    const std::vector<uint8_t> origPlain = carrierBytes(1u << 20, 4);
+    CHECK(writeHostFile(a, origA) && writeHostFile(b, origB) && writeHostFile(c, origC));
+    CHECK(writeHostFile(plain, origPlain));
+    CHECK(writeHostFile(zipLike, carrierBytes(64u << 10, 5, {'P', 'K', 3, 4})));
+
+    // ---- profile: sizes the carriers, never writes ----
+    const std::vector<std::string> order1 = {b, a, c};
+    const ProfileRec prof = compositeProfile(order1, 50);
+    CHECK_RC(prof.rc, VE_OK);
+    CHECK(prof.items.size() == 3);
+    {
+        uint64_t sum = 0;
+        std::vector<bool> seenInput(3, false);
+        for (const auto& it : prof.items) {
+            sum += it.allocatable;
+            if (it.inputIndex < 3) seenInput[it.inputIndex] = true;
+            CHECK(it.payloadOffset == it.fileSize);  // generic / PNG / JPEG: appended after the content
+            CHECK(it.allocatable % 512 == 0);
+        }
+        CHECK(sum == prof.total);
+        CHECK(seenInput[0] && seenInput[1] && seenInput[2]);  // inputIndex = the position in the caller's list
+        CHECK(prof.total == (3u + 4u + 3u) * (1ull << 20));   // 50 % of 6 + 8 + 6 MiB
+        const ProfileItem* ia = prof.find(a);
+        const ProfileItem* ib = prof.find(b);
+        const ProfileItem* ic = prof.find(c);
+        CHECK(ia && ib && ic);
+        if (ia && ib && ic) {
+            CHECK(ia->format == "generic" && ia->tier == 2);
+            CHECK(ib->format == "png" && ib->tier == 0);
+            CHECK(ic->format == "jpeg" && ic->tier == 1);
+            CHECK(ib->inputIndex == 0 && ia->inputIndex == 1 && ic->inputIndex == 2);
+        }
+    }
+    CHECK(readHostFile(a) == origA && readHostFile(b) == origB && readHostFile(c) == origC);  // untouched
+    {
+        const ProfileRec zip = compositeProfile({zipLike}, 50);  // archives are refused as carriers
+        CHECK_RC(zip.rc, VE_OK);
+        CHECK(zip.items.size() == 1 && zip.items[0].format == "archive_unsupported" && zip.total == 0);
+    }
+    {
+        ve_buffer out{};
+        const char* one[] = {a.c_str()};
+        const char* withEmpty[] = {a.c_str(), ""};
+        CHECK_RC(ve_composite_profile(nullptr, 1, 10, &out), VE_ERR_INVALID_ARG);
+        CHECK_RC(ve_composite_profile(one, 0, 10, &out), VE_ERR_INVALID_ARG);
+        CHECK_RC(ve_composite_profile(withEmpty, 2, 10, &out), VE_ERR_INVALID_ARG);
+        CHECK_RC(ve_composite_profile(one, 1, 10, nullptr), VE_ERR_INVALID_ARG);
+    }
+
+    // ---- create: refusals leave every carrier untouched ----
+    {
+        CompositeOutcome r = compositeCreate(order1, static_cast<int64_t>(prof.total) + 512, 50, kPw);
+        CHECK_RC(r.rc, VE_ERR_FAILED);
+        CHECK(r.error == "CARRIER_CAPACITY_CHANGED");
+        r = compositeCreate(order1, 0, 50, std::string(129, 'x').c_str());
+        CHECK_RC(r.rc, VE_ERR_FAILED);
+        CHECK(r.error == "PASSWORD_TOO_LONG");
+        CHECK(readHostFile(a) == origA && readHostFile(b) == origB && readHostFile(c) == origC);
+
+        // too small to hold a volume, with a keyfile handed over: refused, nothing written, keyfile closed
+        const std::string tiny1 = tempPath("ve_smoke_comp_tiny1.bin");
+        const std::string tiny2 = tempPath("ve_smoke_comp_tiny2.bin");
+        const std::string kf = tempPath("ve_smoke_comp_tiny.key");
+        const std::vector<uint8_t> t1 = carrierBytes(100u << 10, 6), t2 = carrierBytes(100u << 10, 7);
+        CHECK(writeHostFile(tiny1, t1) && writeHostFile(tiny2, t2) && writeHostFile(kf, carrierBytes(64, 8)));
+        r = compositeCreate({tiny1, tiny2}, 0, 50, kPw, {kf});
+        CHECK_RC(r.rc, VE_ERR_FAILED);
+        CHECK(r.error == "SIZE_TOO_SMALL");
+        CHECK(r.keyfilesClosed());
+        CHECK(readHostFile(tiny1) == t1 && readHostFile(tiny2) == t2);
+        std::remove(tiny1.c_str());
+        std::remove(tiny2.c_str());
+        std::remove(kf.c_str());
+    }
+
+    // ---- create: the real thing ----
+    {
+        const CompositeOutcome r = compositeCreate(order1, static_cast<int64_t>(prof.total), 50, kPw);
+        CHECK_RC(r.rc, VE_OK);
+        CHECK(r.error.empty());
+        CHECK(slotIsEmpty(2));  // the formatting slot is left empty, not unlocked
+        for (const auto& [path, orig] : {std::pair<std::string, const std::vector<uint8_t>*>{a, &origA},
+                                         {b, &origB}, {c, &origC}}) {
+            const std::vector<uint8_t> now = readHostFile(path);
+            CHECK(now.size() > orig->size());  // grew by its share
+            CHECK(std::equal(orig->begin(), orig->end(), now.begin()));  // the host content is exactly as it was
+        }
+    }
+
+    // ---- unlock: failures ----
+    CHECK(slotIsEmpty(3));
+    {
+        CompositeOutcome r = compositeUnlock(order1, "definitely wrong");
+        CHECK_RC(r.rc, VE_ERR_FAILED);
+        CHECK(r.error == "INCORRECT_PASSWORD_OR_INVALID_CONTAINER");
+        CHECK(slotIsEmpty(3));
+
+        // a file that never carried a share: nothing to find, so no key derivation either
+        const std::string kf = tempPath("ve_smoke_comp_nf.key");
+        CHECK(writeHostFile(kf, carrierBytes(64, 9)));
+        r = compositeUnlock({plain}, kPw, {kf});
+        CHECK_RC(r.rc, VE_ERR_FAILED);
+        CHECK(r.error == "NO_EXTENTS_DETECTED");
+        CHECK(r.keyfilesClosed());
+        CHECK(readHostFile(plain) == origPlain);
+        std::remove(kf.c_str());
+
+        // a carrier missing from the set
+        r = compositeUnlock({a, b}, kPw);
+        std::printf("  missing carrier: rc=%d %s\n", r.rc, r.error.c_str());
+        CHECK_RC(r.rc, VE_ERR_FAILED);
+        CHECK(!r.error.empty());
+        CHECK(slotIsEmpty(3));
+    }
+
+    // ---- unlock in a different order each time: files written in one session are there in the next ----
+    const std::string hello = "hello from a composite vault";
+    const std::vector<uint8_t> big = carrierBytes(1u << 20, 10);
+    {
+        const CompositeOutcome r = compositeUnlock({c, b, a}, kPw);
+        CHECK_RC(r.rc, VE_OK);
+        CHECK(ve_get_container_format(3) == 0);
+        CHECK(ve_get_matched_cipher_id(3) >= 0 && ve_get_matched_hash_id(3) >= 0);
+        uint64_t total = 0, freeB = 0;
+        CHECK_RC(ve_get_space_info(3, &total, &freeB), VE_OK);
+        CHECK(total > 0 && freeB > 0);
+        CHECK_RC(ve_create_directory(3, "/docs"), VE_OK);
+        CHECK_RC(ve_write_file_chunk(3, "/docs/hello.txt", 0, reinterpret_cast<const uint8_t*>(hello.data()), hello.size()), VE_OK);
+        CHECK_RC(ve_write_file_chunk(3, "/docs/big.bin", 0, big.data(), big.size()), VE_OK);
+        CHECK(readAll(3, "/docs/hello.txt") == hello);
+        ve_lock(3);
+        CHECK(slotIsEmpty(3));
+    }
+    {
+        const CompositeOutcome r = compositeUnlock({a, c, b}, kPw);
+        CHECK_RC(r.rc, VE_OK);
+        CHECK(listContains(listDir(3, "/"), "docs"));
+        CHECK(readAll(3, "/docs/hello.txt") == hello);
+        CHECK(readAll(3, "/docs/big.bin") == std::string(big.begin(), big.end()));
+        ve_lock(3);
+    }
+
+    // ---- read-only unlock: readable, not writable, carriers untouched ----
+    {
+        const std::vector<uint8_t> beforeA = readHostFile(a), beforeB = readHostFile(b), beforeC = readHostFile(c);
+        const CompositeOutcome r = compositeUnlock({b, a, c}, kPw, {}, 3, /*readOnly=*/true);
+        CHECK_RC(r.rc, VE_OK);
+        CHECK(readAll(3, "/docs/hello.txt") == hello);
+        CHECK_RC(ve_write_file_chunk(3, "/docs/nope.txt", 0, reinterpret_cast<const uint8_t*>("x"), 1), VE_ERR_READ_ONLY);
+        ve_lock(3);
+        CHECK(readHostFile(a) == beforeA && readHostFile(b) == beforeB && readHostFile(c) == beforeC);
+    }
+
+    // ---- keyfile-only credential: create and unlock, every keyfile descriptor closed ----
+    {
+        const std::string e = tempPath("ve_smoke_comp_e.bin");
+        const std::string f = tempPath("ve_smoke_comp_f.bin");
+        const std::string key = tempPath("ve_smoke_comp_k.key");
+        CHECK(writeHostFile(e, carrierBytes(4u << 20, 11)) && writeHostFile(f, carrierBytes(4u << 20, 12)));
+        CHECK(writeHostFile(key, carrierBytes(64, 13)));
+        CompositeOutcome r = compositeCreate({e, f}, 0, 50, "", {key});
+        CHECK_RC(r.rc, VE_OK);
+        CHECK(r.keyfilesClosed());
+        r = compositeUnlock({f, e}, "", {key});
+        CHECK_RC(r.rc, VE_OK);
+        CHECK(r.keyfilesClosed());
+        CHECK_RC(ve_write_file_chunk(3, "k.txt", 0, reinterpret_cast<const uint8_t*>("k"), 1), VE_OK);
+        ve_lock(3);
+        std::remove(e.c_str());
+        std::remove(f.c_str());
+        std::remove(key.c_str());
+    }
+
+    // ---- invalid arguments: refused, every descriptor handed over is closed ----
+    {
+        const std::string key = tempPath("ve_smoke_comp_inv.key");
+        CHECK(writeHostFile(key, carrierBytes(64, 14)));
+        const char* one[] = {a.c_str()};
+        const char* withEmpty[] = {a.c_str(), ""};
+        auto handedKeyfile = [&](std::vector<int>& fds) { return openKeyfiles({key}, fds); };
+
+        {
+            std::vector<int> fds;
+            CHECK(handedKeyfile(fds));
+            ve_composite_unlock_params p;
+            std::memset(&p, 0, sizeof(p));
+            p.struct_size = sizeof(p);
+            p.vol_id = 999;  // no such slot
+            p.carrier_paths = one;
+            p.carrier_count = 1;
+            p.keyfile_fds = reinterpret_cast<const int32_t*>(fds.data());
+            p.keyfile_count = 1;
+            CHECK_RC(ve_composite_unlock(&p, nullptr), VE_ERR_INVALID_ARG);
+            CHECK(fdIsClosed(fds[0]));
+        }
+        {
+            std::vector<int> fds;
+            CHECK(handedKeyfile(fds));
+            ve_composite_unlock_params p;
+            std::memset(&p, 0, sizeof(p));
+            p.struct_size = sizeof(p);
+            p.vol_id = 3;
+            p.carrier_paths = withEmpty;  // an empty path
+            p.carrier_count = 2;
+            p.keyfile_fds = reinterpret_cast<const int32_t*>(fds.data());
+            p.keyfile_count = 1;
+            CHECK_RC(ve_composite_unlock(&p, nullptr), VE_ERR_INVALID_ARG);
+            CHECK(fdIsClosed(fds[0]));
+            p.struct_size = 4;  // a struct from an older / broken caller
+            std::vector<int> fds2;
+            CHECK(handedKeyfile(fds2));
+            p.keyfile_fds = reinterpret_cast<const int32_t*>(fds2.data());
+            CHECK_RC(ve_composite_unlock(&p, nullptr), VE_ERR_INVALID_ARG);
+            CHECK(fdIsClosed(fds2[0]));
+        }
+        {
+            std::vector<int> fds;
+            CHECK(handedKeyfile(fds));
+            ve_composite_create_params p;
+            std::memset(&p, 0, sizeof(p));
+            p.struct_size = sizeof(p);
+            p.vol_id = 2;
+            p.carrier_paths = one;
+            p.carrier_count = 1;
+            p.file_system = nullptr;  // required
+            p.keyfile_fds = reinterpret_cast<const int32_t*>(fds.data());
+            p.keyfile_count = 1;
+            CHECK_RC(ve_composite_create(&p, nullptr), VE_ERR_INVALID_ARG);
+            CHECK(fdIsClosed(fds[0]));
+        }
+        {
+            // a password with a NUL in it would be cut short by the C string the engine takes
+            const uint8_t nulPw[4] = {'a', 0, 'b', 'c'};
+            ve_composite_create_params p;
+            std::memset(&p, 0, sizeof(p));
+            p.struct_size = sizeof(p);
+            p.vol_id = 2;
+            p.carrier_paths = one;
+            p.carrier_count = 1;
+            p.file_system = "fat";
+            p.password = nulPw;
+            p.password_len = 4;
+            CHECK_RC(ve_composite_create(&p, nullptr), VE_ERR_INVALID_ARG);
+            p.password = reinterpret_cast<const uint8_t*>("");  // no password and no keyfile: nothing to authenticate with
+            p.password_len = 0;
+            CHECK_RC(ve_composite_create(&p, nullptr), VE_ERR_INVALID_ARG);
+            CHECK_RC(ve_composite_create(nullptr, nullptr), VE_ERR_INVALID_ARG);
+            CHECK_RC(ve_composite_unlock(nullptr, nullptr), VE_ERR_INVALID_ARG);
+        }
+        CHECK(readHostFile(a).size() > origA.size());  // (a carries its share from the create above; nothing here changed it)
+        std::remove(key.c_str());
+    }
+
+    for (const auto& path : {a, b, c, plain, zipLike}) std::remove(path.c_str());
+}
+
 int main(int argc, char** argv) {
     std::printf("ve abi %d, %d volume slots\n", ve_abi_version(), ve_max_volumes());
     CHECK(ve_abi_version() == VE_ABI_VERSION);
@@ -1600,6 +2017,12 @@ int main(int argc, char** argv) {
 
     if (argc == 2 && std::strcmp(argv[1], "tools") == 0) {  // fast path: expand / grow / hidden-in-existing only
         runVolumeTools();
+        std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "composite") == 0) {  // fast path: composite containers only
+        runComposite();
         std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
         return g_failures == 0 ? 0 : 1;
     }
@@ -1630,6 +2053,7 @@ int main(int argc, char** argv) {
 
     runHidden();
     runVolumeTools();
+    runComposite();
     runChangePassword(0, "fat", 8ll << 20);
     runChangePassword(1, "ext4", 16ll << 20);
     runFolderVaults();

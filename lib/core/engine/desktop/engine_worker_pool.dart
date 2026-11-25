@@ -781,12 +781,86 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
           _wipe(userEntropy);
         }
       }
+    // ── composite containers (ABI 13): one volume over several ordinary files ──
+    // compositeProfile [carrierPaths, safetyMarginPct] -> [rc, record?]   (record: see parseCompositeProfile)
+    case 'compositeProfile':
+      {
+        final (rc, record) = n.compositeProfile(
+          carrierPaths: (a[0] as List).cast<String>(),
+          safetyMarginPct: a[1] as int,
+        );
+        return [rc, record];
+      }
+    // compositeCreate [carrierPaths, volId, requestedBytes, safetyMarginPct, password, pim, fileSystem, cipherId,
+    //                  hashId, keyfilePaths, quickFormat, userEntropy?] -> [rc, errorCode?]
+    case 'compositeCreate':
+      {
+        final password = a[4] as Uint8List;
+        final userEntropy = a[11] as Uint8List?;
+        try {
+          final keyfileFds = _openKeyfiles(n, (a[9] as List).cast<String>());
+          if (keyfileFds == null) return [veErrFailed, _kCompositeKeyfileError];
+          final (rc, error) = n.compositeCreate(
+            carrierPaths: (a[0] as List).cast<String>(),
+            volId: a[1] as int,
+            requestedBytes: a[2] as int,
+            safetyMarginPct: a[3] as int,
+            password: password,
+            pim: a[5] as int,
+            fileSystem: a[6] as String,
+            cipherId: a[7] as int,
+            hashId: a[8] as int,
+            keyfileFds: keyfileFds,
+            quickFormat: a[10] as bool,
+            userEntropy: userEntropy,
+          );
+          return [rc, error];
+        } finally {
+          _wipe(password);
+          _wipe(userEntropy);
+        }
+      }
+    // compositeUnlock [carrierPaths, volId, password, pim, cipherId, hashId, keyfilePaths, readOnly]
+    //   -> {rc, error?, format, cipherId, hashId, files}   (the last four only when rc is veOk)
+    case 'compositeUnlock':
+      {
+        final password = a[2] as Uint8List;
+        try {
+          final keyfileFds = _openKeyfiles(n, (a[6] as List).cast<String>());
+          if (keyfileFds == null) return {'rc': veErrFailed, 'error': _kCompositeKeyfileError};
+          final volId = a[1] as int;
+          final (rc, error) = n.compositeUnlock(
+            carrierPaths: (a[0] as List).cast<String>(),
+            volId: volId,
+            password: password,
+            pim: a[3] as int,
+            cipherId: a[4] as int,
+            hashId: a[5] as int,
+            keyfileFds: keyfileFds,
+            readOnly: a[7] as bool,
+          );
+          if (rc != veOk) return {'rc': rc, 'error': error};
+          final (listRc, files) = n.listDirectory(volId, '');
+          return {
+            'rc': veOk,
+            'format': veFormatWireName(n.containerFormat(volId)),
+            'cipherId': n.matchedCipherId(volId),
+            'hashId': n.matchedHashId(volId),
+            'files': listRc == veOk ? files : const <String>[],
+          };
+        } finally {
+          _wipe(password);
+        }
+      }
     case 'opCancel':
       n.opCancel(a[0] as int);
       return null;
   }
   throw ArgumentError('unknown engine op: $op');
 }
+
+// The engine's own code for a keyfile it could not read (ve_engine.h, composite containers).
+const String _kCompositeKeyfileError = 'KEYFILE_FAILED';
 
 // Tool results for a file the worker could not open (ve_engine.h, "container tools": outcome 4 I/O error,
 // 5 unreadable keyfile; the analysis record is [outcome, fsKind, cluster size, largest hidden volume]).

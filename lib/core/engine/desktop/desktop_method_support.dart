@@ -119,10 +119,9 @@ const Set<String> desktopAndroidOnlyMethods = {
 /// Methods that SHOULD work on desktop and are planned, grouped by the phase that delivers them.
 /// Each one answers `null` today; when a phase lands, move its methods out of this set.
 const Set<String> desktopPendingMethods = {
-  // Phase 1d -- composite and split containers.
-  'createCompositeContainer',
-  'profileCarriers',
-  'unlockCompositeContainer',
+  // Phase 1d (split) -- the composite methods are done (desktop_composite.dart). A split container is not a composite
+  // one (it is the ordinary volume cut into parts, any VeraCrypt / LUKS format), so it needs its own engine-level joined
+  // source feeding the normal unlock; see docs/desktop-port.md.
   'unlockSplitContainer',
 
   // Phase 4.4 -- AVIF (libavif / libgav1 are gated off for desktop builds).

@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 12 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 13 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -595,6 +595,84 @@ typedef struct ve_hidden_in_existing_params {
 } ve_hidden_in_existing_params;
 
 VE_API int32_t ve_hidden_create_in_existing(const ve_hidden_in_existing_params* params, int32_t* outcome_out);
+
+/* ---- composite containers (ABI 13) ----------------------------------------------------------------
+ * One VeraCrypt volume spread over several ordinary host files ("carriers": photos, videos, documents, ...). Each
+ * carrier keeps its own content and carries its share of the encrypted volume after it, followed by a small
+ * header-keyed trailer that lets the share be found again without any index. Only standard VeraCrypt volumes are
+ * composite (no LUKS, BitLocker or hidden volume).
+ *
+ * Carriers are host PATHS (UTF-8): the engine opens them itself, a few at a time, so the number of carriers is not
+ * limited by open descriptors. Keyfile descriptors (the one thing here that is a descriptor) belong to the call and
+ * are closed on every path, like the keyfile fds of ve_unlock. The order the paths are given in never matters: the
+ * engine sorts the carriers canonically (by a digest of each file's first bytes) in all three calls.
+ *
+ * Failures answer VE_ERR_FAILED and, when error_out is not NULL, put a code in it (UTF-8, no NUL; free with
+ * ve_buffer_free): create -- NO_EXTENTS_DERIVED, CARRIER_CAPACITY_CHANGED, INVALID_VOLUME_ID, CARRIER_OPEN_FAILED,
+ * CARRIER_CORRUPTION_GUARD, SIZE_TOO_SMALL, PASSWORD_TOO_LONG, KEYFILE_FAILED, URANDOM_READ_FAILED, KDF_FAILED,
+ * FORMAT_FAILED; unlock -- NO_EXTENTS_DETECTED, INVALID_VOLUME_ID, SIZE_TOO_SMALL, HEADER_READ_FAILED,
+ * KEYFILE_FAILED, INCORRECT_PASSWORD_OR_INVALID_CONTAINER, COMPOSITE_CARRIERS_INCOMPLETE (a carrier is missing),
+ * CASCADE_KEY_SETUP_FAILED, FILESYSTEM_MOUNT_FAILED (with VE_ERR_MOUNT_FAILED). An unlock stopped by
+ * ve_request_cancel_unlock answers VE_ERR_CANCELLED.
+ */
+
+/* Sizes a set of carriers (read-only). safety_margin_pct is the share of each carrier's size that may be added to it
+ * (1..50; larger values mean "reserve this much", i.e. 100 - value is added; 0 or > 100 = 10). On VE_OK, out holds
+ * (little-endian): u64 totalAllocatableBytes, u32 count, then per carrier in canonical order: u32 fileIndex,
+ * u32 inputIndex (the position in carrier_paths), u32 tier (0 spec-guaranteed skippable data, 1 tolerated by common
+ * readers, 2 appended after the end), u64 fileSize, u64 payloadOffset, u64 allocatableBytes, u32 formatLen + the
+ * detected format ("png", "jpeg", "isobmff", "generic", "composite_carrier" for a carrier that already holds a
+ * share, "archive_unsupported", ...), u32 pathLen + the path. */
+VE_API int32_t ve_composite_profile(const char* const* carrier_paths, int32_t carrier_count, int32_t safety_margin_pct,
+                                    ve_buffer* out);
+
+typedef struct ve_composite_create_params {
+    int32_t struct_size;            /* sizeof(ve_composite_create_params) */
+    int32_t vol_id;                 /* a FREE slot: it formats the volume and is left empty (locked) on return */
+    const char* const* carrier_paths;
+    int32_t carrier_count;
+    int64_t requested_bytes;        /* capacity wanted; 0 = everything the carriers can hold. Must equal what
+                                       ve_composite_profile reported when > 0 (else CARRIER_CAPACITY_CHANGED) */
+    int32_t safety_margin_pct;      /* 1..50 = growth per carrier in percent; anything else = 10 */
+    const uint8_t* password;        /* UTF-8 bytes without NUL, may be NULL when keyfiles are used; a password or at
+                                       least one keyfile is required (VE_ERR_INVALID_ARG otherwise) */
+    int32_t password_len;
+    int32_t pim;
+    const char* file_system;        /* "fat" | "exfat" | "ntfs" | "ext2" | "ext3" | "ext4" */
+    int32_t cipher_id;              /* 255 = default (AES) */
+    int32_t hash_id;                /* 255 = default (SHA-512) */
+    const int32_t* keyfile_fds;     /* owned by the call */
+    int32_t keyfile_count;
+    int32_t quick_format;
+    const uint8_t* user_entropy;    /* optional, mixed on top of the OS RNG */
+    int32_t user_entropy_len;
+} ve_composite_create_params;
+
+/* Writes the volume's shares into the carriers (growing each) and formats it. WRITES TO THE CARRIER FILES. VE_OK when
+ * the volume exists; it is not left unlocked. Refused before any carrier is touched: NO_EXTENTS_DERIVED,
+ * CARRIER_CAPACITY_CHANGED, SIZE_TOO_SMALL (under 300 KiB in all) and PASSWORD_TOO_LONG (over 128 bytes). A failure
+ * after the carriers were written can leave them grown by the unused share, which is harmless to their content. */
+VE_API int32_t ve_composite_create(const ve_composite_create_params* params, ve_buffer* error_out);
+
+typedef struct ve_composite_unlock_params {
+    int32_t struct_size;            /* sizeof(ve_composite_unlock_params) */
+    int32_t vol_id;                 /* slot to unlock into */
+    const char* const* carrier_paths;
+    int32_t carrier_count;
+    const uint8_t* password;        /* UTF-8 bytes, may be NULL when keyfiles are used */
+    int32_t password_len;
+    int32_t pim;
+    int32_t cipher_id;              /* 255 = auto-detect */
+    int32_t hash_id;                /* 255 = auto-detect */
+    const int32_t* keyfile_fds;     /* owned by the call */
+    int32_t keyfile_count;
+    int32_t read_only;
+} ve_composite_unlock_params;
+
+/* Finds every carrier's share, checks that none is missing, unlocks the volume into vol_id and mounts its file
+ * system. After VE_OK the slot behaves exactly like one unlocked by ve_unlock (ve_lock, ve_list_directory, ... and
+ * ve_get_container_format / ve_get_matched_*_id). */
+VE_API int32_t ve_composite_unlock(const ve_composite_unlock_params* params, ve_buffer* error_out);
 
 /* ---- archives -----------------------------------------------------------------------------------
  * Reads zip, 7z, rar, tar.*, iso and cpio archives, including split sets (name.7z.001, name.z01 + name.zip --

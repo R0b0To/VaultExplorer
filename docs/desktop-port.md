@@ -3,8 +3,8 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
-**Update for v1.66.0 (ABI 12).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
-library is at `VE_ABI_VERSION` 12 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls, ABI 12 the container tools: expand, grow the file system, hidden volume in an existing volume). Method coverage is now measured, not counted by hand:
+**Update for v1.66.0 (ABI 13).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
+library is at `VE_ABI_VERSION` 13 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls, ABI 12 the container tools: expand, grow the file system, hidden volume in an existing volume, ABI 13 composite containers). Method coverage is now measured, not counted by hand:
 `test/core/engine/desktop/desktop_method_coverage_test.dart` diffs `ChannelMethods` against the host, the crypto
 handler, the Android-only defaults and the two explicit lists in `lib/core/engine/desktop/desktop_method_support.dart`
 (see "Engine-channel coverage" under "Not yet"). CI (`ci.yml`, job `desktop_engine_linux`) now builds the Linux engine,
@@ -30,6 +30,40 @@ a hidden volume added to an existing volume and unlocked afterwards, refusal whi
 invalid arguments with descriptor-closing checks, BitLocker refusals) and `desktop_volume_tools_test.dart` (fake engine).
 Not exercised: the BitLocker *success* paths (no BitLocker fixture), containers over 2 GiB on Windows, the Windows file-identity
 call itself, and the Dart side (no Dart SDK where this was written; run `flutter test` and `flutter analyze`).
+
+**Composite containers (Phase 1d).** One standard VeraCrypt volume spread over several ordinary files ("carriers": images, videos,
+anything that is not an archive) that each keep their own content and carry their share of the volume after it. `ffi/ve_composite.cpp`
+exposes `ve_composite_profile` (read-only: sizes the carriers in the canonical order, the record layout is in `ve_engine.h`),
+`ve_composite_create` and `ve_composite_unlock` (params structs) over the same `containers/carrier_profiler.cpp`,
+`composite_map.cpp` and `container_create_composite.cpp` that Android's `jni/composite_bridge.cpp` calls, in the same sequence
+(canonical order, profile, derive the extents, then create or unlock; unlock mounts the file system the way `ve_unlock` does). Carriers
+cross as host paths and the engine's carrier cache opens them itself (`io/host_file.h`, Windows-safe); only the keyfiles are
+descriptors, and the ownership rule is the one the other calls follow (the call closes them on every path). `DesktopComposite`
+(`desktop_composite.dart`) is what `CompositeContainerHandlers.kt` does around the native calls: argument checks (`INVALID_ARGS`,
+`MAX_CONTAINERS`), the profile map `VaultCompositeApi` decodes (`PROFILE_FAILED` when it cannot be produced), create answering true or
+false, and unlock failing with `AUTH_FAIL` whose message and details are the engine's reason (`INCORRECT_PASSWORD_OR_INVALID_CONTAINER`,
+`COMPOSITE_CARRIERS_INCOMPLETE`, `NO_EXTENTS_DETECTED`, `KEYFILE_FAILED`, `FILESYSTEM_MOUNT_FAILED`), or `CANCELLED`. A composite
+session is registered as `composite:<first carrier exactly as the app gave it>`, the key the app saves, so lock, status, auto-lock and
+the optional OS exposure treat it like any other session. Differences from Android that the app cannot see: `payloadOffsets` is not
+needed (the engine reads each carrier's own header-keyed trailer), `extentLengths` only says how much capacity was asked for (its
+sum), the unlock result lists the root (Android's is empty), and create takes no operation id (the shared code ignores it too, so there
+is no progress or cancel on either platform). Two things changed in code shared with Android, both fixes: `createCompositeContainer` /
+`prepareCompositeSession` leaked the keyfile descriptors on their early returns (a scope guard now closes them until
+`applyKeyfilesToPassword` takes them over), and desktop `ve_composite_create` refuses a volume that is too small (under 300 KiB), a
+password over 128 bytes, or no credential at all BEFORE touching any carrier, because the shared create grows every carrier file first
+and only then checks size and password length. Smoke-tested by `./ve_smoke_test composite`: profile (formats, tiers, alignment, files
+untouched, invalid arguments), create refusals that leave every carrier byte-identical, create over three carriers of three formats,
+unlock in three different carrier orders with files written in one session read back in the next, wrong password, missing carrier, a
+plain file (no key derivation), read-only unlock (write refused, carriers untouched), keyfile-only create and unlock, and descriptor
+closing on every failure path; `desktop_composite_test.dart` covers the Dart half with a fake engine. A session slot is held for the
+duration of a composite call, so two composite calls never pick the same free slot (a normal unlock started at the same moment is not
+coordinated with them, as on Android). **Split containers are not done**: `unlockSplitContainer` stays in
+`desktopPendingMethods`. Android's `unlockSplitContainer` is a plain delegate to `unlockContainer` and the app does not call it; real
+split support there is in the unlock path (a FUSE-backed joined source), and a composite is not equivalent (it is VeraCrypt-standard
+only and every part would have to carry a trailer). On desktop it needs an engine-level joined source that feeds the normal unlock
+for any format; that is the remaining half of Phase 1d. The "Container splitter" tool (split and join to files) works.
+Not exercised: the Dart side (no Dart SDK where this was written; run `flutter test` and `flutter analyze`), Windows, and the Android build
+of the shared-code change.
 
 **Check & Repair and header backup (Phase 1b).** `ffi/ve_repair.cpp` wraps `containers/container_repair.cpp` (diagnose and
 restore an unmounted container file, diagnose and check a mounted volume's file system, export and restore the header
@@ -396,11 +430,11 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 
 ## Not yet
 
-- Engine-channel coverage: `ChannelMethods` has 281 methods. The desktop host answers 150 of them (including the
+- Engine-channel coverage: `ChannelMethods` has 283 methods. The desktop host answers 155 of them (including the
   crypto primitives), gives 42 more an Android-only default (`_androidOnlyDefaults`), lists 66 as Android-only
   (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, USB, SAF, APK install, Jetpack PDF, ...)
-  and 23 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them:
-  composite/split containers, AVIF, PDF, comic/EPUB, image probing, audio/video editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
+  and 20 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them:
+  split containers, AVIF, PDF, comic/EPUB, image probing, audio/video editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
   stays true; run it to see the current numbers. These counts cover the one engine channel only. Camera, Media3,
   picture-in-picture, brightness, panorama, disguise mode and the platform views use their own channels, which the
   desktop binding passes to Flutter (they throw `MissingPluginException` on desktop unless the Dart caller is guarded).

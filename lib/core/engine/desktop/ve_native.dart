@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 12;
+const int kVeAbiVersion = 13;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -299,6 +299,64 @@ final class VeHiddenInExistingParams extends Struct {
   external Pointer<Uint8> userEntropy;
   @Int32()
   external int userEntropyLen;
+}
+
+/// `ve_composite_create_params` (ABI 13): one VeraCrypt volume spread over several ordinary files.
+final class VeCompositeCreateParams extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int volId;
+  external Pointer<Pointer<Utf8>> carrierPaths;
+  @Int32()
+  external int carrierCount;
+  @Int64()
+  external int requestedBytes;
+  @Int32()
+  external int safetyMarginPct;
+  external Pointer<Uint8> password;
+  @Int32()
+  external int passwordLen;
+  @Int32()
+  external int pim;
+  external Pointer<Utf8> fileSystem;
+  @Int32()
+  external int cipherId;
+  @Int32()
+  external int hashId;
+  external Pointer<Int32> keyfileFds;
+  @Int32()
+  external int keyfileCount;
+  @Int32()
+  external int quickFormat;
+  external Pointer<Uint8> userEntropy;
+  @Int32()
+  external int userEntropyLen;
+}
+
+/// `ve_composite_unlock_params` (ABI 13).
+final class VeCompositeUnlockParams extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int volId;
+  external Pointer<Pointer<Utf8>> carrierPaths;
+  @Int32()
+  external int carrierCount;
+  external Pointer<Uint8> password;
+  @Int32()
+  external int passwordLen;
+  @Int32()
+  external int pim;
+  @Int32()
+  external int cipherId;
+  @Int32()
+  external int hashId;
+  external Pointer<Int32> keyfileFds;
+  @Int32()
+  external int keyfileCount;
+  @Int32()
+  external int readOnly;
 }
 
 final class VeSingleFileParams extends Struct {
@@ -612,6 +670,16 @@ class VeNative {
   late final int Function(Pointer<VeHiddenInExistingParams>, Pointer<Int32>) _hiddenCreateInExisting = _lib.lookupFunction<
       Int32 Function(Pointer<VeHiddenInExistingParams>, Pointer<Int32>),
       int Function(Pointer<VeHiddenInExistingParams>, Pointer<Int32>)>('ve_hidden_create_in_existing');
+  // Composite containers (ABI 13; ve_engine.h).
+  late final int Function(Pointer<Pointer<Utf8>>, int, int, Pointer<VeBuffer>) _compositeProfile = _lib.lookupFunction<
+      Int32 Function(Pointer<Pointer<Utf8>>, Int32, Int32, Pointer<VeBuffer>),
+      int Function(Pointer<Pointer<Utf8>>, int, int, Pointer<VeBuffer>)>('ve_composite_profile');
+  late final int Function(Pointer<VeCompositeCreateParams>, Pointer<VeBuffer>) _compositeCreate = _lib.lookupFunction<
+      Int32 Function(Pointer<VeCompositeCreateParams>, Pointer<VeBuffer>),
+      int Function(Pointer<VeCompositeCreateParams>, Pointer<VeBuffer>)>('ve_composite_create');
+  late final int Function(Pointer<VeCompositeUnlockParams>, Pointer<VeBuffer>) _compositeUnlock = _lib.lookupFunction<
+      Int32 Function(Pointer<VeCompositeUnlockParams>, Pointer<VeBuffer>),
+      int Function(Pointer<VeCompositeUnlockParams>, Pointer<VeBuffer>)>('ve_composite_unlock');
   late final int Function(int) _format;
   late final int Function(int) _matchedCipher;
   late final int Function(int) _matchedHash;
@@ -2236,6 +2304,144 @@ class VeNative {
       for (final p in allocated) {
         calloc.free(p);
       }
+    }
+  }
+
+  // ── Composite containers (ABI 13) ────────────────────────────────────────
+  // Carriers are host paths the engine opens itself. Only the keyfile descriptors belong to the call (it closes them on
+  // every path, including a refused argument), so callers must not close them again.
+
+  /// Runs [body] with [paths] as a native `char*` array (UTF-8), freed afterwards.
+  T _withPathArray<T>(List<String> paths, T Function(Pointer<Pointer<Utf8>> p, int n) body) {
+    final array = calloc<Pointer<Utf8>>(paths.isEmpty ? 1 : paths.length);
+    final strings = <Pointer<Utf8>>[];
+    try {
+      for (var i = 0; i < paths.length; i++) {
+        final s = paths[i].toNativeUtf8();
+        strings.add(s);
+        array[i] = s;
+      }
+      return body(array, paths.length);
+    } finally {
+      for (final s in strings) {
+        calloc.free(s);
+      }
+      calloc.free(array);
+    }
+  }
+
+  /// `ve_composite_profile` (read-only): (rc, record). The record is `parseCompositeProfile`'s input
+  /// (desktop_composite.dart); it is null unless [rc] is [veOk].
+  (int, Uint8List?) compositeProfile({required List<String> carrierPaths, required int safetyMarginPct}) {
+    final out = calloc<VeBuffer>();
+    try {
+      final rc = _withPathArray(carrierPaths, (paths, n) => _compositeProfile(paths, n, safetyMarginPct, out));
+      final record = _takeBuffer(out);
+      return (rc, rc == veOk ? record : null);
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// `ve_composite_create`: (rc, error). WRITES TO THE CARRIER FILES. [error] is the engine's failure code
+  /// (CARRIER_CAPACITY_CHANGED, SIZE_TOO_SMALL, ...) when there is one. The slot [volId] is left empty on success.
+  (int, String?) compositeCreate({
+    required List<String> carrierPaths,
+    required int volId,
+    required int requestedBytes,
+    required int safetyMarginPct,
+    required Uint8List password,
+    int pim = 0,
+    required String fileSystem,
+    int cipherId = 255,
+    int hashId = 255,
+    List<int> keyfileFds = const [],
+    bool quickFormat = true,
+    Uint8List? userEntropy,
+  }) {
+    final params = calloc<VeCompositeCreateParams>();
+    final err = calloc<VeBuffer>();
+    final fsName = fileSystem.toNativeUtf8();
+    final entropy = _Pin(userEntropy);
+    try {
+      final rc = _withPathArray(
+        carrierPaths,
+        (paths, n) => _withSecretBytes(
+          password,
+          (pw, pwLen) => _withFdArray(keyfileFds, (kf, kfCount) {
+            final r = params.ref;
+            r.structSize = sizeOf<VeCompositeCreateParams>();
+            r.volId = volId;
+            r.carrierPaths = paths;
+            r.carrierCount = n;
+            r.requestedBytes = requestedBytes;
+            r.safetyMarginPct = safetyMarginPct;
+            r.password = pw;
+            r.passwordLen = pwLen;
+            r.pim = pim;
+            r.fileSystem = fsName;
+            r.cipherId = cipherId;
+            r.hashId = hashId;
+            r.keyfileFds = kf;
+            r.keyfileCount = kfCount;
+            r.quickFormat = quickFormat ? 1 : 0;
+            r.userEntropy = entropy.ptr;
+            r.userEntropyLen = entropy.len;
+            return _compositeCreate(params, err);
+          }),
+        ),
+      );
+      return (rc, _takeMessage(err));
+    } finally {
+      entropy.release();
+      calloc.free(fsName);
+      calloc.free(err);
+      calloc.free(params);
+    }
+  }
+
+  /// `ve_composite_unlock`: (rc, error). On [veOk] the volume is unlocked into [volId] and its file system mounted,
+  /// like `unlock`. [error] is the engine's failure code (INCORRECT_PASSWORD_OR_INVALID_CONTAINER,
+  /// COMPOSITE_CARRIERS_INCOMPLETE, NO_EXTENTS_DETECTED, ...).
+  (int, String?) compositeUnlock({
+    required List<String> carrierPaths,
+    required int volId,
+    required Uint8List password,
+    int pim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<int> keyfileFds = const [],
+    bool readOnly = false,
+  }) {
+    final params = calloc<VeCompositeUnlockParams>();
+    final err = calloc<VeBuffer>();
+    try {
+      final rc = _withPathArray(
+        carrierPaths,
+        (paths, n) => _withSecretBytes(
+          password,
+          (pw, pwLen) => _withFdArray(keyfileFds, (kf, kfCount) {
+            final r = params.ref;
+            r.structSize = sizeOf<VeCompositeUnlockParams>();
+            r.volId = volId;
+            r.carrierPaths = paths;
+            r.carrierCount = n;
+            r.password = pw;
+            r.passwordLen = pwLen;
+            r.pim = pim;
+            r.cipherId = cipherId;
+            r.hashId = hashId;
+            r.keyfileFds = kf;
+            r.keyfileCount = kfCount;
+            r.readOnly = readOnly ? 1 : 0;
+            return _compositeUnlock(params, err);
+          }),
+        ),
+      );
+      return (rc, _takeMessage(err));
+    } finally {
+      calloc.free(err);
+      calloc.free(params);
     }
   }
 

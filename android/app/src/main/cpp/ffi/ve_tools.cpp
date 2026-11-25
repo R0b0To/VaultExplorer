@@ -10,55 +10,16 @@
 #include <exception>
 #include <string>
 
-#if defined(_WIN32)
-#  include <io.h>
-#else
-#  include <unistd.h>
-#endif
-
-#include <mbedtls/platform_util.h>
-
 #include "../containers/container_create.h"
 #include "../crypto/user_entropy.h"
+#include "ve_fd_util.h"
 
 namespace {
 
-void closeFd(int32_t fd) {
-    if (fd < 0) return;
-#if defined(_WIN32)
-    _close(fd);
-#else
-    close(fd);
-#endif
-}
-
-// Keyfile fds are owned by the call: close what a refused call never reached.
-void closeAll(const int32_t* fds, int32_t count) {
-    if (!fds) return;
-    for (int32_t i = 0; i < count; ++i) closeFd(fds[i]);
-}
-
-bool credentialOk(const uint8_t* password, int32_t passwordLen, const int32_t* keyfileFds, int32_t keyfileCount) {
-    return passwordLen >= 0 && (passwordLen == 0 || password != nullptr) && keyfileCount >= 0 &&
-           (keyfileCount == 0 || keyfileFds != nullptr);
-}
-
-// A NUL-terminated copy of a password that is wiped when it goes out of scope (the engine takes C strings).
-class SecretString {
-public:
-    SecretString(const uint8_t* bytes, int32_t len)
-        : text_(bytes != nullptr ? reinterpret_cast<const char*>(bytes) : "",
-                bytes != nullptr ? static_cast<size_t>(len) : 0) {}
-    ~SecretString() {
-        if (!text_.empty()) mbedtls_platform_zeroize(&text_[0], text_.size());
-    }
-    SecretString(const SecretString&) = delete;
-    SecretString& operator=(const SecretString&) = delete;
-    const char* c_str() const { return text_.c_str(); }
-
-private:
-    std::string text_;
-};
+using veffi::closeAll;
+using veffi::closeFd;
+using veffi::credentialOk;
+using veffi::SecretString;
 
 // File-system kind code for the result record: the label fsGetFilesystemLabel reports ("NTFS", "ext4", ...), as the
 // JNI bridge's fsKindCode maps it (jni/container_lifecycle_bridge.cpp).

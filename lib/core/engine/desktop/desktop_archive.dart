@@ -26,6 +26,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/utils/secure_temp_file.dart';
 
 import 've_native.dart' show veErrNotUnlocked, veOk;
 
@@ -260,11 +261,7 @@ class DesktopArchive {
       try {
         await for (final e in base.list(followLinks: false)) {
           if (e is Directory && p.basename(e.path).startsWith(_stagingPrefix)) {
-            try {
-              await e.delete(recursive: true);
-            } on FileSystemException {
-              // in use or not ours; leave it
-            }
+            await SecureTempFile.wipeAndDeleteDir(e);
           }
         }
       } on FileSystemException {
@@ -315,7 +312,7 @@ class DesktopArchive {
   Future<bool> _deleteQuietly(String path) async {
     try {
       final f = File(path);
-      if (await f.exists()) await f.delete();
+      if (await f.exists()) await SecureTempFile.wipeAndDelete(f);
       return true;
     } on FileSystemException {
       return false;
@@ -336,11 +333,7 @@ class DesktopArchive {
     final dir = _stagingDir;
     _stagingDir = null;
     if (dir == null) return;
-    try {
-      await dir.delete(recursive: true);
-    } on FileSystemException {
-      // already gone
-    }
+    await SecureTempFile.wipeAndDeleteDir(dir);
   }
 
   // ── extract everything ─────────────────────────────────────────────────────
@@ -462,11 +455,7 @@ class DesktopArchive {
     } finally {
       if (opId > 0) unregisterOp(opId);
       if (spool != null) {
-        try {
-          await spool.delete(recursive: true);
-        } on FileSystemException {
-          // already gone
-        }
+        await SecureTempFile.wipeAndDeleteDir(spool);
       }
     }
   }

@@ -79,6 +79,10 @@ class FileItemActionsSheet extends ConsumerWidget {
   /// whose paths are not vault paths.
   final VoidCallback? onCopyPath;
 
+  /// Copies the image file's decoded pixels + PNG onto the OS clipboard
+  /// (desktop only, single image selection).
+  final VoidCallback? onCopyImage;
+
   /// The user's item-action configuration: hidden actions are not offered,
   /// and the quick row and the list follow this order.
   final List<FileItemAction> actionOrder;
@@ -125,6 +129,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onOpenInNewWindow,
     this.onGoToLocation,
     this.onCopyPath,
+    this.onCopyImage,
     this.actionOrder = FileItemAction.values,
     this.hiddenActions = const {},
     this.quickActions = FileItemAction.defaultQuickActions,
@@ -168,6 +173,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onOpenInNewWindow,
     VoidCallback? onGoToLocation,
     VoidCallback? onCopyPath,
+    VoidCallback? onCopyImage,
     List<FileItemAction> actionOrder = FileItemAction.values,
     Set<FileItemAction> hiddenActions = const {},
     Set<FileItemAction> quickActions = FileItemAction.defaultQuickActions,
@@ -209,6 +215,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onOpenInNewWindow: onOpenInNewWindow,
         onGoToLocation: onGoToLocation,
         onCopyPath: onCopyPath,
+        onCopyImage: onCopyImage,
         actionOrder: actionOrder,
         hiddenActions: hiddenActions,
         quickActions: quickActions,
@@ -268,6 +275,30 @@ class FileItemActionsSheet extends ConsumerWidget {
                   spec.label,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: color),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (PlatformFeatures.isDesktop &&
+        onCopyImage != null &&
+        archiveContext == null) {
+      items.add(const PopupMenuDivider(height: 8));
+      items.add(
+        PopupMenuItem<VoidCallback>(
+          value: onCopyImage!,
+          height: itemHeight,
+          child: Row(
+            children: [
+              Icon(Icons.image_outlined, size: 18, color: cs.onSurface),
+              const SizedBox(width: 12),
+                Flexible(
+                child: Text(
+                  context.l10n.copyImageAction,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: cs.onSurface),
                 ),
               ),
             ],

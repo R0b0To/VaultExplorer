@@ -13226,4 +13226,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Ort nicht verfügbar';
+
+  @override
+  String get copyImageAction => 'Bild kopieren';
 }

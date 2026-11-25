@@ -3644,5 +3644,6 @@
   "newTabBehaviorSpecificStorage": "فتح موضع محدد",
   "newTabBehaviorSpecificStorageDesc": "يفتح دائماً الموضع المحدد أدناه. إذا تعذّر فتحه، يُطلب منك الاختيار.",
   "newTabStorageLabel": "الموضع للعلامات الجديدة",
-  "newTabStorageUnavailable": "الموضع غير متاح"
+  "newTabStorageUnavailable": "الموضع غير متاح",
+  "copyImageAction": "نسخ الصورة"
 }

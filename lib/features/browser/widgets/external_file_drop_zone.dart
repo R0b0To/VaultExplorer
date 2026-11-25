@@ -1,6 +1,6 @@
-import 'package:desktop_drop/desktop_drop.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
+import 'package:ve_desktop_transfer/ve_desktop_transfer.dart';
 
 /// Lets files and folders be dragged in from the operating system's file
 /// manager (Windows Explorer, Nautilus, Dolphin, ...) and dropped on [child].
@@ -80,12 +80,12 @@ class _ExternalFileDropZoneState extends State<ExternalFileDropZone> {
     setState(() => _hovering = value);
   }
 
-  void _handleDone(DropDoneDetails details) {
+  void _handleDone(DesktopDropDetails details) {
     _setHovering(false);
     if (!_active) return;
     final paths = <String>[
-      for (final file in details.files)
-        if (file.path.isNotEmpty) file.path,
+      for (final path in details.paths)
+        if (path.isNotEmpty) path,
     ];
     if (paths.isEmpty) return;
     if (widget.blockedReason != null) {
@@ -106,7 +106,7 @@ class _ExternalFileDropZoneState extends State<ExternalFileDropZone> {
     final cardColor = blocked ? cs.errorContainer : cs.primaryContainer;
     final onCard = blocked ? cs.onErrorContainer : cs.onPrimaryContainer;
 
-    return DropTarget(
+    return DesktopDropTarget(
       enable: widget.enabled,
       onDragEntered: (_) {
         if (_active) _setHovering(true);

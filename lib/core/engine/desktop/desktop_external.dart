@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/utils/secure_temp_file.dart';
 
 class DesktopExternal {
   DesktopExternal();
@@ -82,11 +83,7 @@ class DesktopExternal {
       try {
         await for (final e in base.list(followLinks: false)) {
           if (e is Directory && p.basename(e.path).startsWith(_tempPrefix)) {
-            try {
-              await e.delete(recursive: true);
-            } on FileSystemException {
-              // in use or not ours; leave it
-            }
+            await SecureTempFile.wipeAndDeleteDir(e);
           }
         }
       } on FileSystemException {
@@ -108,11 +105,7 @@ class DesktopExternal {
     final dirs = _tempByVolume.remove(vol);
     if (dirs == null) return;
     for (final d in dirs) {
-      try {
-        await d.delete(recursive: true);
-      } on FileSystemException {
-        // already gone
-      }
+      await SecureTempFile.wipeAndDeleteDir(d);
     }
   }
 

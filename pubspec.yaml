@@ -14,10 +14,11 @@ dependencies:
   local_auth: ^3.0.2
   path: ^1.9.1
   ffi: ^2.1.4            # dart:ffi helpers (desktop engine bindings)
-  file_selector: ^1.0.3  # container picker on Linux/Windows
-  # Drag files in from the OS file manager (Explorer, Nautilus, ...) onto the file browser. Only used on
-  # Linux/Windows; the Android build links the package but never creates a DropTarget.
-  desktop_drop: ">=0.5.0 <1.0.0"
+  file_selector: ^1.1.0  # container picker on Linux/Windows
+  # Native Windows OLE and Linux GTK3 drag-and-drop, OS file/image clipboard,
+  # and multi-window drop support.
+  ve_desktop_transfer:
+    path: packages/ve_desktop_transfer
   flutter_secure_storage: ^10.3.4
   # Desktop video playback (libmpv). media_kit / media_kit_video are plain Dart/FFI + a small texture plugin;
   # the native libmpv comes from the two platform packages, which only build on their own platform (Linux needs

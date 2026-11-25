@@ -22,6 +22,7 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/derived_key_expiry_service.dart';
 import 'package:vaultexplorer/core/utils/frame_jank_monitor.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 
 void configurePlatformIntegrations(ProviderContainer container) {
@@ -94,6 +95,9 @@ Future<void> runDeferredStartupWork(ProviderContainer container) async {
     appVersion = 'unknown';
   }
   await _cleanupOrphanedTempFiles();
+  if (Platform.isWindows || Platform.isLinux) {
+    unawaited(DesktopTransferService.instance.purgeStaleAtStartup());
+  }
 }
 
 /// Removes cached derived keys whose per-vault lifetime has run out. The

@@ -6,12 +6,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart'
+    show CategoryEntry;
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 
 export 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart'
@@ -44,6 +48,49 @@ Set<RawEntry> browserEntriesToDrag(
       if (inList.contains(item)) item,
     entry,
   };
+}
+
+/// Converts dragged browser [entries] into native [DesktopTransferEntry] specs,
+/// preserving exact paths for [CategoryEntry] items and skipping synthetic
+/// source-root headers.
+@visibleForTesting
+List<DesktopTransferEntry> buildDesktopTransferEntries({
+  required Iterable<RawEntry> entries,
+  required MountedContainer fallbackContainer,
+  required String sourceDirectory,
+  MountedContainer Function(RawEntry entry)? containerFor,
+}) {
+  final out = <DesktopTransferEntry>[];
+  for (final e in entries) {
+    final entryContainer = containerFor?.call(e) ?? fallbackContainer;
+    if (e is CategoryEntry) {
+      if (e.isSourceRoot) continue;
+      out.add(
+        DesktopTransferEntry(
+          container: entryContainer,
+          vaultPath: e.path,
+          name: e.baseName,
+          isDir: e.isDir,
+          sizeBytes: e.isDir ? 0 : e.sizeBytes,
+          modifiedSecs: e.modifiedSecs,
+        ),
+      );
+    } else {
+      out.add(
+        DesktopTransferEntry(
+          container: entryContainer,
+          vaultPath: sourceDirectory.isEmpty
+              ? e.name
+              : '$sourceDirectory/${e.name}',
+          name: e.name,
+          isDir: e.isDir,
+          sizeBytes: e.isDir ? 0 : e.sizeBytes,
+          modifiedSecs: e.modifiedSecs,
+        ),
+      );
+    }
+  }
+  return out;
 }
 
 /// Data carried while selected browser items are being dragged.
@@ -108,7 +155,7 @@ class BrowserItemDragData {
   /// including the folder the items came from (the conflict sheet then offers
   /// keep-both). Moving there would be a no-op, see [canMoveInto].
   bool canCopyInto(MountedContainer destination, String destinationPath) {
-    if (entries.isEmpty) return false;
+    if (destination.readOnly || entries.isEmpty) return false;
     return !_nestsFolderInItself(destination, destinationPath);
   }
 
@@ -258,6 +305,7 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
     required Duration holdDelay,
     required this.afterSelectDelay,
     required this.onSelect,
+    this.allowImmediateMouseDrag = false,
   }) {
     _timer = Timer(holdDelay, _holdPassed);
   }
@@ -265,6 +313,7 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
   /// Null for a plain hold; otherwise the extra wait before the drag starts.
   final Duration? afterSelectDelay;
   final VoidCallback? onSelect;
+  final bool allowImmediateMouseDrag;
 
   Timer? _timer;
   GestureMultiDragStartCallback? _starter;
@@ -318,6 +367,16 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
   @override
   void checkForResolutionAfterMove() {
     if (!_holding) return;
+    if (allowImmediateMouseDrag && kind == PointerDeviceKind.mouse) {
+      if (pendingDelta!.distance < 8.0) return;
+      _holding = false;
+      _timer?.cancel();
+      _timer = null;
+      _dragReady = true;
+      onSelect?.call();
+      resolve(GestureDisposition.accepted);
+      return;
+    }
     if (pendingDelta!.distance > computeHitSlop(kind, gestureSettings)) {
       resolve(GestureDisposition.rejected);
       _timer?.cancel();
@@ -340,11 +399,22 @@ class _HoldThenDragRecognizer extends MultiDragGestureRecognizer {
   _HoldThenDragRecognizer({
     required this.holdDelay,
     required this.gate,
-    AllowedButtonsFilter? allowedButtonsFilter,
-  }) : super(debugOwner: null, allowedButtonsFilter: allowedButtonsFilter);
+    this.allowImmediateMouseDrag = false,
+    super.allowedButtonsFilter,
+  }) : super(debugOwner: null);
 
   final Duration holdDelay;
   final _HoldDragGate gate;
+  final bool allowImmediateMouseDrag;
+
+  @override
+  bool isPointerAllowed(PointerDownEvent event) {
+    if (event.kind == PointerDeviceKind.mouse &&
+        (event.buttons & kPrimaryMouseButton) == 0) {
+      return false;
+    }
+    return super.isPointerAllowed(event);
+  }
 
   @override
   MultiDragPointerState createNewPointerState(PointerDownEvent event) {
@@ -356,6 +426,10 @@ class _HoldThenDragRecognizer extends MultiDragGestureRecognizer {
       holdDelay: holdDelay,
       afterSelectDelay: selectsFirst ? kItemDragAfterSelectDelay : null,
       onSelect: selectsFirst ? gate.onSelect : null,
+      allowImmediateMouseDrag:
+          allowImmediateMouseDrag &&
+          event.kind == PointerDeviceKind.mouse &&
+          (event.buttons & kPrimaryMouseButton) != 0,
     );
   }
 
@@ -390,6 +464,7 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
     super.onDragEnd,
     this.delay = kItemDragHoldDelay,
     this.hapticFeedbackOnStart = true,
+    this.allowImmediateMouseDrag = false,
     required this.gate,
     required this.tryBegin,
     required this.release,
@@ -400,6 +475,7 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
 
   /// Whether a tick is felt when the drag starts.
   final bool hapticFeedbackOnStart;
+  final bool allowImmediateMouseDrag;
 
   final _HoldDragGate gate;
   final bool Function(Offset position) tryBegin;
@@ -412,6 +488,7 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
     return _HoldThenDragRecognizer(
       holdDelay: delay,
       gate: gate,
+      allowImmediateMouseDrag: allowImmediateMouseDrag,
       allowedButtonsFilter: allowedButtonsFilter,
     )..onStart = (Offset position) {
       if (!tryBegin(position)) return null;
@@ -447,6 +524,7 @@ class BrowserItemDragItem extends StatefulWidget {
   final Widget child;
   final RawEntry entry;
   final MountedContainer? container;
+  final MountedContainer Function(RawEntry entry)? containerFor;
   final String currentDirectory;
   final List<RawEntry> visibleItems;
   final Set<RawEntry> selectedItems;
@@ -460,6 +538,7 @@ class BrowserItemDragItem extends StatefulWidget {
     required this.child,
     required this.entry,
     required this.container,
+    this.containerFor,
     required this.currentDirectory,
     required this.visibleItems,
     required this.selectedItems,
@@ -474,6 +553,11 @@ class BrowserItemDragItem extends StatefulWidget {
 }
 
 class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
+  int? _activePointerId;
+  PointerDeviceKind? _activePointerKind;
+  bool _isPrimaryMouseDown = false;
+  bool _handedOffToOsDrag = false;
+
   late final _HoldDragGate _gate = _HoldDragGate(
     selectsFirst: () => !widget.isSelectionMode,
     onSelect: _selectOnHold,
@@ -490,6 +574,48 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
     ).read(browserDragSessionProvider);
     if (session.isActive) return;
     widget.onItemLongPress(widget.entry);
+  }
+
+  void _handoffToOsDrag(
+    int viewId,
+    BrowserItemDragData data,
+    BrowserDragSession session,
+    FullScreenDragDrawerScope? drawerScope,
+  ) {
+    final resolved = data.entries;
+    if (resolved.isEmpty) return;
+
+    final transferItems = buildDesktopTransferEntries(
+      entries: resolved,
+      fallbackContainer: data.source,
+      sourceDirectory: data.sourceDirectory,
+      containerFor: widget.containerFor,
+    );
+    if (transferItems.isEmpty) return;
+
+    _handedOffToOsDrag = true;
+    final pointer = _activePointerId;
+    if (pointer != null) {
+      scheduleMicrotask(() => GestureBinding.instance.cancelPointer(pointer));
+    }
+    session.end();
+    drawerScope?.setDrawerDragBlocked(false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_isPrimaryMouseDown) {
+        _handedOffToOsDrag = false;
+        return;
+      }
+      unawaited(
+        DesktopTransferService.instance
+            .startOutboundDrag(viewId: viewId, items: transferItems)
+            .whenComplete(() {
+              _handedOffToOsDrag = false;
+              _isPrimaryMouseDown = false;
+              _activePointerId = null;
+            }),
+      );
+    });
   }
 
   /// The tile with its overlays. The tile is always the first child of the
@@ -608,11 +734,12 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
     if (isSelectionMode && !selectedItems.contains(entry)) return dragChild;
 
     final tabId = scope?.tabId ?? _kUnscopedTab;
-    return _GuardedLongPressDraggable<BrowserItemDragData>(
+    final draggable = _GuardedLongPressDraggable<BrowserItemDragData>(
       data: data,
       delay: kItemDragHoldDelay,
       maxSimultaneousDrags: 1,
       dragAnchorStrategy: pointerDragAnchorStrategy,
+      allowImmediateMouseDrag: PlatformFeatures.isDesktop,
       gate: _gate,
       tryBegin: (position) => session.tryBegin(tabId, position),
       release: session.end,
@@ -622,7 +749,28 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
         // then.
         widget.onItemLongPress(entry);
       },
-      onDragUpdate: (details) => session.updatePointer(details.globalPosition),
+      onDragUpdate: (details) {
+        session.updatePointer(details.globalPosition);
+        if (!PlatformFeatures.isDesktop ||
+            _handedOffToOsDrag ||
+            !_isPrimaryMouseDown ||
+            _activePointerKind != PointerDeviceKind.mouse) {
+          return;
+        }
+        final view = View.maybeOf(context);
+        if (view == null) return;
+        final dpr = view.devicePixelRatio > 0 ? view.devicePixelRatio : 1.0;
+        final size = view.physicalSize / dpr;
+        if (size.width <= 0 || size.height <= 0) return;
+        final pos = details.globalPosition;
+        const edgeMargin = 4.0;
+        if (pos.dx <= edgeMargin ||
+            pos.dy <= edgeMargin ||
+            pos.dx >= size.width - edgeMargin ||
+            pos.dy >= size.height - edgeMargin) {
+          _handoffToOsDrag(view.viewId, data, session, drawerScope);
+        }
+      },
       onDragEnd: (_) {
         session.end();
         drawerScope?.setDrawerDragBlocked(false);
@@ -636,6 +784,33 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
       ),
       childWhenDragging: dragChild,
       child: dragChild,
+    );
+    if (!PlatformFeatures.isDesktop) return draggable;
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        _activePointerId = event.pointer;
+        _activePointerKind = event.kind;
+        _handedOffToOsDrag = false;
+        _isPrimaryMouseDown =
+            event.kind == PointerDeviceKind.mouse &&
+            (event.buttons & kPrimaryMouseButton) != 0;
+      },
+      onPointerUp: (event) {
+        if (event.pointer == _activePointerId) {
+          _isPrimaryMouseDown = false;
+          _activePointerId = null;
+        }
+      },
+      onPointerCancel: (event) {
+        if (event.pointer == _activePointerId) {
+          if (!_handedOffToOsDrag) {
+            _isPrimaryMouseDown = false;
+          }
+          _activePointerId = null;
+        }
+      },
+      child: draggable,
     );
   }
 }

@@ -29,6 +29,7 @@ import 'desktop_archive.dart';
 import 'desktop_composite.dart';
 import 'desktop_crypto.dart';
 import 'desktop_external.dart';
+import 'desktop_transfer_service.dart';
 import 'desktop_hash.dart';
 import 'desktop_host_info.dart';
 import 'desktop_images.dart';
@@ -229,11 +230,9 @@ class DesktopEngineHost {
     'notifyResumedFramePainted': null,
     'warmContainer': null,
     'biometricKeyDelete': true,
-    // Explicit "not supported" answers (false), so the caller's fallback runs: the sensitive-clipboard pair
-    // falls back to Flutter's clipboard plus a compare-and-clear timer (sensitive_clipboard.dart); the
-    // keep-screen-on request is fire-and-forget and desktop has no wake-lock API without a plugin.
-    'setSensitiveClipboardText': false,
-    'clearSensitiveClipboardText': false,
+    // Explicit "not supported" answer (false), so the caller's fallback runs:
+    // the keep-screen-on request is fire-and-forget and desktop has no
+    // wake-lock API without a plugin.
     'setKeepScreenOn': false,
   };
 
@@ -465,6 +464,14 @@ class DesktopEngineHost {
         return args['filePath'] is String ? Uri.file(args['filePath'] as String).toString() : null;
       case ChannelMethods.openWithApp:
         return _openVaultFileWithApp(args);
+      case ChannelMethods.setSensitiveClipboardText:
+        return DesktopTransferService.instance.setSensitiveClipboardText(
+          (args['text'] as String?) ?? '',
+        );
+      case ChannelMethods.clearSensitiveClipboardText:
+        return DesktopTransferService.instance.clearSensitiveClipboardText(
+          expectedText: args['expectedText'] as String?,
+        );
       case ChannelMethods.readExternalFileBytes:
         return _external.readFileBytes(args['uri'] as String? ?? '');
       case ChannelMethods.writeExternalFileBytes:
@@ -1251,6 +1258,7 @@ class DesktopEngineHost {
     _forget(vol);
     await _external.cleanupVolume(vol);
     await _archive.cleanupVolume(vol);
+    await DesktopTransferService.instance.onVolumeLocked(vol);
     return true;
   }
 
@@ -1593,6 +1601,7 @@ class DesktopEngineHost {
     await _mounts.dispose();
     await _external.cleanupAll();
     await _archive.cleanupAll();
+    await DesktopTransferService.instance.dispose();
     await _hash.dispose();
     await pool.dispose();
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +27,7 @@ import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
 import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -408,8 +410,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   bool _isPathWithin(String path, String ancestor) =>
       ancestor.isEmpty || path == ancestor || path.startsWith('$ancestor/');
 
+  bool _hasOsClipboardContent = false;
+  DateTime? _lastOsClipboardCheck;
+  bool _osClipboardCheckInFlight = false;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && PlatformFeatures.isDesktop) {
+      unawaited(_refreshOsClipboardAvailability(force: true));
+    }
     if (state != AppLifecycleState.resumed ||
         !_initialLoadDone ||
         !_currentListingMayChangeExternally) {
@@ -1047,7 +1056,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final l10n = menuContext.l10n;
     final inArchive = _archiveContext != null;
     final readOnly = _isReadOnly;
-    final hasClipboard = ref.read(crossContainerClipboardProvider).hasItems;
+    final hasClipboard =
+        ref.read(crossContainerClipboardProvider).hasItems ||
+        _hasOsClipboardContent;
     final sort = _getSortStateForFolder(_currentDirPath);
 
     return <Widget>[
@@ -1165,11 +1176,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       child: Stack(
         fit: StackFit.passthrough,
         children: [
-          FolderBackgroundContextMenu(
-            // Locked panes (a drag in flight) must not pop a menu.
-            enabled: !locked,
-            menuBuilder: _buildFolderBackgroundMenu,
-            child: body,
+          Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: PlatformFeatures.isDesktop
+                ? (event) {
+                    if ((event.buttons & kSecondaryMouseButton) != 0) {
+                      unawaited(_refreshOsClipboardAvailability());
+                    }
+                  }
+                : null,
+            child: FolderBackgroundContextMenu(
+              // Locked panes (a drag in flight) must not pop a menu.
+              enabled: !locked,
+              menuBuilder: _buildFolderBackgroundMenu,
+              child: body,
+            ),
           ),
           Positioned.fill(
             child: IgnorePointer(
@@ -1194,6 +1215,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleBrowserKey);
     MouseNavDispatcher.instance.register(_handleMouseNav, viewId: _ownViewId);
+    if (PlatformFeatures.isDesktop) {
+      unawaited(_refreshOsClipboardAvailability(force: true));
+    }
     if (widget.scrollController != null) {
       _browserScrollController = widget.scrollController!;
     }
@@ -1665,6 +1689,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         );
       },
       onCopy: () {
+        final transferEntries = <DesktopTransferEntry>[
+          for (final target in targets)
+            DesktopTransferEntry(
+              container: widget.container,
+              vaultPath: _fullPathOf(target),
+              name: target.name,
+              isDir: target.isDir,
+              sizeBytes: target.isDir ? 0 : target.sizeBytes,
+              modifiedSecs: target.modifiedSecs,
+            ),
+        ];
         _clip.set(
           volId: widget.container.volId,
           displayName: widget.container.displayName,
@@ -1679,6 +1714,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               ),
           ],
         );
+        _syncSelectionToOsClipboard(transferEntries, cut: false);
         _setStatus(
           context.l10n.copiedSuffix(
             targets.length > 1
@@ -1706,6 +1742,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               ),
           ],
         );
+        _syncSelectionToOsClipboard(const [], cut: true);
         _setStatus(context.l10n.clipboardVerbMoving);
       },
       onCopyPath: _archiveContext == null
@@ -1798,6 +1835,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           _setStatus(context.l10n.couldNotShareFiles, error: true);
         }
       },
+      onCopyImage: (PlatformFeatures.isDesktop &&
+              _archiveContext == null &&
+              targets.length == 1 &&
+              !entry.isDir &&
+              MediaViewerConstants.isImage(entry.name))
+          ? () => unawaited(_copyImageToOsClipboard(entry, fullPath))
+          : null,
       onEditImage: (!entry.isDir && MediaViewerConstants.isImage(entry.name))
           ? () => _editImage(entry.name, fullPath)
           : null,
@@ -2189,17 +2233,24 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     unawaited(_loadDirectoryContents(_currentDirPath, refresh: true));
   }
 
-  /// The toolbar's paste button: enabled while the clipboard holds items.
+  /// The toolbar's paste button: enabled while the internal or OS clipboard
+  /// holds items.
   Widget _buildPasteToolbarButton() {
     return Consumer(
       builder: (context, ref, _) {
         final hasItems = ref.watch(
           crossContainerClipboardProvider.select((clip) => clip.hasItems),
         );
-        return IconButton(
+        final canPaste = (hasItems || _hasOsClipboardContent) && !_isReadOnly;
+        final button = IconButton(
           icon: const Icon(Icons.content_paste_rounded),
           tooltip: context.l10n.actionPaste,
-          onPressed: hasItems && !_isReadOnly ? () => unawaited(_paste()) : null,
+          onPressed: canPaste ? () => unawaited(_paste()) : null,
+        );
+        if (!PlatformFeatures.isDesktop) return button;
+        return MouseRegion(
+          onEnter: (_) => unawaited(_refreshOsClipboardAvailability()),
+          child: button,
         );
       },
     );
@@ -2590,6 +2641,79 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         isLocalStorage: widget.container.isLocalStorage,
       ),
     );
+  }
+
+  Future<void> _refreshOsClipboardAvailability({bool force = false}) async {
+    if (!PlatformFeatures.isDesktop || _osClipboardCheckInFlight) return;
+    final now = DateTime.now();
+    if (!force &&
+        _lastOsClipboardCheck != null &&
+        now.difference(_lastOsClipboardCheck!) <
+            const Duration(milliseconds: 600)) {
+      return;
+    }
+    _osClipboardCheckInFlight = true;
+    _lastOsClipboardCheck = now;
+    try {
+      final available =
+          await DesktopTransferService.instance.hasOsPasteableContent();
+      if (mounted && available != _hasOsClipboardContent) {
+        setState(() => _hasOsClipboardContent = available);
+      }
+    } finally {
+      _osClipboardCheckInFlight = false;
+    }
+  }
+
+  void _syncSelectionToOsClipboard(
+    List<DesktopTransferEntry> items, {
+    required bool cut,
+  }) {
+    if (!PlatformFeatures.isDesktop) return;
+    if (cut) {
+      unawaited(DesktopTransferService.instance.markInternalNonOsClipboard());
+      return;
+    }
+    if (items.isEmpty) return;
+    unawaited(
+      DesktopTransferService.instance.copyFilesToOsClipboard(items: items),
+    );
+  }
+
+  Future<void> _copyImageToOsClipboard(RawEntry entry, String fullPath) async {
+    final ok = await DesktopTransferService.instance.copyImageToOsClipboard(
+      container: widget.container,
+      vaultPath: fullPath,
+      fileIoApi: ref.read(vaultFileIoApiProvider),
+    );
+    if (!mounted) return;
+    _setStatus(
+      ok
+          ? context.l10n.copiedSuffix(entry.name)
+          : context.l10n.bookmarkTargetMissing,
+      error: !ok,
+    );
+  }
+
+  Future<void> _pasteClipboardImagePng(Uint8List pngBytes) async {
+    if (_isReadOnly || _archiveContext != null) return;
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final fileName =
+        await DesktopTransferService.instance.pasteImagePngToContainer(
+          container: widget.container,
+          targetDirPath: _currentDirPath,
+          fileIoApi: fileIoApi,
+          pngBytes: pngBytes,
+        );
+    if (!mounted) return;
+    if (fileName == null) {
+      _setStatus(context.l10n.bookmarkTargetMissing, error: true);
+      return;
+    }
+    await _loadDirectoryContents(_currentDirPath, refresh: true);
+    if (mounted) {
+      _setStatus(context.l10n.copiedSuffix(fileName));
+    }
   }
 
   /// Leaves the search and shows [entry] in the folder it lives in. Deep-search
@@ -5176,6 +5300,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       cut: cut,
       clipItems: clipItems,
     );
+    _syncSelectionToOsClipboard([
+      for (final item in selected)
+        DesktopTransferEntry(
+          container: item.container,
+          vaultPath: fullPathOf(item.entry, item.currentDirPath),
+          name: item.entry.name,
+          isDir: item.entry.isDir,
+          sizeBytes: item.entry.isDir ? 0 : item.entry.sizeBytes,
+          modifiedSecs: item.entry.modifiedSecs,
+        ),
+    ], cut: cut);
     exitSelectionMode();
   }
 
@@ -5331,14 +5466,52 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   Future<void> _paste() async {
-    final clip = ref.read(crossContainerClipboardProvider);
-    final returnToTabId = clip.returnToTabId;
-    final returnToFilter = clip.returnToFilter;
-    if (!clip.hasItems) return;
+    if (_archiveContext != null) return;
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyCantPaste, error: true);
       return;
     }
+    final clip = ref.read(crossContainerClipboardProvider);
+    final returnToTabId = clip.returnToTabId;
+    final returnToFilter = clip.returnToFilter;
+
+    if (PlatformFeatures.isDesktop) {
+      final osClip = await DesktopTransferService.instance.inspectOsClipboard();
+      if (!mounted) return;
+      final osHasExternal =
+          (osClip.hasFiles &&
+              !osClip.isOwnFiles &&
+              osClip.filePaths.isNotEmpty) ||
+          osClip.hasImage;
+      final isNonOsMirroredClip =
+          clip.isCutOperation || clip.isArchiveCreate || clip.isArchiveExtract;
+      final preferOs =
+          osHasExternal &&
+          (!clip.hasItems ||
+              (!isNonOsMirroredClip && !osClip.isOwnFiles) ||
+              (isNonOsMirroredClip &&
+                  DesktopTransferService.instance
+                      .hasExternalClipboardChangedSinceWatermark(osClip)));
+      if (preferOs) {
+        if (osClip.hasFiles &&
+            !osClip.isOwnFiles &&
+            osClip.filePaths.isNotEmpty) {
+          await _handleExternalDrop(osClip.filePaths);
+          return;
+        }
+        if (osClip.hasImage) {
+          final png =
+              await DesktopTransferService.instance.readClipboardImagePng();
+          if (!mounted) return;
+          if (png != null && png.isNotEmpty) {
+            await _pasteClipboardImagePng(png);
+            return;
+          }
+        }
+      }
+    }
+
+    if (!clip.hasItems) return;
     _signalActivity();
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final srcVolId = clip.sourceVolId;
@@ -6239,46 +6412,73 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // import: the conflicts were computed against this folder.
     final container = widget.container;
     final destDirPath = _currentDirPath;
-    final fileIo = ref.read(vaultFileIoApiProvider);
-
-    final pick = await fileIo.prepareDropImport(container, destDirPath, paths);
-    if (!mounted) {
-      if (pick != null) unawaited(fileIo.cancelPickedImport(pick.pickToken));
-      return;
-    }
-    if (pick == null) {
-      _setStatus(
-        context.l10n.dropImportSkippedItems(paths.length),
-        error: true,
-      );
-      return;
-    }
-    final skipped = paths.length - pick.items.length;
-
-    final conflictPlan = await _resolveImportConflicts(
-      pick,
-      candidateIsDir: null,
-    );
-    if (conflictPlan == null || !mounted) return;
-
-    final onlyFolders = pick.items.every((i) => i.isDir);
-    final op = _opSvc.enqueueImport(
-      dest: container,
+    if (DesktopTransferService.instance.isSameOriginDrop(
+      paths,
+      destVolId: container.volId,
       destDirPath: destDirPath,
-      items: pick.items,
-      isFolder: onlyFolders,
-      performImport: (opId) => fileIo.importFiles(
-        container,
-        destDirPath,
-        opId,
-        pick.pickToken,
-        conflictPlan: conflictPlan.map((k, v) => MapEntry(k, v.name)),
-      ),
-      l10n: context.l10n,
-    );
-    _attachImportCompletionListener(op, isFolder: onlyFolders);
-    if (skipped > 0) {
-      _setStatus(context.l10n.dropImportSkippedItems(skipped), error: true);
+    )) {
+      return;
+    }
+    final fileIo = ref.read(vaultFileIoApiProvider);
+    final pinnedDirs = DesktopTransferService.instance.retainImportPaths(paths);
+    final skipDeleteSources =
+        DesktopTransferService.instance.containsStagedPath(paths);
+    var handedToOp = false;
+
+    try {
+      final pick = await fileIo.prepareDropImport(container, destDirPath, paths);
+      if (!mounted) {
+        if (pick != null) unawaited(fileIo.cancelPickedImport(pick.pickToken));
+        return;
+      }
+      if (pick == null) {
+        _setStatus(
+          context.l10n.dropImportSkippedItems(paths.length),
+          error: true,
+        );
+        return;
+      }
+      final skipped = paths.length - pick.items.length;
+
+      final conflictPlan = await _resolveImportConflicts(
+        pick,
+        candidateIsDir: null,
+      );
+      if (conflictPlan == null || !mounted) return;
+
+      final onlyFolders = pick.items.every((i) => i.isDir);
+      final op = _opSvc.enqueueImport(
+        dest: container,
+        destDirPath: destDirPath,
+        items: pick.items,
+        isFolder: onlyFolders,
+        performImport: (opId) => fileIo.importFiles(
+          container,
+          destDirPath,
+          opId,
+          pick.pickToken,
+          conflictPlan: conflictPlan.map((k, v) => MapEntry(k, v.name)),
+        ),
+        l10n: context.l10n,
+      );
+      _attachImportCompletionListener(
+        op,
+        isFolder: onlyFolders,
+        skipDeleteSources: skipDeleteSources,
+        onDone: pinnedDirs.isEmpty
+            ? null
+            : () => DesktopTransferService.instance.releaseImportPaths(
+                pinnedDirs,
+              ),
+      );
+      handedToOp = true;
+      if (skipped > 0) {
+        _setStatus(context.l10n.dropImportSkippedItems(skipped), error: true);
+      }
+    } finally {
+      if (!handedToOp && pinnedDirs.isNotEmpty) {
+        DesktopTransferService.instance.releaseImportPaths(pinnedDirs);
+      }
     }
   }
 
@@ -6292,11 +6492,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void _attachImportCompletionListener(
     FileOperation op, {
     required bool isFolder,
+    bool skipDeleteSources = false,
+    VoidCallback? onDone,
   }) {
     final fileIo = ref.read(vaultFileIoApiProvider);
+    var completedHandled = false;
+    void finishOnce() {
+      if (completedHandled) return;
+      completedHandled = true;
+      onDone?.call();
+    }
+
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
+        finishOnce();
         unawaited(fileIo.clearImportSources(op.id));
         return;
       }
@@ -6305,6 +6515,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           op.status != FileOperationStatus.pending;
       if (done) {
         op.removeListener(listener);
+        finishOnce();
         // See _opNeedsAttention's doc comment (applied the same way in
         // bindOpListener, above) -- a failed/diskFull/partially-failed
         // import stays in the service's list instead of being dismissed out
@@ -6319,7 +6530,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         } else if (!keepVisible) {
           _opSvc.dismiss(op.id);
         }
-        if (op.status == FileOperationStatus.completed) {
+        if (op.status == FileOperationStatus.completed && !skipDeleteSources) {
           _maybeDeleteImportSources(op, isFolder: isFolder);
         } else {
           unawaited(fileIo.clearImportSources(op.id));
@@ -8559,9 +8770,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                     onSelectionChanged:
                                                         setSelectedItems,
                                                     enableFileDrag:
-                                                        !widget
-                                                            .container
-                                                            .readOnly &&
+                                                        (PlatformFeatures
+                                                                .isDesktop ||
+                                                            !widget
+                                                                .container
+                                                                .readOnly) &&
                                                         _archiveContext ==
                                                             null &&
                                                         !_isDeepSearch,

@@ -6,9 +6,10 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 
-MountedContainer _volume(int volId) => MountedContainer(
+MountedContainer _volume(int volId, {bool readOnly = false}) => MountedContainer(
   volId: volId,
   uri: 'file:///vault$volId.hc',
   displayName: 'Vault $volId',
@@ -17,6 +18,7 @@ MountedContainer _volume(int volId) => MountedContainer(
   totalSpace: 1000000,
   freeSpace: 500000,
   containerFormat: 'veracrypt',
+  readOnly: readOnly,
 );
 
 // RawEntry overrides ==, so it cannot be an element of a const set.
@@ -157,6 +159,56 @@ void main() {
 
       expect(data.canCopyInto(vault, 'x'), isFalse);
       expect(data.canMoveInto(vault, 'x'), isFalse);
+    });
+
+    test('read-only destination rejects internal drops', () {
+      final rw = _volume(1);
+      final ro = _volume(2, readOnly: true);
+      final data = _data(source: rw, entries: {_file});
+
+      expect(data.canCopyInto(ro, 'docs'), isFalse);
+      expect(data.canMoveInto(ro, 'docs'), isFalse);
+      expect(data.canDropInto(ro, 'docs'), isFalse);
+    });
+  });
+
+  group('buildDesktopTransferEntries', () {
+    test('resolves RawEntry against sourceDirectory and CategoryEntry full path without source roots', () {
+      final v1 = _volume(1);
+      final v2 = _volume(2);
+      const rawFile = RawEntry(name: 'notes.txt', isDir: false, sizeBytes: 42, modifiedSecs: 100);
+      final catFile = CategoryEntry(
+        name: 'vacation/beach.jpg',
+        sourceVolId: 2,
+        path: 'photos/vacation/beach.jpg',
+        isDir: false,
+        sizeBytes: 2048,
+        modifiedSecs: 200,
+      );
+      final sourceRoot = CategoryEntry(
+        name: 'Vault 2',
+        sourceVolId: 2,
+        path: '',
+        isDir: true,
+        sizeBytes: 0,
+        modifiedSecs: 0,
+        isSourceRoot: true,
+      );
+
+      final result = buildDesktopTransferEntries(
+        entries: [rawFile, catFile, sourceRoot],
+        fallbackContainer: v1,
+        sourceDirectory: 'docs',
+        containerFor: (e) => e is CategoryEntry && e.sourceVolId == 2 ? v2 : v1,
+      );
+
+      expect(result.length, 2);
+      expect(result[0].container.volId, 1);
+      expect(result[0].vaultPath, 'docs/notes.txt');
+      expect(result[0].name, 'notes.txt');
+      expect(result[1].container.volId, 2);
+      expect(result[1].vaultPath, 'photos/vacation/beach.jpg');
+      expect(result[1].name, 'beach.jpg');
     });
   });
 

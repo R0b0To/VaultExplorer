@@ -3,12 +3,12 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  desktop_drop
   dynamic_color
   file_selector_windows
   flutter_secure_storage_windows
   local_auth_windows
   media_kit_libs_windows_video
+  ve_desktop_transfer
   media_kit_video
 )
 

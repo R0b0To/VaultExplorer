@@ -418,7 +418,7 @@ class VeNativeEvent {
 }
 
 class VeNative {
-  VeNative._(this._lib) {
+  VeNative._(this._lib, this.libraryPath) {
     _openFile = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Int32), int Function(Pointer<Utf8>, int)>('ve_open_file');
     _closeFd = _lib.lookupFunction<Void Function(Int32), void Function(int)>('ve_close_fd');
     _createFile = _lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ve_create_file');
@@ -490,6 +490,7 @@ class VeNative {
   }
 
   final DynamicLibrary _lib;
+  final String libraryPath;
   late final int Function(Pointer<Utf8>, int) _openFile;
   late final void Function(int) _closeFd;
   late final int Function(Pointer<Utf8>) _createFile;
@@ -757,9 +758,17 @@ class VeNative {
             '(or run with VE_ENGINE_LIBRARY=<path to the fresh .so>).');
         continue;
       }
-      return VeNative._(lib);
+      return VeNative._(lib, path);
     }
     throw StateError('Could not load the VaultExplorer engine library:\n${problems.join('\n')}');
+  }
+
+  /// Returns the first candidate engine library path that exists on disk, or null.
+  static String? resolveExistingLibraryPath() {
+    for (final path in candidatePaths()) {
+      if (File(path).existsSync()) return path;
+    }
+    return null;
   }
 
   int get maxVolumes => _maxVolumes();

@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -13,7 +14,10 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
+import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
@@ -710,6 +714,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         });
 
     _playlistController.addListener(_onPlaylistUpdate);
+    HardwareKeyboard.instance.addHandler(_handleViewerKey);
     _playbackManager.activeControllerNotifier.addListener(
       _onActiveVideoControllerChanged,
     );
@@ -3719,8 +3724,57 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     });
   }
 
+  bool _handleViewerKey(KeyEvent event) {
+    if (!PlatformFeatures.isDesktop) return false;
+    if (event is! KeyDownEvent || !mounted) return false;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+    if (!keyboardFocusIsInViewOf(context)) return false;
+    final focused = FocusManager.instance.primaryFocus?.context;
+    if (focused?.findAncestorWidgetOfExactType<EditableText>() != null ||
+        focused?.widget is EditableText) {
+      return false;
+    }
+    final kb = HardwareKeyboard.instance;
+    final primary = kb.isControlPressed || kb.isMetaPressed;
+    if (primary &&
+        !kb.isShiftPressed &&
+        !kb.isAltPressed &&
+        event.logicalKey == LogicalKeyboardKey.keyC &&
+        MediaViewerConstants.isImage(_playlistController.currentFile)) {
+      unawaited(_copyCurrentImageToClipboard());
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _copyCurrentImageToClipboard() async {
+    final fileName = _playlistController.currentFile;
+    if (fileName.isEmpty || !MediaViewerConstants.isImage(fileName)) return;
+    final ok = await DesktopTransferService.instance.copyImageToOsClipboard(
+      container: widget.container,
+      vaultPath: fileName,
+      fileIoApi: ref.read(vaultFileIoApiProvider),
+      sensitiveOverride: widget.isArchivePreview ? true : null,
+    );
+    if (!mounted) return;
+    final label = p.posix.basename(fileName);
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? context.l10n.copiedSuffix(label)
+                : context.l10n.bookmarkTargetMissing,
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleViewerKey);
     unawaited(_saveActivePlaybackPosition());
     unawaited(_mediaSessionSubscription!.cancel());
     _engineEvents.removeUsbContainerDetachedListener(_onContainerDetached);
@@ -4689,6 +4743,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                     onPlaylistChanged: _onPlaylistChanged,
                                     onMenuOpened: _menuOpened,
                                     onMenuClosed: _menuClosed,
+                                    onCopyImage: PlatformFeatures.isDesktop
+                                        ? () => unawaited(
+                                            _copyCurrentImageToClipboard(),
+                                          )
+                                        : null,
                                     isImage: MediaViewerConstants.isImage(
                                       _playlistController.currentFile,
                                     ),

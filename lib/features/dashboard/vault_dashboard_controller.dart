@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
@@ -936,6 +937,7 @@ class VaultDashboardController extends _$VaultDashboardController {
         (clip.sourceVolId == volId || clip.items.any((i) => i.volId == volId))) {
       ref.read(crossContainerClipboardProvider.notifier).clear();
     }
+    unawaited(DesktopTransferService.instance.onVolumeLocked(volId));
     ref.read(fileOperationServiceProvider).clearForVolume(volId);
     FullResImageCache.clear();
     ref.read(vaultEngineEventsProvider).notifyContainerLocked(volId);

@@ -523,6 +523,7 @@ class FileGridViewState extends State<FileGridView>
       child: BrowserItemDragItem(
         entry: entry,
         container: _containerOf(entry),
+        containerFor: widget.containerFor,
         currentDirectory: widget.currentDirPath,
         visibleItems: widget.items,
         selectedItems: widget.selectedItems,

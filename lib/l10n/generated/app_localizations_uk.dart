@@ -13329,4 +13329,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Місце недоступне';
+
+  @override
+  String get copyImageAction => 'Копіювати зображення';
 }

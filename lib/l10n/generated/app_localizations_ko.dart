@@ -12507,4 +12507,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '위치를 사용할 수 없음';
+
+  @override
+  String get copyImageAction => '이미지 복사';
 }

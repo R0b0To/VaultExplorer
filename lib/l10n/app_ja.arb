@@ -3644,5 +3644,6 @@
   "newTabBehaviorSpecificStorage": "特定の場所を開く",
   "newTabBehaviorSpecificStorageDesc": "下で選んだ場所を常に開きます。開けない場合は開く場所を尋ねます。",
   "newTabStorageLabel": "新しいタブの場所",
-  "newTabStorageUnavailable": "場所を利用できません"
+  "newTabStorageUnavailable": "場所を利用できません",
+  "copyImageAction": "画像をコピー"
 }

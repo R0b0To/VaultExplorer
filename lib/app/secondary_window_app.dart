@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
+import 'package:ve_desktop_transfer/ve_desktop_transfer.dart';
 import 'package:vaultexplorer/core/windowing/window_caption.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -78,6 +79,7 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
     final previous = _viewId;
     if (previous != null) {
       MouseNavDispatcher.instance.unregisterViewNavigator(previous);
+      unawaited(VeDesktopTransfer.instance.releaseView(previous));
     }
     _viewId = viewId;
     if (viewId != null) {
@@ -85,6 +87,7 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
         viewId,
         widget.entry.navigatorKey,
       );
+      unawaited(VeDesktopTransfer.instance.retainView(viewId));
       unawaited(_replaceNativeCaption(viewId));
     }
   }
@@ -94,6 +97,7 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
     final viewId = _viewId;
     if (viewId != null) {
       MouseNavDispatcher.instance.unregisterViewNavigator(viewId);
+      unawaited(VeDesktopTransfer.instance.releaseView(viewId));
     }
     super.dispose();
   }

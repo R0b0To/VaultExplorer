@@ -3,11 +3,11 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  desktop_drop
   dynamic_color
   file_selector_linux
   flutter_secure_storage_linux
   media_kit_libs_linux
+  ve_desktop_transfer
   media_kit_video
 )
 

@@ -3638,5 +3638,6 @@
   "newTabBehaviorSpecificStorage": "Belirli bir konumu aç",
   "newTabBehaviorSpecificStorageDesc": "Aşağıda seçilen konumu her zaman açar. Açılamazsa size sorulur.",
   "newTabStorageLabel": "Yeni sekmeler için konum",
-  "newTabStorageUnavailable": "Konum kullanılamıyor"
+  "newTabStorageUnavailable": "Konum kullanılamıyor",
+  "copyImageAction": "Resmi kopyala"
 }

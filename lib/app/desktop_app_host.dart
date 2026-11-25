@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/windowing/app_windows.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
+import 'package:ve_desktop_transfer/ve_desktop_transfer.dart';
 import 'package:vaultexplorer/core/windowing/window_caption.dart';
 
 /// The root of the app on Linux and Windows (`runWidget`, not `runApp`).
@@ -124,25 +125,34 @@ class _MainWindowChromeState extends State<MainWindowChrome> {
     if (viewId == _viewId) return;
     final previous = _viewId;
     if (previous != null) {
-      MouseNavDispatcher.instance.unregisterViewNavigator(previous);
+      if (!(_inRunnerWindow)) {
+        MouseNavDispatcher.instance.unregisterViewNavigator(previous);
+      }
+      unawaited(VeDesktopTransfer.instance.releaseView(previous));
     }
     _viewId = viewId;
-    if (viewId != null && !_inRunnerWindow) {
-      // The dispatcher assumes the app's navigator for the platform's own
-      // window only; any other window has to say which one is its own.
-      MouseNavDispatcher.instance.registerViewNavigator(
-        viewId,
-        appNavigatorKey,
-      );
-      unawaited(_replaceNativeCaption(viewId));
+    if (viewId != null) {
+      unawaited(VeDesktopTransfer.instance.retainView(viewId));
+      if (!_inRunnerWindow) {
+        // The dispatcher assumes the app's navigator for the platform's own
+        // window only; any other window has to say which one is its own.
+        MouseNavDispatcher.instance.registerViewNavigator(
+          viewId,
+          appNavigatorKey,
+        );
+        unawaited(_replaceNativeCaption(viewId));
+      }
     }
   }
 
   @override
   void dispose() {
     final viewId = _viewId;
-    if (viewId != null && !_inRunnerWindow) {
-      MouseNavDispatcher.instance.unregisterViewNavigator(viewId);
+    if (viewId != null) {
+      if (!_inRunnerWindow) {
+        MouseNavDispatcher.instance.unregisterViewNavigator(viewId);
+      }
+      unawaited(VeDesktopTransfer.instance.releaseView(viewId));
     }
     super.dispose();
   }

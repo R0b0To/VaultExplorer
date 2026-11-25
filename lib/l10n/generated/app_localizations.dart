@@ -21985,6 +21985,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Location not available'**
   String get newTabStorageUnavailable;
+
+  /// Context and overflow menu action that copies the decoded image onto the system clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copy image'**
+  String get copyImageAction;
 }
 
 class _AppLocalizationsDelegate

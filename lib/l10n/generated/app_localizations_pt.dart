@@ -13223,4 +13223,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Local indisponível';
+
+  @override
+  String get copyImageAction => 'Copiar imagem';
 }

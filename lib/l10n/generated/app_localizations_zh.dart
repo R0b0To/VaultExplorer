@@ -12312,4 +12312,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '位置不可用';
+
+  @override
+  String get copyImageAction => '复制图片';
 }

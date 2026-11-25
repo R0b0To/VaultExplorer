@@ -656,6 +656,7 @@ class FileListViewState extends State<FileListView> {
       child: BrowserItemDragItem(
         entry: entry,
         container: (widget.containerFor?.call(entry) ?? widget.container),
+        containerFor: widget.containerFor,
         currentDirectory: widget.currentDirPath,
         visibleItems: widget.items,
         selectedItems: widget.selectedItems,

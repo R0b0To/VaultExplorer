@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
@@ -11,7 +12,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_actio
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_glyph.dart';
 import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
-enum _MoreMenuSelection { customizeControls }
+enum _MoreMenuSelection { copyImage, customizeControls }
 
 class MediaViewerTopBar extends StatelessWidget {
   final PlaylistController playlistController;
@@ -29,6 +30,7 @@ class MediaViewerTopBar extends StatelessWidget {
   final VoidCallback onPlaylistChanged;
   final VoidCallback? onMenuOpened;
   final VoidCallback? onMenuClosed;
+  final VoidCallback? onCopyImage;
   final bool isImage;
   final bool isAudio;
 
@@ -49,6 +51,7 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.onPlaylistChanged,
     this.onMenuOpened,
     this.onMenuClosed,
+    this.onCopyImage,
     required this.isImage,
     required this.isAudio,
   });
@@ -204,6 +207,8 @@ class MediaViewerTopBar extends StatelessWidget {
         HapticFeedback.lightImpact();
         if (selection is MediaViewerAction) {
           onExecuteAction(selection);
+        } else if (selection == _MoreMenuSelection.copyImage) {
+          onCopyImage?.call();
         } else {
           onCustomizeControls();
         }
@@ -245,6 +250,23 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
           );
         }),
+        if (PlatformFeatures.isDesktop && isImage && onCopyImage != null) ...[
+          const PopupMenuDivider(),
+          PopupMenuItem<Object>(
+            value: _MoreMenuSelection.copyImage,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.copy_rounded,
+                  size: AppIconSize.small,
+                  color: cs.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text(context.l10n.copyImageAction),
+              ],
+            ),
+          ),
+        ],
         const PopupMenuDivider(),
         PopupMenuItem<Object>(
           value: _MoreMenuSelection.customizeControls,

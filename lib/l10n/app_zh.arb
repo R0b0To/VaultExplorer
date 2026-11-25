@@ -3644,5 +3644,6 @@
   "newTabBehaviorSpecificStorage": "打开指定位置",
   "newTabBehaviorSpecificStorageDesc": "始终打开下方选择的位置。若无法打开，则改为询问。",
   "newTabStorageLabel": "新标签页的位置",
-  "newTabStorageUnavailable": "位置不可用"
+  "newTabStorageUnavailable": "位置不可用",
+  "copyImageAction": "复制图片"
 }

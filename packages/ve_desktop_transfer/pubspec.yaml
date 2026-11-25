@@ -1,0 +1,25 @@
+name: ve_desktop_transfer
+description: Native desktop drag-and-drop and clipboard integration (Windows OLE + Linux GTK3 X11/Wayland) for VaultExplorer.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      linux:
+        pluginClass: VeDesktopTransferPlugin
+      windows:
+        pluginClass: VeDesktopTransferPlugin

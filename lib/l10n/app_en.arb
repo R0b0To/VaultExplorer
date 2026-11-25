@@ -15240,5 +15240,9 @@
   "newTabStorageUnavailable": "Location not available",
   "@newTabStorageUnavailable": {
     "description": "Shown in the new tab storage picker when the chosen storage no longer exists"
+  },
+  "copyImageAction": "Copy image",
+  "@copyImageAction": {
+    "description": "Context and overflow menu action that copies the decoded image onto the system clipboard"
   }
 }

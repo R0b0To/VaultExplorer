@@ -47,7 +47,9 @@ import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
+import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
@@ -373,6 +375,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       );
     }
 
+    HardwareKeyboard.instance.addHandler(_handleCategoryKey);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_startScan());
     });
@@ -394,6 +397,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleCategoryKey);
     _disposed = true;
     _deactivated = true;
     _token?.cancel();
@@ -2080,6 +2084,31 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           returnToFilter: _scoped ? widget.category.filterKey : null,
         );
     _clearSelection();
+    if (PlatformFeatures.isDesktop) {
+      if (cut) {
+        unawaited(DesktopTransferService.instance.markInternalNonOsClipboard());
+      } else {
+        final transferEntries = <DesktopTransferEntry>[
+          for (final e in eligible)
+            if (_containers[e.sourceVolId] != null)
+              DesktopTransferEntry(
+                container: _containers[e.sourceVolId]!,
+                vaultPath: e.path,
+                name: e.path.split('/').last,
+                isDir: e.isDir,
+                sizeBytes: e.sizeBytes,
+                modifiedSecs: e.modifiedSecs,
+              ),
+        ];
+        if (transferEntries.isNotEmpty) {
+          unawaited(
+            DesktopTransferService.instance.copyFilesToOsClipboard(
+              items: transferEntries,
+            ),
+          );
+        }
+      }
+    }
     _notify(context.l10n.categoryClipboardReady(eligible.length));
     _openFileManagerForStagedItems(eligible);
   }
@@ -2457,6 +2486,68 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     );
   }
 
+  bool get _isCategoryKeyboardTarget {
+    if (!PlatformFeatures.isDesktop) return false;
+    if (!mounted || _disposed || _deactivated || !_isActiveTab) return false;
+    if (ModalRoute.of(context)?.isCurrent != true) return false;
+    var hidden = false;
+    context.visitAncestorElements((element) {
+      final w = element.widget;
+      if (w is Offstage && w.offstage) {
+        hidden = true;
+        return false;
+      }
+      return true;
+    });
+    if (hidden) return false;
+    if (!keyboardFocusIsInViewOf(context)) return false;
+    final focused = FocusManager.instance.primaryFocus?.context;
+    return focused?.findAncestorWidgetOfExactType<EditableText>() == null;
+  }
+
+  bool _handleCategoryKey(KeyEvent event) {
+    if (event is! KeyDownEvent || !_isCategoryKeyboardTarget) return false;
+    final kb = HardwareKeyboard.instance;
+    final primary = kb.isControlPressed || kb.isMetaPressed;
+    if (!primary || kb.isAltPressed || kb.isShiftPressed) return false;
+    final selected = ref
+        .read(fileBrowserSelectionProvider(widget.tabId))
+        .items
+        .whereType<CategoryEntry>()
+        .toList();
+    if (event.logicalKey == LogicalKeyboardKey.keyA && _items.isNotEmpty) {
+      _selectAll();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyC && selected.isNotEmpty) {
+      _stage(selected, cut: false);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyX && selected.isNotEmpty) {
+      _stage(selected, cut: true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _copyImageToOsClipboard(
+    MountedContainer container,
+    CategoryEntry entry,
+  ) async {
+    final ok = await DesktopTransferService.instance.copyImageToOsClipboard(
+      container: container,
+      vaultPath: entry.path,
+      fileIoApi: ref.read(vaultFileIoApiProvider),
+    );
+    if (!mounted) return;
+    _notify(
+      ok
+          ? context.l10n.copiedSuffix(entry.baseName)
+          : context.l10n.bookmarkTargetMissing,
+      error: !ok,
+    );
+  }
+
   void _copyPath(CategoryEntry entry) {
     final container = _containers[entry.sourceVolId];
     if (container == null) return;
@@ -2550,6 +2641,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           : null,
       onEditMetadata: entry.isDir ? null : () => _editMetadata([entry]),
       onCopyPath: () => _copyPath(entry),
+      onCopyImage: (PlatformFeatures.isDesktop && isImg)
+          ? () => unawaited(_copyImageToOsClipboard(container, entry))
+          : null,
       onGoToLocation: widget.onShowInFolder != null
           ? () => _showInFolder(entry)
           : null,
@@ -3717,8 +3811,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         .read(fileBrowserSelectionProvider(widget.tabId).notifier)
         .setSelectedItems(_filesOnly(set));
 
-    // Drag-and-drop: enable drag unless all containers are read-only.
-    final enableDrag = _containers.values.any((c) => !c.readOnly);
+    // Drag-and-drop: allow outbound OS drag on desktop even when read-only;
+    // in-app folder drop targets reject read-only destinations cleanly.
+    final enableDrag =
+        PlatformFeatures.isDesktop ||
+        _containers.values.any((c) => !c.readOnly);
 
     Future<void> onFileDrop(
       BrowserItemDragData data,

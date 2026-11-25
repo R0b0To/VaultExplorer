@@ -3644,5 +3644,6 @@
   "newTabBehaviorSpecificStorage": "Apri una posizione specifica",
   "newTabBehaviorSpecificStorageDesc": "Apre sempre la posizione scelta qui sotto. Se non è accessibile, ti viene chiesto dove aprire.",
   "newTabStorageLabel": "Posizione delle nuove schede",
-  "newTabStorageUnavailable": "Posizione non disponibile"
+  "newTabStorageUnavailable": "Posizione non disponibile",
+  "copyImageAction": "Copia immagine"
 }

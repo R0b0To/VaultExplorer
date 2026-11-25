@@ -9,8 +9,8 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart'
     show FileThumbnailLeading;
-import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/preview_pane_content.dart';
 import 'package:vaultexplorer/features/browser/widgets/preview_pane_media.dart';
 
 /// A compact details and thumbnail panel for the file manager's current
@@ -66,19 +66,25 @@ class BrowserPreviewPane extends StatelessWidget {
               ? context.l10n.sizeCalculatingLabel
               : formatBytes(listedFileBytes)
         : formatBytes(folderTotalBytes!);
-    // Images and videos get a larger area than the generic thumbnail, since
-    // they show the real content (full-resolution image / playable video).
-    final isMediaPreview =
+    // Content that is shown for real (full-resolution image, playable video or
+    // audio, the start of a text file, a font specimen) gets a larger area than
+    // the generic thumbnail. Archives cannot be read through the container
+    // path, so they keep the thumbnail only.
+    final previewKind =
         entry != null &&
-        !entry.isDir &&
-        !entry.isPlaceholder &&
-        archiveContext == null &&
-        (MediaViewerConstants.isImage(entry.name) ||
-            MediaViewerConstants.isVideo(entry.name));
+            !entry.isDir &&
+            !entry.isPlaceholder &&
+            archiveContext == null
+        ? previewPaneKindFor(entry.name)
+        : PreviewPaneKind.none;
+    final isRichPreview =
+        previewKind != PreviewPaneKind.none &&
+        previewKind != PreviewPaneKind.unknownText;
+    final richExtent = previewKind == PreviewPaneKind.audio ? 300.0 : 420.0;
     final imageExtent = isBottom
         ? 132.0
-        : isMediaPreview
-        ? 420.0
+        : isRichPreview
+        ? richExtent
         : 240.0;
 
     return Material(
@@ -106,7 +112,7 @@ class BrowserPreviewPane extends StatelessWidget {
                         ? imageExtent
                         : isBottom
                         ? constraints.maxHeight
-                        : (constraints.maxHeight * (isMediaPreview ? 0.6 : 0.45))
+                        : (constraints.maxHeight * (isRichPreview ? 0.6 : 0.45))
                               .clamp(96.0, imageExtent)
                               .toDouble();
                     final fallbackColor = entry.isDir
@@ -155,28 +161,54 @@ class BrowserPreviewPane extends StatelessWidget {
                                 : iconForFile(entry.name),
                             fallbackIconColor: fallbackColor,
                           );
-                    // Images show at full resolution and videos play in place;
-                    // the thumbnail stays as the video's poster.
+                    // Images show at full resolution, videos and audio play in
+                    // place and text/fonts render their content; the thumbnail
+                    // stays as the poster / fallback.
                     final entryPath = currentDirPath.isEmpty
                         ? entry.name
                         : '$currentDirPath/${entry.name}';
-                    final Widget previewContent = !isMediaPreview
-                        ? thumbnailContent
-                        : MediaViewerConstants.isVideo(entry.name)
-                        ? PreviewPaneVideo(
-                            key: ValueKey<String>(
-                              'desktop_preview_video:${container.volId}:$entryPath',
-                            ),
-                            container: container,
-                            filePath: entryPath,
-                            poster: thumbnailContent,
-                          )
-                        : PreviewPaneImage(
-                            container: container,
-                            filePath: entryPath,
-                            quality: quality,
-                            cacheMode: cacheMode,
-                          );
+                    final contentKey =
+                        '${container.volId}:$entryPath:${entry.sizeBytes}:${entry.modifiedSecs}';
+                    final Widget previewContent = switch (previewKind) {
+                      PreviewPaneKind.none => thumbnailContent,
+                      PreviewPaneKind.video => PreviewPaneVideo(
+                        key: ValueKey<String>(
+                          'desktop_preview_video:${container.volId}:$entryPath',
+                        ),
+                        container: container,
+                        filePath: entryPath,
+                        poster: thumbnailContent,
+                      ),
+                      PreviewPaneKind.image => PreviewPaneImage(
+                        container: container,
+                        filePath: entryPath,
+                        quality: quality,
+                        cacheMode: cacheMode,
+                      ),
+                      PreviewPaneKind.audio => PreviewPaneAudio(
+                        key: ValueKey<String>('desktop_preview_audio:$contentKey'),
+                        container: container,
+                        filePath: entryPath,
+                        sizeBytes: entry.sizeBytes,
+                        poster: thumbnailContent,
+                      ),
+                      PreviewPaneKind.text ||
+                      PreviewPaneKind.unknownText => PreviewPaneText(
+                        key: ValueKey<String>('desktop_preview_text:$contentKey'),
+                        container: container,
+                        filePath: entryPath,
+                        sizeBytes: entry.sizeBytes,
+                        sniff: previewKind == PreviewPaneKind.unknownText,
+                        poster: thumbnailContent,
+                      ),
+                      PreviewPaneKind.font => PreviewPaneFont(
+                        key: ValueKey<String>('desktop_preview_font:$contentKey'),
+                        container: container,
+                        filePath: entryPath,
+                        sizeBytes: entry.sizeBytes,
+                        poster: thumbnailContent,
+                      ),
+                    };
                     final thumbnail = DecoratedBox(
                       position: DecorationPosition.foreground,
                       decoration: BoxDecoration(

@@ -529,6 +529,10 @@ class FileGridViewState extends State<FileGridView>
         selectedItems: widget.selectedItems,
         isSelectionMode: widget.isSelectionMode,
         enabled: widget.enableFileDrag && widget.archiveContext == null,
+        thumbnailCacheMode: widget.thumbnailCacheMode,
+        cacheModeFor: widget.cacheModeFor,
+        thumbnailQuality: widget.thumbnailQuality,
+        qualityFor: widget.qualityFor,
         onItemLongPress: widget.onItemLongPress,
         onDrop: widget.onFileDrop,
         child: entry.isDir

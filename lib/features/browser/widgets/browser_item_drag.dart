@@ -3,20 +3,34 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart'
     show CategoryEntry;
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
+import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 
 export 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart'
     show BrowserDropMode;
@@ -579,6 +593,11 @@ class BrowserItemDragItem extends StatefulWidget {
   final Set<RawEntry> selectedItems;
   final bool isSelectionMode;
   final bool enabled;
+  final bool showThumbnails;
+  final ThumbnailCacheMode thumbnailCacheMode;
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+  final ThumbnailQuality thumbnailQuality;
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
   final ValueChanged<RawEntry> onItemLongPress;
   final BrowserItemDropHandler? onDrop;
 
@@ -593,6 +612,11 @@ class BrowserItemDragItem extends StatefulWidget {
     required this.selectedItems,
     required this.isSelectionMode,
     required this.enabled,
+    this.showThumbnails = true,
+    this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    this.cacheModeFor,
+    this.thumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.qualityFor,
     required this.onItemLongPress,
     required this.onDrop,
   });
@@ -830,13 +854,20 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
         session.end();
         drawerScope?.setDrawerDragBlocked(false);
       },
-      // Keep the overlay independent from the live tile. File tiles can own
+     // Keep the overlay independent from the live tile. File tiles can own
       // stateful thumbnail and PiP subtrees that must not be laid out twice.
       feedback: _DragFeedback(
         entry: entry,
         data: data,
         pointer: session.pointer,
         isMouse: () => _gate.lastWasMouse,
+        skin: FileManagerSkinScope.of(context),
+        containerFor: widget.containerFor,
+        showThumbnails: widget.showThumbnails,
+        thumbnailCacheMode: widget.thumbnailCacheMode,
+        cacheModeFor: widget.cacheModeFor,
+        thumbnailQuality: widget.thumbnailQuality,
+        qualityFor: widget.qualityFor,
       ),
       childWhenDragging: dragChild,
       child: dragChild,
@@ -978,12 +1009,15 @@ class _DropRevealPulseState extends State<_DropRevealPulse>
   }
 }
 
-/// The card that follows the finger. The overlay places its origin at the
-/// touch point, so the card is shifted to sit above the fingertip -- or to the
-/// side when there is no room above -- instead of underneath the hand.
+/// The card that follows the finger or mouse cursor. Single-item drags show the
+/// file's thumbnail or file-type icon alongside its name and size; multi-item
+/// drags fan up to 3 thumbnails/icons in a stacked deck with a compact count
+/// pill.
 class _DragFeedback extends StatelessWidget {
-  static const double _width = 220;
-  static const double _height = 56;
+ static const double _singleMaxWidth = 248;
+  static const double _singleHeight = 60;
+  static const double _multiMaxWidth = 284;
+  static const double _multiHeight = 66;
 
   /// Clear space between the fingertip and the card.
   static const double _gap = 44;
@@ -995,6 +1029,13 @@ class _DragFeedback extends StatelessWidget {
   final RawEntry entry;
   final BrowserItemDragData data;
   final ValueListenable<Offset?> pointer;
+  final FileManagerSkin skin;
+  final MountedContainer Function(RawEntry entry)? containerFor;
+  final bool showThumbnails;
+  final ThumbnailCacheMode thumbnailCacheMode;
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+  final ThumbnailQuality thumbnailQuality;
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
 
   /// Whether the drag is driven by a mouse: the card then trails the cursor
   /// (below and to its right) instead of floating above a fingertip.
@@ -1005,124 +1046,288 @@ class _DragFeedback extends StatelessWidget {
     required this.data,
     required this.pointer,
     required this.isMouse,
+    required this.skin,
+    required this.containerFor,
+    required this.showThumbnails,
+    required this.thumbnailCacheMode,
+    required this.cacheModeFor,
+    required this.thumbnailQuality,
+    required this.qualityFor,
   });
 
-  /// How many items are being dragged. Only worked out once the feedback is
-  /// actually shown (see [BrowserItemDragData.lazy]).
-  int get count => data.entries.length;
+  static Offset shiftFor({
+    required Size screenSize,
+    required double topPadding,
+    required Offset finger,
+    required Size cardSize,
+    required bool isMouse,
+  }) {
+    final width = cardSize.width;
+    final height = cardSize.height;
+    final minTop = topPadding + _margin;
 
-  Offset _shiftFor(BuildContext context, Offset finger) {
-    final media = MediaQuery.of(context);
-    final size = media.size;
-    final minTop = media.padding.top + _margin;
-
-    if (isMouse()) {
+    if (isMouse) {
       var left = finger.dx + _cursorGap;
       var top = finger.dy + _cursorGap;
-      if (left + _width > size.width - _margin) {
-        left = finger.dx - _cursorGap - _width;
+      if (left + width > screenSize.width - _margin) {
+        left = finger.dx - _cursorGap - width;
       }
-      if (top + _height > size.height - _margin) {
-        top = finger.dy - _cursorGap - _height;
+      if (top + height > screenSize.height - _margin) {
+        top = finger.dy - _cursorGap - height;
       }
       left = left
-          .clamp(_margin, math.max(_margin, size.width - _width - _margin))
+          .clamp(_margin, math.max(_margin, screenSize.width - width - _margin))
           .toDouble();
       top = top
-          .clamp(minTop, math.max(minTop, size.height - _height - _margin))
+          .clamp(minTop, math.max(minTop, screenSize.height - height - _margin))
           .toDouble();
       return Offset(left - finger.dx, top - finger.dy);
     }
 
-    var left = finger.dx - _width / 2;
-    var top = finger.dy - _height - _gap;
+    var left = finger.dx - width / 2;
+    var top = finger.dy - height - _gap;
     if (top < minTop) {
       // Not enough room above: sit beside the finger, on the roomier side.
-      top = finger.dy - _height / 2;
-      final roomRight = size.width - finger.dx;
-      left = roomRight >= _width + _gap + _margin
+      top = finger.dy - height / 2;
+      final roomRight = screenSize.width - finger.dx;
+      left = roomRight >= width + _gap + _margin
           ? finger.dx + _gap
-          : finger.dx - _gap - _width;
+          : finger.dx - _gap - width;
     }
     left = left
-        .clamp(_margin, math.max(_margin, size.width - _width - _margin))
+        .clamp(_margin, math.max(_margin, screenSize.width - width - _margin))
         .toDouble();
     top = top
-        .clamp(minTop, math.max(minTop, size.height - _height - _margin))
+        .clamp(minTop, math.max(minTop, screenSize.height - height - _margin))
         .toDouble();
     return Offset(left - finger.dx, top - finger.dy);
   }
 
+  static String _rawNameOf(RawEntry item) =>
+      item is CategoryEntry ? item.baseName : item.name;
+
+  static String _displayLabelOf(RawEntry item) {
+    final raw = _rawNameOf(item);
+    if (item.isDir || item.isSymlink) return raw;
+    final dot = raw.lastIndexOf('.');
+    if (dot <= 0) return raw;
+    final ext = raw.substring(dot + 1);
+    return vaultIconForExt(ext) != null ? raw.substring(0, dot) : raw;
+  }
+
+  static String? _singleSubtitleOf(RawEntry item) {
+    if (item.isDir || item.sizeBytes <= 0) return null;
+    final raw = _rawNameOf(item);
+    final dot = raw.lastIndexOf('.');
+    final ext = dot >= 0 && dot < raw.length - 1 ? raw.substring(dot + 1) : '';
+    if (ext.isNotEmpty && vaultIconForExt(ext) != null) return null;
+    final size = formatBytes(item.sizeBytes);
+    return ext.isEmpty ? size : '${ext.toUpperCase()} · $size';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final card = Opacity(opacity: 0.82, child: _buildCard(context));
-    return ValueListenableBuilder<Offset?>(
-      valueListenable: pointer,
-      child: card,
-      builder: (context, finger, card) {
-        if (finger == null) return card!;
-        return Transform.translate(
-          offset: _shiftFor(context, finger),
-          child: card,
-        );
-      },
+    final entries = data.entries;
+    final count = entries.length;
+    final previews = <RawEntry>[entry];
+    for (final item in entries) {
+      if (previews.length >= 3) break;
+      if (item != entry) previews.add(item);
+    }
+
+    final media = MediaQuery.of(context);
+    final isMulti = count > 1;
+    final maxWidth = isMulti ? _multiMaxWidth : _singleMaxWidth;
+    final height = isMulti ? _multiHeight : _singleHeight;
+
+    return _DragShiftBox(
+      pointer: pointer,
+      screenSize: media.size,
+      topPadding: media.padding.top,
+      isMouse: isMouse,
+      child: _buildCard(
+        context,
+        previews: previews,
+        count: count,
+        maxWidth: maxWidth,
+        height: height,
+      ),
     );
   }
 
-  Widget _buildCard(BuildContext context) {
+  Widget _buildPreviewTile(
+    RawEntry item, {
+    required double size,
+    double elevation = 0,
+    bool framed = false,
+  }) {
+    final itemContainer = containerFor?.call(item) ?? data.source;
+    final fullPath = item is CategoryEntry ? item.path : data.pathFor(item);
+    final rawName = _rawNameOf(item);
+    final cacheMode = cacheModeFor?.call(item) ?? thumbnailCacheMode;
+    final quality = qualityFor?.call(item) ?? thumbnailQuality;
+    return _DragPreviewTile(
+      key: ValueKey('drag_preview:${itemContainer.volId}:$fullPath'),
+      entry: item,
+      container: itemContainer,
+      fullPath: fullPath,
+      rawName: rawName,
+      skin: skin,
+      showThumbnails: showThumbnails,
+      cacheMode: cacheMode,
+      quality: quality,
+      size: size,
+      framed: framed,
+      elevation: elevation,
+    );
+  }
+
+  Widget _buildStackedThumbnails(List<RawEntry> previews) {
+    return SizedBox(
+      width: 58,
+      height: 50,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (previews.length >= 3)
+            Positioned(
+              left: 18,
+              top: 1,
+              child: Transform.rotate(
+                angle: 0.16,
+                child: _buildPreviewTile(
+                  previews[2],
+                  size: 36,
+                  framed: true,
+                  elevation: 2,
+                ),
+              ),
+            ),
+          if (previews.length >= 2)
+            Positioned(
+              left: previews.length >= 3 ? 9 : 14,
+              top: previews.length >= 3 ? 3 : 2,
+              child: Transform.rotate(
+                angle: previews.length >= 3 ? 0.08 : 0.11,
+                child: _buildPreviewTile(
+                  previews[1],
+                  size: 38,
+                  framed: true,
+                  elevation: 3,
+                ),
+              ),
+            ),
+          Positioned(
+            left: 0,
+            top: 6,
+            child: _buildPreviewTile(
+              previews[0],
+              size: 40,
+              framed: true,
+              elevation: 4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context, {
+    required List<RawEntry> previews,
+    required int count,
+    required double maxWidth,
+    required double height,
+  }) {
     final colors = Theme.of(context).colorScheme;
-    final color = colors.primary;
+    final textTheme = Theme.of(context).textTheme;
+    final isMulti = count > 1;
+    final title = _displayLabelOf(entry);
+    final subtitle = isMulti ? null : _singleSubtitleOf(entry);
+
     return Material(
       color: Colors.transparent,
       child: Container(
-        width: _width,
-        height: _height,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        constraints: BoxConstraints(
+          maxWidth: maxWidth,
+          minHeight: height,
+          maxHeight: height,
+        ),
+        padding: EdgeInsets.fromLTRB(10, 8, isMulti ? 12 : 14, 8),
         decoration: BoxDecoration(
-          color: colors.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.45)),
+          color: colors.surfaceContainerHigh.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(isMulti ? 16 : 14),
+          border: Border.all(color: colors.primary.withValues(alpha: 0.42)),
           boxShadow: [
             BoxShadow(
-              color: colors.shadow.withValues(alpha: 0.18),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: colors.shadow.withValues(alpha: 0.24),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              entry.isDir
-                  ? Icons.folder_rounded
-                  : Icons.insert_drive_file_rounded,
-              color: color,
-            ),
+            if (isMulti)
+              _buildStackedThumbnails(previews)
+            else
+              _buildPreviewTile(entry, size: 44),
             const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                entry.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleSmall,
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textWidthBasis: TextWidthBasis.longestLine,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      fontFamily: skin.nameStyle(
+                        textTheme.titleSmall,
+                        isDir: entry.isDir,
+                      )?.fontFamily,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            if (count > 1) ...[
-              const SizedBox(width: 8),
+            if (isMulti) ...[
+              const SizedBox(width: 10),
               Container(
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: const EdgeInsets.symmetric(horizontal: 7),
-                alignment: Alignment.center,
+                height: 24,
+                constraints: const BoxConstraints(minWidth: 24),
+                padding: EdgeInsets.symmetric(horizontal: count >= 10 ? 7 : 6),
                 decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(16),
+                  color: colors.primary,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    color: colors.onPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                child: Center(
+                  widthFactor: 1.0,
+                  heightFactor: 1.0,
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      height: 1.0,
+                    ),
                   ),
                 ),
               ),
@@ -1132,4 +1337,331 @@ class _DragFeedback extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Shifts the laid-out drag feedback card using its actual measured [Size],
+/// repainting directly on pointer updates without rebuilding or re-layout.
+class _DragShiftBox extends SingleChildRenderObjectWidget {
+  final ValueListenable<Offset?> pointer;
+  final Size screenSize;
+  final double topPadding;
+  final bool Function() isMouse;
+
+  const _DragShiftBox({
+    required this.pointer,
+    required this.screenSize,
+    required this.topPadding,
+    required this.isMouse,
+    required super.child,
+  });
+
+  @override
+  _DragShiftRenderBox createRenderObject(BuildContext context) =>
+      _DragShiftRenderBox(
+        pointer: pointer,
+        screenSize: screenSize,
+        topPadding: topPadding,
+        isMouse: isMouse,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _DragShiftRenderBox renderObject,
+  ) {
+    renderObject
+      ..pointer = pointer
+      ..screenSize = screenSize
+      ..topPadding = topPadding
+      ..isMouse = isMouse;
+  }
+}
+
+class _DragShiftRenderBox extends RenderProxyBox {
+  _DragShiftRenderBox({
+    required ValueListenable<Offset?> pointer,
+    required Size screenSize,
+    required double topPadding,
+    required bool Function() isMouse,
+  }) : _pointer = pointer,
+       _screenSize = screenSize,
+       _topPadding = topPadding,
+       _isMouse = isMouse;
+
+  ValueListenable<Offset?> _pointer;
+  Size _screenSize;
+  double _topPadding;
+  bool Function() _isMouse;
+
+  set pointer(ValueListenable<Offset?> value) {
+    if (identical(_pointer, value)) return;
+    if (attached) _pointer.removeListener(markNeedsPaint);
+    _pointer = value;
+    if (attached) _pointer.addListener(markNeedsPaint);
+    markNeedsPaint();
+  }
+
+  set screenSize(Size value) {
+    if (_screenSize == value) return;
+    _screenSize = value;
+    markNeedsPaint();
+  }
+
+  set topPadding(double value) {
+    if (_topPadding == value) return;
+    _topPadding = value;
+    markNeedsPaint();
+  }
+
+  set isMouse(bool Function() value) {
+    _isMouse = value;
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _pointer.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    _pointer.removeListener(markNeedsPaint);
+    super.detach();
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) return;
+    final finger = _pointer.value;
+    final shift = finger == null
+        ? Offset.zero
+        : _DragFeedback.shiftFor(
+            screenSize: _screenSize,
+            topPadding: _topPadding,
+            finger: finger,
+            cardSize: size,
+            isMouse: _isMouse(),
+          );
+    context.paintChild(child, offset + shift);
+  }
+}
+
+class _DragPreviewTile extends ConsumerStatefulWidget {
+  final RawEntry entry;
+  final MountedContainer container;
+  final String fullPath;
+  final String rawName;
+  final FileManagerSkin skin;
+  final bool showThumbnails;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final double size;
+  final bool framed;
+  final double elevation;
+
+  const _DragPreviewTile({
+    super.key,
+    required this.entry,
+    required this.container,
+    required this.fullPath,
+    required this.rawName,
+    required this.skin,
+    required this.showThumbnails,
+    required this.cacheMode,
+    required this.quality,
+    required this.size,
+    this.framed = false,
+    this.elevation = 0,
+  });
+
+  @override
+  ConsumerState<_DragPreviewTile> createState() => _DragPreviewTileState();
+}
+
+class _DragPreviewTileState extends ConsumerState<_DragPreviewTile> {
+  Uint8List? _bytes;
+  late String _effectiveName = widget.rawName;
+
+  bool get _hasVaultItemIcon {
+    if (widget.entry.isDir || widget.entry.isSymlink) return false;
+    final dot = widget.rawName.lastIndexOf('.');
+    if (dot < 0) return false;
+    return vaultIconForExt(widget.rawName.substring(dot + 1)) != null;
+  }
+
+  bool get _supportsThumb {
+    if (!widget.showThumbnails ||
+        widget.entry.isDir ||
+        widget.entry.isPlaceholder ||
+        _hasVaultItemIcon) {
+      return false;
+    }
+    return widget.entry.isSymlink ||
+        MediaViewerConstants.isImage(widget.rawName) ||
+        MediaViewerConstants.isVideo(widget.rawName) ||
+        isApkFile(widget.rawName) ||
+        isBookWithCover(widget.rawName);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_supportsThumb) return;
+    _bytes = ThumbnailCacheService.getFromMemory(
+      widget.container,
+      widget.fullPath,
+    );
+    if (_bytes == null) {
+      unawaited(_loadThumb());
+    }
+  }
+
+  Future<void> _loadThumb() async {
+    try {
+      final fileIo = ref.read(vaultFileIoApiProvider);
+      var targetPath = widget.fullPath;
+      var targetName = widget.rawName;
+
+      if (widget.entry.isSymlink &&
+          mayHaveVaultSymbolicLinks(widget.container)) {
+        final resolved = await resolveShortcutTargetPath(
+          fileIoApi: fileIo,
+          container: widget.container,
+          linkPath: widget.fullPath,
+        );
+        if (!mounted || resolved == null) return;
+        targetPath = resolved;
+        targetName = p.posix.basename(resolved);
+        _effectiveName = targetName;
+      }
+
+      var bytes = ThumbnailCacheService.getFromMemory(
+        widget.container,
+        targetPath,
+      );
+      if (bytes == null && widget.cacheMode != ThumbnailCacheMode.disabled) {
+        bytes = await ThumbnailCacheService.getPlaceholder(
+          container: widget.container,
+          filePath: targetPath,
+          mode: widget.cacheMode,
+          quality: widget.quality,
+          isStillWanted: () => mounted,
+        );
+      }
+      if (bytes == null && mounted && MediaViewerConstants.isImage(targetName)) {
+        bytes = await fileIo.getImageThumbnailOrThrow(
+          widget.container,
+          targetPath,
+          targetSize: 120,
+          quality: 75,
+        );
+        if (bytes != null && bytes.isNotEmpty) {
+          ThumbnailCacheService.putInMemory(
+            widget.container,
+            targetPath,
+            bytes,
+            widget.quality,
+          );
+        }
+      }
+
+      if (mounted && bytes != null && bytes.isNotEmpty) {
+        setState(() => _bytes = bytes);
+      } else if (mounted && _effectiveName != widget.rawName) {
+        setState(() {});
+      }
+    } catch (_) {
+      // Fall back quietly to the file-type icon.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isDir = widget.entry.isDir;
+    final iconColor = isDir
+        ? widget.skin.folderIconColor(colors)
+        : widget.skin.fileIconColor(colors, _effectiveName);
+    final iconData = isDir
+        ? widget.skin.folderIcon
+        : widget.skin.fileIcon(_effectiveName);
+    final bytes = _bytes;
+    final isApk = !isDir && isApkFile(_effectiveName);
+    final isVid = !isDir && MediaViewerConstants.isVideo(_effectiveName);
+
+    Widget inner;
+    if (bytes != null && bytes.isNotEmpty) {
+      inner = Stack(
+        fit: StackFit.expand,
+        children: [
+          ColoredBox(
+            color: colors.surfaceContainerHighest,
+            child: Image.memory(
+              bytes,
+              fit: isApk ? BoxFit.contain : BoxFit.cover,
+              filterQuality: FilterQuality.low,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => _iconFallback(iconData, iconColor),
+            ),
+          ),
+          if (isVid)
+            Positioned(
+              right: 2,
+              bottom: 2,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 10,
+                ),
+              ),
+            ),
+        ],
+      );
+    } else {
+      inner = DecoratedBox(
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(
+            iconColor.withValues(alpha: 0.16),
+            colors.surfaceContainerHighest,
+          ),
+        ),
+        child: _iconFallback(iconData, iconColor),
+      );
+    }
+
+    return Container(
+      width: widget.size,
+      height: widget.size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: widget.framed
+            ? Border.all(color: colors.surfaceContainerHigh, width: 1.5)
+            : Border.all(color: colors.outlineVariant.withValues(alpha: 0.35)),
+        boxShadow: widget.elevation > 0
+            ? [
+                BoxShadow(
+                  color: colors.shadow.withValues(alpha: 0.22),
+                  blurRadius: widget.elevation * 1.5,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(widget.framed ? 8.5 : 9.0),
+        child: inner,
+      ),
+    );
+  }
+
+  Widget _iconFallback(IconData icon, Color color) => Center(
+    child: Icon(icon, size: widget.size * 0.52, color: color),
+  );
 }

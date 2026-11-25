@@ -653,7 +653,7 @@ class FileListViewState extends State<FileListView> {
       key: ValueKey(entry),
       index: index,
       entry: entry,
-      child: BrowserItemDragItem(
+       child: BrowserItemDragItem(
         entry: entry,
         container: (widget.containerFor?.call(entry) ?? widget.container),
         containerFor: widget.containerFor,
@@ -662,6 +662,11 @@ class FileListViewState extends State<FileListView> {
         selectedItems: widget.selectedItems,
         isSelectionMode: widget.isSelectionMode,
         enabled: widget.enableFileDrag && widget.archiveContext == null,
+        showThumbnails: widget.showThumbnails,
+        thumbnailCacheMode: widget.thumbnailCacheMode,
+        cacheModeFor: widget.cacheModeFor,
+        thumbnailQuality: widget.thumbnailQuality,
+        qualityFor: widget.qualityFor,
         onItemLongPress: widget.onItemLongPress,
         onDrop: widget.onFileDrop,
         child: tile,

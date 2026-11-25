@@ -1,4 +1,3 @@
-// Extracted from vault_explorer_api_file_io.dart (old _FileIoOps mixin) as part of the Riverpod migration, Phase 2.
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -57,6 +56,23 @@ class VaultFileIoApi {
             'mimeType': mimeType,
           });
       return result ?? false;
+    }
+    if (container.isLocalStorage) {
+      // Plain on-device storage has no vault session to stream from, so
+      // the vault `openWithApp` channel can't serve it. Hand the real path
+      // to the FileProvider-backed local handler instead (same route the
+      // file browser uses). packageName isn't supported there.
+      try {
+        final result = await _channel
+            .invokeMethod<bool>(ChannelMethods.openLocalFileWithApp, {
+              'filePath': p.join(container.uri, fileName),
+              'mimeType': ?mimeType,
+            });
+        return result ?? false;
+      } catch (e) {
+        logSwallowed('openWithApp(local)', e);
+        return false;
+      }
     }
     final result = await _channel
         .invokeMethod<bool>(ChannelMethods.openWithApp, {

@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/biometric_auth_utils.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -814,7 +815,9 @@ void selectDevice(UsbDeviceInfo device) {
     final crypto = ref.read(vaultCryptoApiProvider);
 
     try {
-      if (!device.hasPermission) {
+      // Android asks the system for USB permission. Desktop has no such dialog: the disk either opens or the unlock
+      // reports why not (root / the disk group / an elevated process), which says more than "permission required".
+      if (!device.hasPermission && PlatformFeatures.usbHost) {
         state = state._copy(requestingPermission: true);
         final granted = await lifecycle.requestUsbPermission(device.deviceName);
         state = state._copy(requestingPermission: false);

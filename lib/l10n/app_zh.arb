@@ -3647,5 +3647,13 @@
   "newTabBehaviorSpecificStorageDesc": "始终打开下方选择的位置。若无法打开，则改为询问。",
   "newTabStorageLabel": "新标签页的位置",
   "newTabStorageUnavailable": "位置不可用",
-  "containerOpenedReadOnlyNoWriteAccess": "已以只读方式打开，因为 Android 仅授予了此文件的读取权限。"
+  "containerOpenedReadOnlyNoWriteAccess": "已以只读方式打开，因为 Android 仅授予了此文件的读取权限。",
+  "mountDriveTitle": "Mount drive",
+  "mountDriveSubtitle": "Unlock a BitLocker, VeraCrypt or LUKS disk or partition",
+  "unlockDriveTitle": "Unlock Drive",
+  "reconnectDriveTitle": "Reconnect \"{label}\"",
+  "noDrivesDetectedTitle": "No drives found",
+  "drivesNeedAccessNote": "Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.",
+  "driveInUseLabel": "Mounted by the system",
+  "driveSystemLabel": "System drive"
 }

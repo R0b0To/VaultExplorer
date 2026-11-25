@@ -3,8 +3,10 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
+**Raw drives (ABI 14).** The desktop app can mount an encrypted disk or partition (BitLocker, VeraCrypt, LUKS) picked from the list of drives of the computer (see "Raw drives" below). `VE_ABI_VERSION` is 14: `ve_list_block_devices` and `ve_unlock_device` are new, on top of the composite-container calls of ABI 13.
+
 **Update for v1.66.0 (ABI 13).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
-library is at `VE_ABI_VERSION` 13 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls, ABI 12 the container tools: expand, grow the file system, hidden volume in an existing volume, ABI 13 composite containers). Method coverage is now measured, not counted by hand:
+library is at `VE_ABI_VERSION` 14 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls, ABI 12 the container tools: expand, grow the file system, hidden volume in an existing volume, ABI 13 composite containers, ABI 14 raw drives). Method coverage is now measured, not counted by hand:
 `test/core/engine/desktop/desktop_method_coverage_test.dart` diffs `ChannelMethods` against the host, the crypto
 handler, the Android-only defaults and the two explicit lists in `lib/core/engine/desktop/desktop_method_support.dart`
 (see "Engine-channel coverage" under "Not yet"). CI (`ci.yml`, job `desktop_engine_linux`) now builds the Linux engine,
@@ -226,7 +228,7 @@ What the Windows port changed, and why (all behind the desktop/Windows switches,
   import/export round-trip in the smoke test.
 - `Common/Endian.h` allows little-endian Windows explicitly (it deliberately refuses unknown platforms).
 - zlib is vendored (MinGW has none); libarchive is built without a regex library (MinGW has none).
-- Not applicable on Windows: raw USB mass-storage access, the Android file-descriptor tricks.
+- Not applicable on desktop: Android's USB host mode (a drive is opened as a disk by the OS instead, see "Raw drives"), the Android file-descriptor tricks.
 - Newer MinGW compilers (GCC 14+) make several legacy-C constructs hard errors (implicit function
   declarations, int/pointer conversions). The vendored C libraries still contain a few, so the desktop build
   declares the POSIX functions they use (`ffi/compat/ve_win_types.h`, force-included into every vendored C
@@ -434,7 +436,7 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 
 - Engine-channel coverage: `ChannelMethods` has 283 methods. The desktop host answers 155 of them (including the
   crypto primitives), gives 42 more an Android-only default (`_androidOnlyDefaults`), lists 66 as Android-only
-  (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, USB, SAF, APK install, Jetpack PDF, ...)
+  (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, formatting a USB drive, SAF, APK install, Jetpack PDF, ...)
   and 20 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them:
   split containers, AVIF, PDF, comic/EPUB, image probing, audio/video editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
   stays true; run it to see the current numbers. These counts cover the one engine channel only. Camera, Media3,
@@ -458,3 +460,42 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 - Windows: the engine was validated under Wine on v1.39 (see "Windows" above; re-run it after the rebase); the
   Flutter app on Windows is untested.
 - macOS / iOS: not started.
+
+## Raw drives (BitLocker, VeraCrypt, LUKS disks and partitions)
+
+"Mount existing container" opens a file picker, so a disk or partition cannot be chosen there. "Mount drive" (desktop's
+counterpart of Android's "Mount USB drive", same sheet) lists the disks the OS knows and unlocks the one you pick.
+
+How it works. The engine already unlocks a raw device (`session/session_prepare.cpp`, `prepareUsbSession`): it scans the
+MBR/GPT partitions for LUKS and BitLocker, then tries VeraCrypt at the start of the device and of every partition (with the
+hidden-volume header). It reads and writes in 512-byte sectors through the `usbReadSectors` / `usbWriteSectors` /
+`usbSyncDevice` hooks, keyed by volume slot. On Android those call into Kotlin; on desktop `ffi/ve_callbacks.cpp` forwards
+them to `ffi/ve_raw_device.cpp`, which keeps one open device per slot.
+
+| File | Role |
+|---|---|
+| `ffi/ve_raw_device.{h,cpp}` | slot registry, the 512-byte view of a device whose real sector is larger (4Kn: read-modify-write), BitLocker/LUKS probing for the list, JSON |
+| `ffi/ve_rawdev_posix.cpp` | Linux: `open` (`O_EXCL` for a writable block device), `BLKGETSIZE64`/`BLKSSZGET`, `pread`/`pwrite`/`fsync`, `/sys/block` listing with stable `/dev/disk/by-id` paths |
+| `ffi/ve_rawdev_win.cpp` | Windows: `\\.\PhysicalDriveN`, sector-aligned I/O, `FlushFileBuffers`; includes `<windows.h>` and no engine header |
+| `ve_list_block_devices`, `ve_unlock_device` | the C ABI (ABI 14). `ve_lock` also closes the device |
+
+On the Dart side the three USB channel methods are answered by `DesktopEngineHost`: `listUsbDevices` (the disk list),
+`requestUsbPermission` (a re-check: desktop has no permission dialog) and `unlockUsbContainer`. A drive is addressed as
+`usb:<device path>`, like an Android USB source, so cards, re-unlock and lock need no special case. Formatting a drive
+(`createUsbContainer`, `getUsbDeviceCapacity`) stays Android-only.
+
+What to know:
+
+- **Permission.** Linux needs root, membership of the `disk` group, or a udev rule; Windows needs an elevated process. The
+  list shows disks it cannot open, and the unlock says why. (Unprivileged access through udisks2 `OpenDevice` is not done.)
+- **Safety.** A writable open of a Linux block device is exclusive (`O_EXCL`): the kernel refuses it while the disk or one of
+  its partitions is mounted, and the unlock reports that; mount read-only to look anyway. The list tags disks that are
+  mounted and the disk that carries the running OS. On Windows the OS blocks writes to the sectors of a mounted volume.
+- **Disk images.** A regular file is accepted as a "disk" by `ve_unlock_device`; the native smoke test uses that to run
+  without root (`ve_smoke_test device`: whole-device VeraCrypt, raw LUKS2, an MBR image with a VeraCrypt partition).
+  `ve_raw_device_test` covers the sector adapter, bounds, the same-device guard and the probing against a fake disk.
+- **Limits.** VeraCrypt *system* encryption (header at sector 62 of the boot drive) is not handled by the engine. On 4Kn disks
+  whole-device volumes work, but the engine's partition scan assumes 512-byte sectors, so volumes inside partitions are not
+  found. A raw LUKS/BitLocker volume with no partition table (for example `/dev/sdb1` on its own) is tried on desktop only
+  (`VE_DESKTOP_RAW_DEVICES` in `session_prepare.cpp`). The Windows `PhysicalDriveN` number can change between boots, so a saved
+  Windows drive may need to be picked again (Linux keeps a stable by-id path).

@@ -543,6 +543,16 @@ class DesktopEngineHost {
       case ChannelMethods.lockContainer:
         return _lock(args['filePath'] as String);
 
+      // ── raw drives (Android: USB mass storage over OTG) ──
+      // A disk or partition holding a BitLocker / VeraCrypt / LUKS volume, addressed as `usb:<device path>` like the
+      // Android USB sources so the rest of the app (cards, re-unlock, lock) treats it the same way.
+      case ChannelMethods.listUsbDevices:
+        return _listDrives();
+      case ChannelMethods.requestUsbPermission:
+        return _driveAccessible(args['deviceName'] as String);
+      case ChannelMethods.unlockUsbContainer:
+        return _unlockDrive(args);
+
       // ── OS mounts (Android: the folder DocumentsProvider) ──
       case ChannelMethods.mountContainerFolder:
         {
@@ -1199,6 +1209,177 @@ class DesktopEngineHost {
     }
   }
 
+  // ── raw drives ─────────────────────────────────────────────────────────
+
+  /// The disks the OS lists, in the shape the USB sheet reads (`deviceName`, `productName`, `hasPermission`) plus the
+  /// extra keys the desktop list shows (`detail`, `bus`, `sizeBytes`, `inUse`, `system`, `formats`).
+  Future<List<Map<String, Object?>>> _listDrives() async {
+    final rows = (await pool.call('listBlockDevices', const [])) as List<Object?>;
+    return [
+      for (final r in rows)
+        () {
+          final d = Map<String, Object?>.from(r as Map);
+          final path = d['path'] as String;
+          final name = (d['name'] as String?) ?? '';
+          final bus = (d['bus'] as String?) ?? '';
+          final size = (d['sizeBytes'] as num?)?.toInt() ?? 0;
+          return <String, Object?>{
+            'deviceName': path,
+            'productName': name.isNotEmpty ? name : p.basename(path),
+            'hasPermission': d['readable'] == true,
+            'detail': [
+              if (size > 0) _formatDriveSize(size),
+              if (bus.isNotEmpty) bus.toUpperCase(),
+              path,
+            ].join(' · '),
+            'bus': bus,
+            'sizeBytes': size,
+            'inUse': d['inUse'] == true,
+            'system': d['system'] == true,
+            'formats': d['formats'],
+          };
+        }(),
+    ];
+  }
+
+  /// "Request permission" has no dialog on desktop: the OS either lets this process open the disk or it does not.
+  /// Re-checks, which also covers a user who has just added themselves to the `disk` group and restarted.
+  Future<bool> _driveAccessible(String device) async {
+    final rows = (await pool.call('listBlockDevices', const [])) as List<Object?>;
+    for (final r in rows) {
+      final d = r as Map;
+      if (d['path'] == device) return d['readable'] == true;
+    }
+    return false;
+  }
+
+  /// Drive sizes the way drive vendors print them (decimal units): "931.5 GB".
+  static String _formatDriveSize(int bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    var v = bytes.toDouble();
+    var i = 0;
+    while (v >= 1000 && i < units.length - 1) {
+      v /= 1000;
+      i++;
+    }
+    return '${v.toStringAsFixed(i == 0 || v >= 100 ? 0 : 1)} ${units[i]}';
+  }
+
+  /// Why the OS would not open the drive, in words a person can act on (the unlock sheet shows the message as is).
+  String _driveOpenError(int rc, int osError, String device) {
+    final os = osError != 0 ? ' (system error $osError)' : '';
+    switch (rc) {
+      case veErrDeviceNotFound:
+        return 'This drive is no longer available. It may have been unplugged or renumbered by the system. '
+            'Refresh the list and select it again.';
+      case veErrDevicePermission:
+        return Platform.isWindows
+            ? 'Windows only lets administrators open a disk directly. Restart VaultExplorer with "Run as administrator" and try again.$os'
+            : 'Permission denied opening $device. Reading a disk directly needs root, membership of the "disk" group, '
+                'or a udev rule that gives your user access to it.$os';
+      case veErrDeviceBusy:
+        return 'The system is using this drive or one of its partitions (it is mounted). Unmount it first, '
+            'or mount it read-only.$os';
+      default:
+        return 'Could not open this drive. It may already be open, may not be a disk, or reported a read error.$os';
+    }
+  }
+
+  Future<Object?> _unlockDrive(Map<Object?, Object?> args) async {
+    final device = args['deviceName'] as String;
+    final uri = 'usb:$device';
+    final protectHidden = args['protectHiddenVolume'] == true;
+
+    int? vol = _volByUri[uri];
+    if (vol == null) {
+      final slots = await _slotCount();
+      for (var i = 0; i < slots; i++) {
+        if (!_uriByVol.containsKey(i)) {
+          vol = i;
+          break;
+        }
+      }
+      if (vol == null) {
+        throw PlatformException(code: 'MAX_CONTAINERS', message: 'Maximum $slots containers already mounted');
+      }
+    }
+
+    emit('onUnlockStarted', {'volId': vol});
+
+    final password = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    final hidden = protectHidden
+        ? Uint8List.fromList(utf8.encode((args['hiddenVolumePassword'] as String?) ?? ''))
+        : null;
+    final preserved = args['preservedKey'] is String ? base64Decode(args['preservedKey'] as String) : null;
+
+    final result = await _withActivity(() => pool.call('unlockDevice', [
+          {
+            'path': device,
+            'volId': vol,
+            'password': password,
+            'pim': (args['pim'] as num?)?.toInt() ?? 0,
+            'cipherId': (args['cipherId'] as num?)?.toInt() ?? 255,
+            'hashId': (args['hashId'] as num?)?.toInt() ?? 255,
+            'preservedKey': preserved,
+            'keyfilePaths': (args['keyfilePaths'] as List<Object?>?)?.cast<String>() ?? const <String>[],
+            'readOnly': args['readOnly'] == true,
+            'hiddenPassword': hidden,
+            'hiddenPim': (args['hiddenVolumePim'] as num?)?.toInt() ?? 0,
+            'hiddenCipherId': (args['hiddenVolumeCipherId'] as num?)?.toInt() ?? 255,
+            'hiddenHashId': (args['hiddenVolumeHashId'] as num?)?.toInt() ?? 255,
+            'hiddenKeyfilePaths':
+                (args['hiddenVolumeKeyfilePaths'] as List<Object?>?)?.cast<String>() ?? const <String>[],
+          },
+        ])) as Map;
+    password.fillRange(0, password.length, 0);
+    hidden?.fillRange(0, hidden.length, 0);
+
+    final rc = result['rc'] as int;
+    switch (rc) {
+      case veOk:
+        _volByUri[uri] = vol;
+        _uriByVol[vol] = uri;
+        _meta[vol] = _SessionMeta(
+          displayName: (args['displayName'] as String?) ?? p.basename(device),
+          format: result['format'] as String,
+          readOnly: args['readOnly'] == true,
+        );
+        _exposeAfterUnlock(vol, uri, args);
+        return {
+          'volId': vol,
+          'files': (result['files'] as List<Object?>).cast<String>(),
+          'matchedCipherId': result['cipherId'],
+          'matchedHashId': result['hashId'],
+          'containerFormat': result['format'],
+        };
+      case veErrFailed:
+        // The same answer the Android USB path gives for "no volume on this device opened with these credentials":
+        // null, which the sheet reports as incorrect credentials.
+        return null;
+      case veErrCancelled:
+        throw PlatformException(code: 'CANCELLED', message: 'Unlock cancelled');
+      case -1:
+        throw PlatformException(code: 'C++_ERROR', message: 'Could not open a keyfile');
+      case veErrMountFailed:
+        throw PlatformException(code: 'C++_ERROR', message: 'Drive decrypted but its filesystem could not be mounted');
+      case veErrDeviceNotFound:
+      case veErrDevicePermission:
+      case veErrDeviceBusy:
+      case veErrDeviceOpen:
+        throw PlatformException(
+          code: switch (rc) {
+            veErrDeviceNotFound => 'DEVICE_NOT_FOUND',
+            veErrDevicePermission => 'DEVICE_PERMISSION',
+            veErrDeviceBusy => 'DEVICE_BUSY',
+            _ => 'DEVICE_OPEN',
+          },
+          message: _driveOpenError(rc, (result['osError'] as num?)?.toInt() ?? 0, device),
+        );
+      default:
+        throw PlatformException(code: 'C++_ERROR', message: 'Native unlock failed (code $rc)');
+    }
+  }
+
   /// Opens a mounted folder in the OS file manager. There is no sidebar entry for it yet and the mounts
   /// live under a hidden ~/.local path, so without this an explicit "expose" would look like nothing happened.
   void _reveal(int vol, String path) {
@@ -1221,7 +1402,9 @@ class DesktopEngineHost {
     ];
     if (!whole && folders.isEmpty) return;
     final meta = _meta[vol];
-    final container = p.basenameWithoutExtension(uri);
+    // A drive's URI is a device path ("usb:/dev/disk/by-id/usb-Vendor_3.2Gen1_0123"); its extension-less base name
+    // would cut at a dot in the model name, so name the mount after the label the person sees instead.
+    final container = uri.startsWith('usb:') ? (meta?.displayName ?? p.basename(uri)) : p.basenameWithoutExtension(uri);
     unawaited(() async {
       if (whole) {
         final ok = await _mounts.mount(

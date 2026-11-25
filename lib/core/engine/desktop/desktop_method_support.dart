@@ -60,12 +60,10 @@ const Set<String> desktopAndroidOnlyMethods = {
   'shareFile',
   'shareLocalFile',
 
-  // USB OTG mass storage.
+  // USB OTG mass storage: formatting a drive into a container. (Mounting an existing encrypted drive is answered on
+  // desktop through the raw-disk path: listUsbDevices / requestUsbPermission / unlockUsbContainer.)
   'createUsbContainer',
   'getUsbDeviceCapacity',
-  'listUsbDevices',
-  'requestUsbPermission',
-  'unlockUsbContainer',
 
   // Storage Access Framework and document providers.
   'safCanListDirectory',

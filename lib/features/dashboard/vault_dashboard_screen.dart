@@ -857,6 +857,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         VeLog.w(_kLogTag, 'USB device enumeration failed', e);
       }
     }
+    // Android offers the entry once a drive is attached. On desktop the disks are always there to look at, and an
+    // empty list (no permission to read them) is explained inside the sheet, so the entry is always offered.
+    final canMountDrive = PlatformFeatures.usbHost
+        ? hasUsb
+        : PlatformFeatures.driveMount;
 
     if (!mounted) return;
     ref
@@ -899,17 +904,24 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
                 _showUnlockSheet();
               },
             ),
-            if (hasUsb) ...[
+            if (canMountDrive)
               SheetOptionTile(
-                icon: Icons.usb_rounded,
+                icon: PlatformFeatures.isDesktop
+                    ? Icons.storage_rounded
+                    : Icons.usb_rounded,
                 iconColor: cs.tertiary,
-                title: context.l10n.mountUsbDriveTitle,
-                subtitle: context.l10n.mountUsbDriveSubtitle,
+                title: PlatformFeatures.isDesktop
+                    ? context.l10n.mountDriveTitle
+                    : context.l10n.mountUsbDriveTitle,
+                subtitle: PlatformFeatures.isDesktop
+                    ? context.l10n.mountDriveSubtitle
+                    : context.l10n.mountUsbDriveSubtitle,
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _showUsbUnlockSheet();
                 },
               ),
+            if (hasUsb) ...[
               SheetOptionTile(
                 icon: Icons.usb_off_rounded,
                 iconColor: cs.error,

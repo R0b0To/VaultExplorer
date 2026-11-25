@@ -22003,6 +22003,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opened read-only because Android only granted read access to this file.'**
   String get containerOpenedReadOnlyNoWriteAccess;
+
+  /// Desktop add-vault option title: unlock an encrypted disk or partition picked from the drives of this computer
+  ///
+  /// In en, this message translates to:
+  /// **'Mount drive'**
+  String get mountDriveTitle;
+
+  /// Desktop add-vault option subtitle under "Mount drive"
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock a BitLocker, VeraCrypt or LUKS disk or partition'**
+  String get mountDriveSubtitle;
+
+  /// Desktop AppBar title of the sheet that unlocks an encrypted disk or partition
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Drive'**
+  String get unlockDriveTitle;
+
+  /// Desktop AppBar title when reconnecting a previously saved drive
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect \"{label}\"'**
+  String reconnectDriveTitle(String label);
+
+  /// Desktop empty state of the drive list: the operating system lists no disk
+  ///
+  /// In en, this message translates to:
+  /// **'No drives found'**
+  String get noDrivesDetectedTitle;
+
+  /// Desktop note under the drive list when at least one disk cannot be opened by this app
+  ///
+  /// In en, this message translates to:
+  /// **'Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.'**
+  String get drivesNeedAccessNote;
+
+  /// Tag on a drive in the desktop drive list: a file system on it is mounted by the operating system
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted by the system'**
+  String get driveInUseLabel;
+
+  /// Tag on the drive in the desktop drive list that carries the running operating system
+  ///
+  /// In en, this message translates to:
+  /// **'System drive'**
+  String get driveSystemLabel;
 }
 
 class _AppLocalizationsDelegate

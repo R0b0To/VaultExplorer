@@ -18,6 +18,8 @@ void main() {
     expect(PlatformFeatures.backgroundService, isFalse);
     expect(PlatformFeatures.backgroundScheduling, isFalse);
     expect(PlatformFeatures.usbHost, isFalse);
+    // ...but an encrypted disk can still be mounted on desktop, straight from the OS.
+    expect(PlatformFeatures.driveMount, isTrue);
     expect(PlatformFeatures.camera, isFalse);
     expect(PlatformFeatures.audioRecorder, isFalse);
     expect(PlatformFeatures.logcat, isFalse);
@@ -32,6 +34,8 @@ void main() {
     expect(PlatformFeatures.maskMode, isTrue);
     expect(PlatformFeatures.panicResponder, isTrue);
     expect(PlatformFeatures.automation, isTrue);
+    expect(PlatformFeatures.usbHost, isTrue);
+    expect(PlatformFeatures.driveMount, isTrue);
     expect(PlatformFeatures.storageIntegrationSettings, isTrue);
   });
 }

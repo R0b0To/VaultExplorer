@@ -1642,6 +1642,21 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         }
     }
 
+#if defined(VE_DESKTOP_RAW_DEVICES)
+    // Desktop: a raw disk can be a single LUKS / BitLocker volume with no partition table at all (or be a partition
+    // node such as /dev/sdb1 handed over on its own). Those candidates ({0, 0}, or a hint that matched no table
+    // entry) carry no size, and the LUKS and BitLocker scans below skip a size of 0, so give them the rest of the
+    // device. Not done for the Android USB path, which keeps its behaviour unchanged.
+    if (deviceSizeBytes > 0) {
+        const uint64_t deviceSectors = static_cast<uint64_t>(deviceSizeBytes) / 512ULL;
+        for (auto& part : partitions) {
+            if (part.sectorCount == 0 && part.startSector < deviceSectors) {
+                part.sectorCount = deviceSectors - part.startSector;
+            }
+        }
+    }
+#endif
+
     bool keyfilesConsumedByLuks = false;
     for (const auto& part : partitions) {
         if (part.sectorCount == 0) {

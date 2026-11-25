@@ -178,6 +178,58 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         };
       }
 
+    case 'unlockDevice':
+      {
+        // A raw disk / partition (BitLocker, VeraCrypt, LUKS). The worker opens the device itself, so no descriptor
+        // crosses an isolate; the engine keeps it for the slot until `lock`.
+        final m = Map<String, Object?>.from(a[0] as Map);
+        final volId = m['volId'] as int;
+        final (rc, osError) = n.unlockDevice(
+          devicePath: m['path'] as String,
+          password: m['password'] as Uint8List,
+          pim: m['pim'] as int,
+          volId: volId,
+          cipherId: m['cipherId'] as int,
+          hashId: m['hashId'] as int,
+          preservedKey: m['preservedKey'] as Uint8List?,
+          keyfilePaths: (m['keyfilePaths'] as List<Object?>).cast<String>(),
+          readOnly: m['readOnly'] as bool,
+          hiddenPassword: m['hiddenPassword'] as Uint8List?,
+          hiddenPim: m['hiddenPim'] as int,
+          hiddenCipherId: m['hiddenCipherId'] as int,
+          hiddenHashId: m['hiddenHashId'] as int,
+          hiddenKeyfilePaths: (m['hiddenKeyfilePaths'] as List<Object?>).cast<String>(),
+        );
+        if (rc != veOk) return {'rc': rc, 'osError': osError};
+        final (listRc, files) = n.listDirectory(volId, '');
+        return {
+          'rc': veOk,
+          'osError': 0,
+          'format': veFormatWireName(n.containerFormat(volId)),
+          'cipherId': n.matchedCipherId(volId),
+          'hashId': n.matchedHashId(volId),
+          'files': listRc == veOk ? files : const <String>[],
+        };
+      }
+
+    case 'listBlockDevices':
+      return [
+        for (final d in n.listBlockDevices())
+          {
+            'path': d.path,
+            'name': d.name,
+            'bus': d.bus,
+            'sizeBytes': d.sizeBytes,
+            'sectorSize': d.sectorSize,
+            'removable': d.removable,
+            'readable': d.readable,
+            'writable': d.writable,
+            'inUse': d.inUse,
+            'system': d.system,
+            'formats': d.formats,
+          },
+      ];
+
     case 'createContainer':
       {
         final m = Map<String, Object?>.from(a[0] as Map);

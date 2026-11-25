@@ -1363,6 +1363,15 @@ class VaultLifecycleApi {
             deviceName: m['deviceName'] as String,
             productName: m['productName'] as String,
             hasPermission: m['hasPermission'] as bool,
+            // Desktop disks carry more (the Android host sends only the three above).
+            detail: m['detail'] as String?,
+            bus: m['bus'] as String? ?? '',
+            inUse: m['inUse'] as bool? ?? false,
+            isSystem: m['system'] as bool? ?? false,
+            formats: [
+              for (final f in (m['formats'] as List<Object?>? ?? const []))
+                f.toString(),
+            ],
           ),
         )
         .toList();

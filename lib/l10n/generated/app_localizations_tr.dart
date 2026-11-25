@@ -13127,4 +13127,32 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get containerOpenedReadOnlyNoWriteAccess =>
       'Android bu dosyaya yalnızca okuma erişimi verdiği için salt okunur olarak açıldı.';
+
+  @override
+  String get mountDriveTitle => 'Sürücü bağla';
+
+  @override
+  String get mountDriveSubtitle =>
+      'Bir BitLocker, VeraCrypt veya LUKS diskinin ya da bölümünün kilidini açın';
+
+  @override
+  String get unlockDriveTitle => 'Sürücünün kilidini aç';
+
+  @override
+  String reconnectDriveTitle(String label) {
+    return '\"$label\" sürücüsünü yeniden bağla';
+  }
+
+  @override
+  String get noDrivesDetectedTitle => 'Sürücü bulunamadı';
+
+  @override
+  String get drivesNeedAccessNote =>
+      'Bazı sürücüler listeleniyor ancak açılamıyor. Bir diski doğrudan okumak için Linux\'ta root yetkisi veya \"disk\" grubu üyeliği, Windows\'ta ise VaultExplorer\'ın yönetici olarak çalıştırılması gerekir.';
+
+  @override
+  String get driveInUseLabel => 'Sistem tarafından bağlandı';
+
+  @override
+  String get driveSystemLabel => 'Sistem sürücüsü';
 }

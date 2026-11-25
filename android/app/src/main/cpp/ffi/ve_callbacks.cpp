@@ -14,6 +14,7 @@
 
 #include "jni_callbacks.h"
 #include "ve_engine.h"
+#include "ve_raw_device.h"
 
 #include <algorithm>
 #include <cstring>
@@ -260,7 +261,13 @@ void notifyHiddenVolumeProtectionTriggered(int volId) {
     emit(makeEvent(VE_EVENT_HIDDEN_VOLUME_PROTECTION, volId, 0), false);
 }
 
-// Raw USB mass-storage access is Android-only (USB host mode).
-bool usbReadSectors(int, uint64_t, uint32_t, unsigned char*) { return false; }
-bool usbWriteSectors(int, uint64_t, uint32_t, const unsigned char*) { return false; }
-bool usbSyncDevice(int) { return false; }
+// Raw device access (ffi/ve_raw_device.cpp). On Android these reach a USB mass-storage device through Kotlin;
+// on desktop the "device" is a disk or partition opened by ve_unlock_device and attached to the slot. A slot with
+// nothing attached answers false, which is also what a slot backed by an ordinary container file gets.
+bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount, unsigned char* out) {
+    return veraw::readSectors(volId, startSector, sectorCount, out);
+}
+bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount, const unsigned char* in) {
+    return veraw::writeSectors(volId, startSector, sectorCount, in);
+}
+bool usbSyncDevice(int volId) { return veraw::syncDevice(volId); }

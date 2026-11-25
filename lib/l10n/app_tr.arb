@@ -3641,5 +3641,13 @@
   "newTabBehaviorSpecificStorageDesc": "Aşağıda seçilen konumu her zaman açar. Açılamazsa size sorulur.",
   "newTabStorageLabel": "Yeni sekmeler için konum",
   "newTabStorageUnavailable": "Konum kullanılamıyor",
-  "containerOpenedReadOnlyNoWriteAccess": "Android bu dosyaya yalnızca okuma erişimi verdiği için salt okunur olarak açıldı."
+  "containerOpenedReadOnlyNoWriteAccess": "Android bu dosyaya yalnızca okuma erişimi verdiği için salt okunur olarak açıldı.",
+  "mountDriveTitle": "Sürücü bağla",
+  "mountDriveSubtitle": "Bir BitLocker, VeraCrypt veya LUKS diskinin ya da bölümünün kilidini açın",
+  "unlockDriveTitle": "Sürücünün kilidini aç",
+  "reconnectDriveTitle": "\"{label}\" sürücüsünü yeniden bağla",
+  "noDrivesDetectedTitle": "Sürücü bulunamadı",
+  "drivesNeedAccessNote": "Bazı sürücüler listeleniyor ancak açılamıyor. Bir diski doğrudan okumak için Linux'ta root yetkisi veya \"disk\" grubu üyeliği, Windows'ta ise VaultExplorer'ın yönetici olarak çalıştırılması gerekir.",
+  "driveInUseLabel": "Sistem tarafından bağlandı",
+  "driveSystemLabel": "Sistem sürücüsü"
 }

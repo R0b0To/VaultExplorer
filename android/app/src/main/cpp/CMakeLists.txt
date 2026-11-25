@@ -713,10 +713,14 @@ if(VAULTEXPLORER_DESKTOP)
             ffi/ve_tools.cpp
             ffi/ve_composite.cpp
             ffi/ve_mount_fs.cpp
-            ffi/ve_mount_fuse.cpp)
+            ffi/ve_mount_fuse.cpp
+            ffi/ve_raw_device.cpp)  # raw disks / partitions (BitLocker, VeraCrypt, LUKS) behind the USB hooks
     if(WIN32)
-        # pread/pwrite over CRT descriptors + BCryptGenRandom (the only file that includes <windows.h>)
-        list(APPEND VE_ENGINE_SOURCES ffi/ve_win_platform.cpp)
+        # pread/pwrite over CRT descriptors + BCryptGenRandom. With ve_rawdev_win.cpp (raw \\.\PhysicalDriveN)
+        # these are the only files that include <windows.h>; neither includes an engine header.
+        list(APPEND VE_ENGINE_SOURCES ffi/ve_win_platform.cpp ffi/ve_rawdev_win.cpp)
+    else()
+        list(APPEND VE_ENGINE_SOURCES ffi/ve_rawdev_posix.cpp)
     endif()
 endif()
 
@@ -841,6 +845,8 @@ target_link_libraries(
 if(VAULTEXPLORER_DESKTOP)
     find_package(Threads REQUIRED)
     target_link_libraries(vaultexplorer Threads::Threads)
+    # Lets session/session_prepare.cpp treat a whole raw device (no partition table) as one candidate volume.
+    target_compile_definitions(vaultexplorer PRIVATE VE_DESKTOP_RAW_DEVICES=1)
     if(WIN32)
         # OS mounts through WinFsp's FUSE 3 API (ffi/ve_mount_winfsp.cpp). winfsp-x64.dll is loaded at run time
         # from WinFsp's install dir, so only WinFsp's *headers* (the "Developer" install component, or
@@ -921,6 +927,11 @@ if(VAULTEXPLORER_DESKTOP)
     if(WIN32)
         target_link_options(ve_smoke_test PRIVATE -static)
     endif()
+
+    # Raw-device layer unit test: compiles ffi/ve_raw_device.cpp into itself against an in-memory fake disk that
+    # enforces raw-handle alignment (4Kn adapter, bounds, same-device guard, BitLocker/LUKS probing, JSON).
+    add_executable(ve_raw_device_test ffi/test/ve_raw_device_test.cpp ffi/ve_raw_device.cpp)
+    target_include_directories(ve_raw_device_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
 
     # Mount-layer test. It compiles ffi/ve_mount_fs.cpp into itself (the library keeps its internals
     # hidden) and drives it through the exported ve_* ABI, on every container format and a folder vault.

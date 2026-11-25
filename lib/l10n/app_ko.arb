@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "목록",
   "dashboardLayoutDetails": "자세히",
   "dashboardColumnFree": "여유 공간",
-  "dashboardColumnUsage": "사용량"
+  "dashboardColumnUsage": "사용량",
+  "newTabBehaviorLabel": "새 탭을 열 때",
+  "newTabBehaviorDuplicate": "현재 탭 복제",
+  "newTabBehaviorDuplicateDesc": "앞에 있는 탭의 복사본을 같은 위치에서 엽니다.",
+  "newTabBehaviorPrompt": "열 위치 묻기",
+  "newTabBehaviorPromptDesc": "선택할 수 있는 위치 목록을 표시합니다.",
+  "newTabBehaviorSpecificStorage": "특정 위치 열기",
+  "newTabBehaviorSpecificStorageDesc": "아래에서 선택한 위치를 항상 엽니다. 열 수 없으면 위치를 묻습니다.",
+  "newTabStorageLabel": "새 탭 위치",
+  "newTabStorageUnavailable": "위치를 사용할 수 없음"
 }

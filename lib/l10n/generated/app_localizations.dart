@@ -21931,6 +21931,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Used'**
   String get dashboardColumnUsage;
+
+  /// Label of the setting that decides what opening a new tab does
+  ///
+  /// In en, this message translates to:
+  /// **'When opening a new tab'**
+  String get newTabBehaviorLabel;
+
+  /// New tab behavior: open a copy of the current tab
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate the current tab'**
+  String get newTabBehaviorDuplicate;
+
+  /// Description of the duplicate option of the new tab setting
+  ///
+  /// In en, this message translates to:
+  /// **'Opens a copy of the tab in front, in the same place.'**
+  String get newTabBehaviorDuplicateDesc;
+
+  /// New tab behavior: ask where the new tab should open
+  ///
+  /// In en, this message translates to:
+  /// **'Ask where to open'**
+  String get newTabBehaviorPrompt;
+
+  /// Description of the ask option of the new tab setting
+  ///
+  /// In en, this message translates to:
+  /// **'Shows a list of available places to choose from.'**
+  String get newTabBehaviorPromptDesc;
+
+  /// New tab behavior: always open one chosen storage
+  ///
+  /// In en, this message translates to:
+  /// **'Open a specific location'**
+  String get newTabBehaviorSpecificStorage;
+
+  /// Description of the specific storage option of the new tab setting
+  ///
+  /// In en, this message translates to:
+  /// **'Always opens the location chosen below. If it can\'t be opened, you are asked instead.'**
+  String get newTabBehaviorSpecificStorageDesc;
+
+  /// Label of the picker that chooses the storage new tabs open
+  ///
+  /// In en, this message translates to:
+  /// **'Location for new tabs'**
+  String get newTabStorageLabel;
+
+  /// Shown in the new tab storage picker when the chosen storage no longer exists
+  ///
+  /// In en, this message translates to:
+  /// **'Location not available'**
+  String get newTabStorageUnavailable;
 }
 
 class _AppLocalizationsDelegate

@@ -13087,4 +13087,34 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Kullanım';
+
+  @override
+  String get newTabBehaviorLabel => 'Yeni sekme açılırken';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Geçerli sekmeyi çoğalt';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Öndeki sekmenin bir kopyasını aynı konumda açar.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Nerede açılacağını sor';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Aralarından seçim yapabileceğiniz kullanılabilir konumların listesini gösterir.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Belirli bir konumu aç';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Aşağıda seçilen konumu her zaman açar. Açılamazsa size sorulur.';
+
+  @override
+  String get newTabStorageLabel => 'Yeni sekmeler için konum';
+
+  @override
+  String get newTabStorageUnavailable => 'Konum kullanılamıyor';
 }

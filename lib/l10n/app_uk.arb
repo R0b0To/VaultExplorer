@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "Список",
   "dashboardLayoutDetails": "Подробиці",
   "dashboardColumnFree": "Вільне місце",
-  "dashboardColumnUsage": "Використання"
+  "dashboardColumnUsage": "Використання",
+  "newTabBehaviorLabel": "Під час відкриття нової вкладки",
+  "newTabBehaviorDuplicate": "Дублювати поточну вкладку",
+  "newTabBehaviorDuplicateDesc": "Відкриває копію активної вкладки в тому самому місці.",
+  "newTabBehaviorPrompt": "Запитувати, де відкрити",
+  "newTabBehaviorPromptDesc": "Показує список доступних місць на вибір.",
+  "newTabBehaviorSpecificStorage": "Відкривати певне місце",
+  "newTabBehaviorSpecificStorageDesc": "Завжди відкриває місце, вибране нижче. Якщо його не вдається відкрити, вас запитають.",
+  "newTabStorageLabel": "Місце для нових вкладок",
+  "newTabStorageUnavailable": "Місце недоступне"
 }

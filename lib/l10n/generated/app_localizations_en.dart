@@ -13006,4 +13006,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Used';
+
+  @override
+  String get newTabBehaviorLabel => 'When opening a new tab';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Duplicate the current tab';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Opens a copy of the tab in front, in the same place.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Ask where to open';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Shows a list of available places to choose from.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Open a specific location';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Always opens the location chosen below. If it can\'t be opened, you are asked instead.';
+
+  @override
+  String get newTabStorageLabel => 'Location for new tabs';
+
+  @override
+  String get newTabStorageUnavailable => 'Location not available';
 }

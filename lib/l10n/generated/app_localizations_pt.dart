@@ -13193,4 +13193,34 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Uso';
+
+  @override
+  String get newTabBehaviorLabel => 'Ao abrir uma nova aba';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Duplicar a aba atual';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Abre uma cópia da aba em primeiro plano no mesmo local.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Perguntar onde abrir';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Mostra uma lista de locais disponíveis para escolher.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Abrir um local específico';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Abre sempre o local escolhido abaixo. Se não for possível abri-lo, você será perguntado.';
+
+  @override
+  String get newTabStorageLabel => 'Local das novas abas';
+
+  @override
+  String get newTabStorageUnavailable => 'Local indisponível';
 }

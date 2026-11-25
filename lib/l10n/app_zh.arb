@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "列表",
   "dashboardLayoutDetails": "详细信息",
   "dashboardColumnFree": "可用空间",
-  "dashboardColumnUsage": "已用"
+  "dashboardColumnUsage": "已用",
+  "newTabBehaviorLabel": "打开新标签页时",
+  "newTabBehaviorDuplicate": "复制当前标签页",
+  "newTabBehaviorDuplicateDesc": "在同一位置打开当前标签页的副本。",
+  "newTabBehaviorPrompt": "询问打开位置",
+  "newTabBehaviorPromptDesc": "显示可供选择的位置列表。",
+  "newTabBehaviorSpecificStorage": "打开指定位置",
+  "newTabBehaviorSpecificStorageDesc": "始终打开下方选择的位置。若无法打开，则改为询问。",
+  "newTabStorageLabel": "新标签页的位置",
+  "newTabStorageUnavailable": "位置不可用"
 }

@@ -486,6 +486,20 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['split view', 'two panes', 'side by side', 'landscape'],
   ),
   _e(
+    'file_manager.new_tab_behavior',
+    SettingsDestination.fileManager,
+    (l) => l.browserTabNew,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [
+      (l) => l.newTabBehaviorLabel,
+      (l) => l.newTabBehaviorDuplicate,
+      (l) => l.newTabBehaviorPrompt,
+      (l) => l.newTabBehaviorSpecificStorage,
+      (l) => l.newTabStorageLabel,
+    ],
+    keywords: ['new tab', 'duplicate tab', 'open tab', 'plus button', 'storage'],
+  ),
+  _e(
     'file_manager.tab_edge_swipe',
     SettingsDestination.fileManager,
     (l) => l.tabEdgeSwipeLabel,

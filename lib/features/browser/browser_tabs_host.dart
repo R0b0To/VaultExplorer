@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/data/models/new_tab_behavior.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -1301,7 +1302,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       // The new tab joins the pane that was swiped past its last tab.
       if (pane != null) _workspaceActions.focusPane(pane);
       unawaited(
-        _openNewTabSheet().whenComplete(() {
+        _openNewTab().whenComplete(() {
           _afterThisFrame(() => _newTabPromptScheduled = false);
         }),
       );
@@ -1359,6 +1360,43 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     );
   }
 
+  /// Opens a new tab the way the "New tab" setting asks: a copy of the tab in
+  /// front, the prompt, or a fixed storage. A storage that cannot be opened
+  /// right now falls back to the prompt.
+  Future<void> _openNewTab() async {
+    final settings = ref.read(appSettingsControllerProvider).settings;
+    if (!settings.useBrowserTabs) return;
+    final active = _workspaceState.activeTab;
+    if (active == null) return;
+    if (_workspaceState.atLimit) {
+      _showLimitReached();
+      return;
+    }
+    switch (settings.newTabBehavior) {
+      case NewTabBehavior.duplicate:
+        _duplicate(active);
+        return;
+      case NewTabBehavior.specificStorage:
+        final choice = await BrowserNewTabSheet.resolveConfiguredStorage(
+          context,
+          storageId: settings.newTabStorageId,
+          currentContainer: active.container,
+          primaryLocalContainer: widget.primaryLocalContainer(),
+        );
+        if (!mounted) return;
+        // This host may have no Vaults page to show; the prompt then.
+        final hasVaultsPage =
+            widget.includeDashboardTab || widget.homeBuilder != null;
+        if (choice != null && (choice.container != null || hasVaultsPage)) {
+          await _applyNewTabChoice(choice);
+          return;
+        }
+      case NewTabBehavior.prompt:
+        break;
+    }
+    await _openNewTabSheet();
+  }
+
   Future<void> _openNewTabSheet() async {
     if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return;
@@ -1384,12 +1422,20 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       allowDashboard: widget.includeDashboardTab || widget.homeBuilder != null,
     );
     if (!mounted || choice == null) return;
+    await _applyNewTabChoice(choice);
+  }
+
+  /// Opens the tab for [choice]: the Vaults page when it names no container,
+  /// otherwise that container (re-read from the engine when it is an unlocked
+  /// vault, which may have been locked since the list was built).
+  Future<void> _applyNewTabChoice(BrowserNewTabChoice choice) async {
     if (choice.container == null) {
       if (_workspaceActions.openNewDashboardTab() == null) {
         _showLimitReached();
       }
       return;
     }
+    final mountedVaults = widget.mountedContainers();
     final path = choice.path;
     var container = choice.container!;
     final wasMountedVault = mountedVaults.any(
@@ -1428,6 +1474,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final container = tab.container;
     if (tab.isDashboard) {
       if (_workspaceActions.openNewDashboardTab() == null) _showLimitReached();
+      return;
+    }
+    if (tab.isCategory) {
+      final tabId = _workspaceActions.openCategoryTab(
+        tab.category!,
+        primaryLocalContainer: tab.primaryLocalContainer,
+        includeVaults: tab.includeVaults,
+      );
+      if (tabId == null) _showLimitReached();
       return;
     }
     if (container == null) return;
@@ -1550,11 +1605,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     // below its app bar as on Linux.
     final windowsCaption =
         PlatformFeatures.isWindows && !NativeWindowChrome.of(context);
-    // The desktop chrome (the file manager's toolbar and breadcrumb rows, the
-    // Vaults page's toolbar rows) does not depend on tabs: with tabs off the
-    // strip is simply absent and the rest looks the same.
     final desktopFileManagerChrome =
         PlatformFeatures.isDesktop &&
+        tabsEnabled &&
         activeTab != null &&
         !activeTab.isCategory;
     final desktopDashboardChrome =
@@ -1613,7 +1666,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     ).left;
     final strip = BrowserTabStrip(
       workspaceConfig: _workspace,
-      onNewTab: widget.onNewTab ?? _openNewTabSheet,
+      onNewTab: widget.onNewTab ?? _openNewTab,
       onDuplicate: widget.onDuplicate ?? _duplicate,
     );
     Widget paneStrip(TabPane pane) => _DragLockedStrip(
@@ -1622,7 +1675,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       child: BrowserTabStrip(
         key: ValueKey<TabPane>(pane),
         workspaceConfig: _workspace,
-        onNewTab: widget.onNewTab ?? _openNewTabSheet,
+        onNewTab: widget.onNewTab ?? _openNewTab,
         onDuplicate: widget.onDuplicate ?? _duplicate,
         pane: pane,
         paneBounds: _paneBounds,
@@ -1741,9 +1794,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             !widget.externallyHostedTabStrip
         ? DesktopWindowTitleBar(
             height: 32,
-            tabs: !tabsEnabled
-                ? const SizedBox.shrink()
-                : dualPaneForTabStrip
+            tabs: dualPaneForTabStrip
                 ? LayoutBuilder(
                     builder: (context, constraints) {
                       final pageWidth =

@@ -13214,4 +13214,34 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Utilizzo';
+
+  @override
+  String get newTabBehaviorLabel => 'All\'apertura di una nuova scheda';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Duplica la scheda corrente';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Apre una copia della scheda in primo piano nella stessa posizione.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Chiedi dove aprire';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Mostra un elenco di posizioni disponibili tra cui scegliere.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Apri una posizione specifica';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Apre sempre la posizione scelta qui sotto. Se non è accessibile, ti viene chiesto dove aprire.';
+
+  @override
+  String get newTabStorageLabel => 'Posizione delle nuove schede';
+
+  @override
+  String get newTabStorageUnavailable => 'Posizione non disponibile';
 }

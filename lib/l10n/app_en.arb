@@ -15204,5 +15204,41 @@
   "dashboardColumnUsage": "Used",
   "@dashboardColumnUsage": {
     "description": "Column header of the Vaults details table: usage bar and percentage of space used"
+  },
+  "newTabBehaviorLabel": "When opening a new tab",
+  "@newTabBehaviorLabel": {
+    "description": "Label of the setting that decides what opening a new tab does"
+  },
+  "newTabBehaviorDuplicate": "Duplicate the current tab",
+  "@newTabBehaviorDuplicate": {
+    "description": "New tab behavior: open a copy of the current tab"
+  },
+  "newTabBehaviorDuplicateDesc": "Opens a copy of the tab in front, in the same place.",
+  "@newTabBehaviorDuplicateDesc": {
+    "description": "Description of the duplicate option of the new tab setting"
+  },
+  "newTabBehaviorPrompt": "Ask where to open",
+  "@newTabBehaviorPrompt": {
+    "description": "New tab behavior: ask where the new tab should open"
+  },
+  "newTabBehaviorPromptDesc": "Shows a list of available places to choose from.",
+  "@newTabBehaviorPromptDesc": {
+    "description": "Description of the ask option of the new tab setting"
+  },
+  "newTabBehaviorSpecificStorage": "Open a specific location",
+  "@newTabBehaviorSpecificStorage": {
+    "description": "New tab behavior: always open one chosen storage"
+  },
+  "newTabBehaviorSpecificStorageDesc": "Always opens the location chosen below. If it can't be opened, you are asked instead.",
+  "@newTabBehaviorSpecificStorageDesc": {
+    "description": "Description of the specific storage option of the new tab setting"
+  },
+  "newTabStorageLabel": "Location for new tabs",
+  "@newTabStorageLabel": {
+    "description": "Label of the picker that chooses the storage new tabs open"
+  },
+  "newTabStorageUnavailable": "Location not available",
+  "@newTabStorageUnavailable": {
+    "description": "Shown in the new tab storage picker when the chosen storage no longer exists"
   }
 }

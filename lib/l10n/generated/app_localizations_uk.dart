@@ -13299,4 +13299,34 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Використання';
+
+  @override
+  String get newTabBehaviorLabel => 'Під час відкриття нової вкладки';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Дублювати поточну вкладку';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Відкриває копію активної вкладки в тому самому місці.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Запитувати, де відкрити';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Показує список доступних місць на вибір.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Відкривати певне місце';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Завжди відкриває місце, вибране нижче. Якщо його не вдається відкрити, вас запитають.';
+
+  @override
+  String get newTabStorageLabel => 'Місце для нових вкладок';
+
+  @override
+  String get newTabStorageUnavailable => 'Місце недоступне';
 }

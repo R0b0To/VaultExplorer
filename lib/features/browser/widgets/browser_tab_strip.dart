@@ -20,7 +20,6 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_tab_paths.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
-import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
@@ -949,15 +948,6 @@ class _TabItemState extends ConsumerState<_TabItem> {
               (s) => s.pathStack.length <= 1 ? null : s.pathStack.last.label,
             ),
           );
-    // Items selected in this tab. Selections in different tabs add up when
-    // the user copies / cuts, so each tab shows what it is contributing.
-    final selectedCount = tab.isDashboard
-        ? 0
-        : ref.watch(
-            fileBrowserSelectionProvider(
-              tab.tabId,
-            ).select((s) => s.items.length),
-          );
     final name = tab.isCategory
         ? tab.category!.label(context.l10n)
         : tab.container?.displayName ?? context.l10n.vaultsSectionTitle;
@@ -1008,26 +998,6 @@ class _TabItemState extends ConsumerState<_TabItem> {
                     alignment: Alignment.center,
                     child: Row(
                       children: [
-                        if (selectedCount > 0)
-                          Container(
-                            margin: const EdgeInsets.only(right: 6),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cs.primary,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$selectedCount',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: cs.onPrimary,
-                              ),
-                            ),
-                          ),
                         if (tab.isCategory) ...[
                           Icon(
                             tab.category!.icon,

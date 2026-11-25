@@ -8,8 +8,6 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
-import 'package:vaultexplorer/app/desktop_session_keeper.dart';
-import 'package:vaultexplorer/app/session_lock_wiring.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
@@ -26,6 +24,7 @@ import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/data/models/new_tab_behavior.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
@@ -264,7 +263,7 @@ class _MainShellState extends ConsumerState<MainShell>
 
   void _shortcutNewTab() {
     if (!_tabShortcutsActive) return;
-    _browserWorkspaceActions?.openNewDashboardTab();
+    unawaited(_openNewBrowserTab());
   }
 
   void _shortcutCloseTab() {
@@ -486,7 +485,23 @@ class _MainShellState extends ConsumerState<MainShell>
 
   void _configureSessionLock() {
     final lockController = ref.read(sessionLockControllerProvider);
-    configureSessionLock(_container, enforceAppLock: _enforceAppLock);
+    lockController.configure(
+      settings: () => _container.read(appSettingsControllerProvider).settings,
+      lockAllMountedContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockAllMountedContainersForAutoLock(),
+      // Containers set to "Immediately", locked on real background/screen-off
+      // events independently of the app-wide sweep (see SessionLockController).
+      lockImmediateOverrideContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockImmediatelyConfiguredContainers(),
+      // Containers set to "Screen Lock Only"; SessionLockController only calls
+      // this from handleScreenOff, never for mere backgrounding.
+      lockScreenLockOnlyContainers: () => _container
+          .read(vaultDashboardControllerProvider.notifier)
+          .lockScreenLockOnlyConfiguredContainers(),
+      enforceAppLock: _enforceAppLock,
+    );
     lockController.notifyAppUnlocked(preserveBackgroundState: true);
     unawaited(_resumePersistedVaultAutoLock());
   }
@@ -593,17 +608,6 @@ class _MainShellState extends ConsumerState<MainShell>
     FileManagerEnvironment.instance.detach();
     HardwareKeyboard.instance.removeHandler(_handleTabShortcutKey);
     WidgetsBinding.instance.removeObserver(this);
-    // The main window can be closed while file manager windows stay open
-    // (desktop). They still need the environment, the lifecycle -> auto-lock
-    // hand-over and the app lock this shell provides, so hand those on. This
-    // only does anything then, not when the shell is replaced by the lock gate
-    // in a main window that stays open. After the detach above, and before the
-    // notifiers below are disposed.
-    DesktopSessionKeeper.instance.takeOverIfNeeded(
-      container: _container,
-      localStorage:
-          _localStorageNotifier.value ?? _primaryLocalStorageContainer,
-    );
     OpenDrawerBackGuard.setDrawerOpen(this, false);
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
@@ -854,10 +858,12 @@ class _MainShellState extends ConsumerState<MainShell>
     });
   }
 
+  /// Opens a new tab the way the "New tab" setting asks: a copy of the tab in
+  /// front, the prompt, or a fixed storage. A storage that cannot be opened
+  /// right now falls back to the prompt.
   Future<void> _openNewBrowserTab() async {
-    if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
-      return;
-    }
+    final settings = ref.read(appSettingsControllerProvider).settings;
+    if (!settings.useBrowserTabs) return;
     final actions = _browserWorkspaceActions;
     if (actions == null) return;
     // Don't offer a picker whose every choice would fail.
@@ -866,6 +872,28 @@ class _MainShellState extends ConsumerState<MainShell>
       return;
     }
     _cacheDashboardLocalStorageContainer();
+    final active = _browserWorkspaceState?.activeTab;
+    switch (settings.newTabBehavior) {
+      case NewTabBehavior.duplicate:
+        if (active != null) {
+          _duplicateBrowserTab(active);
+          return;
+        }
+      case NewTabBehavior.specificStorage:
+        final choice = await BrowserNewTabSheet.resolveConfiguredStorage(
+          context,
+          storageId: settings.newTabStorageId,
+          currentContainer: active?.container,
+          primaryLocalContainer: _primaryLocalStorageContainer,
+        );
+        if (!mounted) return;
+        if (choice != null) {
+          _applyBrowserNewTabChoice(choice);
+          return;
+        }
+      case NewTabBehavior.prompt:
+        break;
+    }
     final choice = await BrowserNewTabSheet.show(
       context,
       // Read the keepAlive controller directly: the notifier is only a mirror
@@ -874,6 +902,12 @@ class _MainShellState extends ConsumerState<MainShell>
       primaryLocalContainer: _primaryLocalStorageContainer,
     );
     if (!mounted || choice == null) return;
+    _applyBrowserNewTabChoice(choice);
+  }
+
+  void _applyBrowserNewTabChoice(BrowserNewTabChoice choice) {
+    final actions = _browserWorkspaceActions;
+    if (actions == null) return;
     if (choice.container == null) {
       if (actions.openNewDashboardTab() == null) {
         _showBrowserTabLimit();

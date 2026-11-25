@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "Liste",
   "dashboardLayoutDetails": "Détails",
   "dashboardColumnFree": "Espace libre",
-  "dashboardColumnUsage": "Utilisé"
+  "dashboardColumnUsage": "Utilisé",
+  "newTabBehaviorLabel": "À l'ouverture d'un nouvel onglet",
+  "newTabBehaviorDuplicate": "Dupliquer l'onglet actuel",
+  "newTabBehaviorDuplicateDesc": "Ouvre une copie de l'onglet au premier plan, au même endroit.",
+  "newTabBehaviorPrompt": "Demander où ouvrir",
+  "newTabBehaviorPromptDesc": "Affiche une liste d'emplacements disponibles à choisir.",
+  "newTabBehaviorSpecificStorage": "Ouvrir un emplacement précis",
+  "newTabBehaviorSpecificStorageDesc": "Ouvre toujours l'emplacement choisi ci-dessous. S'il est inaccessible, la question vous est posée.",
+  "newTabStorageLabel": "Emplacement des nouveaux onglets",
+  "newTabStorageUnavailable": "Emplacement indisponible"
 }

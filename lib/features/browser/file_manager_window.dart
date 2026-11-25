@@ -26,6 +26,7 @@ import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
+import 'package:vaultexplorer/data/models/new_tab_behavior.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_title_bar_tabs.dart';
 import 'package:vaultexplorer/features/dashboard/drawer_unlock_flow.dart';
@@ -274,6 +275,9 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
     }
   }
 
+  /// Opens a new tab the way the "New tab" setting asks: a copy of the tab in
+  /// front, the prompt, or a fixed storage. A storage that cannot be opened
+  /// right now falls back to the prompt.
   Future<void> _openNewTab() async {
     if (!_tabsEnabled) return;
     // Don't offer a picker whose every choice would fail.
@@ -281,13 +285,40 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
       _showTabLimit();
       return;
     }
+    final settings = ref.read(appSettingsControllerProvider).settings;
+    final active = _state.activeTab;
+    switch (settings.newTabBehavior) {
+      case NewTabBehavior.duplicate:
+        if (active != null) {
+          _duplicateTab(active);
+          return;
+        }
+      case NewTabBehavior.specificStorage:
+        final choice = await BrowserNewTabSheet.resolveConfiguredStorage(
+          context,
+          storageId: settings.newTabStorageId,
+          currentContainer: active?.container,
+          primaryLocalContainer: _env.primaryLocalContainer(),
+        );
+        if (!mounted) return;
+        if (choice != null) {
+          _applyNewTabChoice(choice);
+          return;
+        }
+      case NewTabBehavior.prompt:
+        break;
+    }
     final choice = await BrowserNewTabSheet.show(
       context,
-      currentContainer: _state.activeTab?.container,
+      currentContainer: active?.container,
       mountedVaults: _env.mountedContainers(),
       primaryLocalContainer: _env.primaryLocalContainer(),
     );
     if (!mounted || choice == null) return;
+    _applyNewTabChoice(choice);
+  }
+
+  void _applyNewTabChoice(BrowserNewTabChoice choice) {
     final container = choice.container;
     if (container == null) {
       if (_actions.openNewDashboardTab() == null) _showTabLimit();

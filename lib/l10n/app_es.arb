@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "Lista",
   "dashboardLayoutDetails": "Detalles",
   "dashboardColumnFree": "Espacio libre",
-  "dashboardColumnUsage": "Uso"
+  "dashboardColumnUsage": "Uso",
+  "newTabBehaviorLabel": "Al abrir una pestaña nueva",
+  "newTabBehaviorDuplicate": "Duplicar la pestaña actual",
+  "newTabBehaviorDuplicateDesc": "Abre una copia de la pestaña activa en el mismo lugar.",
+  "newTabBehaviorPrompt": "Preguntar dónde abrir",
+  "newTabBehaviorPromptDesc": "Muestra una lista de lugares disponibles para elegir.",
+  "newTabBehaviorSpecificStorage": "Abrir una ubicación concreta",
+  "newTabBehaviorSpecificStorageDesc": "Abre siempre la ubicación elegida abajo. Si no se puede abrir, se te pregunta.",
+  "newTabStorageLabel": "Ubicación de las pestañas nuevas",
+  "newTabStorageUnavailable": "Ubicación no disponible"
 }

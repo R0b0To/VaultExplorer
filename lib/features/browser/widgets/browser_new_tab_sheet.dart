@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/new_tab_behavior.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
@@ -56,6 +57,96 @@ class BrowserNewTabSheet extends ConsumerWidget {
     this.allowDashboard = true,
   });
 
+  /// This device's own storage as a container, when it can be listed: the
+  /// host's, the current tab's, or one built now if "All files access" is
+  /// granted. Null otherwise (or when [context] is gone meanwhile).
+  static Future<MountedContainer?> _resolveLocalContainer(
+    BuildContext context, {
+    MountedContainer? currentContainer,
+    required MountedContainer? primaryLocalContainer,
+  }) async {
+    var localContainer = primaryLocalContainer;
+    if (localContainer == null &&
+        currentContainer?.isPrimaryLocalStorage == true) {
+      localContainer = currentContainer;
+    }
+    if (localContainer != null) return localContainer;
+    try {
+      final providerContainer = ProviderScope.containerOf(
+        context,
+        listen: false,
+      );
+      final hasAccess = await providerContainer
+          .read(vaultLifecycleApiProvider)
+          .hasAllFilesAccess();
+      if (hasAccess) {
+        final root = await const DecoyLocalRepository().primaryRoot();
+        if (!context.mounted) return null;
+        return buildLocalStorageContainer(
+          rootPath: root.path,
+          displayName: localStorageDisplayName(context.l10n.localStorageCardTitle),
+        );
+      }
+    } catch (_) {
+      // The picker remains usable when local storage is unavailable.
+    }
+    return null;
+  }
+
+  /// The place chosen in settings for [NewTabBehavior.specificStorage]:
+  /// [kNewTabVaultsPageId] is the Vaults page (a choice with no container,
+  /// like the sheet's own Vaults row), [kNewTabLocalStorageId] this device's
+  /// storage, anything else the id of an added external storage.
+  ///
+  /// Returns null whenever that storage cannot be opened right now (removed,
+  /// unplugged, or "All files access" not granted), so the caller can fall
+  /// back to the prompt instead of opening an empty tab.
+  static Future<BrowserNewTabChoice?> resolveConfiguredStorage(
+    BuildContext context, {
+    required String storageId,
+    MountedContainer? currentContainer,
+    required MountedContainer? primaryLocalContainer,
+  }) async {
+    if (storageId == kNewTabVaultsPageId) {
+      return (container: null, path: null);
+    }
+    if (storageId == kNewTabLocalStorageId) {
+      final local = await _resolveLocalContainer(
+        context,
+        currentContainer: currentContainer,
+        primaryLocalContainer: primaryLocalContainer,
+      );
+      return local == null ? null : (container: local, path: null);
+    }
+    try {
+      final providerContainer = ProviderScope.containerOf(
+        context,
+        listen: false,
+      );
+      final location = providerContainer
+          .read(externalStorageLocationsProvider)
+          .where((l) => l.id == storageId)
+          .firstOrNull;
+      if (location == null) return null;
+      // SAF locations carry their own persisted grant; only raw paths
+      // (auto-discovered SD card / USB) need "All files access".
+      if (!location.resolvedUri.startsWith('content://') &&
+          !await providerContainer
+              .read(vaultLifecycleApiProvider)
+              .hasAllFilesAccess()) {
+        return null;
+      }
+      final notifier = providerContainer.read(
+        externalStorageLocationsProvider.notifier,
+      );
+      if (!await notifier.isAccessible(location)) return null;
+      final container = notifier.resolveContainer(location.volId);
+      return container == null ? null : (container: container, path: null);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<BrowserNewTabChoice?> show(
     BuildContext context, {
     MountedContainer? currentContainer,
@@ -63,32 +154,11 @@ class BrowserNewTabSheet extends ConsumerWidget {
     required MountedContainer? primaryLocalContainer,
     bool allowDashboard = true,
   }) async {
-    var localContainer = primaryLocalContainer;
-    if (localContainer == null &&
-        currentContainer?.isPrimaryLocalStorage == true) {
-      localContainer = currentContainer;
-    }
-    if (localContainer == null) {
-      try {
-        final providerContainer = ProviderScope.containerOf(
-          context,
-          listen: false,
-        );
-        final hasAccess = await providerContainer
-            .read(vaultLifecycleApiProvider)
-            .hasAllFilesAccess();
-        if (hasAccess) {
-          final root = await const DecoyLocalRepository().primaryRoot();
-          if (!context.mounted) return null;
-          localContainer = buildLocalStorageContainer(
-            rootPath: root.path,
-            displayName: localStorageDisplayName(context.l10n.localStorageCardTitle),
-          );
-        }
-      } catch (_) {
-        // The picker remains usable when local storage is unavailable.
-      }
-    }
+    final localContainer = await _resolveLocalContainer(
+      context,
+      currentContainer: currentContainer,
+      primaryLocalContainer: primaryLocalContainer,
+    );
     if (!context.mounted) return null;
     return showAdaptiveSheet<BrowserNewTabChoice>(
       context: context,

@@ -13196,4 +13196,34 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Belegt';
+
+  @override
+  String get newTabBehaviorLabel => 'Beim Öffnen eines neuen Tabs';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Aktuellen Tab duplizieren';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Öffnet eine Kopie des vorderen Tabs am selben Ort.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Nachfragen, wo geöffnet wird';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Zeigt eine Liste der verfügbaren Orte zur Auswahl.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Bestimmten Ort öffnen';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Öffnet immer den unten gewählten Ort. Lässt er sich nicht öffnen, wird stattdessen nachgefragt.';
+
+  @override
+  String get newTabStorageLabel => 'Ort für neue Tabs';
+
+  @override
+  String get newTabStorageUnavailable => 'Ort nicht verfügbar';
 }

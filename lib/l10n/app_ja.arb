@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "リスト",
   "dashboardLayoutDetails": "詳細",
   "dashboardColumnFree": "空き容量",
-  "dashboardColumnUsage": "使用状況"
+  "dashboardColumnUsage": "使用状況",
+  "newTabBehaviorLabel": "新しいタブを開くとき",
+  "newTabBehaviorDuplicate": "現在のタブを複製",
+  "newTabBehaviorDuplicateDesc": "手前のタブのコピーを同じ場所で開きます。",
+  "newTabBehaviorPrompt": "開く場所を尋ねる",
+  "newTabBehaviorPromptDesc": "選択できる場所の一覧を表示します。",
+  "newTabBehaviorSpecificStorage": "特定の場所を開く",
+  "newTabBehaviorSpecificStorageDesc": "下で選んだ場所を常に開きます。開けない場合は開く場所を尋ねます。",
+  "newTabStorageLabel": "新しいタブの場所",
+  "newTabStorageUnavailable": "場所を利用できません"
 }

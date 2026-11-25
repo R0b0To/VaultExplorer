@@ -13296,4 +13296,34 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Utilisé';
+
+  @override
+  String get newTabBehaviorLabel => 'À l\'ouverture d\'un nouvel onglet';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Dupliquer l\'onglet actuel';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Ouvre une copie de l\'onglet au premier plan, au même endroit.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Demander où ouvrir';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Affiche une liste d\'emplacements disponibles à choisir.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Ouvrir un emplacement précis';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Ouvre toujours l\'emplacement choisi ci-dessous. S\'il est inaccessible, la question vous est posée.';
+
+  @override
+  String get newTabStorageLabel => 'Emplacement des nouveaux onglets';
+
+  @override
+  String get newTabStorageUnavailable => 'Emplacement indisponible';
 }

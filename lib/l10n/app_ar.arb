@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "قائمة",
   "dashboardLayoutDetails": "تفاصيل",
   "dashboardColumnFree": "المساحة الحرة",
-  "dashboardColumnUsage": "المستخدم"
+  "dashboardColumnUsage": "المستخدم",
+  "newTabBehaviorLabel": "عند فتح علامة تبويب جديدة",
+  "newTabBehaviorDuplicate": "تكرار علامة التبويب الحالية",
+  "newTabBehaviorDuplicateDesc": "يفتح نسخة من علامة التبويب الحالية في الموضع نفسه.",
+  "newTabBehaviorPrompt": "السؤال عن مكان الفتح",
+  "newTabBehaviorPromptDesc": "يعرض قائمة بالأماكن المتاحة لاختيار أحدها.",
+  "newTabBehaviorSpecificStorage": "فتح موضع محدد",
+  "newTabBehaviorSpecificStorageDesc": "يفتح دائماً الموضع المحدد أدناه. إذا تعذّر فتحه، يُطلب منك الاختيار.",
+  "newTabStorageLabel": "الموضع للعلامات الجديدة",
+  "newTabStorageUnavailable": "الموضع غير متاح"
 }

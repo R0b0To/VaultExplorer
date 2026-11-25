@@ -12479,4 +12479,32 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => '사용량';
+
+  @override
+  String get newTabBehaviorLabel => '새 탭을 열 때';
+
+  @override
+  String get newTabBehaviorDuplicate => '현재 탭 복제';
+
+  @override
+  String get newTabBehaviorDuplicateDesc => '앞에 있는 탭의 복사본을 같은 위치에서 엽니다.';
+
+  @override
+  String get newTabBehaviorPrompt => '열 위치 묻기';
+
+  @override
+  String get newTabBehaviorPromptDesc => '선택할 수 있는 위치 목록을 표시합니다.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => '특정 위치 열기';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      '아래에서 선택한 위치를 항상 엽니다. 열 수 없으면 위치를 묻습니다.';
+
+  @override
+  String get newTabStorageLabel => '새 탭 위치';
+
+  @override
+  String get newTabStorageUnavailable => '위치를 사용할 수 없음';
 }

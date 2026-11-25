@@ -12285,4 +12285,31 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => '已用';
+
+  @override
+  String get newTabBehaviorLabel => '打开新标签页时';
+
+  @override
+  String get newTabBehaviorDuplicate => '复制当前标签页';
+
+  @override
+  String get newTabBehaviorDuplicateDesc => '在同一位置打开当前标签页的副本。';
+
+  @override
+  String get newTabBehaviorPrompt => '询问打开位置';
+
+  @override
+  String get newTabBehaviorPromptDesc => '显示可供选择的位置列表。';
+
+  @override
+  String get newTabBehaviorSpecificStorage => '打开指定位置';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc => '始终打开下方选择的位置。若无法打开，则改为询问。';
+
+  @override
+  String get newTabStorageLabel => '新标签页的位置';
+
+  @override
+  String get newTabStorageUnavailable => '位置不可用';
 }

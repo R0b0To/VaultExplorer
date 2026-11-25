@@ -13260,4 +13260,34 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'المستخدم';
+
+  @override
+  String get newTabBehaviorLabel => 'عند فتح علامة تبويب جديدة';
+
+  @override
+  String get newTabBehaviorDuplicate => 'تكرار علامة التبويب الحالية';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'يفتح نسخة من علامة التبويب الحالية في الموضع نفسه.';
+
+  @override
+  String get newTabBehaviorPrompt => 'السؤال عن مكان الفتح';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'يعرض قائمة بالأماكن المتاحة لاختيار أحدها.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'فتح موضع محدد';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'يفتح دائماً الموضع المحدد أدناه. إذا تعذّر فتحه، يُطلب منك الاختيار.';
+
+  @override
+  String get newTabStorageLabel => 'الموضع للعلامات الجديدة';
+
+  @override
+  String get newTabStorageUnavailable => 'الموضع غير متاح';
 }

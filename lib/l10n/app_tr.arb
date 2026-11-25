@@ -3629,5 +3629,14 @@
   "dashboardLayoutList": "Liste",
   "dashboardLayoutDetails": "Ayrıntılar",
   "dashboardColumnFree": "Boş alan",
-  "dashboardColumnUsage": "Kullanım"
+  "dashboardColumnUsage": "Kullanım",
+  "newTabBehaviorLabel": "Yeni sekme açılırken",
+  "newTabBehaviorDuplicate": "Geçerli sekmeyi çoğalt",
+  "newTabBehaviorDuplicateDesc": "Öndeki sekmenin bir kopyasını aynı konumda açar.",
+  "newTabBehaviorPrompt": "Nerede açılacağını sor",
+  "newTabBehaviorPromptDesc": "Aralarından seçim yapabileceğiniz kullanılabilir konumların listesini gösterir.",
+  "newTabBehaviorSpecificStorage": "Belirli bir konumu aç",
+  "newTabBehaviorSpecificStorageDesc": "Aşağıda seçilen konumu her zaman açar. Açılamazsa size sorulur.",
+  "newTabStorageLabel": "Yeni sekmeler için konum",
+  "newTabStorageUnavailable": "Konum kullanılamıyor"
 }

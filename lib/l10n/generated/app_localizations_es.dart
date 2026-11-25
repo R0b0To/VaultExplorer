@@ -13222,4 +13222,34 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => 'Uso';
+
+  @override
+  String get newTabBehaviorLabel => 'Al abrir una pestaña nueva';
+
+  @override
+  String get newTabBehaviorDuplicate => 'Duplicar la pestaña actual';
+
+  @override
+  String get newTabBehaviorDuplicateDesc =>
+      'Abre una copia de la pestaña activa en el mismo lugar.';
+
+  @override
+  String get newTabBehaviorPrompt => 'Preguntar dónde abrir';
+
+  @override
+  String get newTabBehaviorPromptDesc =>
+      'Muestra una lista de lugares disponibles para elegir.';
+
+  @override
+  String get newTabBehaviorSpecificStorage => 'Abrir una ubicación concreta';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      'Abre siempre la ubicación elegida abajo. Si no se puede abrir, se te pregunta.';
+
+  @override
+  String get newTabStorageLabel => 'Ubicación de las pestañas nuevas';
+
+  @override
+  String get newTabStorageUnavailable => 'Ubicación no disponible';
 }

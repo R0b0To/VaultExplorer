@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/video_playback_mode.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/dashboard_layout_mode.dart';
+import 'package:vaultexplorer/data/models/new_tab_behavior.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -179,6 +180,15 @@ class AppSettings {
   bool useOledBlackTheme;
   BrowserLayoutMode defaultLayoutMode;
   bool useBrowserTabs;
+
+  /// What opening a new tab does: duplicate the current tab (default), ask
+  /// where, or open a fixed storage.
+  NewTabBehavior newTabBehavior;
+
+  /// The storage a new tab opens with [NewTabBehavior.specificStorage]:
+  /// [kNewTabLocalStorageId] for this device's storage, otherwise the id of an
+  /// added external storage location.
+  String newTabStorageId;
   bool useDualPaneBrowsing;
 
   /// Whether the desktop file manager's preview pane is folded away (to a thin
@@ -260,6 +270,8 @@ class AppSettings {
     this.appLockScreenLockOnly = false,
     this.defaultLayoutMode = BrowserLayoutMode.detailed,
     this.useBrowserTabs = true,
+    this.newTabBehavior = NewTabBehavior.duplicate,
+    this.newTabStorageId = kNewTabLocalStorageId,
     this.useDualPaneBrowsing = false,
     this.desktopPreviewPaneCollapsed = false,
     this.tabSwipeGestures = const TabSwipeGestures(),
@@ -402,6 +414,8 @@ class AppSettings {
     bool? useOledBlackTheme,
     BrowserLayoutMode? defaultLayoutMode,
     bool? useBrowserTabs,
+    NewTabBehavior? newTabBehavior,
+    String? newTabStorageId,
     bool? useDualPaneBrowsing,
     bool? desktopPreviewPaneCollapsed,
     TabSwipeGestures? tabSwipeGestures,
@@ -471,6 +485,8 @@ class AppSettings {
           appLockScreenLockOnly ?? this.appLockScreenLockOnly,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       useBrowserTabs: useBrowserTabs ?? this.useBrowserTabs,
+      newTabBehavior: newTabBehavior ?? this.newTabBehavior,
+      newTabStorageId: newTabStorageId ?? this.newTabStorageId,
       useDualPaneBrowsing: useDualPaneBrowsing ?? this.useDualPaneBrowsing,
       desktopPreviewPaneCollapsed:
           desktopPreviewPaneCollapsed ?? this.desktopPreviewPaneCollapsed,
@@ -583,6 +599,8 @@ class AppSettings {
     'appLockScreenLockOnly': appLockScreenLockOnly,
     'extensionPreferences': extensionPreferences,
     'useBrowserTabs': useBrowserTabs,
+    'newTabBehavior': newTabBehavior.toJson(),
+    'newTabStorageId': newTabStorageId,
     'useDualPaneBrowsing': useDualPaneBrowsing,
     'desktopPreviewPaneCollapsed': desktopPreviewPaneCollapsed,
     'tabSwipeGestures': tabSwipeGestures.toJson(),
@@ -664,6 +682,8 @@ class AppSettings {
     appLockScreenLockOnly: other.appLockScreenLockOnly,
     extensionPreferences: other.extensionPreferences,
     useBrowserTabs: other.useBrowserTabs,
+    newTabBehavior: other.newTabBehavior,
+    newTabStorageId: other.newTabStorageId,
     useDualPaneBrowsing: other.useDualPaneBrowsing,
     desktopPreviewPaneCollapsed: other.desktopPreviewPaneCollapsed,
     tabSwipeGestures: other.tabSwipeGestures,
@@ -767,6 +787,10 @@ class AppSettings {
         BrowserLayoutMode.fromJson(j['defaultLayoutMode'] as String?) ??
         BrowserLayoutMode.detailed,
     useBrowserTabs: j['useBrowserTabs'] as bool? ?? true,
+    newTabBehavior: NewTabBehavior.fromJson(j['newTabBehavior']),
+    newTabStorageId: (j['newTabStorageId'] as String?)?.isNotEmpty == true
+        ? j['newTabStorageId'] as String
+        : kNewTabLocalStorageId,
     useDualPaneBrowsing: j['useDualPaneBrowsing'] as bool? ?? false,
     desktopPreviewPaneCollapsed:
         j['desktopPreviewPaneCollapsed'] as bool? ?? false,

@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "Liste",
   "dashboardLayoutDetails": "Details",
   "dashboardColumnFree": "Freier Speicher",
-  "dashboardColumnUsage": "Belegt"
+  "dashboardColumnUsage": "Belegt",
+  "newTabBehaviorLabel": "Beim Öffnen eines neuen Tabs",
+  "newTabBehaviorDuplicate": "Aktuellen Tab duplizieren",
+  "newTabBehaviorDuplicateDesc": "Öffnet eine Kopie des vorderen Tabs am selben Ort.",
+  "newTabBehaviorPrompt": "Nachfragen, wo geöffnet wird",
+  "newTabBehaviorPromptDesc": "Zeigt eine Liste der verfügbaren Orte zur Auswahl.",
+  "newTabBehaviorSpecificStorage": "Bestimmten Ort öffnen",
+  "newTabBehaviorSpecificStorageDesc": "Öffnet immer den unten gewählten Ort. Lässt er sich nicht öffnen, wird stattdessen nachgefragt.",
+  "newTabStorageLabel": "Ort für neue Tabs",
+  "newTabStorageUnavailable": "Ort nicht verfügbar"
 }

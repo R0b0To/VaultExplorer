@@ -12477,4 +12477,32 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get dashboardColumnUsage => '使用状況';
+
+  @override
+  String get newTabBehaviorLabel => '新しいタブを開くとき';
+
+  @override
+  String get newTabBehaviorDuplicate => '現在のタブを複製';
+
+  @override
+  String get newTabBehaviorDuplicateDesc => '手前のタブのコピーを同じ場所で開きます。';
+
+  @override
+  String get newTabBehaviorPrompt => '開く場所を尋ねる';
+
+  @override
+  String get newTabBehaviorPromptDesc => '選択できる場所の一覧を表示します。';
+
+  @override
+  String get newTabBehaviorSpecificStorage => '特定の場所を開く';
+
+  @override
+  String get newTabBehaviorSpecificStorageDesc =>
+      '下で選んだ場所を常に開きます。開けない場合は開く場所を尋ねます。';
+
+  @override
+  String get newTabStorageLabel => '新しいタブの場所';
+
+  @override
+  String get newTabStorageUnavailable => '場所を利用できません';
 }

@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "Elenco",
   "dashboardLayoutDetails": "Dettagli",
   "dashboardColumnFree": "Spazio libero",
-  "dashboardColumnUsage": "Utilizzo"
+  "dashboardColumnUsage": "Utilizzo",
+  "newTabBehaviorLabel": "All'apertura di una nuova scheda",
+  "newTabBehaviorDuplicate": "Duplica la scheda corrente",
+  "newTabBehaviorDuplicateDesc": "Apre una copia della scheda in primo piano nella stessa posizione.",
+  "newTabBehaviorPrompt": "Chiedi dove aprire",
+  "newTabBehaviorPromptDesc": "Mostra un elenco di posizioni disponibili tra cui scegliere.",
+  "newTabBehaviorSpecificStorage": "Apri una posizione specifica",
+  "newTabBehaviorSpecificStorageDesc": "Apre sempre la posizione scelta qui sotto. Se non è accessibile, ti viene chiesto dove aprire.",
+  "newTabStorageLabel": "Posizione delle nuove schede",
+  "newTabStorageUnavailable": "Posizione non disponibile"
 }

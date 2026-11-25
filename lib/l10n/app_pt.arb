@@ -3635,5 +3635,14 @@
   "dashboardLayoutList": "Lista",
   "dashboardLayoutDetails": "Detalhes",
   "dashboardColumnFree": "Espaço livre",
-  "dashboardColumnUsage": "Uso"
+  "dashboardColumnUsage": "Uso",
+  "newTabBehaviorLabel": "Ao abrir uma nova aba",
+  "newTabBehaviorDuplicate": "Duplicar a aba atual",
+  "newTabBehaviorDuplicateDesc": "Abre uma cópia da aba em primeiro plano no mesmo local.",
+  "newTabBehaviorPrompt": "Perguntar onde abrir",
+  "newTabBehaviorPromptDesc": "Mostra uma lista de locais disponíveis para escolher.",
+  "newTabBehaviorSpecificStorage": "Abrir um local específico",
+  "newTabBehaviorSpecificStorageDesc": "Abre sempre o local escolhido abaixo. Se não for possível abri-lo, você será perguntado.",
+  "newTabStorageLabel": "Local das novas abas",
+  "newTabStorageUnavailable": "Local indisponível"
 }

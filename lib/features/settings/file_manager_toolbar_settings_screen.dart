@@ -25,6 +25,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolb
 import 'package:vaultexplorer/features/settings/file_manager_item_actions_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/widgets/new_tab_behavior_section.dart';
 import 'package:vaultexplorer/features/settings/widgets/tab_swipe_gestures_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/vault_gallery_meta_storage.dart';
@@ -391,6 +392,11 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+
+                      // What opening a new tab does: duplicate the current tab,
+                      // ask where, or open a fixed storage.
+                      const NewTabBehaviorSection(),
                       const SizedBox(height: 16),
 
                       // The tab swipe gestures: swipe between tabs, and what a

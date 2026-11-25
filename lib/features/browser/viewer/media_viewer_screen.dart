@@ -312,6 +312,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// viewer. Lasts for this viewer only; it is never saved.
   bool _controlsLocked = false;
 
+  // Keyboard-adjusted volume (0-100). Mute still wins over it; see
+  // [_effectiveVolume]. Kept for the lifetime of the viewer so it carries
+  // across playlist items like the mute state does.
+  int _volumeLevel = 100;
+  int get _effectiveVolume => _isMuted ? 0 : _volumeLevel;
+
   /// Bumped to reveal the lock button without a touch (a back press while
   /// locked).
   final ValueNotifier<int> _lockNudge = ValueNotifier<int>(0);
@@ -714,7 +720,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         });
 
     _playlistController.addListener(_onPlaylistUpdate);
-    HardwareKeyboard.instance.addHandler(_handleViewerKey);
+    FocusManager.instance.addEarlyKeyEventHandler(_handleViewerKey);
     _playbackManager.activeControllerNotifier.addListener(
       _onActiveVideoControllerChanged,
     );
@@ -1607,7 +1613,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     // starts at the platform's default volume -- reapply the persisted
     // mute state here so toggling mute stays in effect as the person
     // moves through the playlist, not just for the item it was set on.
-    controller.setVolume(_isMuted ? 0 : 100);
+    controller.setVolume(_effectiveVolume);
   }
 
   void _onCurrentMediaFileChanged() {
@@ -3266,7 +3272,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       case MediaViewerAction.mute:
         _startHideTimer();
         _sessionController.toggleMute();
-        _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
+        _playbackManager.activeController?.setVolume(_effectiveVolume);
         ref.read(appSettingsServiceProvider).loadSettings().then((appSettings) {
           ref
               .read(appSettingsServiceProvider)
@@ -3724,27 +3730,278 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     });
   }
 
-  bool _handleViewerKey(KeyEvent event) {
-    if (!PlatformFeatures.isDesktop) return false;
-    if (event is! KeyDownEvent || !mounted) return false;
-    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
-    if (!keyboardFocusIsInViewOf(context)) return false;
+ final Set<LogicalKeyboardKey> _handledViewerKeysDown = {};
+
+  KeyEventResult _handleViewerKey(KeyEvent event) {
+    if (!mounted) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (event is KeyUpEvent) {
+      return _handledViewerKeysDown.remove(key)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
+      return KeyEventResult.ignored;
+    }
+    if (!keyboardFocusIsInViewOf(context)) return KeyEventResult.ignored;
     final focused = FocusManager.instance.primaryFocus?.context;
     if (focused?.findAncestorWidgetOfExactType<EditableText>() != null ||
         focused?.widget is EditableText) {
-      return false;
+      return KeyEventResult.ignored;
     }
     final kb = HardwareKeyboard.instance;
+    final isRepeat = event is KeyRepeatEvent;
     final primary = kb.isControlPressed || kb.isMetaPressed;
+
+    KeyEventResult markHandled() {
+      if (event is KeyDownEvent) {
+        _handledViewerKeysDown.add(key);
+      }
+      return KeyEventResult.handled;
+    }
+
+    // Ctrl/Cmd+C copies the image (desktop clipboard).
     if (primary &&
         !kb.isShiftPressed &&
         !kb.isAltPressed &&
-        event.logicalKey == LogicalKeyboardKey.keyC &&
-        MediaViewerConstants.isImage(_playlistController.currentFile)) {
+        key == LogicalKeyboardKey.keyC) {
+      if (!PlatformFeatures.isDesktop ||
+          !MediaViewerConstants.isImage(_playlistController.currentFile)) {
+        return KeyEventResult.ignored;
+      }
+      if (isRepeat) return markHandled();
       unawaited(_copyCurrentImageToClipboard());
-      return true;
+      return markHandled();
     }
-    return false;
+
+    // Everything below is a plain key (Shift only matters for < and >).
+    if (primary || kb.isAltPressed) return KeyEventResult.ignored;
+    // A menu or sheet is open, or the touch lock is on: leave the keys alone.
+    if (OpenMenuBackGuard.hasOpenMenu || _activeMenuCount > 0) {
+      return KeyEventResult.ignored;
+    }
+    if (_controlsLocked) return KeyEventResult.ignored;
+    if (_playlistController.isEmpty) return KeyEventResult.ignored;
+
+    final isImage = MediaViewerConstants.isImage(_playlistController.currentFile);
+    final shift = kb.isShiftPressed;
+
+    // Keys that may auto-repeat while held (seek, volume, speed).
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      final forward = key == LogicalKeyboardKey.arrowRight;
+      if (isImage) {
+        if (isRepeat) return markHandled();
+        _startHideTimer();
+        forward ? _navigateToNext() : _navigateToPrev();
+      } else {
+        _seekBy(Duration(seconds: shift ? 30 : 5) * (forward ? 1 : -1));
+      }
+      return markHandled();
+    }
+    if (!isImage &&
+        (key == LogicalKeyboardKey.keyJ || key == LogicalKeyboardKey.keyL)) {
+      _seekBy(Duration(seconds: 10) * (key == LogicalKeyboardKey.keyL ? 1 : -1));
+      return markHandled();
+    }
+    if (!isImage &&
+        (key == LogicalKeyboardKey.arrowUp ||
+            key == LogicalKeyboardKey.arrowDown)) {
+      _changeVolume(key == LogicalKeyboardKey.arrowUp ? 5 : -5);
+      return markHandled();
+    }
+    if (!isImage &&
+        (key == LogicalKeyboardKey.less ||
+            key == LogicalKeyboardKey.greater ||
+            (shift &&
+                (key == LogicalKeyboardKey.comma ||
+                    key == LogicalKeyboardKey.period)))) {
+      if (isRepeat) return markHandled();
+      final faster =
+          key == LogicalKeyboardKey.greater || key == LogicalKeyboardKey.period;
+      _stepPlaybackSpeed(faster ? 1 : -1);
+      return markHandled();
+    }
+
+    if (shift) return KeyEventResult.ignored;
+
+    // 0-9 jump to that tenth of the video (top row or numpad).
+    if (!isImage) {
+      final digit = _digitFor(key);
+      if (digit != null) {
+        if (!isRepeat) _seekToFraction(digit / 10);
+        return markHandled();
+      }
+      if (key == LogicalKeyboardKey.home) {
+        if (!isRepeat) _seekToFraction(0);
+        return markHandled();
+      }
+      if (key == LogicalKeyboardKey.end) {
+        if (!isRepeat) _seekToFraction(1);
+        return markHandled();
+      }
+    }
+
+    MediaViewerAction? action;
+    if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
+      action = MediaViewerAction.playPause;
+    } else if (key == LogicalKeyboardKey.keyN ||
+        key == LogicalKeyboardKey.pageDown) {
+      action = MediaViewerAction.next;
+    } else if (key == LogicalKeyboardKey.keyP ||
+        key == LogicalKeyboardKey.pageUp) {
+      action = MediaViewerAction.previous;
+    } else if (key == LogicalKeyboardKey.keyM && !isImage) {
+      action = MediaViewerAction.mute;
+    } else if (key == LogicalKeyboardKey.keyR) {
+      action = MediaViewerAction.rotate90;
+    } else if (key == LogicalKeyboardKey.keyI) {
+      action = MediaViewerAction.fileInfo;
+    } else if (key == LogicalKeyboardKey.keyB) {
+      action = MediaViewerAction.bookmark;
+    } else if (key == LogicalKeyboardKey.keyT) {
+      action = MediaViewerAction.thumbnailCarousel;
+    } else if (key == LogicalKeyboardKey.keyA && !isImage) {
+      action = MediaViewerAction.abLoop;
+    } else if (key == LogicalKeyboardKey.keyO) {
+      action = MediaViewerAction.openWithApp;
+    } else if (key == LogicalKeyboardKey.f2) {
+      action = MediaViewerAction.rename;
+    } else if (key == LogicalKeyboardKey.delete) {
+      action = MediaViewerAction.delete;
+    }
+    if (action != null) {
+      if (!isRepeat) _executeMediaAction(action);
+      return markHandled();
+    }
+
+    if (key == LogicalKeyboardKey.keyC && !isImage) {
+      if (!isRepeat) {
+        _startHideTimer();
+        _sessionController.setSubtitlesEnabled(!_subtitlesEnabled);
+        _showKeyToast(
+          _subtitlesEnabled ? 'CC' : 'CC · ${context.l10n.offLabel}',
+        );
+      }
+      return markHandled();
+    }
+    if (key == LogicalKeyboardKey.keyH) {
+      if (!isRepeat) _setUIVisibility(!_showUI);
+      return markHandled();
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      if (!isRepeat) unawaited(Navigator.of(context).maybePop());
+      return markHandled();
+    }
+    return KeyEventResult.ignored;
+  }
+
+  static int? _digitFor(LogicalKeyboardKey key) {
+    final digits = <LogicalKeyboardKey, int>{
+      LogicalKeyboardKey.digit0: 0,
+      LogicalKeyboardKey.digit1: 1,
+      LogicalKeyboardKey.digit2: 2,
+      LogicalKeyboardKey.digit3: 3,
+      LogicalKeyboardKey.digit4: 4,
+      LogicalKeyboardKey.digit5: 5,
+      LogicalKeyboardKey.digit6: 6,
+      LogicalKeyboardKey.digit7: 7,
+      LogicalKeyboardKey.digit8: 8,
+      LogicalKeyboardKey.digit9: 9,
+      LogicalKeyboardKey.numpad0: 0,
+      LogicalKeyboardKey.numpad1: 1,
+      LogicalKeyboardKey.numpad2: 2,
+      LogicalKeyboardKey.numpad3: 3,
+      LogicalKeyboardKey.numpad4: 4,
+      LogicalKeyboardKey.numpad5: 5,
+      LogicalKeyboardKey.numpad6: 6,
+      LogicalKeyboardKey.numpad7: 7,
+      LogicalKeyboardKey.numpad8: 8,
+      LogicalKeyboardKey.numpad9: 9,
+    };
+    return digits[key];
+  }
+
+  NativeVideoController? _keyboardPlayer() {
+    final controller = _playbackManager.activeController;
+    if (controller == null ||
+        controller.isDisposed ||
+        !controller.value.isInitialized) {
+      return null;
+    }
+    return controller;
+  }
+
+  void _showKeyToast(String message) => _showAbLoopToast(message);
+
+  void _seekBy(Duration delta) {
+    final controller = _keyboardPlayer();
+    if (controller == null) return;
+    VeLog.d('MediaViewerKey', '_seekBy delta=${delta.inSeconds}s');
+    _startHideTimer();
+    final duration = controller.value.duration;
+    var target = controller.value.position + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    if (duration > Duration.zero && target > duration) target = duration;
+    unawaited(controller.seekTo(target));
+    _showKeyToast(
+      '${formatClockDuration(target)} / ${formatClockDuration(duration)}',
+    );
+  }
+
+  void _seekToFraction(double fraction) {
+    final controller = _keyboardPlayer();
+    if (controller == null) return;
+    _startHideTimer();
+    final duration = controller.value.duration;
+    if (duration <= Duration.zero) return;
+    final target = Duration(
+      milliseconds: (duration.inMilliseconds * fraction).round(),
+    );
+    unawaited(controller.seekTo(target));
+    _showKeyToast(
+      '${formatClockDuration(target)} / ${formatClockDuration(duration)}',
+    );
+  }
+
+  void _changeVolume(int delta) {
+    final controller = _keyboardPlayer();
+    if (controller == null) return;
+    VeLog.d(
+      'MediaViewerKey',
+      '_changeVolume delta=$delta next=$_volumeLevel->${(_volumeLevel + delta).clamp(0, 100)}',
+    );
+    _startHideTimer();
+    final wasMuted = _isMuted;
+    _volumeLevel = (_volumeLevel + delta).clamp(0, 100);
+    if (wasMuted && delta > 0) {
+      // Turning the volume up while muted is an unmute, the same as in
+      // every other player.
+      _sessionController.setIsMuted(false);
+      ref.read(appSettingsServiceProvider).loadSettings().then((s) {
+        ref
+            .read(appSettingsServiceProvider)
+            .saveSettings(s.copyWith(videoMuted: false));
+      });
+    }
+    unawaited(controller.setVolume(_effectiveVolume));
+    _showKeyToast('${_effectiveVolume}%');
+  }
+
+  void _stepPlaybackSpeed(int direction) {
+    const speeds = MediaViewerConstants.playbackSpeeds;
+    var index = speeds.indexWhere((s) => (s - _playbackSpeed).abs() < 0.001);
+    if (index < 0) {
+      index = speeds.indexWhere((s) => s >= _playbackSpeed);
+      if (index < 0) index = speeds.length - 1;
+    }
+    final next = (index + direction).clamp(0, speeds.length - 1);
+    _startHideTimer();
+    _sessionController.setPlaybackSpeed(speeds[next]);
+    _showKeyToast('${speeds[next]}x');
   }
 
   Future<void> _copyCurrentImageToClipboard() async {
@@ -3774,7 +4031,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleViewerKey);
+    FocusManager.instance.removeEarlyKeyEventHandler(_handleViewerKey);
+    _handledViewerKeysDown.clear();
     unawaited(_saveActivePlaybackPosition());
     unawaited(_mediaSessionSubscription!.cancel());
     _engineEvents.removeUsbContainerDetachedListener(_onContainerDetached);
@@ -3969,7 +4227,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   if (_isMuted != muted) {
                     _sessionController.setIsMuted(muted);
                     _playbackManager.activeController?.setVolume(
-                      muted ? 0 : 100,
+                      muted ? 0 : _volumeLevel,
                     );
                     ref.read(appSettingsServiceProvider).loadSettings().then((
                       appSettings,

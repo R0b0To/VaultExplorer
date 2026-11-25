@@ -41,6 +41,7 @@ public:
     Family family() const override { return Family::BlockDevice; }
     bool readOnly() const override { return readOnly_; }
     bool alive() const override;
+    bool caseInsensitive() const override;   // FAT / exFAT / NTFS
 
     bool listDirectory(const std::string& path, std::vector<std::string>& wire) override;
     bool listSymlinks(const std::string& path, std::vector<std::string>& wire) override;
@@ -55,6 +56,10 @@ public:
 
     bool readFileChunk(const std::string& path, int64_t offset, size_t length, Bytes& out) override;
     bool writeFileChunk(const std::string& path, int64_t offset, const uint8_t* data, size_t len) override;
+    bool createEmptyFile(const std::string& path) override;
+    bool supportsRandomWrites() const override { return true; }
+    bool writeFileAt(const std::string& path, int64_t offset, const uint8_t* data, size_t len) override;
+    bool truncateFile(const std::string& path, int64_t size) override;
     // finishWrite(): the default (true) -- block filesystems have nothing to commit.
     // importStream(): the default chunk loop; each chunk is its own locked call, so
     // other operations on the volume interleave with a long import.

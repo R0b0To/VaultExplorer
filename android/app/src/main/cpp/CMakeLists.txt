@@ -872,10 +872,11 @@ if(VAULTEXPLORER_DESKTOP)
         target_link_libraries(vaultexplorer ${CMAKE_DL_LIBS})
         target_sources(vaultexplorer PRIVATE ffi/ve_mount_places.cpp)  # sidebar entries (Dolphin / GTK bookmarks)
     endif()
-    # (Windows used to define VE_NO_FOLDERVAULT here -- the "unsupported" stubs in ffi/ve_foldervault.cpp. The core now builds
-    # there; only a build without foldervault_core would still need the stubs.)
-    if(NOT VE_FV_LIB)
-        target_compile_definitions(vaultexplorer PRIVATE VE_NO_FOLDERVAULT=1)
+    # The C ABI's file calls all go through one vm::VolumeManager (ffi/ve_volumes.h), and a folder vault is a volume
+    # in it, so the desktop engine cannot be built without foldervault_core / volman_core. (The "unsupported" stubs
+    # that used to cover that case, VE_NO_FOLDERVAULT, are gone.)
+    if(NOT VE_FV_LIB OR NOT VE_VOLMAN_LIB)
+        message(FATAL_ERROR "The desktop engine needs foldervault_core and volman_core")
     endif()
     if(WIN32)
         # Self-contained DLL: link the MinGW runtime (libgcc / libstdc++ / winpthread) statically, so it depends

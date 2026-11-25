@@ -3,6 +3,7 @@
 //          stream, copy and close semantics independent of any cipher.
 //   Part 2 puts real gocryptfs / Cryptomator / CryFS vaults (PosixStorage in a
 //          temp directory) behind the same manager and copies between them.
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -110,6 +111,29 @@ public:
         files_[norm(b)] = std::move(it->second); files_.erase(it); return true;
     }
     bool setLastModifiedTime(const std::string&, int64_t) override { return !ro; }
+
+    bool randomWrites = false;           // advertise in-place writes
+    bool caseless = false;               // advertise case-insensitive names
+    bool supportsRandomWrites() const override { return randomWrites; }
+    bool caseInsensitive() const override { return caseless; }
+    bool writeFileAt(const std::string& p, int64_t off, const uint8_t* data, size_t len) override {
+        Call c(*this); if (!c || ro || !randomWrites) return false;
+        std::lock_guard<std::mutex> g(mu_);
+        auto it = files_.find(norm(p));
+        if (it == files_.end() || off < 0 || static_cast<size_t>(off) > it->second.size()) return false;
+        Bytes& f = it->second;
+        if (static_cast<size_t>(off) + len > f.size()) f.resize(static_cast<size_t>(off) + len);
+        if (len) std::copy(data, data + len, f.begin() + off);
+        return true;
+    }
+    bool truncateFile(const std::string& p, int64_t size) override {
+        Call c(*this); if (!c || ro || !randomWrites || size < 0) return false;
+        std::lock_guard<std::mutex> g(mu_);
+        auto it = files_.find(norm(p));
+        if (it == files_.end()) return false;
+        it->second.resize(static_cast<size_t>(size));
+        return true;
+    }
     bool deleteFile(const std::string& p) override {
         Call c(*this); if (!c || ro) return false;
         std::lock_guard<std::mutex> g(mu_);
@@ -326,6 +350,70 @@ static void testForwarding() {
     CHECK_EQ(m.spaceInfo(id, sp), Status::NotUnlocked);
     CHECK_EQ(m.listDirectory(42, "", wire), Status::NotUnlocked);
     CHECK_EQ(m.listDirectory(-1, "", wire), Status::NotUnlocked);
+}
+
+static void testCapabilities() {
+    std::printf("capabilities\n");
+    VolumeManager m;
+    auto v = mem();
+    const int id = m.attach(v, "t");
+
+    VolumeManager::Traits t;
+    CHECK(ok(m.traits(id, t)));
+    CHECK(t.family == Family::BlockDevice);
+    CHECK(!t.readOnly && !t.caseInsensitive && !t.randomWrites);
+    CHECK_EQ(m.traits(id + 1, t), Status::NotUnlocked);                 // an empty slot
+
+    // createEmptyFile: the default spelling creates the file, and empties an existing one.
+    const Bytes data = rnd(40);
+    int64_t size = -2;
+    CHECK(ok(m.createEmptyFile(id, "e.bin")));
+    CHECK(ok(m.getFileSize(id, "e.bin", size))); CHECK_EQ(size, 0);
+    CHECK(ok(m.writeFileChunk(id, "e.bin", 0, data.data(), data.size())));
+    CHECK(ok(m.createEmptyFile(id, "e.bin")));
+    CHECK(ok(m.getFileSize(id, "e.bin", size))); CHECK_EQ(size, 0);
+    CHECK_EQ(m.createEmptyFile(id, "nodir/e.bin"), Status::Failed);
+
+    // A volume without in-place writes refuses both calls and leaves the file alone.
+    CHECK(ok(m.writeFileChunk(id, "e.bin", 0, data.data(), data.size())));
+    CHECK_EQ(m.writeFileAt(id, "e.bin", 0, data.data(), 4), Status::Failed);
+    CHECK_EQ(m.truncateFile(id, "e.bin", 10), Status::Failed);
+    CHECK(ok(m.getFileSize(id, "e.bin", size))); CHECK_EQ(size, 40);
+
+    // A volume that has them.
+    auto r = mem(); r->randomWrites = true; r->caseless = true;
+    const int rid = m.attach(r, "r");
+    CHECK(ok(m.traits(rid, t))); CHECK(t.randomWrites && t.caseInsensitive && !t.readOnly);
+    CHECK(ok(m.writeFileChunk(rid, "f.bin", 0, data.data(), data.size())));
+    const uint8_t patch[3] = {1, 2, 3};
+    CHECK(ok(m.writeFileAt(rid, "f.bin", 10, patch, 3)));
+    Bytes out;
+    CHECK(ok(m.readFileChunk(rid, "f.bin", 8, 7, out)));
+    CHECK_EQ(out.size(), 7u);
+    CHECK(out[0] == data[8] && out[1] == data[9] && out[2] == 1 && out[3] == 2 && out[4] == 3 && out[5] == data[13]);
+    CHECK(ok(m.writeFileAt(rid, "f.bin", 40, patch, 3)));               // at the end: grows
+    CHECK(ok(m.getFileSize(rid, "f.bin", size))); CHECK_EQ(size, 43);
+    CHECK_EQ(m.writeFileAt(rid, "f.bin", 50, patch, 3), Status::Failed); // past the end: truncate first
+    CHECK_EQ(m.writeFileAt(rid, "gone.bin", 0, patch, 3), Status::Failed);
+    CHECK(ok(m.truncateFile(rid, "f.bin", 5)));
+    CHECK(ok(m.getFileSize(rid, "f.bin", size))); CHECK_EQ(size, 5);
+    CHECK(ok(m.truncateFile(rid, "f.bin", 20)));                        // growing zero-fills
+    CHECK(ok(m.readFileChunk(rid, "f.bin", 5, 15, out)));
+    CHECK_EQ(out, Bytes(15, 0));
+    CHECK_EQ(m.truncateFile(rid, "missing.bin", 1), Status::Failed);
+
+    // Read-only is reported, and the volume itself refuses.
+    auto ro = mem(); ro->randomWrites = true; ro->ro = true;
+    const int roid = m.attach(ro, "ro");
+    CHECK(ok(m.traits(roid, t))); CHECK(t.readOnly && t.randomWrites);
+    CHECK_EQ(m.createEmptyFile(roid, "x.bin"), Status::Failed);
+    CHECK_EQ(m.truncateFile(roid, "x.bin", 0), Status::Failed);
+
+    // A volume that was locked behind the manager's back stops answering.
+    v->aliveFlag = false;
+    CHECK_EQ(m.traits(id, t), Status::NotUnlocked);
+    CHECK_EQ(m.createEmptyFile(id, "late.bin"), Status::NotUnlocked);
+    CHECK_EQ(m.writeFileAt(id, "e.bin", 0, patch, 3), Status::NotUnlocked);
 }
 
 static void testDeadSlots() {
@@ -882,6 +970,7 @@ static void testRealVaults() {
 int main() {
     testSlots();
     testForwarding();
+    testCapabilities();
     testDeadSlots();
     testDestructorIsSilent();
     testVolumeHash();

@@ -18,8 +18,16 @@ test/vm_block_tests.cpp  BlockVolume on the real volumes[] table with a fake fil
 ```
 
 `vm_block_volume.cpp` needs the engine (`session/volume_state.h`, `filesystems/fs_ops.h`,
-`io/virtual_block_device.h`), so it is compiled into the target that has the engine -- the
-Android library today, a desktop engine target later -- not into `volman_core`.
+`io/virtual_block_device.h`), so it is compiled into the targets that have the engine -- the
+Android library and the desktop engine -- not into `volman_core`.
+
+**Desktop:** the desktop engine owns one `VolumeManager` (`ffi/ve_volumes.h`, `ve_internal_volumes()`) and
+every file-level `ve_*` call is a thin wrapper over it. A container is attached (`BlockVolume`) once
+`ve_unlock` / `ve_composite_unlock` has mounted it; a folder vault (`FolderVaultVolume`) once `ve_fv_unlock` has
+opened it; `ve_lock` closes the slot and then locks the session. Beyond the file operations above, `Volume`
+has a few optional capabilities with "not supported" defaults, which the OS-mount layer needs:
+`supportsRandomWrites` / `writeFileAt` / `truncateFile` (only block volumes), `caseInsensitive`, and
+`createEmptyFile`. `VolumeManager::traits()` reads family / read-only / those capabilities in one call.
 
 ## Using it
 
@@ -64,6 +72,13 @@ mgr.close(ia);                                           // slot is NotUnlocked 
 
 ## Not done yet
 
+- **Desktop:** container host-file import/export (`ve_import_file` / `ve_export_file`) and the container-to-container
+  copy still use the filesystem backends' own paths, which hold the volume lock across a whole file and have
+  same-filesystem fast paths; only folder vaults and mixed copies go through the manager. Container-level
+  info (`ve_get_vault_info`, the filesystem label) and the session calls (unlock, lock, repair, expand) stay
+  in the engine. Three block-volume quirks are kept in the `ve_*` wrappers so the ABI did not change: listing
+  an unreadable folder returns an empty list, a read at end of file returns `VE_ERR_FAILED`, and an unknown
+  free-space answer is 0 / 0.
 - Kotlin still does most of the dispatch: only the cross-volume copy (`ContainerFileSystem`) goes
   through `NativeVolumeManager`. Listing, per-chunk I/O, read streams, `ContainerEngine`'s
   routing and `ContainerSessionRegistry`'s locks move over one operation at a time.

@@ -117,6 +117,28 @@ public:
     // path (a folder vault's chunked writer) override it. `obs` may be null.
     virtual bool importStream(const std::string& path, ByteSource& src, Observer* obs);
 
+    // Creates an empty file, or empties an existing one. The default is the
+    // incremental writer's own spelling of it (a zero-length write at offset 0,
+    // then finishWrite()), so it works for every family; engines with a native
+    // call override it.
+    virtual bool createEmptyFile(const std::string& path);
+
+    // ---- optional: in-place (random-access) writes ---------------------
+    // Only a volume that can overwrite part of an existing file says so. The
+    // OS-mount layer needs it (a program writing through a mount does real
+    // random-access I/O); the folder vaults cannot offer it (their writer is
+    // sequential, finish-on-close) and keep the defaults.
+    virtual bool supportsRandomWrites() const { return false; }
+    // `offset` must be <= the current size (grow with truncateFile() first).
+    virtual bool writeFileAt(const std::string& /*path*/, int64_t /*offset*/, const uint8_t* /*data*/, size_t /*len*/) { return false; }
+    // Sets the size of an existing file; growing zero-fills.
+    virtual bool truncateFile(const std::string& /*path*/, int64_t /*size*/) { return false; }
+
+    // True when names compare case-insensitively (FAT, exFAT, NTFS). A host that
+    // exposes the volume through an OS mount needs it to resolve names the way
+    // the filesystem itself does.
+    virtual bool caseInsensitive() const { return false; }
+
     // ---- batching / caches ---------------------------------------------
     virtual void beginBatchWrite() {}
     virtual void endBatchWrite() {}

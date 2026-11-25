@@ -6,13 +6,17 @@
 // ensureMounted -> fsXxx -- so behavior on desktop is the behavior Android has
 // shipped, only with C types instead of JNI ones.
 //
+// File-level calls (list, read, write, delete, streams, ...) no longer branch on "container or folder vault":
+// both families sit in one vm::VolumeManager (ve_volumes.h) and these functions are thin wrappers over it.
+// Sessions (unlock, lock, password change) still use the engine's own state; they register or remove the slot.
+//
 // NOTE (tech debt, intentional for the first cut): a few bodies (lockSlot, the
 // unlock sequence, the copy dual-lock) are duplicated from the JNI bridges so the
 // Android build is left completely untouched. A follow-up should hoist them into
 // a JNI-free session_ops.{h,cpp} that both bridges call.
 
 #include "ve_engine.h"
-#include "ve_foldervault.h"
+#include "ve_volumes.h"
 #include "ve_mount_internal.h"
 
 #include <algorithm>
@@ -50,6 +54,7 @@ int ve_win_open_utf8(const char* path, int writable, int create);
 #include "session_guard.h"
 #include "session_prepare.h"
 #include "virtual_block_device.h"
+#include "volman/vm_block_volume.h"
 #include "volume_state.h"
 
 // ── logging ──────────────────────────────────────────────────────────────
@@ -153,6 +158,40 @@ int32_t withMounted(int32_t vol, const char* op, bool needsWrite, Body&& body) {
 
 inline int32_t okOrFailed(bool ok) { return ok ? VE_OK : VE_ERR_FAILED; }
 
+vm::VolumeManager& mgr() { return ve_internal_volumes(); }
+
+// vm::Status as the ABI's code. A cancelled transfer reports VE_ERR_FAILED, as the block-device path always did
+// (VE_ERR_CANCELLED belongs to unlock).
+int32_t rcOf(vm::Status s) {
+    switch (s) {
+        case vm::Status::Ok: return VE_OK;
+        case vm::Status::NotUnlocked: return VE_ERR_NOT_UNLOCKED;
+        default: return VE_ERR_FAILED;
+    }
+}
+
+bool isFolderVault(int32_t vol) {
+    vm::VolumeManager::Traits t;
+    return validVol(vol) && mgr().traits(vol, t) == vm::Status::Ok && t.family == vm::Family::FolderVault;
+}
+
+// What every write checks first: the slot must hold a live volume (NOT_UNLOCKED) that allows writes
+// (READ_ONLY). `out` receives the traits when the slot is live.
+int32_t writeGate(int32_t vol, vm::VolumeManager::Traits* out = nullptr) {
+    vm::VolumeManager::Traits t;
+    if (mgr().traits(vol, t) != vm::Status::Ok) return VE_ERR_NOT_UNLOCKED;
+    if (out) *out = t;
+    return t.readOnly ? VE_ERR_READ_ONLY : VE_OK;
+}
+
+// Progress and cancellation of a copy between volumes, keyed by the caller's op id.
+struct CopyObserver final : vm::Observer {
+    explicit CopyObserver(int32_t op) : op_(op) {}
+    void onBytes(uint64_t n) override { reportCopyProgress(op_, n); }
+    bool cancelled() override { return isCopyCancelled(op_); }
+    int32_t op_;
+};
+
 void putU32(std::vector<uint8_t>& out, uint32_t v) {
     out.push_back(static_cast<uint8_t>(v));
     out.push_back(static_cast<uint8_t>(v >> 8));
@@ -173,7 +212,45 @@ bool emitBuffer(const uint8_t* bytes, size_t len, ve_buffer* out) {
     return true;
 }
 
+// Directory entries on the wire: u32 count, then u32-length-prefixed UTF-8 entries. Names come out of an
+// untrusted container, so each one gets the same UTF-8 scrub the JNI path applies.
+int32_t packWireList(std::vector<std::string>& results, ve_buffer* out) {
+    std::vector<uint8_t> packed;
+    putU32(packed, static_cast<uint32_t>(results.size()));
+    for (auto& entry : results) {
+        sanitizeString(entry);
+        putU32(packed, static_cast<uint32_t>(entry.size()));
+        packed.insert(packed.end(), entry.begin(), entry.end());
+    }
+    return emitBuffer(packed.data(), packed.size(), out) ? VE_OK : VE_ERR_FAILED;
+}
+
 }  // namespace
+
+// ── the slot table ───────────────────────────────────────────────────────
+
+// Leaked on purpose: a BlockVolume touches the global volumes[] table when it closes, and a function-local
+// static would be destroyed at an unspecified point relative to that table when the process exits.
+vm::VolumeManager& ve_internal_volumes() {
+    static vm::VolumeManager* const manager = new vm::VolumeManager(FF_VOLUMES);
+    return *manager;
+}
+
+bool ve_internal_attach_block(int32_t volId) {
+    if (!validVol(volId)) return false;
+    auto volume = vm::wrapBlockVolume(volId);
+    return volume && mgr().attach(volId, std::move(volume));
+}
+
+bool ve_internal_prepare_block_slot(int32_t volId) {
+    if (!validVol(volId)) return false;
+    if (isFolderVault(volId)) return false;
+    // A container that is still registered here is about to be replaced by the session being unlocked:
+    // detach it (new calls see NotUnlocked, calls in flight finish) so attach() finds the slot free.
+    // Closing a BlockVolume only detaches it; the session itself belongs to the unlock that follows.
+    mgr().close(volId);
+    return true;
+}
 
 // ── info ─────────────────────────────────────────────────────────────────
 
@@ -235,6 +312,12 @@ extern "C" VE_API int32_t ve_unlock(const ve_unlock_params* p) {
     }
     VE_TRY
     const int volId = p->vol_id;
+    if (!ve_internal_prepare_block_slot(volId)) {  // the slot holds an unlocked folder vault
+        closeOne(p->fd);
+        closeFds(p->keyfile_fds, p->keyfile_count);
+        closeFds(p->hidden_keyfile_fds, p->hidden_keyfile_count);
+        return VE_ERR_FAILED;
+    }
     clearUnlockCancellation(volId);
 
     static const unsigned char kEmpty[1] = {0};
@@ -275,6 +358,10 @@ extern "C" VE_API int32_t ve_unlock(const ve_unlock_params* p) {
     } else {
         closeFds(p->hidden_keyfile_fds, p->hidden_keyfile_count);
     }
+    if (!ve_internal_attach_block(volId)) {  // never leave a decrypted session behind that no call can reach
+        lockSlot(volId);
+        return VE_ERR_FAILED;
+    }
     return VE_OK;
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -288,8 +375,11 @@ extern "C" VE_API void ve_lock(int32_t vol_id) {
         // OS mounts first: they commit pending writes through this very slot, and must be gone before the
         // keys are wiped (otherwise a live mount would hand out errors -- or worse, stale data).
         ve_internal_unmount_volume(vol_id);
-        if (vefv::isSlot(vol_id)) { vefv::closeSlot(vol_id); return; }  // folder vault: wipe keys, free the slot
-        lockSlot(vol_id);
+        const bool folderVault = isFolderVault(vol_id);
+        // New calls see NotUnlocked from here on; streams end and calls in flight finish. Closing a folder vault
+        // wipes its keys; a container is only detached -- the session below is what actually locks it.
+        if (validVol(vol_id)) mgr().close(vol_id);
+        if (!folderVault) lockSlot(vol_id);
     } catch (...) {}
 }
 
@@ -302,14 +392,14 @@ extern "C" VE_API int32_t ve_get_container_format(int32_t vol_id) {
 
 extern "C" VE_API int32_t ve_get_matched_cipher_id(int32_t vol_id) {
     if (!validVol(vol_id)) return -1;
-    if (vefv::isSlot(vol_id)) return 255;  // folder vaults have no cascade to report
+    if (isFolderVault(vol_id)) return 255;  // folder vaults have no cascade to report
     std::shared_lock<std::shared_mutex> lock(volumes[vol_id].mutex);
     return static_cast<int32_t>(volumes[vol_id].matchedCipherId);
 }
 
 extern "C" VE_API int32_t ve_get_matched_hash_id(int32_t vol_id) {
     if (!validVol(vol_id)) return -1;
-    if (vefv::isSlot(vol_id)) return 255;
+    if (isFolderVault(vol_id)) return 255;
     std::shared_lock<std::shared_mutex> lock(volumes[vol_id].mutex);
     return static_cast<int32_t>(volumes[vol_id].matchedHashId);
 }
@@ -449,6 +539,9 @@ extern "C" VE_API int32_t ve_change_password(const ve_change_password_params* p)
 }
 
 // ── filesystem operations ────────────────────────────────────────────────
+// Every call below asks the slot table (ve_volumes.h) for the volume in `vol`; the manager answers
+// NotUnlocked for an empty slot, so no call needs to know whether a container or a folder vault is behind it.
+// Block-device volumes keep the quirks their ABI always had (marked "legacy" where they differ from folder vaults).
 
 extern "C" VE_API int32_t ve_list_directory(int32_t vol, const char* path, ve_buffer* out) {
     if (!out) return VE_ERR_INVALID_ARG;
@@ -456,36 +549,21 @@ extern "C" VE_API int32_t ve_list_directory(int32_t vol, const char* path, ve_bu
     out->len = 0;
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::list(vol, path, out);
+    vm::VolumeManager::Traits t;
+    if (mgr().traits(vol, t) != vm::Status::Ok) return VE_ERR_NOT_UNLOCKED;
     std::vector<std::string> results;
     results.reserve(256);
-    const int32_t rc = withMounted(vol, "listDirectory", false, [&](auto&) {
-        fsListDirectory(vol, path, results);
-        return VE_OK;
-    });
-    if (rc != VE_OK) return rc;
-
-    std::vector<uint8_t> packed;
-    putU32(packed, static_cast<uint32_t>(results.size()));
-    for (auto& entry : results) {
-        sanitizeString(entry);  // same UTF-8 scrub the JNI path applies
-        putU32(packed, static_cast<uint32_t>(entry.size()));
-        packed.insert(packed.end(), entry.begin(), entry.end());
+    const vm::Status st = mgr().listDirectory(vol, path, results);
+    if (st == vm::Status::NotUnlocked) return VE_ERR_NOT_UNLOCKED;
+    if (st != vm::Status::Ok) {
+        if (t.family == vm::Family::FolderVault) return VE_ERR_FAILED;
+        // Legacy: a block-device folder that cannot be read lists as empty (the callers -- browsing, the mount
+        // layer, archive part discovery -- were written against that). Only a session that ended meanwhile is an error.
+        if (!mgr().isUnlocked(vol)) return VE_ERR_NOT_UNLOCKED;
+        results.clear();
     }
-    return emitBuffer(packed.data(), packed.size(), out) ? VE_OK : VE_ERR_FAILED;
+    return packWireList(results, out);
     VE_CATCH(VE_ERR_EXCEPTION)
-}
-
-// Same wire packing as ve_list_directory (u32 count, then u32-length-prefixed UTF-8 entries).
-static int32_t packWireList(std::vector<std::string>& results, ve_buffer* out) {
-    std::vector<uint8_t> packed;
-    putU32(packed, static_cast<uint32_t>(results.size()));
-    for (auto& entry : results) {
-        sanitizeString(entry);
-        putU32(packed, static_cast<uint32_t>(entry.size()));
-        packed.insert(packed.end(), entry.begin(), entry.end());
-    }
-    return emitBuffer(packed.data(), packed.size(), out) ? VE_OK : VE_ERR_FAILED;
 }
 
 extern "C" VE_API int32_t ve_list_symlinks(int32_t vol, const char* path, ve_buffer* out) {
@@ -494,13 +572,9 @@ extern "C" VE_API int32_t ve_list_symlinks(int32_t vol, const char* path, ve_buf
     out->len = 0;
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::listSymlinks(vol, path, out);
     std::vector<std::string> results;
-    const int32_t rc = withMounted(vol, "listSymlinks", false, [&](auto&) {
-        fsListSymlinks(vol, path, results);
-        return VE_OK;
-    });
-    if (rc != VE_OK) return rc;
+    const vm::Status st = mgr().listSymlinks(vol, path, results);
+    if (st != vm::Status::Ok) return rcOf(st);
     return packWireList(results, out);
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -511,12 +585,9 @@ extern "C" VE_API int32_t ve_read_symlink(int32_t vol, const char* path, ve_buff
     out->len = 0;
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::readSymlink(vol, path, out);
     std::string target;
-    const int32_t rc = withMounted(vol, "readSymlink", false, [&](auto&) {
-        return okOrFailed(fsReadSymlink(vol, path, target));
-    });
-    if (rc != VE_OK) return rc;
+    const vm::Status st = mgr().readSymlink(vol, path, target);
+    if (st != vm::Status::Ok) return rcOf(st);
     return emitBuffer(reinterpret_cast<const uint8_t*>(target.data()), target.size(), out) ? VE_OK : VE_ERR_FAILED;
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -524,36 +595,28 @@ extern "C" VE_API int32_t ve_read_symlink(int32_t vol, const char* path, ve_buff
 extern "C" VE_API int32_t ve_create_symlink(int32_t vol, const char* path, const char* target) {
     if (!path || !target || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::createSymlink(vol, path, target);
-    return withMounted(vol, "createSymlink", true, [&](auto&) {
-        return okOrFailed(fsCreateSymlink(vol, path, target));
-    });
+    if (const int32_t gate = writeGate(vol); gate != VE_OK) return gate;
+    return rcOf(mgr().createSymlink(vol, path, target));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int64_t ve_get_file_size(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return -VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::fileSize(vol, path);
-    int64_t size = 0;
-    const int32_t rc = withMounted(vol, "getFileSize", false, [&](auto&) {
-        size = static_cast<int64_t>(fsGetFileSize(vol, path));
-        return VE_OK;
-    });
-    return rc == VE_OK ? size : -static_cast<int64_t>(rc);
+    int64_t size = -1;
+    const vm::Status st = mgr().getFileSize(vol, path, size);
+    if (st == vm::Status::NotUnlocked) return -static_cast<int64_t>(VE_ERR_NOT_UNLOCKED);
+    return st == vm::Status::Ok && size >= 0 ? size : -1;  // -1: missing, or a directory
     VE_CATCH(-VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int64_t ve_get_folder_size(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return -VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::folderSize(vol, path);
-    int64_t total = 0;
-    const int32_t rc = withMounted(vol, "getFolderSize", false, [&](auto&) {
-        total = static_cast<int64_t>(fsGetFolderSize(vol, path));
-        return VE_OK;
-    });
-    return rc == VE_OK ? total : -static_cast<int64_t>(rc);
+    int64_t total = -1;
+    const vm::Status st = mgr().getFolderSize(vol, path, total);
+    if (st != vm::Status::Ok || total < 0) return -static_cast<int64_t>(rcOf(st == vm::Status::Ok ? vm::Status::Failed : st));
+    return total;
     VE_CATCH(-VE_ERR_EXCEPTION)
 }
 
@@ -567,14 +630,14 @@ extern "C" VE_API int32_t ve_read_file_chunk(int32_t vol, const char* path, int6
         return VE_ERR_INVALID_ARG;
     }
     VE_TRY
+    vm::VolumeManager::Traits t;
+    if (mgr().traits(vol, t) != vm::Status::Ok) return VE_ERR_NOT_UNLOCKED;
     std::vector<uint8_t> buffer;
-    const bool isFv = vefv::isSlot(vol);
-    const int32_t rc = isFv ? vefv::readChunk(vol, path, offset, length, buffer)
-                            : withMounted(vol, "readFileChunk", false, [&](auto&) {
-        return okOrFailed(fsReadFileChunk(vol, path, static_cast<uint64_t>(offset),
-                                          static_cast<size_t>(length), buffer));
-    });
-    if (rc != VE_OK) return rc;
+    const vm::Status st = mgr().readFileChunk(vol, path, offset, static_cast<size_t>(length), buffer);
+    if (st != vm::Status::Ok) return rcOf(st);
+    // Legacy: a block-device read that returns no bytes (end of file) is VE_ERR_FAILED, as ve_engine.h says;
+    // a folder vault answers OK with an empty buffer. Both mean "no more data" to the callers.
+    if (buffer.empty() && t.family == vm::Family::BlockDevice) return VE_ERR_FAILED;
     const bool ok = emitBuffer(buffer.data(), buffer.size(), out);
     if (!buffer.empty()) mbedtls_platform_zeroize(buffer.data(), buffer.size());
     return ok ? VE_OK : VE_ERR_FAILED;
@@ -587,44 +650,41 @@ extern "C" VE_API int32_t ve_write_file_chunk(int32_t vol, const char* path, int
         return VE_ERR_INVALID_ARG;
     }
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::writeChunk(vol, path, offset, data, len);
-    return withMounted(vol, "writeFileChunk", true, [&](auto&) {
-        return okOrFailed(fsWriteFileChunk(vol, path, static_cast<uint64_t>(offset), data, len));
-    });
+    if (const int32_t gate = writeGate(vol); gate != VE_OK) return gate;
+    static const uint8_t kNone = 0;  // a zero-length write at offset 0 still creates / empties the file
+    return rcOf(mgr().writeFileChunk(vol, path, offset, data ? data : &kNone, len));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int32_t ve_delete_file(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::remove(vol, path);
-    return withMounted(vol, "deleteFile", true, [&](auto&) { return okOrFailed(fsDeleteFile(vol, path)); });
+    if (const int32_t gate = writeGate(vol); gate != VE_OK) return gate;
+    return rcOf(mgr().deleteFile(vol, path));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int32_t ve_create_directory(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::makeDirectory(vol, path);
-    return withMounted(vol, "createDirectory", true, [&](auto&) { return okOrFailed(fsCreateDirectory(vol, path)); });
+    if (const int32_t gate = writeGate(vol); gate != VE_OK) return gate;
+    return rcOf(mgr().createDirectory(vol, path));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int32_t ve_rename_file(int32_t vol, const char* old_path, const char* new_path) {
     if (!old_path || !new_path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::rename(vol, old_path, new_path);
-    return withMounted(vol, "renameFile", true, [&](auto&) { return okOrFailed(fsRenameFile(vol, old_path, new_path)); });
+    if (const int32_t gate = writeGate(vol); gate != VE_OK) return gate;
+    return rcOf(mgr().renameFile(vol, old_path, new_path));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int32_t ve_set_last_modified(int32_t vol, const char* path, int64_t epoch_seconds) {
     if (!path || !validVol(vol) || epoch_seconds < 0) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::setLastModified(vol, path, epoch_seconds);
-    return withMounted(vol, "setLastModifiedTime", true, [&](auto&) {
-        return okOrFailed(fsSetLastModifiedTime(vol, path, static_cast<uint64_t>(epoch_seconds)));
-    });
+    if (const int32_t gate = writeGate(vol); gate != VE_OK) return gate;
+    return rcOf(mgr().setLastModifiedTime(vol, path, epoch_seconds));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
@@ -633,59 +693,53 @@ extern "C" VE_API int32_t ve_set_last_modified(int32_t vol, const char* path, in
 extern "C" VE_API int32_t ve_write_file_at(int32_t vol, const char* path, int64_t offset, const uint8_t* data, size_t len) {
     if (!path || !validVol(vol) || offset < 0 || len > kMaxChunk || (len > 0 && !data)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return VE_ERR_UNSUPPORTED;
-    return withMounted(vol, "writeFileAt", true, [&](auto&) {
-        return okOrFailed(fsWriteFileAt(vol, path, static_cast<uint64_t>(offset), data, len));
-    });
+    vm::VolumeManager::Traits t;
+    if (const int32_t gate = writeGate(vol, &t); gate == VE_ERR_NOT_UNLOCKED) return gate;
+    if (!t.randomWrites) return VE_ERR_UNSUPPORTED;  // folder vaults write sequentially (see ve_fv_finish_write)
+    if (t.readOnly) return VE_ERR_READ_ONLY;
+    static const uint8_t kNone = 0;
+    return rcOf(mgr().writeFileAt(vol, path, offset, data ? data : &kNone, len));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int32_t ve_truncate(int32_t vol, const char* path, int64_t size) {
     if (!path || !validVol(vol) || size < 0) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return VE_ERR_UNSUPPORTED;
-    return withMounted(vol, "truncate", true, [&](auto&) {
-        return okOrFailed(fsTruncateFile(vol, path, static_cast<uint64_t>(size)));
-    });
+    vm::VolumeManager::Traits t;
+    if (const int32_t gate = writeGate(vol, &t); gate == VE_ERR_NOT_UNLOCKED) return gate;
+    if (!t.randomWrites) return VE_ERR_UNSUPPORTED;
+    if (t.readOnly) return VE_ERR_READ_ONLY;
+    return rcOf(mgr().truncateFile(vol, path, size));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 extern "C" VE_API int32_t ve_create_empty_file(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) {
-        int32_t rc = vefv::writeChunk(vol, path, 0, nullptr, 0);
-        return rc == VE_OK ? vefv::finishWrite(vol, path) : rc;
-    }
-    return withMounted(vol, "createEmptyFile", true, [&](auto&) {
-        return okOrFailed(fsCreateEmptyFile(vol, path));
-    });
+    if (const int32_t gate = writeGate(vol); gate != VE_OK) return gate;
+    return rcOf(mgr().createEmptyFile(vol, path));
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
 // Facts the mount layer needs that the public ABI does not carry (see ve_mount_internal.h).
 bool ve_internal_vol_traits(int32_t vol, bool* folderVault, bool* caseInsensitive, bool* readOnly) {
-    if (!validVol(vol)) return false;
-    const bool fv = vefv::isSlot(vol);
-    if (folderVault) *folderVault = fv;
-    if (fv) {
-        if (caseInsensitive) *caseInsensitive = false;
-        if (readOnly) *readOnly = vefv::isReadOnly(vol);
-        return true;
-    }
-    if (caseInsensitive) {
-        const auto t = volumes[vol].fsType;
-        *caseInsensitive = (t == VolumeState::FS_FATFS || t == VolumeState::FS_NTFS);
-    }
-    if (readOnly) *readOnly = isVolumeReadOnly(vol);
+    vm::VolumeManager::Traits t;
+    if (!validVol(vol) || mgr().traits(vol, t) != vm::Status::Ok) return false;
+    if (folderVault) *folderVault = t.family == vm::Family::FolderVault;
+    if (caseInsensitive) *caseInsensitive = t.caseInsensitive;
+    if (readOnly) *readOnly = t.readOnly;
     return true;
 }
+
+// ── whole-file transfers ─────────────────────────────────────────────────
 
 extern "C" VE_API int32_t ve_import_file(int32_t vol, const char* vault_path,
                                          const char* host_source_path, int32_t op_id) {
     if (!vault_path || !host_source_path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::importFile(vol, vault_path, host_source_path, op_id);
+    if (isFolderVault(vol)) return vefv::importFile(vol, vault_path, host_source_path, op_id);
+    // Containers copy through the filesystem backends' own host-file path, which holds the volume lock for the
+    // whole file and yields it between chunks.
     return withMounted(vol, "writeBackFile", true, [&](std::unique_lock<std::shared_mutex>& fsLock) {
         return okOrFailed(fsWriteBackFile(vol, vault_path, host_source_path,
             [op_id, vol, &fsLock](uint64_t bytesWritten) -> bool {
@@ -704,7 +758,7 @@ extern "C" VE_API int32_t ve_export_file(int32_t vol, const char* vault_path,
                                          const char* host_dest_path, int32_t op_id) {
     if (!vault_path || !host_dest_path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::exportFile(vol, vault_path, host_dest_path, op_id);
+    if (isFolderVault(vol)) return vefv::exportFile(vol, vault_path, host_dest_path, op_id);
     return withMounted(vol, "extractFile", false, [&](std::unique_lock<std::shared_mutex>& fsLock) {
         return okOrFailed(fsExtractFile(vol, vault_path, host_dest_path,
             [op_id, vol, &fsLock](uint64_t bytesWritten) -> bool {
@@ -719,78 +773,26 @@ extern "C" VE_API int32_t ve_export_file(int32_t vol, const char* vault_path,
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
-// Copy where at least one side is a folder vault (the block-device-only case keeps its dedicated
-// fsCopyFile fast paths below). Streams through memory in 2 MiB steps like fsCopyFile's cross-filesystem
-// fallback: the block-device side takes its volume lock per chunk, a folder vault is internally
-// thread-safe. A failed or cancelled copy removes the partial destination, as fsCopyFile does.
-static int32_t copyMixed(int32_t srcVol, const char* srcPath, int32_t destVol, const char* destPath, int32_t opId) {
-    const bool srcFv = vefv::isSlot(srcVol);
-    const bool destFv = vefv::isSlot(destVol);
-    if (!srcFv && !requireActiveSession(srcVol, "copyFile (src)")) return VE_ERR_NOT_UNLOCKED;
-    if (!destFv && !requireActiveSession(destVol, "copyFile (dest)")) return VE_ERR_NOT_UNLOCKED;
-    if (destFv ? vefv::isReadOnly(destVol) : isVolumeReadOnly(destVol)) return VE_ERR_READ_ONLY;
-
-    int64_t size = -1;
-    if (srcFv) {
-        size = vefv::fileSize(srcVol, srcPath);
-    } else {
-        const int32_t rc = withMounted(srcVol, "copyFile (size)", false, [&](auto&) {
-            size = fsGetFileSize(srcVol, srcPath);
-            return VE_OK;
-        });
-        if (rc != VE_OK) return rc;
-    }
-    if (size < 0) return VE_ERR_FAILED;
-
-    static const uint8_t kNone = 0;
-    auto writeAt = [&](int64_t off, const uint8_t* d, size_t n) -> int32_t {
-        if (destFv) return vefv::writeChunk(destVol, destPath, off, d, n);
-        return withMounted(destVol, "copyFile (write)", true, [&](auto&) {
-            return okOrFailed(fsWriteFileChunk(destVol, destPath, static_cast<uint64_t>(off), d ? d : &kNone, n));
-        });
-    };
-
-    constexpr size_t kStep = 2u * 1024u * 1024u;
-    std::vector<uint8_t> buf;
-    int64_t offset = 0;
-    int32_t rc = VE_OK;
-    if (size == 0) rc = writeAt(0, nullptr, 0);  // an empty source still has to create the destination
-    while (rc == VE_OK && offset < size) {
-        const size_t want = static_cast<size_t>(std::min<int64_t>(static_cast<int64_t>(kStep), size - offset));
-        buf.clear();
-        if (srcFv) {
-            rc = vefv::readChunk(srcVol, srcPath, offset, static_cast<int32_t>(want), buf);
-        } else {
-            rc = withMounted(srcVol, "copyFile (read)", false, [&](auto&) {
-                return okOrFailed(fsReadFileChunk(srcVol, srcPath, static_cast<uint64_t>(offset), want, buf));
-            });
-        }
-        if (rc != VE_OK) break;
-        if (buf.empty()) { rc = VE_ERR_FAILED; break; }  // source shorter than its reported size
-        rc = writeAt(offset, buf.data(), buf.size());
-        if (rc != VE_OK) break;
-        offset += static_cast<int64_t>(buf.size());
-        reportCopyProgress(opId, buf.size());
-        mbedtls_platform_zeroize(buf.data(), buf.size());
-        if (isCopyCancelled(opId)) { rc = VE_ERR_FAILED; break; }  // same code the block path reports for a cancel
-    }
-    if (!buf.empty()) mbedtls_platform_zeroize(buf.data(), buf.size());
-    if (rc == VE_OK && destFv) rc = vefv::finishWrite(destVol, destPath);  // the file only becomes valid here
-    if (rc != VE_OK) {
-        if (destFv) vefv::remove(destVol, destPath);
-        else withMounted(destVol, "copyFile (cleanup)", true, [&](auto&) { return okOrFailed(fsDeleteFile(destVol, destPath)); });
-    }
-    return rc;
-}
-
 extern "C" VE_API int32_t ve_copy_file(int32_t srcVol, const char* srcPath,
                                        int32_t destVol, const char* destPath, int32_t opId) {
     if (!srcPath || !destPath || !validVol(srcVol) || !validVol(destVol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(srcVol) || vefv::isSlot(destVol)) return copyMixed(srcVol, srcPath, destVol, destPath, opId);
+    vm::VolumeManager::Traits srcTraits, destTraits;
+    if (mgr().traits(srcVol, srcTraits) != vm::Status::Ok || mgr().traits(destVol, destTraits) != vm::Status::Ok) {
+        return VE_ERR_NOT_UNLOCKED;
+    }
+    if (destTraits.readOnly) return VE_ERR_READ_ONLY;
+
+    // A folder vault on either side: through memory in 2 MiB steps, one chunk at a time, nothing staged on disk;
+    // a failed or cancelled copy removes the partial destination (vm::VolumeManager::copyFile).
+    if (srcTraits.family == vm::Family::FolderVault || destTraits.family == vm::Family::FolderVault) {
+        CopyObserver observer(opId);
+        return rcOf(mgr().copyFile(srcVol, srcPath, destVol, destPath, &observer));
+    }
+
+    // Container to container keeps the filesystem backends' own copy, which has same-filesystem fast paths.
     if (!requireActiveSession(srcVol, "copyFile (src)")) return VE_ERR_NOT_UNLOCKED;
     if (!requireActiveSession(destVol, "copyFile (dest)")) return VE_ERR_NOT_UNLOCKED;
-    if (isVolumeReadOnly(destVol)) return VE_ERR_READ_ONLY;
 
     const bool sameVolume = (srcVol == destVol);
     std::unique_lock<std::shared_mutex> destLock(volumes[destVol].mutex, std::defer_lock);
@@ -818,22 +820,24 @@ extern "C" VE_API int32_t ve_copy_file(int32_t srcVol, const char* srcPath,
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
+// ── volume info ──────────────────────────────────────────────────────────
+
 extern "C" VE_API int32_t ve_get_space_info(int32_t vol, uint64_t* total, uint64_t* free_bytes) {
     if (!total || !free_bytes || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    uint64_t t = 0, f = 0;
-    if (vefv::isSlot(vol)) {
-        const int32_t fvRc = vefv::spaceInfo(vol, &t, &f);
-        if (fvRc == VE_OK) { *total = t; *free_bytes = f; }
-        return fvRc;
+    vm::VolumeManager::Traits t;
+    if (mgr().traits(vol, t) != vm::Status::Ok) return VE_ERR_NOT_UNLOCKED;
+    vm::SpaceInfo si;
+    const vm::Status st = mgr().spaceInfo(vol, si);
+    if (st == vm::Status::NotUnlocked) return VE_ERR_NOT_UNLOCKED;
+    if (st != vm::Status::Ok) {
+        if (t.family == vm::Family::FolderVault) return VE_ERR_FAILED;
+        // Legacy: a container whose filesystem cannot say reports 0 / 0 rather than an error.
+        if (!mgr().isUnlocked(vol)) return VE_ERR_NOT_UNLOCKED;
+        si = vm::SpaceInfo{0, 0};
     }
-    const int32_t rc = withMounted(vol, "getSpaceInfo", false, [&](auto&) {
-        fsGetSpaceInfo(vol, t, f);
-        return VE_OK;
-    });
-    if (rc != VE_OK) return rc;
-    *total = t;
-    *free_bytes = f;
+    *total = si.total > 0 ? static_cast<uint64_t>(si.total) : 0;
+    *free_bytes = si.free > 0 ? static_cast<uint64_t>(si.free) : 0;
     return VE_OK;
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -841,7 +845,9 @@ extern "C" VE_API int32_t ve_get_space_info(int32_t vol, uint64_t* total, uint64
 extern "C" VE_API int32_t ve_get_filesystem_label(int32_t vol, char* buf, size_t cap) {
     if (!buf || cap == 0 || !validVol(vol)) return -VE_ERR_INVALID_ARG;
     VE_TRY
-    if (vefv::isSlot(vol)) { buf[0] = '\0'; return 0; }  // folder vaults have no filesystem label
+    vm::VolumeManager::Traits t;
+    if (mgr().traits(vol, t) != vm::Status::Ok) return -VE_ERR_NOT_UNLOCKED;
+    if (t.family == vm::Family::FolderVault) { buf[0] = '\0'; return 0; }  // folder vaults have no filesystem label
     std::string label;
     const int32_t rc = withMounted(vol, "getFilesystemLabel", false, [&](auto&) {
         label = fsGetFilesystemLabel(vol);
@@ -860,7 +866,7 @@ extern "C" VE_API int32_t ve_get_vault_info(int32_t vol, ve_vault_info* out) {
         return VE_ERR_INVALID_ARG;
     }
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::vaultInfo(vol, out);
+    if (isFolderVault(vol)) return vefv::vaultInfo(vol, out);
     if (!requireActiveSession(vol, "getVaultInfo")) return VE_ERR_NOT_UNLOCKED;
     const int32_t size = out->struct_size;
     std::memset(out, 0, sizeof(*out));
@@ -909,17 +915,15 @@ extern "C" VE_API int32_t ve_get_vault_info(int32_t vol, ve_vault_info* out) {
 }
 
 // ── streams ──────────────────────────────────────────────────────────────
+// Handles come from the manager: unique across volumes, never reused, and ended when their volume closes.
+// A container's streams are native (an open file of the mounted filesystem); a folder vault's are emulated with
+// positioned reads.
 
 extern "C" VE_API int64_t ve_open_stream(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return 0;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::openStream(vol, path);
-    intptr_t handle = 0;
-    const int32_t rc = withMounted(vol, "openStream", false, [&](auto&) {
-        handle = reinterpret_cast<intptr_t>(fsOpenStream(vol, path));
-        return VE_OK;
-    });
-    return rc == VE_OK ? static_cast<int64_t>(handle) : 0;
+    uint64_t handle = 0;
+    return mgr().openStream(vol, path, handle) == vm::Status::Ok ? static_cast<int64_t>(handle) : 0;
     VE_CATCH(0)
 }
 
@@ -927,18 +931,15 @@ extern "C" VE_API int32_t ve_read_stream(int32_t vol, int64_t handle, int64_t of
                                          uint8_t* dest, int32_t length) {
     if (handle == 0 || length <= 0 || !dest || offset < 0 || !validVol(vol)) return -1;
     VE_TRY
-    if (vefv::isSlot(vol)) return vefv::readStream(vol, handle, offset, dest, length);
-    std::unique_lock<std::shared_mutex> fsLock(volumes[vol].mutex);
-    return fsReadStream(vol, reinterpret_cast<void*>(static_cast<intptr_t>(handle)),
-                        static_cast<uint64_t>(offset), dest, static_cast<size_t>(length));
+    const int64_t n = mgr().readStream(vol, static_cast<uint64_t>(handle), static_cast<uint64_t>(offset),
+                                       dest, static_cast<size_t>(length));
+    return n < 0 ? -1 : static_cast<int32_t>(n);
     VE_CATCH(-1)
 }
 
 extern "C" VE_API void ve_close_stream(int32_t vol, int64_t handle) {
     if (handle == 0 || !validVol(vol)) return;
     try {
-        if (vefv::isSlot(vol)) { vefv::closeStream(vol, handle); return; }
-        std::unique_lock<std::shared_mutex> fsLock(volumes[vol].mutex);
-        fsCloseStream(vol, reinterpret_cast<void*>(static_cast<intptr_t>(handle)));
+        mgr().closeStream(vol, static_cast<uint64_t>(handle));
     } catch (...) {}
 }

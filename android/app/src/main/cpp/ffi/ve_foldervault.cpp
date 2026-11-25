@@ -1,19 +1,18 @@
-// Desktop C ABI for folder vaults (gocryptfs / Cryptomator / CryFS); see ve_engine.h and ve_foldervault.h.
+// Desktop C ABI for folder vaults (gocryptfs / Cryptomator / CryFS); see ve_engine.h and ve_volumes.h.
 //
 // This is the desktop twin of jni/foldervault_bridge.cpp: the same fv:: core, the same open/create
 // semantics, only with C types instead of JNI ones and PosixStorage as the only storage backend
 // (a desktop vault folder is an ordinary directory, so no SAF-style callback storage is needed).
-// An unlocked vault is parked in a volume slot so the generic ve_* file calls reach it.
+// An unlocked vault is parked in a slot of the engine's vm::VolumeManager (ve_volumes.h) so the generic ve_*
+// file calls reach it exactly as they reach a container.
 
 #include "ve_engine.h"
-#include "ve_foldervault.h"
+#include "ve_volumes.h"
 
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
-
-#if !defined(VE_NO_FOLDERVAULT)
 
 #include <atomic>
 #include <exception>
@@ -27,6 +26,7 @@
 #include "foldervault/fv_storage.h"
 #include "foldervault/fv_vault.h"
 #include "platform/engine_hooks.h"
+#include "volman/vm_foldervault.h"
 #include "jni_callbacks.h"
 
 extern "C" int ve_log_enabled(void);
@@ -34,28 +34,23 @@ extern "C" void ve_log_dispatch(int prio, const char* tag, const char* message);
 
 namespace {
 
-// ── slot registry ───────────────────────────────────────────────────────────────────────────
-struct Stream {
-    std::string path;
-};
-struct Slot {
-    std::shared_ptr<fv::Vault> vault;
-    std::set<Stream*> streams;
-};
-
-std::mutex g_mu;
-
-std::vector<Slot>& slots() {  // callers hold g_mu
-    static std::vector<Slot> s(static_cast<size_t>(ve_max_volumes()));
-    return s;
-}
+// ── slots ───────────────────────────────────────────────────────────────────────────────────
+// The slot table is the engine's vm::VolumeManager; a folder vault is a vm::FolderVaultVolume in it.
 
 bool validVol(int32_t vol) { return vol >= 0 && vol < ve_max_volumes(); }
 
-std::shared_ptr<fv::Vault> vaultOf(int32_t vol) {
+// The folder-vault volume in `vol`, or null when the slot is empty, holds a container, or its vault was closed.
+std::shared_ptr<vm::FolderVaultVolume> folderVolumeOf(int32_t vol) {
     if (!validVol(vol)) return nullptr;
-    std::lock_guard<std::mutex> g(g_mu);
-    return slots()[static_cast<size_t>(vol)].vault;
+    auto fvv = std::dynamic_pointer_cast<vm::FolderVaultVolume>(ve_internal_volumes().get(vol));
+    return (fvv && fvv->alive()) ? fvv : nullptr;
+}
+
+// The vault itself, for the calls that need more than vm::Volume offers. The pointer keeps the volume (and so
+// the vault) alive while the caller uses it; fv::Vault::close() still waits for calls in flight.
+std::shared_ptr<fv::Vault> vaultOf(int32_t vol) {
+    auto fvv = folderVolumeOf(vol);
+    return fvv ? std::shared_ptr<fv::Vault>(fvv, &fvv->vault()) : nullptr;
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────
@@ -199,152 +194,18 @@ int32_t formatCodeOf(fv::VaultFormat f) {
 
 }  // namespace
 
-// ════════════════════════════════════════════ internal slot API (ve_foldervault.h) ════════
+// ════════════════════════════════════════════ internal helpers (ve_volumes.h) ════════
 
 namespace vefv {
-
-bool isSlot(int32_t vol) { return vaultOf(vol) != nullptr; }
-
-void closeSlot(int32_t vol) {
-    if (!validVol(vol)) return;
-    std::shared_ptr<fv::Vault> v;
-    {
-        std::lock_guard<std::mutex> g(g_mu);
-        Slot& s = slots()[static_cast<size_t>(vol)];
-        v = std::move(s.vault);
-        s.vault.reset();
-        for (Stream* st : s.streams) delete st;
-        s.streams.clear();
-    }
-    if (v) {
-        try { v->close(); } catch (...) {}  // waits for in-flight calls, wipes keys
-    }
-}
 
 int32_t containerFormat(int32_t vol) {
     auto v = vaultOf(vol);
     return v ? formatCodeOf(v->format()) : -1;
 }
 
-bool isReadOnly(int32_t vol) {
-    auto v = vaultOf(vol);
-    return v && v->readOnly();
-}
-
-#define FV_VAULT_OR_RETURN(rc)                  \
-    auto v = vaultOf(vol);                      \
-    if (!v) return (rc);
-
-int32_t list(int32_t vol, const char* path, ve_buffer* out) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    FV_TRY
-    std::vector<fv::DirEntry> es;
-    if (!v->listDirectory(path, es)) return VE_ERR_FAILED;
-    return packEntries(es, out);
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int64_t fileSize(int32_t vol, const char* path) {
-    FV_VAULT_OR_RETURN(-VE_ERR_NOT_UNLOCKED)
-    FV_TRY
-    return v->getFileSize(path);  // -1 when missing / a directory: the block path's convention too
-    FV_CATCH(-VE_ERR_EXCEPTION, nullptr)
-}
-
-int64_t folderSize(int32_t vol, const char* path) {
-    FV_VAULT_OR_RETURN(-VE_ERR_NOT_UNLOCKED)
-    FV_TRY
-    return v->getFolderSize(path);
-    FV_CATCH(-VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t readChunk(int32_t vol, const char* path, int64_t offset, int32_t length, std::vector<uint8_t>& out) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    FV_TRY
-    auto r = v->readFileChunk(path, offset, length);
-    if (!r) return VE_ERR_FAILED;
-    out = std::move(*r);
-    return VE_OK;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t writeChunk(int32_t vol, const char* path, int64_t offset, const uint8_t* data, size_t len) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    if (v->readOnly()) return VE_ERR_READ_ONLY;
-    FV_TRY
-    static const uint8_t kNone = 0;
-    return v->writeFileChunk(path, offset, data ? data : &kNone, len) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t finishWrite(int32_t vol, const char* path) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    if (v->readOnly()) return VE_ERR_READ_ONLY;
-    FV_TRY
-    return v->finishWrite(path) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t remove(int32_t vol, const char* path) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    if (v->readOnly()) return VE_ERR_READ_ONLY;
-    FV_TRY
-    return v->deleteFile(path) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t makeDirectory(int32_t vol, const char* path) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    if (v->readOnly()) return VE_ERR_READ_ONLY;
-    FV_TRY
-    return v->createDirectory(path) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t rename(int32_t vol, const char* from, const char* to) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    if (v->readOnly()) return VE_ERR_READ_ONLY;
-    FV_TRY
-    return v->renameFile(from, to) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t setLastModified(int32_t vol, const char* path, int64_t epochSeconds) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    if (v->readOnly()) return VE_ERR_READ_ONLY;
-    FV_TRY
-    return v->setLastModifiedTime(path, epochSeconds) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t listSymlinks(int32_t vol, const char* path, ve_buffer* out) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    FV_TRY
-    std::vector<fv::DirEntry> es;
-    if (!v->listSymlinks(path, es)) return VE_ERR_FAILED;
-    return packEntries(es, out);
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t readSymlink(int32_t vol, const char* path, ve_buffer* out) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    FV_TRY
-    auto t = v->readSymlink(path);
-    if (!t) return VE_ERR_FAILED;
-    return emitBuffer(reinterpret_cast<const uint8_t*>(t->data()), t->size(), out) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-int32_t createSymlink(int32_t vol, const char* path, const char* target) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    if (v->readOnly()) return VE_ERR_READ_ONLY;
-    FV_TRY
-    return v->createSymlink(path, target) ? VE_OK : VE_ERR_FAILED;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
 int32_t importFile(int32_t vol, const char* vaultPath, const char* hostSource, int32_t opId) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
+    auto v = vaultOf(vol);
+    if (!v) return VE_ERR_NOT_UNLOCKED;
     if (v->readOnly()) return VE_ERR_READ_ONLY;
     FV_TRY
     ImportProgress prog(opId);
@@ -353,26 +214,17 @@ int32_t importFile(int32_t vol, const char* vaultPath, const char* hostSource, i
 }
 
 int32_t exportFile(int32_t vol, const char* vaultPath, const char* hostDest, int32_t opId) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
+    auto v = vaultOf(vol);
+    if (!v) return VE_ERR_NOT_UNLOCKED;
     FV_TRY
     ExportProgress prog(opId);
     return v->extractFile(vaultPath, hostDest, &prog) ? VE_OK : VE_ERR_FAILED;
     FV_CATCH(VE_ERR_EXCEPTION, nullptr)
 }
 
-int32_t spaceInfo(int32_t vol, uint64_t* total, uint64_t* freeBytes) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
-    FV_TRY
-    int64_t t = 0, f = 0;
-    if (!v->spaceInfo(t, f)) return VE_ERR_FAILED;
-    *total = t > 0 ? static_cast<uint64_t>(t) : 0;
-    *freeBytes = f > 0 ? static_cast<uint64_t>(f) : 0;
-    return VE_OK;
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
 int32_t vaultInfo(int32_t vol, ve_vault_info* out) {
-    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
+    auto v = vaultOf(vol);
+    if (!v) return VE_ERR_NOT_UNLOCKED;
     const int32_t size = out->struct_size;
     std::memset(out, 0, sizeof(*out));
     out->struct_size = size;
@@ -383,57 +235,6 @@ int32_t vaultInfo(int32_t vol, ve_vault_info* out) {
         if (v->spaceInfo(t, f) && t > 0) out->volume_size_bytes = t;
     } catch (...) {}
     return VE_OK;
-}
-
-int64_t openStream(int32_t vol, const char* path) {
-    FV_VAULT_OR_RETURN(0)
-    FV_TRY
-    if (v->getFileSize(path) < 0) return 0;
-    auto* st = new Stream{path};
-    std::lock_guard<std::mutex> g(g_mu);
-    Slot& s = slots()[static_cast<size_t>(vol)];
-    if (s.vault != v) {  // locked/replaced while we were checking
-        delete st;
-        return 0;
-    }
-    s.streams.insert(st);
-    return static_cast<int64_t>(reinterpret_cast<intptr_t>(st));
-    FV_CATCH(0, nullptr)
-}
-
-int32_t readStream(int32_t vol, int64_t handle, int64_t offset, uint8_t* dest, int32_t length) {
-    if (!validVol(vol) || handle == 0) return -1;
-    std::shared_ptr<fv::Vault> v;
-    std::string path;
-    {
-        std::lock_guard<std::mutex> g(g_mu);
-        Slot& s = slots()[static_cast<size_t>(vol)];
-        auto* st = reinterpret_cast<Stream*>(static_cast<intptr_t>(handle));
-        if (!s.vault || s.streams.find(st) == s.streams.end()) return -1;
-        v = s.vault;
-        path = st->path;
-    }
-    try {
-        auto r = v->readFileChunk(path, offset, length);
-        if (!r) return -1;
-        const size_t n = r->size() < static_cast<size_t>(length) ? r->size() : static_cast<size_t>(length);
-        if (n) std::memcpy(dest, r->data(), n);
-        fv::secureZero(r->data(), r->size());
-        return static_cast<int32_t>(n);
-    } catch (...) {
-        return -1;
-    }
-}
-
-void closeStream(int32_t vol, int64_t handle) {
-    if (!validVol(vol) || handle == 0) return;
-    std::lock_guard<std::mutex> g(g_mu);
-    Slot& s = slots()[static_cast<size_t>(vol)];
-    auto* st = reinterpret_cast<Stream*>(static_cast<intptr_t>(handle));
-    auto it = s.streams.find(st);
-    if (it == s.streams.end()) return;  // already invalidated by a lock
-    s.streams.erase(it);
-    delete st;
 }
 
 }  // namespace vefv
@@ -467,12 +268,10 @@ extern "C" VE_API int32_t ve_fv_unlock(int32_t vol_id, int32_t format, const cha
     }
     FV_TRY
     ensureInit();
-    {
-        std::lock_guard<std::mutex> g(g_mu);
-        if (slots()[static_cast<size_t>(vol_id)].vault) {
-            setMessage(message, "volume slot already in use");
-            return VE_ERR_FAILED;
-        }
+    // Checked before the (slow) key derivation; attach() below is what actually decides.
+    if (ve_internal_volumes().isUnlocked(vol_id)) {
+        setMessage(message, "volume slot already in use");
+        return VE_ERR_FAILED;
     }
     auto st = std::make_shared<fv::PosixStorage>(root);
     fv::HostEnv env = makeEnv(local_state_dir, temp_dir);
@@ -495,15 +294,10 @@ extern "C" VE_API int32_t ve_fv_unlock(int32_t vol_id, int32_t format, const cha
     if (derived_key && !r.derivedKey.empty()) emitBuffer(r.derivedKey.data(), r.derivedKey.size(), derived_key);
 
     std::shared_ptr<fv::Vault> vault(std::move(r.vault));
-    {
-        std::lock_guard<std::mutex> g(g_mu);
-        Slot& s = slots()[static_cast<size_t>(vol_id)];
-        if (s.vault) {  // lost a race for the slot
-            vault->close();
-            setMessage(message, "volume slot already in use");
-            return VE_ERR_FAILED;
-        }
-        s.vault = std::move(vault);
+    if (!ve_internal_volumes().attach(vol_id, vm::wrapFolderVault(vault), root)) {  // lost a race for the slot
+        vault->close();
+        setMessage(message, "volume slot already in use");
+        return VE_ERR_FAILED;
     }
     return VE_OK;
     FV_CATCH(VE_ERR_EXCEPTION, message)
@@ -636,7 +430,11 @@ extern "C" VE_API int32_t ve_fv_hidden_entry_count(int32_t vol_id, const char* p
 
 extern "C" VE_API int32_t ve_fv_finish_write(int32_t vol_id, const char* path) {
     if (!path) return VE_ERR_INVALID_ARG;
-    return vefv::finishWrite(vol_id, path);
+    auto& mgr = ve_internal_volumes();
+    vm::VolumeManager::Traits t;
+    if (mgr.traits(vol_id, t) != vm::Status::Ok || t.family != vm::Family::FolderVault) return VE_ERR_NOT_UNLOCKED;
+    if (t.readOnly) return VE_ERR_READ_ONLY;
+    return mgr.finishWrite(vol_id, path) == vm::Status::Ok ? VE_OK : VE_ERR_FAILED;
 }
 
 extern "C" VE_API int32_t ve_fv_batch(int32_t vol_id, int32_t kind, int32_t begin) {
@@ -792,105 +590,3 @@ extern "C" VE_API int32_t ve_fv_validate_config(int32_t format, const uint8_t* b
     return VE_ERR_FAILED;
     FV_CATCH(VE_ERR_EXCEPTION, reason)
 }
-
-#else  // VE_NO_FOLDERVAULT ─────────────────────────────────────────────────────────────────────
-// Windows (for now): no folder-vault storage backend. Slots are never folder vaults, and the
-// ve_fv_* entry points fail cleanly so the Dart side can say "not supported on this platform".
-
-namespace vefv {
-bool isSlot(int32_t) { return false; }
-void closeSlot(int32_t) {}
-int32_t containerFormat(int32_t) { return -1; }
-bool isReadOnly(int32_t) { return false; }
-int32_t list(int32_t, const char*, ve_buffer*) { return VE_ERR_NOT_UNLOCKED; }
-int64_t fileSize(int32_t, const char*) { return -VE_ERR_NOT_UNLOCKED; }
-int64_t folderSize(int32_t, const char*) { return -VE_ERR_NOT_UNLOCKED; }
-int32_t readChunk(int32_t, const char*, int64_t, int32_t, std::vector<uint8_t>&) { return VE_ERR_NOT_UNLOCKED; }
-int32_t writeChunk(int32_t, const char*, int64_t, const uint8_t*, size_t) { return VE_ERR_NOT_UNLOCKED; }
-int32_t finishWrite(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t remove(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t makeDirectory(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t rename(int32_t, const char*, const char*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t setLastModified(int32_t, const char*, int64_t) { return VE_ERR_NOT_UNLOCKED; }
-int32_t listSymlinks(int32_t, const char*, ve_buffer*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t readSymlink(int32_t, const char*, ve_buffer*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t createSymlink(int32_t, const char*, const char*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t importFile(int32_t, const char*, const char*, int32_t) { return VE_ERR_NOT_UNLOCKED; }
-int32_t exportFile(int32_t, const char*, const char*, int32_t) { return VE_ERR_NOT_UNLOCKED; }
-int32_t spaceInfo(int32_t, uint64_t*, uint64_t*) { return VE_ERR_NOT_UNLOCKED; }
-int32_t vaultInfo(int32_t, ve_vault_info*) { return VE_ERR_NOT_UNLOCKED; }
-int64_t openStream(int32_t, const char*) { return 0; }
-int32_t readStream(int32_t, int64_t, int64_t, uint8_t*, int32_t) { return -1; }
-void closeStream(int32_t, int64_t) {}
-}  // namespace vefv
-
-namespace {
-void clearBuf(ve_buffer* b) { if (b) { b->data = nullptr; b->len = 0; } }
-void unsupported(ve_buffer* message) {
-    clearBuf(message);
-    if (!message) return;
-    static const char kMsg[] = "Folder vaults are not available on Windows yet";
-    if (auto* mem = static_cast<uint8_t*>(std::malloc(sizeof(kMsg) - 1))) {
-        std::memcpy(mem, kMsg, sizeof(kMsg) - 1);
-        message->data = mem;
-        message->len = sizeof(kMsg) - 1;
-    }
-}
-}  // namespace
-
-extern "C" VE_API int32_t ve_fv_supported(void) { return 0; }
-extern "C" VE_API int32_t ve_fv_probe(const char*, int32_t* format_out) {
-    if (format_out) *format_out = -1;
-    return VE_OK;
-}
-extern "C" VE_API int32_t ve_fv_unlock(int32_t, int32_t, const char*, const uint8_t*, int32_t, const uint8_t*,
-                                       int32_t, int32_t, int32_t, const char*, const char*, ve_buffer* message,
-                                       ve_buffer* derived_key) {
-    clearBuf(derived_key);
-    unsupported(message);
-    return VE_ERR_FAILED;
-}
-extern "C" VE_API int32_t ve_fv_create(int32_t, const char*, const uint8_t*, int32_t, int32_t, int32_t, int32_t,
-                                       int32_t, int32_t, const char*, const uint8_t*, int32_t, const char*,
-                                       const char*, ve_buffer* message) {
-    unsupported(message);
-    return VE_ERR_FAILED;
-}
-extern "C" VE_API int32_t ve_fv_change_password(int32_t, const char*, const uint8_t*, int32_t, const uint8_t*,
-                                                int32_t, ve_buffer* message) {
-    unsupported(message);
-    return VE_ERR_FAILED;
-}
-extern "C" VE_API int32_t ve_fv_migrate_cryptomator(const char*, const uint8_t*, int32_t, ve_buffer* message) {
-    unsupported(message);
-    return VE_ERR_FAILED;
-}
-extern "C" VE_API int32_t ve_fv_info(int32_t, ve_buffer* out) { clearBuf(out); return VE_ERR_NOT_UNLOCKED; }
-extern "C" VE_API int32_t ve_fv_probe_cryptomator(const char*, int32_t* code_out) {
-    if (code_out) *code_out = 0;
-    return VE_OK;
-}
-extern "C" VE_API int32_t ve_fv_hidden_entry_count(int32_t, const char*) { return -VE_ERR_NOT_UNLOCKED; }
-extern "C" VE_API int32_t ve_fv_finish_write(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
-extern "C" VE_API int32_t ve_fv_batch(int32_t, int32_t, int32_t) { return VE_ERR_NOT_UNLOCKED; }
-
-extern "C" VE_API int32_t ve_fv_check(int32_t, const char*, const uint8_t*, int32_t, int32_t, const char*, const char*,
-                                      int32_t, ve_buffer* out) {
-    clearBuf(out);
-    return VE_ERR_FAILED;
-}
-extern "C" VE_API int32_t ve_fv_repair(int32_t, const char*, const uint8_t*, int32_t, int32_t, const char*, const char*,
-                                       int32_t, ve_buffer* out) {
-    clearBuf(out);
-    return VE_ERR_FAILED;
-}
-extern "C" VE_API int32_t ve_fv_config_file_name(int32_t, ve_buffer* out) {
-    clearBuf(out);
-    return VE_ERR_FAILED;
-}
-extern "C" VE_API int32_t ve_fv_validate_config(int32_t, const uint8_t*, int32_t, ve_buffer* reason) {
-    unsupported(reason);
-    return VE_ERR_FAILED;
-}
-
-#endif  // VE_NO_FOLDERVAULT

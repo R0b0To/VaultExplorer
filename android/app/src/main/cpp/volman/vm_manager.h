@@ -83,6 +83,17 @@ public:
     int addRemovedListener(RemovedListener l);        // token for removeRemovedListener
     void removeRemovedListener(int token);
 
+    // What a front-end needs to know about a volume before it talks to it, read in one
+    // call: which family it is, and the capabilities that decide how it is used. NotUnlocked
+    // for an empty slot or a volume that is no longer alive().
+    struct Traits {
+        Family family = Family::BlockDevice;
+        bool readOnly = false;          // current state: a block volume can become read-only after unlock
+        bool caseInsensitive = false;
+        bool randomWrites = false;      // Volume::supportsRandomWrites
+    };
+    Status traits(int volId, Traits& out);
+
     // ---- namespace ------------------------------------------------------
     Status listDirectory(int volId, const std::string& path, std::vector<std::string>& wire);
     Status listSymlinks(int volId, const std::string& path, std::vector<std::string>& wire);
@@ -101,6 +112,10 @@ public:
     Status writeFileChunk(int volId, const std::string& path, int64_t offset, const uint8_t* data, size_t len);
     Status finishWrite(int volId, const std::string& path);
     Status importStream(int volId, const std::string& path, ByteSource& src, Observer* obs = nullptr);
+    Status createEmptyFile(int volId, const std::string& path);
+    // Failed when the volume has no random-access writer (see Volume::supportsRandomWrites).
+    Status writeFileAt(int volId, const std::string& path, int64_t offset, const uint8_t* data, size_t len);
+    Status truncateFile(int volId, const std::string& path, int64_t size);
 
     Status beginBatchWrite(int volId);
     Status endBatchWrite(int volId);

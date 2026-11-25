@@ -37,6 +37,11 @@ bool Volume::importStream(const std::string& path, ByteSource& src, Observer* ob
     return finishWrite(path);
 }
 
+bool Volume::createEmptyFile(const std::string& path) {
+    // A write at offset 0 creates (or empties) the file; finishWrite() commits it where the engine needs that.
+    return writeFileChunk(path, 0, nullptr, 0) && finishWrite(path);
+}
+
 // --------------------------------------------------------- VolumeManager --
 
 VolumeManager::VolumeManager(int maxVolumes)
@@ -293,6 +298,24 @@ Status VolumeManager::finishWrite(int id, const std::string& path) {
 }
 Status VolumeManager::importStream(int id, const std::string& path, ByteSource& src, Observer* obs) {
     return with(id, [&](Volume& v) { return v.importStream(path, src, obs); });
+}
+Status VolumeManager::createEmptyFile(int id, const std::string& path) {
+    return with(id, [&](Volume& v) { return v.createEmptyFile(path); });
+}
+Status VolumeManager::writeFileAt(int id, const std::string& path, int64_t offset, const uint8_t* data, size_t len) {
+    return with(id, [&](Volume& v) { return v.supportsRandomWrites() && v.writeFileAt(path, offset, data, len); });
+}
+Status VolumeManager::truncateFile(int id, const std::string& path, int64_t size) {
+    return with(id, [&](Volume& v) { return v.supportsRandomWrites() && v.truncateFile(path, size); });
+}
+Status VolumeManager::traits(int id, Traits& out) {
+    return with(id, [&](Volume& v) {
+        out.family = v.family();
+        out.readOnly = v.readOnly();
+        out.caseInsensitive = v.caseInsensitive();
+        out.randomWrites = v.supportsRandomWrites();
+        return true;
+    });
 }
 Status VolumeManager::beginBatchWrite(int id) {
     return with(id, [&](Volume& v) { v.beginBatchWrite(); return true; });

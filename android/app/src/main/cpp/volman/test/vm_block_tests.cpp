@@ -10,6 +10,7 @@
 // and how a VolumeManager holding block volumes *and* real gocryptfs/Cryptomator
 // vaults copies between them. What it cannot show is the real FAT/NTFS/ext code
 // underneath; that has its own tests (filesystems/test).
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -157,6 +158,29 @@ bool fsWriteFileChunk(int id, const std::string& p, uint64_t off, const uint8_t*
     if (off == 0) file.clear();                          // truncate-on-offset-0, as documented in fs_ops.h
     if (file.size() != off) return false;
     file.insert(file.end(), data, data + len);
+    return true;
+}
+bool fsCreateEmptyFile(int id, const std::string& p) {
+    auto& f = fake::g_fs[id]; fake::Inside in(f); std::lock_guard<std::mutex> g(f.mu);
+    const std::string n = fake::norm(p);
+    if (!f.dirs.count(fake::parent(n)) || f.dirs.count(n)) return false;
+    f.files[n].clear();
+    return true;
+}
+bool fsWriteFileAt(int id, const std::string& p, uint64_t off, const uint8_t* data, size_t len) {
+    auto& f = fake::g_fs[id]; fake::Inside in(f); std::lock_guard<std::mutex> g(f.mu);
+    auto it = f.files.find(fake::norm(p));
+    if (it == f.files.end() || off > it->second.size()) return false;     // existing file, no gap
+    auto& file = it->second;
+    if (off + len > file.size()) file.resize(static_cast<size_t>(off + len));
+    if (len) std::copy(data, data + len, file.begin() + static_cast<std::ptrdiff_t>(off));
+    return true;
+}
+bool fsTruncateFile(int id, const std::string& p, uint64_t size) {
+    auto& f = fake::g_fs[id]; fake::Inside in(f); std::lock_guard<std::mutex> g(f.mu);
+    auto it = f.files.find(fake::norm(p));
+    if (it == f.files.end()) return false;
+    it->second.resize(static_cast<size_t>(size));
     return true;
 }
 bool fsDeleteFile(int id, const std::string& p) { auto& f = fake::g_fs[id]; std::lock_guard<std::mutex> g(f.mu); return f.files.erase(fake::norm(p)) > 0; }
@@ -354,6 +378,76 @@ static void testOperations() {
     fake::g_fs[0].label.clear();
     CHECK(v->info().empty());
     CHECK_EQ(v->hiddenEntryCount(""), -1);
+}
+
+static void testCapabilities() {
+    std::printf("capabilities\n");
+    unlockEngine(0);
+    auto v = wrapBlockVolume(0);
+    Bytes out;
+    CHECK(v->supportsRandomWrites());
+    CHECK(v->createDirectory("d"));
+
+    // createEmptyFile: creates, empties an existing file, refuses a directory or a missing parent
+    const Bytes data = rnd(100, 9);
+    CHECK(v->createEmptyFile("d/e"));
+    CHECK_EQ(v->getFileSize("d/e"), 0);
+    CHECK(v->writeFileChunk("d/e", 0, data.data(), data.size()));
+    CHECK(v->createEmptyFile("d/e"));
+    CHECK_EQ(v->getFileSize("d/e"), 0);
+    CHECK(!v->createEmptyFile("d"));
+    CHECK(!v->createEmptyFile("nowhere/e"));
+
+    // in-place writes: inside, at the end (grows), not past it, not into a missing file
+    CHECK(v->writeFileChunk("d/f", 0, data.data(), data.size()));
+    const uint8_t patch[3] = {7, 8, 9};
+    CHECK(v->writeFileAt("d/f", 10, patch, 3));
+    CHECK(v->readFileChunk("d/f", 9, 5, out) && out.size() == 5 && out[1] == 7 && out[2] == 8 && out[3] == 9 && out[4] == data[13]);
+    CHECK(v->writeFileAt("d/f", 100, patch, 3));
+    CHECK_EQ(v->getFileSize("d/f"), 103);
+    CHECK(!v->writeFileAt("d/f", 200, patch, 3));
+    CHECK(!v->writeFileAt("d/gone", 0, patch, 3));
+    CHECK(!v->writeFileAt("d/f", -1, patch, 3));
+    CHECK(!v->writeFileAt("d/f", 0, nullptr, 3));                     // data required when len > 0
+    CHECK(!v->writeFileAt("d/f", 0, patch, (size_t)64 * 1024 * 1024 + 1));   // over the chunk cap
+    CHECK(v->writeFileAt("d/f", 0, nullptr, 0));                      // an empty write is a no-op
+    CHECK_EQ(v->getFileSize("d/f"), 103);
+
+    // truncate: shrink, grow (zero-fill), missing file, bad size
+    CHECK(v->truncateFile("d/f", 5));
+    CHECK_EQ(v->getFileSize("d/f"), 5);
+    CHECK(v->truncateFile("d/f", 12));
+    CHECK(v->readFileChunk("d/f", 5, 7, out) && out == Bytes(7, 0));
+    CHECK(!v->truncateFile("d/gone", 1));
+    CHECK(!v->truncateFile("d/f", -1));
+
+    // case sensitivity follows the filesystem type
+    CHECK(!v->caseInsensitive());                                     // unknown / ext
+    { std::unique_lock<std::shared_mutex> lk(volumes[0].mutex); volumes[0].fsType = VolumeState::FS_FATFS; }
+    CHECK(v->caseInsensitive());
+    { std::unique_lock<std::shared_mutex> lk(volumes[0].mutex); volumes[0].fsType = VolumeState::FS_NTFS; }
+    CHECK(v->caseInsensitive());
+    { std::unique_lock<std::shared_mutex> lk(volumes[0].mutex); volumes[0].fsType = VolumeState::FS_EXT; }
+    CHECK(!v->caseInsensitive());
+    { std::unique_lock<std::shared_mutex> lk(volumes[0].mutex); volumes[0].fsType = VolumeState::FS_FATFS; }
+
+    // read-only volume: all three mutations are refused and nothing changes
+    unlockEngine(1, /*readOnly=*/true);
+    fake::g_fs[1].files["f"] = rnd(50);
+    auto ro = wrapBlockVolume(1);
+    CHECK(ro->readOnly());
+    CHECK(!ro->createEmptyFile("g"));
+    CHECK(!ro->writeFileAt("f", 0, patch, 3));
+    CHECK(!ro->truncateFile("f", 1));
+    CHECK_EQ(ro->getFileSize("f"), 50);
+
+    // after the session ends every call is refused, and the traits fall back to "unknown"
+    lockEngine(0);
+    CHECK(!v->createEmptyFile("d/late"));
+    CHECK(!v->writeFileAt("d/f", 0, patch, 3));
+    CHECK(!v->truncateFile("d/f", 1));
+    CHECK(!v->caseInsensitive());
+    { std::unique_lock<std::shared_mutex> lk(volumes[0].mutex); volumes[0].fsType = VolumeState::FS_UNKNOWN; }
 }
 
 static void testStreams() {
@@ -578,6 +672,7 @@ static void testStress() {
 int main() {
     testActivity();
     testOperations();
+    testCapabilities();
     testStreams();
     testManagerBothFamilies();
     testCloseDrains();

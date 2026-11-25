@@ -108,6 +108,17 @@ attached. Everything else -- listing, per-chunk I/O, streams, `ContainerEngine`'
 dispatch, `ContainerSessionRegistry`'s locks -- still runs in Kotlin and moves over
 operation by operation.
 
+Desktop status: `ffi/ve_volumes.h` gives the desktop engine one `VolumeManager`
+(`ve_internal_volumes()`), and every file-level `ve_*` call in `ffi/ve_engine.cpp` is a
+thin wrapper over it -- there is no per-family branch left in them. A container is attached
+as a `BlockVolume` after `ve_unlock` / `ve_composite_unlock` mounted it, a folder vault as a
+`FolderVaultVolume` after `ve_fv_unlock`; `ve_lock` closes the slot and then locks the
+session. The OS mounts (`ve_mount_fs.cpp`) and the archive engine inherit the manager's
+per-volume locking and safe close. To serve the mount layer `vm::Volume` gained optional
+capabilities with "unsupported" defaults (`writeFileAt`, `truncateFile`, `createEmptyFile`,
+`caseInsensitive`, and `VolumeManager::traits()`). Whole-file host import/export and the
+container-to-container copy still use the filesystem backends' own paths.
+
 **Engine / host boundary** (`cpp/platform/`). The portable engine (`session/`, `io/`,
 `filesystems/`, `containers/`, `crypto/`, `foldervault/`, `volman/`, `xfer/` and the rest of the
 directories listed in `scripts/check_engine_portable.py`) must build without a JVM or the NDK, so a

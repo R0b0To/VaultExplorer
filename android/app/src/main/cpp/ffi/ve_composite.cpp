@@ -9,6 +9,7 @@
 // is Windows-safe), so nothing but the keyfiles is a descriptor and the descriptor ownership rule stays the one the
 // other calls follow.
 #include "ve_engine.h"
+#include "ve_volumes.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -219,6 +220,10 @@ extern "C" VE_API int32_t ve_composite_unlock(const ve_composite_unlock_params* 
     }
     try {
         const int volId = p->vol_id;
+        if (!ve_internal_prepare_block_slot(volId)) {  // the slot holds an unlocked folder vault
+            closeAll(p->keyfile_fds, p->keyfile_count);
+            return VE_ERR_FAILED;
+        }
         clearUnlockCancellation(volId);
 
         auto carriers = makeTargets(p->carrier_paths, p->carrier_count, p->read_only != 0);
@@ -252,6 +257,11 @@ extern "C" VE_API int32_t ve_composite_unlock(const ve_composite_unlock_params* 
             ve_lock(volId);  // never leave a decrypted session behind a failed mount (what ve_unlock does too)
             setText(error_out, "FILESYSTEM_MOUNT_FAILED");
             return VE_ERR_MOUNT_FAILED;
+        }
+        if (!ve_internal_attach_block(volId)) {  // never leave a decrypted session behind that no call can reach
+            ve_lock(volId);
+            setText(error_out, "SLOT_IN_USE");
+            return VE_ERR_FAILED;
         }
         return VE_OK;
     } catch (...) {

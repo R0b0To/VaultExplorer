@@ -79,6 +79,14 @@ bool BlockVolume::alive() const {
     return v.sessionEpoch == epoch_ && engineActive(v);
 }
 
+bool BlockVolume::caseInsensitive() const {
+    if (!validId(id_)) return false;
+    VolumeState& v = volumes[id_];
+    std::shared_lock<std::shared_mutex> lk(v.mutex);
+    if (v.sessionEpoch != epoch_) return false;
+    return v.fsType == VolumeState::FS_FATFS || v.fsType == VolumeState::FS_NTFS;
+}
+
 bool BlockVolume::listDirectory(const std::string& path, std::vector<std::string>& wire) {
     Access a(id_, epoch_, closed_);
     if (!a.ok) return false;
@@ -167,6 +175,23 @@ bool BlockVolume::writeFileChunk(const std::string& path, int64_t offset, const 
     static const uint8_t kNoData = 0;   // a zero-length write at offset 0 still creates / empties the file
     Access a(id_, epoch_, closed_);
     return a.ok && a.writable && fsWriteFileChunk(id_, path, static_cast<uint64_t>(offset), data ? data : &kNoData, len);
+}
+
+bool BlockVolume::createEmptyFile(const std::string& path) {
+    Access a(id_, epoch_, closed_);
+    return a.ok && a.writable && fsCreateEmptyFile(id_, path);
+}
+
+bool BlockVolume::writeFileAt(const std::string& path, int64_t offset, const uint8_t* data, size_t len) {
+    if (offset < 0 || len > kMaxChunk || (len > 0 && !data)) return false;
+    Access a(id_, epoch_, closed_);
+    return a.ok && a.writable && fsWriteFileAt(id_, path, static_cast<uint64_t>(offset), data, len);
+}
+
+bool BlockVolume::truncateFile(const std::string& path, int64_t size) {
+    if (size < 0) return false;
+    Access a(id_, epoch_, closed_);
+    return a.ok && a.writable && fsTruncateFile(id_, path, static_cast<uint64_t>(size));
 }
 
 bool BlockVolume::spaceInfo(SpaceInfo& out) {

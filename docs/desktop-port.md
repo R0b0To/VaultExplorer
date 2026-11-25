@@ -315,9 +315,11 @@ Main (v1.50) moved the three formats into a platform-neutral C++ core (`folderva
 `jni/foldervault_bridge.cpp` (same open/create semantics; `fv::PosixStorage` over an ordinary directory).
 
 An unlocked vault is parked in a **volume slot** (the same slot ids containers use; Dart allocates them).
-`ve_engine.cpp` asks `vefv::isSlot(vol)` at the top of every file-level call and forwards to the vault, so
-list / read / write / rename / delete / mkdir / set-mtime / import / export / streams / space info / lock work
-on it unchanged. `ve_copy_file` between any mix of container and vault slots streams through memory in 2 MiB
+The slot table is the engine's one `vm::VolumeManager` (`ffi/ve_volumes.h`); a vault is a `vm::FolderVaultVolume` in
+it and a container a `vm::BlockVolume`, so the file-level calls in `ve_engine.cpp` need no per-family branch: list / read /
+write / rename / delete / mkdir / set-mtime / streams / space info / lock work on either. Whole-file import / export
+reach the vault through `vefv::importFile` / `exportFile` (host paths, with progress), and `ve_write_file_at` /
+`ve_truncate` answer `VE_ERR_UNSUPPORTED` for a vault (its writer is sequential). `ve_copy_file` between any mix of container and vault slots streams through memory in 2 MiB
 steps (and finishes the destination vault file). Format-specific calls: `ve_fv_probe / unlock / create /
 change_password / migrate_cryptomator / info / list_symlinks / read_symlink / hidden_entry_count /
 finish_write / batch` (`ve_engine.h`). `ve_fv_unlock` takes `backup_key_files` (Cryptomator `.bkup` copies of
@@ -349,8 +351,8 @@ a link to a folder is listed as `LD|0|mtime|name`.
   `fv::PosixStorage` interface; UTF-16 paths in the `\\?\` form, so no MAX_PATH limit and no DOS device names;
   path segments with `\`, `:` or wildcards are refused; only real symlinks / junctions count as links, not OneDrive
   placeholders). The few raw host-file calls in the CryFS code and in import/export go through `foldervault/fv_os.h`
-  (UTF-8 -> UTF-16, binary mode; plain POSIX calls elsewhere). CMake builds the core on Windows and no longer defines
-  `VE_NO_FOLDERVAULT`. Before this, every `ve_fv_*` call was a stub (`ve_fv_supported()==0`, probe "not a vault"),
+  (UTF-8 -> UTF-16, binary mode; plain POSIX calls elsewhere). CMake builds the core on Windows (the `VE_NO_FOLDERVAULT` stubs are gone: the engine cannot be built
+  without it). Before this, every `ve_fv_*` call was a stub (`ve_fv_supported()==0`, probe "not a vault"),
   which showed up as "no config file found" / "folder not empty". `foldervault_storage_test` (CMake target; also
   runs on Linux) covers the empty-folder -> create -> detect -> unlock -> work -> unlock-again cycle for all three
   formats plus Unicode and over-long paths: 310 checks on Linux, 321 on Windows **under Wine** (not real Windows --

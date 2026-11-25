@@ -21889,6 +21889,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sets each file\'s modified date to the date taken stored inside it. Files without a date taken are skipped. The files themselves are not changed.'**
   String get dateToModifiedNote;
+
+  /// Tooltip of the Vaults page button and label of the setting that picks how vaults are laid out
+  ///
+  /// In en, this message translates to:
+  /// **'Layout'**
+  String get dashboardLayoutLabel;
+
+  /// Vaults layout option: one large card per vault
+  ///
+  /// In en, this message translates to:
+  /// **'Cards'**
+  String get dashboardLayoutCards;
+
+  /// Vaults layout option: vertical tiles packed into columns
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get dashboardLayoutGrid;
+
+  /// Vaults layout option: dense one-line rows
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get dashboardLayoutList;
+
+  /// Vaults layout option: table with columns for format, state, free and total space
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get dashboardLayoutDetails;
+
+  /// Column header of the Vaults details table: free space of an unlocked vault
+  ///
+  /// In en, this message translates to:
+  /// **'Free space'**
+  String get dashboardColumnFree;
+
+  /// Column header of the Vaults details table: usage bar and percentage of space used
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get dashboardColumnUsage;
 }
 
 class _AppLocalizationsDelegate

@@ -15176,5 +15176,33 @@
   "dateToModifiedNote": "Sets each file's modified date to the date taken stored inside it. Files without a date taken are skipped. The files themselves are not changed.",
   "@dateToModifiedNote": {
     "description": "Explains the 'Modified from date taken' option: only the modified date changes, files without a date taken are skipped, file contents are untouched"
+  },
+  "dashboardLayoutLabel": "Layout",
+  "@dashboardLayoutLabel": {
+    "description": "Tooltip of the Vaults page button and label of the setting that picks how vaults are laid out"
+  },
+  "dashboardLayoutCards": "Cards",
+  "@dashboardLayoutCards": {
+    "description": "Vaults layout option: one large card per vault"
+  },
+  "dashboardLayoutGrid": "Grid",
+  "@dashboardLayoutGrid": {
+    "description": "Vaults layout option: vertical tiles packed into columns"
+  },
+  "dashboardLayoutList": "List",
+  "@dashboardLayoutList": {
+    "description": "Vaults layout option: dense one-line rows"
+  },
+  "dashboardLayoutDetails": "Details",
+  "@dashboardLayoutDetails": {
+    "description": "Vaults layout option: table with columns for format, state, free and total space"
+  },
+  "dashboardColumnFree": "Free space",
+  "@dashboardColumnFree": {
+    "description": "Column header of the Vaults details table: free space of an unlocked vault"
+  },
+  "dashboardColumnUsage": "Used",
+  "@dashboardColumnUsage": {
+    "description": "Column header of the Vaults details table: usage bar and percentage of space used"
   }
 }

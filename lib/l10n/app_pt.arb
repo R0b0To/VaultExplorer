@@ -3628,5 +3628,12 @@
   "deleteAppStorageVaultMoveOut": "Tirar do app em vez disso",
   "deleteAppStorageVaultFailed": "Não foi possível excluir o cofre.",
   "dateModeToModified": "Modificação a partir da data da captura",
-  "dateToModifiedNote": "Define a data de modificação de cada arquivo como a data da captura armazenada nele. Arquivos sem data da captura são ignorados. Os próprios arquivos não são alterados."
+  "dateToModifiedNote": "Define a data de modificação de cada arquivo como a data da captura armazenada nele. Arquivos sem data da captura são ignorados. Os próprios arquivos não são alterados.",
+  "dashboardLayoutLabel": "Layout",
+  "dashboardLayoutCards": "Cartões",
+  "dashboardLayoutGrid": "Grade",
+  "dashboardLayoutList": "Lista",
+  "dashboardLayoutDetails": "Detalhes",
+  "dashboardColumnFree": "Espaço livre",
+  "dashboardColumnUsage": "Uso"
 }

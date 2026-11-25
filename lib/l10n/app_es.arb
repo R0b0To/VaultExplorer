@@ -3628,5 +3628,12 @@
   "deleteAppStorageVaultMoveOut": "Sacarla en su lugar",
   "deleteAppStorageVaultFailed": "No se pudo eliminar la bóveda.",
   "dateModeToModified": "Modificación desde la fecha de captura",
-  "dateToModifiedNote": "Establece la fecha de modificación de cada archivo con la fecha de captura guardada en él. Los archivos sin fecha de captura se omiten. Los archivos en sí no se modifican."
+  "dateToModifiedNote": "Establece la fecha de modificación de cada archivo con la fecha de captura guardada en él. Los archivos sin fecha de captura se omiten. Los archivos en sí no se modifican.",
+  "dashboardLayoutLabel": "Diseño",
+  "dashboardLayoutCards": "Tarjetas",
+  "dashboardLayoutGrid": "Cuadrícula",
+  "dashboardLayoutList": "Lista",
+  "dashboardLayoutDetails": "Detalles",
+  "dashboardColumnFree": "Espacio libre",
+  "dashboardColumnUsage": "Uso"
 }

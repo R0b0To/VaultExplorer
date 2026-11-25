@@ -12456,4 +12456,25 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       '各ファイルの更新日時を、ファイル内に保存されている撮影日時に設定します。撮影日時のないファイルはスキップされます。ファイル自体は変更されません。';
+
+  @override
+  String get dashboardLayoutLabel => 'レイアウト';
+
+  @override
+  String get dashboardLayoutCards => 'カード';
+
+  @override
+  String get dashboardLayoutGrid => 'グリッド';
+
+  @override
+  String get dashboardLayoutList => 'リスト';
+
+  @override
+  String get dashboardLayoutDetails => '詳細';
+
+  @override
+  String get dashboardColumnFree => '空き容量';
+
+  @override
+  String get dashboardColumnUsage => '使用状況';
 }

@@ -13278,4 +13278,25 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       'Встановлює дату змінення кожного файлу на дату знімання, збережену в ньому. Файли без дати знімання пропускаються. Самі файли не змінюються.';
+
+  @override
+  String get dashboardLayoutLabel => 'Макет';
+
+  @override
+  String get dashboardLayoutCards => 'Картки';
+
+  @override
+  String get dashboardLayoutGrid => 'Сітка';
+
+  @override
+  String get dashboardLayoutList => 'Список';
+
+  @override
+  String get dashboardLayoutDetails => 'Подробиці';
+
+  @override
+  String get dashboardColumnFree => 'Вільне місце';
+
+  @override
+  String get dashboardColumnUsage => 'Використання';
 }

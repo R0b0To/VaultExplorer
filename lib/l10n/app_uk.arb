@@ -3628,5 +3628,12 @@
   "deleteAppStorageVaultMoveOut": "Перемістити назовні",
   "deleteAppStorageVaultFailed": "Не вдалося видалити сховище.",
   "dateModeToModified": "Дата змінення з дати знімання",
-  "dateToModifiedNote": "Встановлює дату змінення кожного файлу на дату знімання, збережену в ньому. Файли без дати знімання пропускаються. Самі файли не змінюються."
+  "dateToModifiedNote": "Встановлює дату змінення кожного файлу на дату знімання, збережену в ньому. Файли без дати знімання пропускаються. Самі файли не змінюються.",
+  "dashboardLayoutLabel": "Макет",
+  "dashboardLayoutCards": "Картки",
+  "dashboardLayoutGrid": "Сітка",
+  "dashboardLayoutList": "Список",
+  "dashboardLayoutDetails": "Подробиці",
+  "dashboardColumnFree": "Вільне місце",
+  "dashboardColumnUsage": "Використання"
 }

@@ -13201,4 +13201,25 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       'Establece la fecha de modificación de cada archivo con la fecha de captura guardada en él. Los archivos sin fecha de captura se omiten. Los archivos en sí no se modifican.';
+
+  @override
+  String get dashboardLayoutLabel => 'Diseño';
+
+  @override
+  String get dashboardLayoutCards => 'Tarjetas';
+
+  @override
+  String get dashboardLayoutGrid => 'Cuadrícula';
+
+  @override
+  String get dashboardLayoutList => 'Lista';
+
+  @override
+  String get dashboardLayoutDetails => 'Detalles';
+
+  @override
+  String get dashboardColumnFree => 'Espacio libre';
+
+  @override
+  String get dashboardColumnUsage => 'Uso';
 }

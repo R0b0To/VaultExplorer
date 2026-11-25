@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_authenticator_button.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/dashboard_layout_button.dart';
 
 /// The Home viewport's fixed shell chrome. Standalone Dashboard routes reuse
 /// the same app bar above their own Scaffold body.
@@ -42,6 +43,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       style: const TextStyle(fontWeight: FontWeight.bold),
     ),
     actions: const [
+      DashboardLayoutButton(),
       AppBarAuthenticatorButton(),
       AppBarTransferButton(),
       SizedBox(width: 4),

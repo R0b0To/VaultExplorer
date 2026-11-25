@@ -3622,5 +3622,12 @@
   "deleteAppStorageVaultMoveOut": "Bunun yerine çıkar",
   "deleteAppStorageVaultFailed": "Kasa silinemedi.",
   "dateModeToModified": "Çekim tarihinden değiştirilme tarihine",
-  "dateToModifiedNote": "Her dosyanın değiştirilme tarihini, içinde saklanan çekim tarihine ayarlar. Çekim tarihi olmayan dosyalar atlanır. Dosyaların kendisi değiştirilmez."
+  "dateToModifiedNote": "Her dosyanın değiştirilme tarihini, içinde saklanan çekim tarihine ayarlar. Çekim tarihi olmayan dosyalar atlanır. Dosyaların kendisi değiştirilmez.",
+  "dashboardLayoutLabel": "Düzen",
+  "dashboardLayoutCards": "Kartlar",
+  "dashboardLayoutGrid": "Izgara",
+  "dashboardLayoutList": "Liste",
+  "dashboardLayoutDetails": "Ayrıntılar",
+  "dashboardColumnFree": "Boş alan",
+  "dashboardColumnUsage": "Kullanım"
 }

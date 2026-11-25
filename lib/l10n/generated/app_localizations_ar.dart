@@ -13239,4 +13239,25 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       'يضبط تاريخ تعديل كل ملف على تاريخ الالتقاط المخزّن داخله. تُتخطى الملفات التي لا تحتوي على تاريخ التقاط. لا تتغير الملفات نفسها.';
+
+  @override
+  String get dashboardLayoutLabel => 'التخطيط';
+
+  @override
+  String get dashboardLayoutCards => 'بطاقات';
+
+  @override
+  String get dashboardLayoutGrid => 'شبكة';
+
+  @override
+  String get dashboardLayoutList => 'قائمة';
+
+  @override
+  String get dashboardLayoutDetails => 'تفاصيل';
+
+  @override
+  String get dashboardColumnFree => 'المساحة الحرة';
+
+  @override
+  String get dashboardColumnUsage => 'المستخدم';
 }

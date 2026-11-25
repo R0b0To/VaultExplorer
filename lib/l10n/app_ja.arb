@@ -3628,5 +3628,12 @@
   "deleteAppStorageVaultMoveOut": "代わりに移動する",
   "deleteAppStorageVaultFailed": "保管庫を削除できませんでした。",
   "dateModeToModified": "撮影日時から更新日時へ",
-  "dateToModifiedNote": "各ファイルの更新日時を、ファイル内に保存されている撮影日時に設定します。撮影日時のないファイルはスキップされます。ファイル自体は変更されません。"
+  "dateToModifiedNote": "各ファイルの更新日時を、ファイル内に保存されている撮影日時に設定します。撮影日時のないファイルはスキップされます。ファイル自体は変更されません。",
+  "dashboardLayoutLabel": "レイアウト",
+  "dashboardLayoutCards": "カード",
+  "dashboardLayoutGrid": "グリッド",
+  "dashboardLayoutList": "リスト",
+  "dashboardLayoutDetails": "詳細",
+  "dashboardColumnFree": "空き容量",
+  "dashboardColumnUsage": "使用状況"
 }

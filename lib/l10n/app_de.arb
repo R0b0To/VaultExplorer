@@ -3628,5 +3628,12 @@
   "deleteAppStorageVaultMoveOut": "Stattdessen herausverschieben",
   "deleteAppStorageVaultFailed": "Der Tresor konnte nicht gelöscht werden.",
   "dateModeToModified": "Änderungsdatum aus Aufnahmedatum",
-  "dateToModifiedNote": "Setzt das Änderungsdatum jeder Datei auf das darin gespeicherte Aufnahmedatum. Dateien ohne Aufnahmedatum werden übersprungen. Die Dateien selbst werden nicht verändert."
+  "dateToModifiedNote": "Setzt das Änderungsdatum jeder Datei auf das darin gespeicherte Aufnahmedatum. Dateien ohne Aufnahmedatum werden übersprungen. Die Dateien selbst werden nicht verändert.",
+  "dashboardLayoutLabel": "Ansicht",
+  "dashboardLayoutCards": "Karten",
+  "dashboardLayoutGrid": "Raster",
+  "dashboardLayoutList": "Liste",
+  "dashboardLayoutDetails": "Details",
+  "dashboardColumnFree": "Freier Speicher",
+  "dashboardColumnUsage": "Belegt"
 }

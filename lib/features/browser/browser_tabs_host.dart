@@ -24,6 +24,7 @@ import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/features/browser/widgets/address_search_field.dart';
 import 'package:vaultexplorer/features/dashboard/dashboard_toolbar_actions.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/dashboard_layout_button.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/lock_all_vaults.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
@@ -583,6 +584,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 children: [
                   const SizedBox(width: 6),
                   const _DashboardSortButton(),
+                  const DashboardLayoutButton(),
                   IconButton(
                     icon: const Icon(Icons.refresh_rounded),
                     tooltip: context.l10n.refreshListButton,

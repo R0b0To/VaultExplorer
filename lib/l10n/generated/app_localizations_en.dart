@@ -12985,4 +12985,25 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       'Sets each file\'s modified date to the date taken stored inside it. Files without a date taken are skipped. The files themselves are not changed.';
+
+  @override
+  String get dashboardLayoutLabel => 'Layout';
+
+  @override
+  String get dashboardLayoutCards => 'Cards';
+
+  @override
+  String get dashboardLayoutGrid => 'Grid';
+
+  @override
+  String get dashboardLayoutList => 'List';
+
+  @override
+  String get dashboardLayoutDetails => 'Details';
+
+  @override
+  String get dashboardColumnFree => 'Free space';
+
+  @override
+  String get dashboardColumnUsage => 'Used';
 }

@@ -12264,4 +12264,25 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       '将每个文件的修改日期设置为其内部保存的拍摄日期。没有拍摄日期的文件会被跳过。文件本身不会被更改。';
+
+  @override
+  String get dashboardLayoutLabel => '布局';
+
+  @override
+  String get dashboardLayoutCards => '卡片';
+
+  @override
+  String get dashboardLayoutGrid => '网格';
+
+  @override
+  String get dashboardLayoutList => '列表';
+
+  @override
+  String get dashboardLayoutDetails => '详细信息';
+
+  @override
+  String get dashboardColumnFree => '可用空间';
+
+  @override
+  String get dashboardColumnUsage => '已用';
 }

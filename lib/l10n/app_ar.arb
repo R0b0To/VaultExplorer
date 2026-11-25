@@ -3628,5 +3628,12 @@
   "deleteAppStorageVaultMoveOut": "نقلها إلى الخارج بدلاً من ذلك",
   "deleteAppStorageVaultFailed": "تعذّر حذف الخزنة.",
   "dateModeToModified": "تاريخ التعديل من تاريخ الالتقاط",
-  "dateToModifiedNote": "يضبط تاريخ تعديل كل ملف على تاريخ الالتقاط المخزّن داخله. تُتخطى الملفات التي لا تحتوي على تاريخ التقاط. لا تتغير الملفات نفسها."
+  "dateToModifiedNote": "يضبط تاريخ تعديل كل ملف على تاريخ الالتقاط المخزّن داخله. تُتخطى الملفات التي لا تحتوي على تاريخ التقاط. لا تتغير الملفات نفسها.",
+  "dashboardLayoutLabel": "التخطيط",
+  "dashboardLayoutCards": "بطاقات",
+  "dashboardLayoutGrid": "شبكة",
+  "dashboardLayoutList": "قائمة",
+  "dashboardLayoutDetails": "تفاصيل",
+  "dashboardColumnFree": "المساحة الحرة",
+  "dashboardColumnUsage": "المستخدم"
 }

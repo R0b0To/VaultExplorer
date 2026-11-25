@@ -12458,4 +12458,25 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       '각 파일의 수정 날짜를 파일 안에 저장된 촬영 날짜로 설정합니다. 촬영 날짜가 없는 파일은 건너뜁니다. 파일 자체는 변경되지 않습니다.';
+
+  @override
+  String get dashboardLayoutLabel => '레이아웃';
+
+  @override
+  String get dashboardLayoutCards => '카드';
+
+  @override
+  String get dashboardLayoutGrid => '격자';
+
+  @override
+  String get dashboardLayoutList => '목록';
+
+  @override
+  String get dashboardLayoutDetails => '자세히';
+
+  @override
+  String get dashboardColumnFree => '여유 공간';
+
+  @override
+  String get dashboardColumnUsage => '사용량';
 }

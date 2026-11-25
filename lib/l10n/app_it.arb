@@ -3628,5 +3628,12 @@
   "deleteAppStorageVaultMoveOut": "Sposta fuori invece",
   "deleteAppStorageVaultFailed": "Impossibile eliminare il vault.",
   "dateModeToModified": "Modifica dalla data scatto",
-  "dateToModifiedNote": "Imposta la data di modifica di ogni file sulla data scatto memorizzata al suo interno. I file senza data scatto vengono ignorati. I file stessi non vengono modificati."
+  "dateToModifiedNote": "Imposta la data di modifica di ogni file sulla data scatto memorizzata al suo interno. I file senza data scatto vengono ignorati. I file stessi non vengono modificati.",
+  "dashboardLayoutLabel": "Visualizzazione",
+  "dashboardLayoutCards": "Schede",
+  "dashboardLayoutGrid": "Griglia",
+  "dashboardLayoutList": "Elenco",
+  "dashboardLayoutDetails": "Dettagli",
+  "dashboardColumnFree": "Spazio libero",
+  "dashboardColumnUsage": "Utilizzo"
 }

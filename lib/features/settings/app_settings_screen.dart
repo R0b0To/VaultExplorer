@@ -15,6 +15,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/inputs/compact_switch_list_tile.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/data/models/dashboard_layout_mode.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
@@ -2632,6 +2633,21 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                         .read(appSettingsControllerProvider.notifier)
                         .updateSettings(
                           (s) => s.copyWith(containerSortMode: v),
+                        ),
+                  ),
+                  OptionPickerTile<DashboardLayoutMode>(
+                    label: context.l10n.dashboardLayoutLabel,
+                    value: state.settings.dashboardLayoutMode,
+                    options: DashboardLayoutMode.values.map((mode) {
+                      return SelectOption(
+                        value: mode,
+                        label: mode.getLocalizedLabel(context.l10n),
+                      );
+                    }).toList(),
+                    onChanged: (v) => ref
+                        .read(appSettingsControllerProvider.notifier)
+                        .updateSettings(
+                          (s) => s.copyWith(dashboardLayoutMode: v),
                         ),
                   ),
                 ],

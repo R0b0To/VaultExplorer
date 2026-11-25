@@ -13066,4 +13066,25 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       'Her dosyanın değiştirilme tarihini, içinde saklanan çekim tarihine ayarlar. Çekim tarihi olmayan dosyalar atlanır. Dosyaların kendisi değiştirilmez.';
+
+  @override
+  String get dashboardLayoutLabel => 'Düzen';
+
+  @override
+  String get dashboardLayoutCards => 'Kartlar';
+
+  @override
+  String get dashboardLayoutGrid => 'Izgara';
+
+  @override
+  String get dashboardLayoutList => 'Liste';
+
+  @override
+  String get dashboardLayoutDetails => 'Ayrıntılar';
+
+  @override
+  String get dashboardColumnFree => 'Boş alan';
+
+  @override
+  String get dashboardColumnUsage => 'Kullanım';
 }

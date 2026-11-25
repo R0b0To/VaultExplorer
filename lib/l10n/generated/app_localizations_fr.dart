@@ -13275,4 +13275,25 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get dateToModifiedNote =>
       'Définit la date de modification de chaque fichier d’après la date de prise de vue qu’il contient. Les fichiers sans date de prise de vue sont ignorés. Les fichiers eux-mêmes ne sont pas modifiés.';
+
+  @override
+  String get dashboardLayoutLabel => 'Disposition';
+
+  @override
+  String get dashboardLayoutCards => 'Cartes';
+
+  @override
+  String get dashboardLayoutGrid => 'Grille';
+
+  @override
+  String get dashboardLayoutList => 'Liste';
+
+  @override
+  String get dashboardLayoutDetails => 'Détails';
+
+  @override
+  String get dashboardColumnFree => 'Espace libre';
+
+  @override
+  String get dashboardColumnUsage => 'Utilisé';
 }

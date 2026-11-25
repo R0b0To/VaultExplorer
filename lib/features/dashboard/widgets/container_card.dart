@@ -148,6 +148,20 @@ class BaseContainerCard extends ConsumerWidget {
   }
 }
 
+/// Colour of a usage bar for a vault that is [fraction] full: calm up to 70 %,
+/// then a warning, then an error. Shared by every dashboard layout so the bar
+/// of one vault reads the same whichever layout shows it.
+Color vaultUsageBarColor(double fraction, ColorScheme cs) {
+  final isLight = cs.brightness == Brightness.light;
+  if (fraction > 0.90) {
+    return isLight ? cs.error.withValues(alpha: 0.6) : cs.error;
+  }
+  if (fraction > 0.70) {
+    return isLight ? cs.tertiary.withValues(alpha: 0.6) : cs.tertiary;
+  }
+  return isLight ? cs.primary.withValues(alpha: 0.6) : cs.primary;
+}
+
 class ContainerCard extends StatelessWidget {
   final MountedContainer container;
   final ContainerRecord? record;
@@ -169,16 +183,8 @@ class ContainerCard extends StatelessWidget {
     this.borderRadius,
   });
 
-  Color _barColor(double fraction, ColorScheme cs) {
-    final isLight = cs.brightness == Brightness.light;
-    if (fraction > 0.90) {
-      return isLight ? cs.error.withValues(alpha: 0.6) : cs.error;
-    }
-    if (fraction > 0.70) {
-      return isLight ? cs.tertiary.withValues(alpha: 0.6) : cs.tertiary;
-    }
-    return isLight ? cs.primary.withValues(alpha: 0.6) : cs.primary;
-  }
+  Color _barColor(double fraction, ColorScheme cs) =>
+      vaultUsageBarColor(fraction, cs);
 
   @override
   Widget build(BuildContext context) {
@@ -269,11 +275,11 @@ class ContainerCard extends StatelessWidget {
       trailingAction: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _LockButton(container: container, onLocked: onLocked),
+          ContainerLockButton(container: container, onLocked: onLocked),
           // Desktop opens these actions with a right-click instead.
           if (!PlatformFeatures.isDesktop) ...[
             const SizedBox(width: 6),
-            _VaultMoreMenuButton(
+            VaultMoreMenuButton(
               onEdit: onEdit,
               onDelete: onDelete,
               isMounted: true,
@@ -357,7 +363,7 @@ class SavedContainerCard extends StatelessWidget {
       subtitle: subtitleWidget,
       trailingAction: PlatformFeatures.isDesktop
           ? null
-          : _VaultMoreMenuButton(
+          : VaultMoreMenuButton(
               onEdit: onEdit,
               onDelete: onDelete,
               isMounted: false,
@@ -385,6 +391,7 @@ class _CompactIconButton extends StatelessWidget {
   final Color backgroundColor;
   final Color foregroundColor;
   final String? tooltip;
+  final double size;
   const _CompactIconButton({
     required this.icon,
     this.isLoading = false,
@@ -392,6 +399,7 @@ class _CompactIconButton extends StatelessWidget {
     required this.backgroundColor,
     required this.foregroundColor,
     this.tooltip,
+    this.size = 38,
   });
   @override
   Widget build(BuildContext context) {
@@ -401,8 +409,8 @@ class _CompactIconButton extends StatelessWidget {
     return Tooltip(
       message: message,
       child: SizedBox(
-        width: 38,
-        height: 38,
+        width: size,
+        height: size,
         child: FilledButton(
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(
@@ -418,29 +426,40 @@ class _CompactIconButton extends StatelessWidget {
           ),
           child: isLoading
               ? SizedBox(
-                  width: 18,
-                  height: 18,
+                  width: size * 18 / 38,
+                  height: size * 18 / 38,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.2,
                     color: foregroundColor.withValues(alpha: 0.8),
                   ),
                 )
-              : Icon(icon, size: 20),
+              : Icon(icon, size: size * 20 / 38),
         ),
       ),
     );
   }
 }
 
-class _LockButton extends ConsumerStatefulWidget {
+/// The round "lock this vault" button of an unlocked vault. Public so that the
+/// other dashboard layouts (grid, list, details) lock a vault through exactly
+/// the same flush prompt, guard and error handling as the card does.
+class ContainerLockButton extends ConsumerStatefulWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
-  const _LockButton({required this.container, required this.onLocked});
+
+  /// Edge length of the button; the compact layouts use a smaller one.
+  final double size;
+  const ContainerLockButton({
+    super.key,
+    required this.container,
+    required this.onLocked,
+    this.size = 38,
+  });
   @override
-  ConsumerState<_LockButton> createState() => _LockButtonState();
+  ConsumerState<ContainerLockButton> createState() => _LockButtonState();
 }
 
-class _LockButtonState extends ConsumerState<_LockButton> {
+class _LockButtonState extends ConsumerState<ContainerLockButton> {
   bool _loading = false;
   Timer? _lockWaitNoticeTimer;
 
@@ -538,6 +557,7 @@ class _LockButtonState extends ConsumerState<_LockButton> {
       backgroundColor: cs.primaryContainer,
       foregroundColor: cs.onPrimaryContainer,
       tooltip: context.l10n.lockContainerTooltip,
+      size: widget.size,
     );
   }
 }
@@ -600,7 +620,9 @@ Future<void> showVaultCardMenu(
   }
 }
 
-class _VaultMoreMenuButton extends StatelessWidget {
+/// The three-dots Edit / Remove menu of a vault. Public for the same reason as
+/// [ContainerLockButton].
+class VaultMoreMenuButton extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool isMounted;
@@ -608,7 +630,8 @@ class _VaultMoreMenuButton extends StatelessWidget {
   /// The vault lives in app storage, so "remove" deletes its files: say so instead of "Remove".
   final bool deletesFiles;
 
-  const _VaultMoreMenuButton({
+  const VaultMoreMenuButton({
+    super.key,
     required this.onEdit,
     required this.onDelete,
     required this.isMounted,

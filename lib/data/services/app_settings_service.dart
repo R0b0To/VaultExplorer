@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/video_playback_mode.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/data/models/dashboard_layout_mode.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -170,6 +171,9 @@ class AppSettings {
   int appLockAfterMins;
   bool appLockScreenLockOnly;
   ContainerSortMode containerSortMode;
+
+  /// How the dashboard lays the vaults out (cards, grid, list, details).
+  DashboardLayoutMode dashboardLayoutMode;
   ThemeMode themeMode;
   bool useDynamicColor;
   bool useOledBlackTheme;
@@ -262,6 +266,7 @@ class AppSettings {
     this.appBarAtBottom = false,
     this.predictiveBackAnimations = true,
     this.containerSortMode = ContainerSortMode.manual,
+    this.dashboardLayoutMode = DashboardLayoutMode.cards,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
     this.useOledBlackTheme = false,
@@ -391,6 +396,7 @@ class AppSettings {
     int? appLockAfterMins,
     bool? appLockScreenLockOnly,
     ContainerSortMode? containerSortMode,
+    DashboardLayoutMode? dashboardLayoutMode,
     ThemeMode? themeMode,
     bool? useDynamicColor,
     bool? useOledBlackTheme,
@@ -473,6 +479,7 @@ class AppSettings {
       predictiveBackAnimations:
           predictiveBackAnimations ?? this.predictiveBackAnimations,
       containerSortMode: containerSortMode ?? this.containerSortMode,
+      dashboardLayoutMode: dashboardLayoutMode ?? this.dashboardLayoutMode,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
       useOledBlackTheme: useOledBlackTheme ?? this.useOledBlackTheme,
@@ -602,6 +609,7 @@ class AppSettings {
     'defaultFileSortBy': defaultFileSortBy.toJson(),
     'defaultFileSortAscending': defaultFileSortAscending,
     'containerSortMode': containerSortMode.toJson(),
+    'dashboardLayoutMode': dashboardLayoutMode.toJson(),
     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
     'categoryShortcutsEnabled': categoryShortcutsEnabled,
     'categoryShortcutOrder': categoryShortcutOrder,
@@ -684,6 +692,7 @@ class AppSettings {
     defaultFileSortBy: other.defaultFileSortBy,
     defaultFileSortAscending: other.defaultFileSortAscending,
     containerSortMode: other.containerSortMode,
+    dashboardLayoutMode: other.dashboardLayoutMode,
     showStorageLocationsInDrawer: other.showStorageLocationsInDrawer,
     categoryShortcutsEnabled: other.categoryShortcutsEnabled,
     categoryShortcutOrder: other.categoryShortcutOrder,
@@ -722,6 +731,9 @@ class AppSettings {
         j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
     containerSortMode: ContainerSortMode.fromJson(
       j['containerSortMode'] as String?,
+    ),
+    dashboardLayoutMode: DashboardLayoutMode.fromJson(
+      j['dashboardLayoutMode'] as String?,
     ),
     themeMode: j['themeMode'] != null
         ? ThemeMode.values[j['themeMode'] as int]

@@ -13229,4 +13229,8 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Local indisponível';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Aberto somente para leitura porque o Android concedeu apenas acesso de leitura a este arquivo.';
 }

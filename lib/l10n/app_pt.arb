@@ -3646,5 +3646,6 @@
   "newTabBehaviorSpecificStorage": "Abrir um local específico",
   "newTabBehaviorSpecificStorageDesc": "Abre sempre o local escolhido abaixo. Se não for possível abri-lo, você será perguntado.",
   "newTabStorageLabel": "Local das novas abas",
-  "newTabStorageUnavailable": "Local indisponível"
+  "newTabStorageUnavailable": "Local indisponível",
+  "containerOpenedReadOnlyNoWriteAccess": "Aberto somente para leitura porque o Android concedeu apenas acesso de leitura a este arquivo."
 }

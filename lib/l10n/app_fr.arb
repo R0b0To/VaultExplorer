@@ -3646,5 +3646,6 @@
   "newTabBehaviorSpecificStorage": "Ouvrir un emplacement précis",
   "newTabBehaviorSpecificStorageDesc": "Ouvre toujours l'emplacement choisi ci-dessous. S'il est inaccessible, la question vous est posée.",
   "newTabStorageLabel": "Emplacement des nouveaux onglets",
-  "newTabStorageUnavailable": "Emplacement indisponible"
+  "newTabStorageUnavailable": "Emplacement indisponible",
+  "containerOpenedReadOnlyNoWriteAccess": "Ouvert en lecture seule, car Android a seulement accordé l’accès en lecture à ce fichier."
 }

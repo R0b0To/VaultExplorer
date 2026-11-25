@@ -12511,4 +12511,8 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '場所を利用できません';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Android がこのファイルに読み取りアクセスのみを許可したため、読み取り専用で開きました。';
 }

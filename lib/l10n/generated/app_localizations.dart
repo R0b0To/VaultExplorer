@@ -21997,6 +21997,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Location not available'**
   String get newTabStorageUnavailable;
+
+  /// Snackbar shown after unlocking a container when read-write was requested but the storage provider only granted read access, so the container was mounted read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Opened read-only because Android only granted read access to this file.'**
+  String get containerOpenedReadOnlyNoWriteAccess;
 }
 
 class _AppLocalizationsDelegate

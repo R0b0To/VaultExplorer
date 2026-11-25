@@ -12513,4 +12513,8 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '위치를 사용할 수 없음';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Android가 이 파일에 읽기 권한만 부여했기 때문에 읽기 전용으로 열었습니다.';
 }

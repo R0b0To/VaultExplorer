@@ -12318,4 +12318,8 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '位置不可用';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      '已以只读方式打开，因为 Android 仅授予了此文件的读取权限。';
 }

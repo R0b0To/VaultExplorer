@@ -2049,7 +2049,9 @@ class UnlockController extends _$UnlockController {
         mountedAt: DateTime.now(),
         totalSpace: 0,
         freeSpace: 0,
-        readOnly: state.readOnly,
+        // Native may have mounted read-only even though read-write was
+        // requested (the storage provider refused write access).
+        readOnly: state.readOnly || result.readOnly,
         containerFormat: result.containerFormat,
       );
 

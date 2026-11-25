@@ -3646,5 +3646,6 @@
   "newTabBehaviorSpecificStorage": "Bestimmten Ort öffnen",
   "newTabBehaviorSpecificStorageDesc": "Öffnet immer den unten gewählten Ort. Lässt er sich nicht öffnen, wird stattdessen nachgefragt.",
   "newTabStorageLabel": "Ort für neue Tabs",
-  "newTabStorageUnavailable": "Ort nicht verfügbar"
+  "newTabStorageUnavailable": "Ort nicht verfügbar",
+  "containerOpenedReadOnlyNoWriteAccess": "Schreibgeschützt geöffnet, da Android für diese Datei nur Lesezugriff gewährt hat."
 }

@@ -13123,4 +13123,8 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Konum kullanılamıyor';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Android bu dosyaya yalnızca okuma erişimi verdiği için salt okunur olarak açıldı.';
 }

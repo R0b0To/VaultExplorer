@@ -124,6 +124,46 @@ class VaultPickerHandlers(
         }
     }
 
+    /**
+     * Persists the grant the picker handed back for a container file.
+     *
+     * takePersistableUriPermission is all-or-nothing: asking for READ|WRITE
+     * when the picker only offered READ throws and persists nothing at all,
+     * which the previous blanket call silently swallowed. Take what was
+     * actually offered, fall back to READ, and log the outcome so a
+     * "container opens read-only on device X" report can be diagnosed from the
+     * exported log (same fields as pickExtractFolder).
+     */
+    private fun persistPickedContainerGrant(uri: Uri, resultFlags: Int) {
+        val readFlag = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        val offeredFlags = resultFlags and (readFlag or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        // What the picker offered; if its result intent carries no grant flags
+        // at all, keep the previous behaviour of asking for read+write first.
+        val firstChoice = if (offeredFlags != 0) offeredFlags else readFlag or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        val candidates = if (firstChoice == readFlag) listOf(readFlag) else listOf(firstChoice, readFlag)
+        var takeError: String? = null
+        for (flags in candidates) {
+            try {
+                activity.contentResolver.takePersistableUriPermission(uri, flags)
+                takeError = null
+                break
+            } catch (e: Exception) {
+                takeError = e.javaClass.simpleName
+            }
+        }
+        val persisted = activity.contentResolver.persistedUriPermissions
+            .firstOrNull { it.uri == uri || it.uri.toString() == uri.toString() }
+        VeLog.w("VaultPickerHandlers") {
+            "pickContainer grant: authority=${uri.authority}, " +
+                "persistableFlagOffered=${(resultFlags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0}, " +
+                "offeredRead=${(offeredFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0}, " +
+                "offeredWrite=${(offeredFlags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0}, " +
+                "persistedRead=${persisted?.isReadPermission == true}, " +
+                "persistedWrite=${persisted?.isWritePermission == true}, " +
+                "takeError=${takeError ?: "none"}"
+        }
+    }
+
     private val pickContainerLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -132,12 +172,7 @@ class VaultPickerHandlers(
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
             ioExecutor.execute {
-                try {
-                    activity.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                } catch (_: SecurityException) {}
+                persistPickedContainerGrant(uri, data.flags)
                 val name = UriNameResolver.resolve(activity.contentResolver, uri)
                 val payload = mapOf(
                     "uri" to uri.toString(),
@@ -611,6 +646,14 @@ class VaultPickerHandlers(
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
+            // Ask for write access explicitly. The AOSP picker grants it
+            // regardless, but OEM pickers may key off the request flags, and a
+            // read-only grant leaves the container unable to write.
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+            )
         }
         pickContainerLauncher.launch(intent)
     }

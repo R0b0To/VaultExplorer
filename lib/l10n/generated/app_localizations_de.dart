@@ -13232,4 +13232,8 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Ort nicht verfügbar';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Schreibgeschützt geöffnet, da Android für diese Datei nur Lesezugriff gewährt hat.';
 }

@@ -19,6 +19,8 @@ import com.aeidolon.vaultexplorer.engine.VaultOpenResult
 import com.aeidolon.vaultexplorer.foldervault.VaultOpenPreferences
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
+import com.aeidolon.vaultexplorer.saf.SafContainerAccess
+import com.aeidolon.vaultexplorer.saf.SafContainerProbe
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import java.io.File
 import kotlin.concurrent.withLock
@@ -40,7 +42,19 @@ object ContainerLifecycleCore {
         val matchedCipherId: Int,
         val matchedHashId: Int,
         val partCount: Int,
+        /**
+         * The mode the container was actually mounted in. Differs from the
+         * requested one when the storage provider refused write access (see
+         * [READ_ONLY_REASON_WRITE_NOT_GRANTED]); the container is then
+         * mounted read-only so the UI can say so, rather than claiming to be
+         * writable while every write fails.
+         */
+        val readOnly: Boolean = false,
+        val readOnlyReason: String? = null,
     )
+
+    /** [UnlockCoreResult.readOnlyReason]: the provider granted read access only. */
+    const val READ_ONLY_REASON_WRITE_NOT_GRANTED = "write_not_granted"
 
     enum class AuthFailureCode {
         INCORRECT_PASSWORD_OR_INVALID_CONTAINER,
@@ -215,29 +229,89 @@ object ContainerLifecycleCore {
             val isSplit = parts.size > 1
             val singleUri = parts.firstOrNull()?.uri ?: uri
             val rawFile = if (isSplit) null else UriToPath.getRawFile(context, singleUri)?.takeIf { it.canRead() }
-            // SAF providers often return descriptors that can be read but do
-            // not support the random-access pwrite() calls made by the native
-            // block layer. Route cloud/document-backed single files through
-            // the same proxy as split containers; SplitFuseCallback can stage
-            // an unsupported provider locally and upload the updated image on
-            // fsync/release. Genuine local files keep the direct-fd fast path.
-            val useSafProxy = isSplit || rawFile == null
+
+            // Effective mode. Starts as the requested one and is only ever
+            // tightened: if the provider refuses write access we mount
+            // read-only and say so, instead of mounting "writable" and
+            // failing every write with a generic I/O error later.
+            var effectiveReadOnly = readOnly
+            var readOnlyReason: String? = null
+
+            // Genuine local files: direct-fd fast path. canRead()/canWrite()
+            // only reflect access(2), so the open itself is the real test; a
+            // refusal falls through to the SAF path below (content URIs only)
+            // rather than aborting the whole unlock.
+            if (rawFile != null) {
+                pfd = try {
+                    ParcelFileDescriptor.open(
+                        rawFile,
+                        if (readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
+                    )
+                } catch (e: Exception) {
+                    if (singleUri.scheme != "content") throw e
+                    VeLog.w(TAG, e) { "Raw open failed for ${censorUri(uriString)}; falling back to the SAF path" }
+                    null
+                }
+            }
+
+            // SAF providers: use the provider's own descriptor when it is a
+            // plain seekable file (what VaultPony does). Only providers that
+            // cannot hand one out -- cloud/document-backed ones whose
+            // descriptors can be read but not pwrite()n -- go through the
+            // proxy, where SplitFuseCallback can stage the file locally and
+            // upload the updated image on fsync/release.
+            var useSafProxy = isSplit
+            if (pfd == null && !isSplit) {
+                val access = SafContainerProbe.open(
+                    context, singleUri, wantWrite = !readOnly, label = censorUri(uriString),
+                )
+                when (access) {
+                    is SafContainerAccess.Direct -> {
+                        pfd = access.pfd
+                        if (!readOnly && !access.writable) {
+                            effectiveReadOnly = true
+                            readOnlyReason = READ_ONLY_REASON_WRITE_NOT_GRANTED
+                        }
+                        VeLog.i(TAG) {
+                            "Using provider descriptor directly for ${censorUri(uriString)} " +
+                                "(writable=${access.writable})"
+                        }
+                    }
+                    is SafContainerAccess.NeedsProxy -> {
+                        useSafProxy = true
+                        if (!readOnly && access.writeDenied) {
+                            effectiveReadOnly = true
+                            readOnlyReason = READ_ONLY_REASON_WRITE_NOT_GRANTED
+                        }
+                        VeLog.i(TAG) {
+                            "Using SAF proxy for single document container ${censorUri(uriString)}: ${access.reason}"
+                        }
+                    }
+                }
+            }
+
+            if (effectiveReadOnly && !readOnly && protectHiddenVolume) {
+                // Hidden-volume protection needs a writable mount; silently
+                // dropping it would put the hidden volume at risk.
+                throw IllegalStateException(
+                    "Hidden volume protection requires write access, but the storage provider only granted read access",
+                )
+            }
+
             if (useSafProxy) {
                 if (isSplit) {
                     VeLog.i(TAG) { "Auto-detected split container across ${parts.size} parts for ${censorUri(uriString)}" }
-                } else {
-                    VeLog.i(TAG) { "Using SAF proxy for single document container ${censorUri(uriString)}" }
                 }
                 val fuseCallback = SplitFuseCallback(
                     context = context,
                     parts = parts,
-                    readOnly = readOnly,
+                    readOnly = effectiveReadOnly,
                     onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
                 )
                 val storageManager = context.getSystemService(StorageManager::class.java)
                 proxyPfd = try {
                     storageManager.openProxyFileDescriptor(
-                        if (readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
+                        if (effectiveReadOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
                         fuseCallback,
                         fuseHandler,
                     )
@@ -246,11 +320,6 @@ object ContainerLifecycleCore {
                     throw e
                 }
                 pfd = proxyPfd
-            } else {
-                pfd = ParcelFileDescriptor.open(
-                    requireNotNull(rawFile),
-                    if (readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
-                )
             }
 
             if (pfd == null) {
@@ -263,7 +332,7 @@ object ContainerLifecycleCore {
 
             val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
                 ContainerEngine.unlockFile(
-                    fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds, readOnly,
+                    fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds, effectiveReadOnly,
                     if (protectHiddenVolume) hiddenPassword ?: "" else null,
                     hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
                     useBackupHeader,
@@ -297,7 +366,7 @@ object ContainerLifecycleCore {
                 cachedFilesList = files.toList(),
                 displayName = computedDisplayName,
                 documentProvider = docProvider,
-                readOnly = readOnly,
+                readOnly = effectiveReadOnly,
                 containerFormat = resolvedFormat,
             )
             ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
@@ -323,6 +392,8 @@ object ContainerLifecycleCore {
                     matchedCipherId = ContainerEngine.matchedCipherId(targetVolId),
                     matchedHashId = ContainerEngine.matchedHashId(targetVolId),
                     partCount = parts.size,
+                    readOnly = effectiveReadOnly,
+                    readOnlyReason = readOnlyReason,
                 )
             )
         } catch (e: Exception) {

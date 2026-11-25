@@ -13335,4 +13335,8 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Місце недоступне';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Відкрито лише для читання, оскільки Android надав для цього файлу тільки доступ на читання.';
 }

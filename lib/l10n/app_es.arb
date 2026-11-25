@@ -3646,5 +3646,6 @@
   "newTabBehaviorSpecificStorage": "Abrir una ubicación concreta",
   "newTabBehaviorSpecificStorageDesc": "Abre siempre la ubicación elegida abajo. Si no se puede abrir, se te pregunta.",
   "newTabStorageLabel": "Ubicación de las pestañas nuevas",
-  "newTabStorageUnavailable": "Ubicación no disponible"
+  "newTabStorageUnavailable": "Ubicación no disponible",
+  "containerOpenedReadOnlyNoWriteAccess": "Abierto en solo lectura porque Android solo concedió acceso de lectura a este archivo."
 }

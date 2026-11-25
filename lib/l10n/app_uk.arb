@@ -3646,5 +3646,6 @@
   "newTabBehaviorSpecificStorage": "Відкривати певне місце",
   "newTabBehaviorSpecificStorageDesc": "Завжди відкриває місце, вибране нижче. Якщо його не вдається відкрити, вас запитають.",
   "newTabStorageLabel": "Місце для нових вкладок",
-  "newTabStorageUnavailable": "Місце недоступне"
+  "newTabStorageUnavailable": "Місце недоступне",
+  "containerOpenedReadOnlyNoWriteAccess": "Відкрито лише для читання, оскільки Android надав для цього файлу тільки доступ на читання."
 }

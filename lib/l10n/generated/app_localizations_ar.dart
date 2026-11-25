@@ -13296,4 +13296,8 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'الموضع غير متاح';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'تم الفتح للقراءة فقط لأن أندرويد منح صلاحية القراءة فقط لهذا الملف.';
 }

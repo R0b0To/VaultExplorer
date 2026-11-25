@@ -1143,12 +1143,6 @@ class VaultLifecycleApi {
     }
   }
 
-  /// Cheap, read-only pre-check to call right after a file is picked for
-  /// unlocking, before ever showing a password field -- see the identical
-  /// method on the old _ContainerLifecycleOps mixin
-  /// (vault_explorer_api_container_lifecycle.dart) for the full doc
-  /// comment; kept in sync with it here for the same reason every other
-  /// method in this file is.
   Future<String> probeContainerFormat(String filePath) async {
     try {
       final result = await _channel.invokeMethod<String>(
@@ -1182,6 +1176,7 @@ class VaultLifecycleApi {
       int matchedCipherId,
       int matchedHashId,
       String containerFormat,
+      bool readOnly,
     })?
   >
   unlockContainer(
@@ -1246,6 +1241,10 @@ class VaultLifecycleApi {
       matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
       matchedHashId: raw['matchedHashId'] as int? ?? 255,
       containerFormat: raw['containerFormat'] as String? ?? 'veracrypt',
+      // The mode actually mounted. Native reports it because a storage
+      // provider can refuse write access to a container that was requested
+      // read-write; fall back to what was asked for when it says nothing.
+      readOnly: raw['readOnly'] as bool? ?? readOnly,
     );
   }
 

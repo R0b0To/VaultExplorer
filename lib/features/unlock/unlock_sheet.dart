@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
@@ -231,11 +232,40 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     return context.l10n.veracryptAlgoProgress(algo, slotName);
   }
 
+  /// Read-write was requested but native mounted the container read-only:
+  /// the storage provider only granted read access.
+  bool _openedReadOnlyByProvider(MountedContainer container) =>
+      container.readOnly && !ref.read(unlockControllerProvider(_params)).readOnly;
+
+  /// Without this the user just sees writes fail, so say why, and offer All
+  /// files access (which bypasses the provider) when it isn't already on.
+  Future<void> _notifyOpenedReadOnlyByProvider() async {
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final l10n = context.l10n;
+    final hasAllFilesAccess = await lifecycle.hasAllFilesAccess();
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.containerOpenedReadOnlyNoWriteAccess,
+      tone: AppBannerTone.warning,
+      action: hasAllFilesAccess
+          ? null
+          : SnackBarAction(
+              label: l10n.localStorageGrantAccess,
+              onPressed: () => lifecycle.requestAllFilesAccess(openSettings: true),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    ref.listen(unlockControllerProvider(_params).select((s) => s.mountedSuccess), (prev, next) {
+    ref.listen(unlockControllerProvider(_params).select((s) => s.mountedSuccess), (prev, next) async {
       if (next != null && mounted) {
         HapticFeedback.lightImpact();
+        if (_openedReadOnlyByProvider(next.container)) {
+          await _notifyOpenedReadOnlyByProvider();
+          if (!mounted) return;
+        }
         widget.onMounted(next.container, record: next.record);
         if (widget.openBrowserRoute != null) {
           Navigator.of(context).pushReplacement(widget.openBrowserRoute!(next.container));

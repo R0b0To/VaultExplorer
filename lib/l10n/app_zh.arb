@@ -3646,5 +3646,6 @@
   "newTabBehaviorSpecificStorage": "打开指定位置",
   "newTabBehaviorSpecificStorageDesc": "始终打开下方选择的位置。若无法打开，则改为询问。",
   "newTabStorageLabel": "新标签页的位置",
-  "newTabStorageUnavailable": "位置不可用"
+  "newTabStorageUnavailable": "位置不可用",
+  "containerOpenedReadOnlyNoWriteAccess": "已以只读方式打开，因为 Android 仅授予了此文件的读取权限。"
 }

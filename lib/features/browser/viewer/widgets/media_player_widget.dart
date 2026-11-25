@@ -27,6 +27,8 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_seek_clai
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_seek_hud.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_dismiss_layer.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/library/tags/audio_tag_reader.dart';
+import 'package:vaultexplorer/features/library/tags/byte_source.dart';
 
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
@@ -256,6 +258,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   Size _lastKnownVideoSize = Size.zero;
   double? _knownAspectRatio;
   Uint8List? _localPosterBytes;
+  // Cover picture embedded in the audio file's tags (ID3 APIC, FLAC picture,
+  // MP4 covr, Ogg METADATA_BLOCK_PICTURE). Held in memory only.
+  Uint8List? _audioCover;
+  int _audioCoverToken = 0;
   late final ThumbnailCacheService _thumbnailCache;
 
   AnimationController? _zoomAnimationController;
@@ -380,6 +386,29 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     _videoTransformationController.addListener(_onVideoTransformationChanged);
     _syncBoundController();
     _ensurePosterLoaded();
+    _loadAudioCover();
+  }
+
+  Future<void> _loadAudioCover() async {
+    final token = ++_audioCoverToken;
+    if (!widget.isAudio) return;
+    final container = widget.container;
+    final fileName = widget.fileName;
+    try {
+      final size = await _fileIoApi.getFileSize(container, fileName);
+      if (size <= 0) return;
+      final art = await AudioTagReader.readCover(
+        _PlayerByteSource(_fileIoApi, container, fileName, size),
+        fileName: fileName,
+      );
+      if (!mounted || token != _audioCoverToken) return;
+      final bytes = art?.bytes;
+      if (bytes != null && bytes.isNotEmpty) {
+        setState(() => _audioCover = bytes);
+      }
+    } catch (_) {
+      // No readable cover: keep the plain music-note visual.
+    }
   }
 
   Future<void> _ensurePosterLoaded() async {
@@ -420,11 +449,13 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             widget.thumbnailQuality,
           );
       _localPosterBytes = newPoster;
+      _audioCover = null;
       _knownAspectRatio = MediaAspectRatioCache.get(
         widget.container,
         widget.fileName,
       );
       _ensurePosterLoaded();
+      _loadAudioCover();
     } else if (widget.posterBytes != null &&
         widget.posterBytes != oldWidget.posterBytes) {
       // Same file, but explicit new poster bytes provided
@@ -1115,6 +1146,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   }
 
   Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
+    // The embedded cover is drawn by the audio visual itself.
+    if (widget.isAudio && _audioCover != null) return const SizedBox.expand();
     final poster =
         _localPosterBytes ??
         widget.posterBytes ??
@@ -2386,27 +2419,68 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     );
   }
 
+  Widget _buildAudioCover(Uint8List cover) {
+    final mq = MediaQuery.of(context);
+    final side = math
+        .min(mq.size.width * 0.75, math.min(mq.size.height * 0.38, 340.0))
+        .clamp(130.0, 340.0);
+    final cacheSide = (side * mq.devicePixelRatio).round();
+    return Container(
+      width: side,
+      height: side,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Image.memory(
+          cover,
+          fit: BoxFit.cover,
+          cacheWidth: cacheSide,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) =>
+              const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAudioCenterVisual(ColorScheme cs, {required bool isPlaying}) {
     final fileTitle = widget.fileName.split('/').last;
+    final cover = _audioCover;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 130,
-          height: 130,
-          decoration: BoxDecoration(
-            color: cs.primaryContainer.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: cs.primary.withValues(alpha: 0.3),
-              width: 2,
+        if (cover != null)
+          _buildAudioCover(cover)
+        else
+          Container(
+            width: 130,
+            height: 130,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: cs.primary.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: Icon(
+                Icons.music_note_rounded,
+                size: 56,
+                color: cs.primary,
+              ),
             ),
           ),
-          child: Center(
-            child: Icon(Icons.music_note_rounded, size: 56, color: cs.primary),
-          ),
-        ),
         const SizedBox(height: 24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -2427,6 +2501,23 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       ],
     );
   }
+}
+
+/// Feeds the tag reader byte ranges of the open file through the vault engine.
+class _PlayerByteSource implements ByteSource {
+  final VaultFileIoApi _io;
+  final MountedContainer _container;
+  final String _path;
+  final int _size;
+
+  _PlayerByteSource(this._io, this._container, this._path, this._size);
+
+  @override
+  int get length => _size;
+
+  @override
+  Future<Uint8List?> read(int offset, int count) =>
+      _io.readFileChunk(_container, _path, offset, count);
 }
 
 class _AudioVisualizer extends StatefulWidget {

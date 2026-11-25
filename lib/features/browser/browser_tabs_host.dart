@@ -1550,9 +1550,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     // below its app bar as on Linux.
     final windowsCaption =
         PlatformFeatures.isWindows && !NativeWindowChrome.of(context);
+    // The desktop chrome (the file manager's toolbar and breadcrumb rows, the
+    // Vaults page's toolbar rows) does not depend on tabs: with tabs off the
+    // strip is simply absent and the rest looks the same.
     final desktopFileManagerChrome =
         PlatformFeatures.isDesktop &&
-        tabsEnabled &&
         activeTab != null &&
         !activeTab.isCategory;
     final desktopDashboardChrome =
@@ -1739,7 +1741,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             !widget.externallyHostedTabStrip
         ? DesktopWindowTitleBar(
             height: 32,
-            tabs: dualPaneForTabStrip
+            tabs: !tabsEnabled
+                ? const SizedBox.shrink()
+                : dualPaneForTabStrip
                 ? LayoutBuilder(
                     builder: (context, constraints) {
                       final pageWidth =

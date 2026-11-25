@@ -27,6 +27,7 @@ import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/app_page_windows.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_relocation_flow.dart';
 import 'package:vaultexplorer/features/browser/controllers/storage_root_request.dart';
@@ -523,6 +524,12 @@ class AppNavigationDrawer extends ConsumerWidget {
     final isSettings = currentVolId == null && selectedTabIndex == 2;
 
     void openTools() {
+      // Desktop: Tools is a window of its own. Falls through to the page
+      // below when native windows are not available.
+      if (PlatformFeatures.isDesktop && openToolsWindow(context)) {
+        _closeDrawer(context);
+        return;
+      }
       if (docked && onSelectTab != null) {
         // Docked: Tools opens in the content area, so the sidebar stays
         // visible beside it.
@@ -551,6 +558,12 @@ class AppNavigationDrawer extends ConsumerWidget {
     }
 
     void openSettings() {
+      // Desktop: Settings is a window of its own. Falls through to the page
+      // below when native windows are not available.
+      if (PlatformFeatures.isDesktop && openSettingsWindow(context)) {
+        _closeDrawer(context);
+        return;
+      }
       if (docked && onSelectTab != null) {
         onSelectTab!(2);
         return;

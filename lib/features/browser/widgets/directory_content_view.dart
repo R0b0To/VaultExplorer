@@ -568,7 +568,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final cleanExt = ext.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim();
     if (cleanExt.isEmpty) return;
 
-    _appSettings.extensionPreferences[cleanExt] = preference;
+    _appSettings = _appSettings.copyWith(
+      extensionPreferences: {
+        ..._appSettings.extensionPreferences,
+        cleanExt: preference,
+      },
+    );
 
     try {
       final currentSettings = ref.read(appSettingsControllerProvider).settings;
@@ -2111,6 +2116,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         _toolbarConfig.isGalleryModeForStorage(widget.container.uri) &&
         !_music.config.enabled) {
       _onFilterChosen('gallery');
+    }
+  }
+
+  /// Re-resolves this folder's layout and/or sort from the current settings.
+  /// Used when a setting that feeds them changes while this view is open (for
+  /// example from the Settings window), so the view follows it right away
+  /// instead of only after a new tab is opened.
+  void _reapplyFolderViewDefaults({bool layout = false, bool sort = false}) {
+    if (!mounted) return;
+    if (layout) {
+      _navNotifier.setLayoutMode(_getLayoutModeForFolder(_currentDirPath));
+    }
+    if (sort) {
+      final resolved = _getSortStateForFolder(_currentDirPath);
+      _sortNotifier.restore(resolved.sortBy, resolved.sortAscending);
     }
   }
 
@@ -7190,6 +7210,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           _toolbarConfigReady = true;
           _applyResolvedThumbnails(next.config);
           if (_isVisibleTab) setState(() {});
+          if (previous != null &&
+              previous.config.rememberPerFolderLayout !=
+                  next.config.rememberPerFolderLayout) {
+            Future.microtask(
+              () => _reapplyFolderViewDefaults(layout: true, sort: true),
+            );
+          }
         }
         if (previous?.thumbnailOverridesRevision !=
             next.thumbnailOverridesRevision) {
@@ -7199,6 +7226,29 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             _navNotifier.markNeedsRefresh();
           }
         }
+      },
+    );
+    // `_appSettings` is read when the view loads; follow later changes (the
+    // Settings window edits them while this view stays open).
+    ref.listen<AppSettings>(
+      appSettingsControllerProvider.select((state) => state.settings),
+      (previous, next) {
+        if (previous == null) return;
+        _appSettings = next;
+        final layoutChanged =
+            previous.defaultLayoutMode != next.defaultLayoutMode;
+        final sortChanged =
+            previous.defaultFileSortBy != next.defaultFileSortBy ||
+            previous.defaultFileSortAscending != next.defaultFileSortAscending;
+        if (layoutChanged || sortChanged) {
+          Future.microtask(
+            () => _reapplyFolderViewDefaults(
+              layout: layoutChanged,
+              sort: sortChanged,
+            ),
+          );
+        }
+        if (_isVisibleTab) setState(() {});
       },
     );
     ref.listen<SyncStatus>(syncStatusProvider, (previous, next) {
@@ -7253,8 +7303,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       previewDirPath,
       previewSort,
     );
-    final desktopFileManager =
-        PlatformFeatures.isDesktop && useBrowserTabs;
+    // The desktop layout (toolbar row, breadcrumb row, preview pane) is the
+    // same with or without tabs; tabs only add the strip above it.
+    final desktopFileManager = PlatformFeatures.isDesktop;
     // The breadcrumb row carries its own search box here, so the bottom
     // search bar (and the room it reserves) is not needed.
     final desktopInlineSearch =

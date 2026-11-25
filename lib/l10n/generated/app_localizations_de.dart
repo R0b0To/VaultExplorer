@@ -11154,6 +11154,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'Seitenmenü öffnen';
 
   @override
+  String get hideSidebarTooltip => 'Seitenmenü ausblenden';
+
+  @override
+  String get showSidebarTooltip => 'Seitenmenü einblenden';
+
+  @override
   String get tabSwipeActionLoopFirst => 'Im Kreis zum ersten Tab';
 
   @override

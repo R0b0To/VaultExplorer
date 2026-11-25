@@ -15,6 +15,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
@@ -562,9 +563,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   /// upper row holds what changes the list (order, refresh) and the search box,
   /// which sits where the file manager's does; the lower row holds the actions
   /// on the vaults themselves.
-  Widget _buildDesktopDashboardChrome(BuildContext context, TabId tabId) {
+  Widget _buildDesktopDashboardChrome(
+    BuildContext context,
+    TabId tabId, {
+    bool showSidebarButton = true,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     final toolbar = ref.read(dashboardToolbarActionsProvider).forTab(tabId);
+    final showSidebar = showSidebarButton ? context.showSidebarAction : null;
     // `surfaceContainer`, like the breadcrumb row: the selected tab above
     // flows into it.
     return IconButtonTheme(
@@ -583,7 +589,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               height: 36,
               child: Row(
                 children: [
-                  const SizedBox(width: 6),
+                  if (showSidebar != null) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.menu_rounded),
+                      tooltip: context.l10n.showSidebarTooltip,
+                      onPressed: showSidebar,
+                    ),
+                  ] else
+                    const SizedBox(width: 6),
                   const _DashboardSortButton(),
                   const DashboardLayoutButton(),
                   IconButton(
@@ -649,6 +663,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     BrowserTabState tab, {
     required bool isActive,
     bool isDualPane = false,
+    bool isSecondaryPane = false,
   }) {
     if (tab.isDashboard) {
       final dashboard =
@@ -665,7 +680,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         child: isDualPane && PlatformFeatures.isDesktop
             ? Column(
                 children: [
-                  _buildDesktopDashboardChrome(context, tab.tabId),
+                  _buildDesktopDashboardChrome(
+                    context,
+                    tab.tabId,
+                    showSidebarButton: !isSecondaryPane,
+                  ),
                   Expanded(child: dashboard),
                 ],
               )
@@ -742,6 +761,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         tabId: tab.tabId,
         workspaceConfig: _workspace,
         isDualPane: isDualPane,
+        showSidebarButton: !isSecondaryPane,
         initialPath: tab.initialPath,
         resolveContainer: widget.resolveContainer,
         thumbnailCacheMode: widget.viewportOptions.thumbnailCacheMode,
@@ -834,10 +854,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                             tabs: groupTabs,
                             shownTabId: shownTabId,
                             onTabChanged: _focusTab,
-                            pageBuilder: (tab) => _buildTabContent(
+                           pageBuilder: (tab) => _buildTabContent(
                               tab,
                               isActive: tab.tabId == activeTabId,
                               isDualPane: true,
+                              isSecondaryPane: pane == TabPane.secondary,
                             ),
                             gate: _swipeGate,
                             swipeEnabled: swipeEnabled,

@@ -155,6 +155,24 @@ class _MainShellState extends ConsumerState<MainShell>
     setState(() => _scaffoldDrawerOpen = isOpen);
   }
 
+  /// Hides the docked sidebar, or brings it back. Saved with the other
+  /// interface settings, so it stays the way the person left it. Only reached
+  /// from windows wide enough to dock the sidebar; elsewhere the menu is a
+  /// modal drawer and there is nothing to hide.
+  void _toggleDockedSidebar() {
+    final collapsed = !ref
+        .read(appSettingsControllerProvider)
+        .settings
+        .dockedSidebarCollapsed;
+    unawaited(
+      ref
+          .read(appSettingsControllerProvider.notifier)
+          .updateSettings(
+            (settings) => settings.copyWith(dockedSidebarCollapsed: collapsed),
+          ),
+    );
+  }
+
   // Cached synchronously while the widget is mounted
   late final _secureScreenPolicy = ref.read(secureScreenPolicyProvider);
   late final _vaultEngineEvents = ref.read(vaultEngineEventsProvider);
@@ -1019,10 +1037,21 @@ class _MainShellState extends ConsumerState<MainShell>
     }
 
     // Tablet landscape and desktop windows get the navigation menu as a
-    // permanent sidebar; everything else keeps the modal drawer.
+    // permanent sidebar; everything else keeps the modal drawer. [docked] says
+    // the window is big enough for the sidebar, and it also means "no modal
+    // drawer", whether or not the sidebar is currently shown: a person who
+    // hid it gets the full width back, and a menu button that brings the
+    // sidebar back in place, never an overlay on top of the content.
     final docked = AppBreakpoints.useDockedSidebarFor(
       MediaQuery.sizeOf(context),
     );
+    final sidebarCollapsed = ref.watch(
+      appSettingsControllerProvider.select(
+        (state) => state.settings.dockedSidebarCollapsed,
+      ),
+    );
+    final sidebarShown = docked && !sidebarCollapsed;
+    final hasWindowsTitleBar = PlatformFeatures.isWindows;
 
     Widget buildDashboardTab({
       bool backPreviewOnly = false,
@@ -1085,8 +1114,11 @@ class _MainShellState extends ConsumerState<MainShell>
       final workspaceActions = workspace == null
           ? null
           : ref.read(browserTabsProvider(workspace).notifier);
-      return AppNavigationDrawer(
+       return AppNavigationDrawer(
         docked: docked,
+        onHideSidebar: (docked && !hasWindowsTitleBar)
+            ? _toggleDockedSidebar
+            : null,
         currentVolId: currentVolId,
         primaryLocalContainer: _primaryLocalStorageContainer,
         localStorageNotifier: _localStorageNotifier,
@@ -1189,14 +1221,15 @@ class _MainShellState extends ConsumerState<MainShell>
       ),
     );
 
+    // The sidebar/drawer highlights the vault whose tab is in front; Tools and
+    // Settings, which live in the content area, highlight themselves.
+    final activeMainTab = _index == 0 ? _browserWorkspaceState?.activeTab : null;
+    final activeVolId = (activeMainTab == null || activeMainTab.isDashboard)
+        ? null
+        : activeMainTab.volId;
+
     Widget shellBody = appBody;
-    if (docked) {
-      // The sidebar highlights the vault whose tab is in front; Tools and
-      // Settings, which live in the content area, highlight themselves.
-      final activeTab = _index == 0 ? _browserWorkspaceState?.activeTab : null;
-      final dockedVolId = (activeTab == null || activeTab.isDashboard)
-          ? null
-          : activeTab.volId;
+    if (sidebarShown) {
       shellBody = LayoutBuilder(
         builder: (context, constraints) {
           final availableWidth = (constraints.maxWidth - 8)
@@ -1217,7 +1250,7 @@ class _MainShellState extends ConsumerState<MainShell>
             },
             first: buildDrawer(
               docked: true,
-              currentVolId: dockedVolId,
+              currentVolId: activeVolId,
               workspace: _browserWorkspace,
             ),
             second: DockedContentFrame(
@@ -1236,41 +1269,52 @@ class _MainShellState extends ConsumerState<MainShell>
         tabsEnabled &&
         workspace != null &&
         browserTabsState != null;
-    final titleBarLeadingWidth = docked ? _dockedSidebarWidth + 8 : 48.0;
+    final titleBarLeadingWidth = sidebarShown ? _dockedSidebarWidth + 8 : 48.0;
     final Widget shellTitleTabs = !showWorkspaceTabs
         ? const SizedBox.shrink()
         : BrowserTitleBarTabs(
             workspace: workspace,
-            docked: docked,
+            docked: sidebarShown,
             splitFraction: _dualPaneSplitFraction,
             onNewTab: _openNewBrowserTab,
             onDuplicate: _duplicateBrowserTab,
           );
-    final Widget? windowsTitleBar = PlatformFeatures.isWindows
+    final Widget? windowsTitleBar = hasWindowsTitleBar
         ? DesktopWindowTitleBar(
             height: 32,
             tabs: shellTitleTabs,
             leadingWidth: titleBarLeadingWidth,
-            leadingDraggable: docked,
-            leading: docked
-                ? SizedBox(width: _dockedSidebarWidth + 8)
-                : SizedBox(
-                    width: 48,
-                    child: Builder(
-                      builder: (buttonContext) => IconButton(
-                        icon: const Icon(Icons.menu_rounded, size: 18),
-                        tooltip: buttonContext.l10n.storageLocationsTitle,
-                        onPressed: () => Scaffold.of(buttonContext).openDrawer(),
-                        style: IconButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(32, 32),
-                          maximumSize: const Size(32, 32),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
+            leadingDraggable: sidebarShown,
+            leading: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: SizedBox(
+                width: 48,
+                height: 32,
+                child: Builder(
+                  builder: (buttonContext) => IconButton(
+                    icon: Icon(
+                      sidebarShown
+                          ? Icons.menu_open_rounded
+                          : Icons.menu_rounded,
+                      size: 18,
+                    ),
+                    tooltip: sidebarShown
+                        ? buttonContext.l10n.hideSidebarTooltip
+                        : buttonContext.l10n.showSidebarTooltip,
+                    onPressed: docked
+                        ? _toggleDockedSidebar
+                        : () => Scaffold.of(buttonContext).openDrawer(),
+                    style: IconButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(32, 32),
+                      maximumSize: const Size(32, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ),
+                ),
+              ),
+            ),
           )
         : null;
 
@@ -1282,16 +1326,30 @@ class _MainShellState extends ConsumerState<MainShell>
               Expanded(child: shellBody),
             ],
           );
-    final Widget scaffold = Scaffold(
-      key: _scaffoldKey,
-      onDrawerChanged: _onScaffoldDrawerChanged,
-      resizeToAvoidBottomInset: !browserContentVisible,
-      // Tools and Settings have no horizontal pager, so let a drawer drag
-      // start anywhere in their content, too.
-      drawerEdgeDragWidth: double.maxFinite,
-      drawerEnableOpenDragGesture: _index != 0 && !docked,
-      drawer: isHidden || docked ? null : buildDrawer(),
-      body: scaffoldBody,
+    // Always in the tree, so the Scaffold below keeps its place when the window
+    // is resized across the docking breakpoint. Menu buttons in the pages read
+    // it to bring a hidden sidebar back; it only reports "hidden" when this
+    // window can dock one.
+    final Widget scaffold = DockedSidebarToggle(
+      collapsed: docked && sidebarCollapsed,
+      onToggle: _toggleDockedSidebar,
+      hostedInTitleBar: hasWindowsTitleBar,
+      child: Scaffold(
+        key: _scaffoldKey,
+        onDrawerChanged: _onScaffoldDrawerChanged,
+        resizeToAvoidBottomInset: !browserContentVisible,
+        // Tools and Settings have no horizontal pager, so let a drawer drag
+        // start anywhere in their content, too.
+        drawerEdgeDragWidth: double.maxFinite,
+        drawerEnableOpenDragGesture: _index != 0 && !docked,
+        drawer: isHidden || docked
+            ? null
+            : buildDrawer(
+                currentVolId: activeVolId,
+                workspace: _browserWorkspace,
+              ),
+        body: scaffoldBody,
+      ),
     );
 
     // Keep the app shell mounted during share and Quick Capture flows, then

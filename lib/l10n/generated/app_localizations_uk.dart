@@ -11245,6 +11245,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'Відкрити бічне меню';
 
   @override
+  String get hideSidebarTooltip => 'Приховати бічне меню';
+
+  @override
+  String get showSidebarTooltip => 'Показати бічне меню';
+
+  @override
   String get tabSwipeActionLoopFirst => 'По колу до першої вкладки';
 
   @override

@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "在任意位置向左滑动",
   "tabSwipeActionNewTab": "新建标签页",
   "tabSwipeActionOpenDrawer": "打开侧边菜单",
+  "hideSidebarTooltip": "隐藏侧边菜单",
+  "showSidebarTooltip": "显示侧边菜单",
   "tabSwipeActionLoopFirst": "循环到第一个标签页",
   "tabSwipeActionLoopLast": "循环到最后一个标签页",
   "tabSwipeActionNothing": "不执行任何操作",

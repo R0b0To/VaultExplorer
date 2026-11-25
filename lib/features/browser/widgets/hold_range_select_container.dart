@@ -25,6 +25,11 @@ class _PinchScaleGestureRecognizer extends ScaleGestureRecognizer {
   @override
   bool isPointerAllowed(PointerDownEvent event) {
     if (isFrozen?.call() ?? false) return false;
+    // A mouse cannot pinch, and a scale recognizer accepts after only ~2 px
+    // of mouse travel (the "precise pointer" pan slop). That beat every item
+    // drag, which starts a little later, and swallowed the gesture. Trackpad
+    // pinches arrive as pan/zoom events, which are unaffected.
+    if (event.kind == PointerDeviceKind.mouse) return false;
     return super.isPointerAllowed(event);
   }
 
@@ -316,6 +321,10 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
     final item = _findItemAt(event.position);
     if (item == null || item.entry.isPlaceholder) return false;
+
+    // A mouse never selects by holding: clicks, modifier clicks and the
+    // marquee select, and pressing then moving drags the item.
+    if (event.kind == PointerDeviceKind.mouse) return false;
 
     // A first hold is left to the item's drag recognizer (BrowserItemDragItem):
     // it selects the item at the hold delay and starts the drag a moment

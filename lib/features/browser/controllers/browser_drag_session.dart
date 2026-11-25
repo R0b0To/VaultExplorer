@@ -102,6 +102,10 @@ class BrowserDragSession extends Notifier<BrowserDragSessionState> {
 
   void updatePointer(Offset position) => pointer.value = position;
 
+  void updateActivePointer(Offset position) {
+    if (state.isActive) pointer.value = position;
+  }
+
   /// Releases the slot. Safe to call repeatedly.
   void end() {
     if (!state.isActive) return;

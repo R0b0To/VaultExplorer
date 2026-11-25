@@ -136,10 +136,17 @@ PreferredSizeWidget buildBrowserAppBar(
   // the top app bar; only a narrow portrait window keeps it at the bottom.
   final isLandscape = context.screen.useLandscapeLayout;
   final showActionBar = !searchActive;
-  // Beside a docked sidebar the menu is always on screen, so the leading slot
+ // Beside a docked sidebar the menu is always on screen, so the leading slot
   // is only needed for "up one folder".
   final docked = DockedSidebarScope.of(context);
+  final titleBarOwnsMenu = context.titleBarHostsSidebarMenu;
   final canGoUp = pathStack.length > 1 && onNavigateUp != null;
+  // The docked sidebar is hidden: the leading menu button brings it back in
+  // place, since the browser has no modal drawer of its own then. Without tabs
+  // the leading slot would otherwise be the back arrow, so "up one folder"
+  // keeps a button beside the menu, as it has beside a docked sidebar.
+  final showSidebar = context.showSidebarAction;
+  final upBesideMenu = showSidebar != null && onBackAtRoot != null && canGoUp;
 
   if (isSelectionMode) {
     final selectedCount = selectedCountOverride ?? selectedItems.length;
@@ -767,10 +774,14 @@ PreferredSizeWidget buildBrowserAppBar(
   // much room they have. WidthAwareAppBar measures the bar, and the actions
   // that do not fit collapse into a "more" menu rather than overlapping the
   // title or running off the edge when the window is resized.
-  final hasLeading = !docked || canGoUp;
+  final hasLeading =
+      (!docked && !titleBarOwnsMenu) ||
+      canGoUp ||
+      (titleBarOwnsMenu && onBackAtRoot != null);
   return WidthAwareAppBar(
     builder: (context, barWidth) => AppBar(
-    leading: docked
+    leadingWidth: upBesideMenu ? 96 : null,
+    leading: docked || titleBarOwnsMenu
         ? (canGoUp
               ? IconButton(
                   icon: Icon(
@@ -782,9 +793,44 @@ PreferredSizeWidget buildBrowserAppBar(
                   ).backButtonTooltip,
                   onPressed: onNavigateUp,
                 )
-              : null)
+              : (titleBarOwnsMenu && onBackAtRoot != null
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.arrow_back,
+                          color: Theme.of(context).appBarTheme.foregroundColor,
+                        ),
+                        tooltip: context.l10n.backToDashboardTooltip,
+                        onPressed: onBackAtRoot,
+                      )
+                    : null))
         : Builder(
       builder: (ctx) {
+        if (showSidebar != null) {
+          final menuButton = IconButton(
+            icon: Icon(
+              Icons.menu_rounded,
+              color: Theme.of(ctx).appBarTheme.foregroundColor,
+            ),
+            tooltip: ctx.l10n.showSidebarTooltip,
+            onPressed: showSidebar,
+          );
+          if (!upBesideMenu) return menuButton;
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              menuButton,
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back,
+                  color: Theme.of(ctx).appBarTheme.foregroundColor,
+                ),
+                tooltip: MaterialLocalizations.of(ctx).backButtonTooltip,
+                onPressed: onNavigateUp,
+              ),
+            ],
+          );
+        }
+
         final scaffold = Scaffold.maybeOf(ctx);
         final fullScreenDrawer = FullScreenDragDrawerScope.maybeOf(ctx);
 
@@ -810,13 +856,13 @@ PreferredSizeWidget buildBrowserAppBar(
             );
           }
 
-          // With tabs enabled, the drawer remains the primary leading action.
+         // With tabs enabled, the drawer remains the primary leading action.
           return IconButton(
             icon: Icon(
               Icons.menu_rounded,
               color: Theme.of(ctx).appBarTheme.foregroundColor,
             ),
-            tooltip: ctx.l10n.storageLocationsTitle,
+            tooltip: ctx.l10n.showSidebarTooltip,
             onPressed: () {
               if (fullScreenDrawer != null) {
                 fullScreenDrawer.openDrawer();
@@ -885,8 +931,9 @@ PreferredSizeWidget buildBrowserAppBar(
           availableWidth: appBarActionsBudget(
             barWidth: barWidth,
             hasLeading: hasLeading,
-            // The transfer button sits beside the strip.
-            otherActionsWidth: 48,
+            // The transfer button sits beside the strip, and the leading slot
+            // is a second button wide when "up" sits beside the menu.
+            otherActionsWidth: 48 + (upBesideMenu ? 40.0 : 0.0),
           ),
           rebuildOn: actionsRebuildOn,
           items: [

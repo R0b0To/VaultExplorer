@@ -35,13 +35,19 @@ typedef BrowserItemDropHandler =
 /// it (selected x listed) comparisons: with 4,700 items selected that is over
 /// twenty million `RawEntry` comparisons, and it ran for every tile on every
 /// rebuild.
+///
+/// With [aloneIfUnselected] (a mouse drag, which does not select the tile it
+/// grabs), a tile that is not part of the selection is dragged on its own and
+/// the selection is left out of the drag, as in a desktop file manager.
 @visibleForTesting
 Set<RawEntry> browserEntriesToDrag(
   RawEntry entry,
   Set<RawEntry> selected,
-  List<RawEntry> visible,
-) {
+  List<RawEntry> visible, {
+  bool aloneIfUnselected = false,
+}) {
   if (selected.isEmpty) return {entry};
+  if (aloneIfUnselected && !selected.contains(entry)) return {entry};
   final inList = visible.toSet();
   return {
     for (final item in selected)
@@ -187,27 +193,37 @@ Future<void> handleBrowserItemDrop(
   if (!data.canCopyInto(destination, destinationPath)) return;
   final canMove = data.canMoveInto(destination, destinationPath);
 
-  final dropPosition = details.offset;
+  final scope = ProviderScope.containerOf(context, listen: false);
+  final dropPosition =
+      scope.read(browserDragSessionProvider.notifier).pointer.value ??
+      details.offset;
   if (!canMove) {
-    final start = ProviderScope.containerOf(
-      context,
-      listen: false,
-    ).read(browserDragSessionProvider).startPosition;
+    final start = scope.read(browserDragSessionProvider).startPosition;
     if (start != null && (dropPosition - start).distance < _kInPlaceDropSlop) {
       return;
     }
   }
 
   final l10n = context.l10n;
-  final screen = MediaQuery.sizeOf(context);
+  final overlay =
+      Overlay.of(context).context.findRenderObject() as RenderBox?;
+  final RelativeRect menuPosition;
+  if (overlay != null && overlay.hasSize) {
+    final localDrop = overlay.globalToLocal(dropPosition);
+    menuPosition = RelativeRect.fromRect(
+      localDrop & Size.zero,
+      Offset.zero & overlay.size,
+    );
+  } else {
+    final screen = MediaQuery.sizeOf(context);
+    menuPosition = RelativeRect.fromRect(
+      dropPosition & Size.zero,
+      Offset.zero & screen,
+    );
+  }
   final choice = await showMenu<BrowserDropMode>(
     context: context,
-    position: RelativeRect.fromLTRB(
-      dropPosition.dx,
-      dropPosition.dy,
-      math.max(0.0, screen.width - dropPosition.dx),
-      math.max(0.0, screen.height - dropPosition.dy),
-    ),
+    position: menuPosition,
     items: [
       PopupMenuItem<BrowserDropMode>(
         value: BrowserDropMode.copy,
@@ -267,6 +283,12 @@ const Duration kItemDragHoldDelay = Duration(milliseconds: 400);
 /// selection feels.
 const Duration kItemDragAfterSelectDelay = Duration(milliseconds: 600);
 
+/// How far a pressed mouse button has to travel before it counts as a drag.
+///
+/// Small enough to feel immediate, large enough that the jitter of an ordinary
+/// click or double-click never lifts the item.
+const double kMouseDragStartSlop = 6.0;
+
 /// What [_HoldThenDragRecognizer] asks about its tile at the moment a finger
 /// lands.
 ///
@@ -274,22 +296,42 @@ const Duration kItemDragAfterSelectDelay = Duration(milliseconds: 600);
 /// while the tile's selection state changes under it, so both are read live
 /// rather than captured when the recognizer was made.
 class _HoldDragGate {
-  const _HoldDragGate({required this.selectsFirst, required this.onSelect});
+  _HoldDragGate({
+    required this.selectsFirst,
+    required this.onSelect,
+    required this.touchAllowed,
+  });
 
   /// Whether a hold that starts now is the one that *selects* the tile
   /// (nothing is selected yet). False when the tile is already part of a
-  /// selection: that hold goes straight to dragging.
+  /// selection: that hold goes straight to dragging. Only asked for touch and
+  /// stylus: a mouse never selects by holding.
   final bool Function() selectsFirst;
 
   /// Selects the tile.
   final VoidCallback onSelect;
+
+  /// Whether a touch or stylus may start a drag from this tile right now.
+  /// False for an unselected tile in selection mode: that hold belongs to the
+  /// range-select recognizer.
+  final bool Function() touchAllowed;
+
+  /// Kind of the pointer that last went down on the tile, i.e. the one whose
+  /// drag is running or about to run.
+  PointerDeviceKind lastKind = PointerDeviceKind.touch;
+
+  bool get lastWasMouse => lastKind == PointerDeviceKind.mouse;
 }
 
-/// Per-finger state of [_HoldThenDragRecognizer].
+/// Per-pointer state of [_HoldThenDragRecognizer].
 ///
-/// A plain hold behaves exactly like Flutter's own delayed drag: the drag
-/// starts when the hold delay is up, and moving before then hands the touch
-/// to scrolling.
+/// A mouse button drags like it does in a desktop file manager: no hold, no
+/// selecting. The drag starts the moment the pointer has moved
+/// [kMouseDragStartSlop] with the button down.
+///
+/// A touch or stylus plain hold behaves exactly like Flutter's own delayed
+/// drag: the drag starts when the hold delay is up, and moving before then
+/// hands the touch to scrolling.
 ///
 /// A select-first hold has two stages. When the hold delay is up it claims
 /// the touch (so the tile's own long-press, which fires at 500 ms, can't take
@@ -305,15 +347,17 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
     required Duration holdDelay,
     required this.afterSelectDelay,
     required this.onSelect,
-    this.allowImmediateMouseDrag = false,
+    required this.isDirectMouse,
   }) {
-    _timer = Timer(holdDelay, _holdPassed);
+    if (!isDirectMouse) _timer = Timer(holdDelay, _holdPassed);
   }
 
   /// Null for a plain hold; otherwise the extra wait before the drag starts.
   final Duration? afterSelectDelay;
   final VoidCallback? onSelect;
-  final bool allowImmediateMouseDrag;
+
+  /// A mouse press: drags by movement alone, with no timer and no select.
+  final bool isDirectMouse;
 
   Timer? _timer;
   GestureMultiDragStartCallback? _starter;
@@ -324,6 +368,9 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
   /// Whether the drag may start as soon as the gesture is accepted.
   bool _dragReady = false;
 
+  Offset get _currentPosition =>
+      initialPosition + (pendingDelta ?? Offset.zero);
+
   void _holdPassed() {
     _timer = null;
     _holding = false;
@@ -333,7 +380,7 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
       final starter = _starter;
       if (starter != null) {
         _starter = null;
-        starter(initialPosition);
+        starter(_currentPosition);
       } else {
         resolve(GestureDisposition.accepted);
       }
@@ -351,14 +398,14 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
     final starter = _starter;
     if (starter != null) {
       _starter = null;
-      starter(initialPosition);
+      starter(_currentPosition);
     }
   }
 
   @override
   void accepted(GestureMultiDragStartCallback starter) {
     if (_dragReady) {
-      starter(initialPosition);
+      starter(_currentPosition);
     } else {
       _starter = starter;
     }
@@ -366,17 +413,14 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
 
   @override
   void checkForResolutionAfterMove() {
-    if (!_holding) return;
-    if (allowImmediateMouseDrag && kind == PointerDeviceKind.mouse) {
-      if (pendingDelta!.distance < 8.0) return;
+    if (isDirectMouse) {
+      if (_dragReady || pendingDelta!.distance < kMouseDragStartSlop) return;
       _holding = false;
-      _timer?.cancel();
-      _timer = null;
       _dragReady = true;
-      onSelect?.call();
       resolve(GestureDisposition.accepted);
       return;
     }
+    if (!_holding) return;
     if (pendingDelta!.distance > computeHitSlop(kind, gestureSettings)) {
       resolve(GestureDisposition.rejected);
       _timer?.cancel();
@@ -392,25 +436,25 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
   }
 }
 
-/// The drag recognizer of a browser tile: Flutter's delayed (long-press) drag,
-/// except that the hold which *selects* a tile starts the drag later than the
-/// select. See [_HoldThenDragPointerState].
+/// The drag recognizer of a browser tile. A mouse drags directly (see
+/// [_HoldThenDragPointerState]); a touch or stylus is Flutter's delayed
+/// (long-press) drag, except that the hold which *selects* a tile starts the
+/// drag later than the select.
 class _HoldThenDragRecognizer extends MultiDragGestureRecognizer {
   _HoldThenDragRecognizer({
     required this.holdDelay,
     required this.gate,
-    this.allowImmediateMouseDrag = false,
     super.allowedButtonsFilter,
   }) : super(debugOwner: null);
 
   final Duration holdDelay;
   final _HoldDragGate gate;
-  final bool allowImmediateMouseDrag;
 
   @override
   bool isPointerAllowed(PointerDownEvent event) {
-    if (event.kind == PointerDeviceKind.mouse &&
-        (event.buttons & kPrimaryMouseButton) == 0) {
+    if (event.kind == PointerDeviceKind.mouse) {
+      if ((event.buttons & kPrimaryMouseButton) == 0) return false;
+    } else if (!gate.touchAllowed()) {
       return false;
     }
     return super.isPointerAllowed(event);
@@ -418,7 +462,9 @@ class _HoldThenDragRecognizer extends MultiDragGestureRecognizer {
 
   @override
   MultiDragPointerState createNewPointerState(PointerDownEvent event) {
-    final selectsFirst = gate.selectsFirst();
+    gate.lastKind = event.kind;
+    final isMouse = event.kind == PointerDeviceKind.mouse;
+    final selectsFirst = !isMouse && gate.selectsFirst();
     return _HoldThenDragPointerState(
       event.position,
       event.kind,
@@ -426,10 +472,7 @@ class _HoldThenDragRecognizer extends MultiDragGestureRecognizer {
       holdDelay: holdDelay,
       afterSelectDelay: selectsFirst ? kItemDragAfterSelectDelay : null,
       onSelect: selectsFirst ? gate.onSelect : null,
-      allowImmediateMouseDrag:
-          allowImmediateMouseDrag &&
-          event.kind == PointerDeviceKind.mouse &&
-          (event.buttons & kPrimaryMouseButton) != 0,
+      isDirectMouse: isMouse,
     );
   }
 
@@ -437,9 +480,10 @@ class _HoldThenDragRecognizer extends MultiDragGestureRecognizer {
   String get debugDescription => 'hold then drag';
 }
 
-/// A long-press [Draggable] that asks [tryBegin] before it lets a drag start,
-/// and that starts the drag of a freshly selected tile a moment after the
-/// select (see [_HoldThenDragRecognizer]).
+/// A [Draggable] that asks [tryBegin] before it lets a drag start. A mouse
+/// drags directly; touch and stylus long-press, and the drag of a freshly
+/// selected tile starts a moment after the select (see
+/// [_HoldThenDragRecognizer]).
 ///
 /// It extends [Draggable] rather than [LongPressDraggable] because the latter
 /// is tied to Flutter's single-delay recognizer; it keeps that widget's
@@ -464,7 +508,6 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
     super.onDragEnd,
     this.delay = kItemDragHoldDelay,
     this.hapticFeedbackOnStart = true,
-    this.allowImmediateMouseDrag = false,
     required this.gate,
     required this.tryBegin,
     required this.release,
@@ -473,9 +516,8 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
   /// How long a finger rests on the tile before the hold counts.
   final Duration delay;
 
-  /// Whether a tick is felt when the drag starts.
+  /// Whether a tick is felt when the drag starts (never for a mouse).
   final bool hapticFeedbackOnStart;
-  final bool allowImmediateMouseDrag;
 
   final _HoldDragGate gate;
   final bool Function(Offset position) tryBegin;
@@ -488,7 +530,6 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
     return _HoldThenDragRecognizer(
       holdDelay: delay,
       gate: gate,
-      allowImmediateMouseDrag: allowImmediateMouseDrag,
       allowedButtonsFilter: allowedButtonsFilter,
     )..onStart = (Offset position) {
       if (!tryBegin(position)) return null;
@@ -498,7 +539,9 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
         release();
         return null;
       }
-      if (hapticFeedbackOnStart) HapticFeedback.selectionClick();
+      if (hapticFeedbackOnStart && !gate.lastWasMouse) {
+        HapticFeedback.selectionClick();
+      }
       return drag;
     };
   }
@@ -507,12 +550,18 @@ class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
 /// Tile id used when a tile is built outside any directory viewport.
 const TabId _kUnscopedTab = TabId(-1);
 
-/// Adds long-press dragging and, for folders, a highlighted drop target
-/// around one file-manager tile. The selection recognizer remains responsible
-/// for range-selecting unselected rows; a selected row can be held to drag the
-/// complete selection.
+/// Adds dragging and, for folders, a highlighted drop target around one
+/// file-manager tile.
 ///
-/// Holding a tile while nothing is selected selects it at the hold delay
+/// With a mouse, pressing any tile and moving drags it straight away, without
+/// selecting it or holding first: a tile that is part of the selection takes
+/// the whole selection along, any other tile goes alone (see
+/// [browserEntriesToDrag]).
+///
+/// With touch or stylus the selection recognizer remains responsible for
+/// range-selecting unselected rows; a selected row can be held to drag the
+/// complete selection. Holding a tile while nothing is selected selects it at
+/// the hold delay
 /// ([kItemDragHoldDelay]) and, if the finger stays down, lifts it into a drag
 /// [kItemDragAfterSelectDelay] later. Lifting and holding again on an already
 /// selected tile starts the drag at the plain hold delay.
@@ -561,6 +610,10 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
   late final _HoldDragGate _gate = _HoldDragGate(
     selectsFirst: () => !widget.isSelectionMode,
     onSelect: _selectOnHold,
+    // An unselected tile in selection mode is left to the range-select hold
+    // for touch; a mouse can always grab it.
+    touchAllowed: () =>
+        !widget.isSelectionMode || widget.selectedItems.contains(widget.entry),
   );
 
   /// The first stage of a select-first hold (see [_HoldThenDragPointerState]).
@@ -697,7 +750,14 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
     final data = BrowserItemDragData.lazy(
       source: source,
       sourceDirectory: currentDirectory,
-      entries: () => browserEntriesToDrag(entry, selectedItems, visibleItems),
+      entries: () => browserEntriesToDrag(
+        entry,
+        selectedItems,
+        visibleItems,
+        // A mouse grabs the tile without selecting it, so an unselected tile
+        // moves alone instead of joining the selection.
+        aloneIfUnselected: _gate.lastWasMouse,
+      ),
       onDrop: onDrop,
     );
 
@@ -729,25 +789,20 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
       );
     }
 
-    // In selection mode, unselected rows belong to the range-select hold
-    // recognizer. They become draggable after selection and a fresh hold.
-    if (isSelectionMode && !selectedItems.contains(entry)) return dragChild;
-
     final tabId = scope?.tabId ?? _kUnscopedTab;
     final draggable = _GuardedLongPressDraggable<BrowserItemDragData>(
       data: data,
       delay: kItemDragHoldDelay,
       maxSimultaneousDrags: 1,
       dragAnchorStrategy: pointerDragAnchorStrategy,
-      allowImmediateMouseDrag: PlatformFeatures.isDesktop,
       gate: _gate,
       tryBegin: (position) => session.tryBegin(tabId, position),
       release: session.end,
       onDragStarted: () {
         drawerScope?.setDrawerDragBlocked(true);
-        // Normally already selected by the hold (see _selectOnHold); a no-op
-        // then.
-        widget.onItemLongPress(entry);
+        // A mouse drags without selecting. Otherwise the tile is normally
+        // already selected by the hold (see _selectOnHold); a no-op then.
+        if (!_gate.lastWasMouse) widget.onItemLongPress(entry);
       },
       onDragUpdate: (details) {
         session.updatePointer(details.globalPosition);
@@ -781,6 +836,7 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
         entry: entry,
         data: data,
         pointer: session.pointer,
+        isMouse: () => _gate.lastWasMouse,
       ),
       childWhenDragging: dragChild,
       child: dragChild,
@@ -796,8 +852,16 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
             event.kind == PointerDeviceKind.mouse &&
             (event.buttons & kPrimaryMouseButton) != 0;
       },
+      onPointerMove: (event) {
+        if (event.pointer == _activePointerId && !_handedOffToOsDrag) {
+          session.updateActivePointer(event.position);
+        }
+      },
       onPointerUp: (event) {
         if (event.pointer == _activePointerId) {
+          if (!_handedOffToOsDrag) {
+            session.updateActivePointer(event.position);
+          }
           _isPrimaryMouseDown = false;
           _activePointerId = null;
         }
@@ -923,16 +987,24 @@ class _DragFeedback extends StatelessWidget {
 
   /// Clear space between the fingertip and the card.
   static const double _gap = 44;
+
+  /// Clear space between a mouse cursor and the card.
+  static const double _cursorGap = 14;
   static const double _margin = 8;
 
   final RawEntry entry;
   final BrowserItemDragData data;
   final ValueListenable<Offset?> pointer;
 
+  /// Whether the drag is driven by a mouse: the card then trails the cursor
+  /// (below and to its right) instead of floating above a fingertip.
+  final bool Function() isMouse;
+
   const _DragFeedback({
     required this.entry,
     required this.data,
     required this.pointer,
+    required this.isMouse,
   });
 
   /// How many items are being dragged. Only worked out once the feedback is
@@ -943,6 +1015,24 @@ class _DragFeedback extends StatelessWidget {
     final media = MediaQuery.of(context);
     final size = media.size;
     final minTop = media.padding.top + _margin;
+
+    if (isMouse()) {
+      var left = finger.dx + _cursorGap;
+      var top = finger.dy + _cursorGap;
+      if (left + _width > size.width - _margin) {
+        left = finger.dx - _cursorGap - _width;
+      }
+      if (top + _height > size.height - _margin) {
+        top = finger.dy - _cursorGap - _height;
+      }
+      left = left
+          .clamp(_margin, math.max(_margin, size.width - _width - _margin))
+          .toDouble();
+      top = top
+          .clamp(minTop, math.max(minTop, size.height - _height - _margin))
+          .toDouble();
+      return Offset(left - finger.dx, top - finger.dy);
+    }
 
     var left = finger.dx - _width / 2;
     var top = finger.dy - _height - _gap;

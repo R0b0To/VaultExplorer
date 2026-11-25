@@ -107,6 +107,11 @@ class AppNavigationDrawer extends ConsumerWidget {
   /// next to the sidebar, and the menu draws as a plain panel.
   final bool docked;
 
+  /// Hides the docked sidebar. Shown at the top-left of the sidebar when
+  /// [docked] is true (and no window title bar already hosts the toggle): a
+  /// modal drawer is already dismissed by a tap outside it or a swipe.
+  final VoidCallback? onHideSidebar;
+
   const AppNavigationDrawer({
     super.key,
     this.currentVolId,
@@ -126,6 +131,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     this.onOpenCategory,
     this.keepBrowserTabsOnNavigate = false,
     this.docked = false,
+    this.onHideSidebar,
   });
 
   /// Closes the modal drawer. A docked sidebar has nothing to close, and a
@@ -596,14 +602,34 @@ class AppNavigationDrawer extends ConsumerWidget {
           context: context,
           removeLeft: !docked,
           removeRight: true,
-          child: Column(
+           child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (docked && onHideSidebar != null)
+              SizedBox(
+                height: kToolbarHeight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.menu_open_rounded,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      tooltip: context.l10n.hideSidebarTooltip,
+                      onPressed: onHideSidebar,
+                    ),
+                  ),
+                ),
+              ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                padding: EdgeInsets.fromLTRB(
+                  12,
+                  (docked && onHideSidebar != null) ? 4 : 8,
+                  12,
+                  8,
                 ),
                 children: [
                   // Encrypted vaults (swipeable rows with lock button). The
@@ -1212,29 +1238,29 @@ class DrawerFooterStrip extends StatelessWidget {
               color: cs.onSurface.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Padding(
+             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (onTools != null) ...[
-                button(
-                  Icons.build_rounded,
-                  context.l10n.navBarToolsLabel,
-                  toolsSelected,
-                  onTools!,
-                ),
-                const SizedBox(width: 16),
-              ],
-              button(
-                Icons.settings,
-                context.l10n.settingsMenuItem,
-                settingsSelected,
-                onSettings,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (onTools != null) ...[
+                    button(
+                      Icons.build_rounded,
+                      context.l10n.navBarToolsLabel,
+                      toolsSelected,
+                      onTools!,
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  button(
+                    Icons.settings,
+                    context.l10n.settingsMenuItem,
+                    settingsSelected,
+                    onSettings,
+                  ),
+                ],
               ),
-            ],
-          ),
             ),
           ),
           ),

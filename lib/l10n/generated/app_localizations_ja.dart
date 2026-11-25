@@ -10548,6 +10548,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'サイドメニューを開く';
 
   @override
+  String get hideSidebarTooltip => 'サイドメニューを非表示';
+
+  @override
+  String get showSidebarTooltip => 'サイドメニューを表示';
+
+  @override
   String get tabSwipeActionLoopFirst => '最初のタブにループ';
 
   @override

@@ -3078,14 +3078,20 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       final pathStack = _buildPathStack(location, l10n);
 
       final dockedSidebar = DockedSidebarScope.of(context);
+      final titleBarOwnsMenu = context.titleBarHostsSidebarMenu;
+      final hideLeadingMenu = dockedSidebar || titleBarOwnsMenu;
+      // A hidden docked sidebar comes back in place, since the browser has no
+      // modal drawer of its own then.
+      final showSidebar = context.showSidebarAction;
       final overflowModel = moreMenuModel(visibleActions);
       // An AppBar lays its actions out with unbounded width, so the bar is
       // measured and the actions that do not fit collapse into a "more" menu
       // instead of overlapping the title when the window is resized.
       return WidthAwareAppBar(
         builder: (context, barWidth) => AppBar(
-        // Beside a docked sidebar there is no drawer to open, so no menu button.
-        leading: DockedSidebarScope.of(context)
+        // Beside a docked sidebar or under a Windows title bar toggle there is
+        // no drawer button to show here.
+        leading: hideLeadingMenu
             ? null
             : Builder(
           builder: (ctx) {
@@ -3096,9 +3102,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 Icons.menu_rounded,
                 color: appBarTheme.foregroundColor,
               ),
-              tooltip: ctx.l10n.storageLocationsTitle,
+              tooltip: ctx.l10n.showSidebarTooltip,
               onPressed: () {
-                if (fullScreenDrawer != null) {
+                if (showSidebar != null) {
+                  showSidebar();
+                } else if (fullScreenDrawer != null) {
                   fullScreenDrawer.openDrawer();
                 } else {
                   scaffold?.openDrawer();
@@ -3239,10 +3247,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           ],
         ),
         actions: [
-          AdaptiveActionStrip(
+            AdaptiveActionStrip(
             availableWidth: appBarActionsBudget(
               barWidth: barWidth,
-              hasLeading: !dockedSidebar,
+              hasLeading: !hideLeadingMenu,
             ),
             items: [
               AdaptiveActionItem(

@@ -11212,6 +11212,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'فتح القائمة الجانبية';
 
   @override
+  String get hideSidebarTooltip => 'إخفاء القائمة الجانبية';
+
+  @override
+  String get showSidebarTooltip => 'إظهار القائمة الجانبية';
+
+  @override
   String get tabSwipeActionLoopFirst => 'الانتقال دائريًا إلى أول علامة تبويب';
 
   @override

@@ -473,12 +473,33 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     // In the docked layout Settings is a page in the content area beside the
     // sidebar, not a pushed route, so there is nothing to go back out of.
     final docked = DockedSidebarScope.of(context);
+    final titleBarMenu = context.titleBarHostsSidebarMenu;
+    // With the docked sidebar hidden Settings is still a page in the content
+    // area, not a pushed route, so the leading button brings the sidebar back
+    // instead of going back.
+    final showSidebar = context.showSidebarAction;
+    final hasShellDrawer =
+        !docked && !titleBarMenu && (Scaffold.maybeOf(context)?.hasDrawer ?? false);
 
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: docked
+        leading: docked || titleBarMenu
             ? null
+            : showSidebar != null
+            ? IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                tooltip: context.l10n.showSidebarTooltip,
+                onPressed: showSidebar,
+              )
+            : hasShellDrawer
+            ? Builder(
+                builder: (ctx) => IconButton(
+                  icon: const Icon(Icons.menu_rounded),
+                  tooltip: ctx.l10n.showSidebarTooltip,
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              )
             : IconButton(
                 icon: const Icon(Icons.arrow_back),
                 tooltip: MaterialLocalizations.of(context).backButtonTooltip,

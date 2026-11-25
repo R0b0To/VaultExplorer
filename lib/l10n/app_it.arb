@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "Scorri verso sinistra ovunque",
   "tabSwipeActionNewTab": "Apri una nuova scheda",
   "tabSwipeActionOpenDrawer": "Apri il menu laterale",
+  "hideSidebarTooltip": "Nascondi menu laterale",
+  "showSidebarTooltip": "Mostra menu laterale",
   "tabSwipeActionLoopFirst": "Passa ciclicamente alla prima scheda",
   "tabSwipeActionLoopLast": "Passa ciclicamente all’ultima scheda",
   "tabSwipeActionNothing": "Non fare nulla",

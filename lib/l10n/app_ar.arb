@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "السحب لليسار في أي مكان",
   "tabSwipeActionNewTab": "فتح علامة تبويب جديدة",
   "tabSwipeActionOpenDrawer": "فتح القائمة الجانبية",
+  "hideSidebarTooltip": "إخفاء القائمة الجانبية",
+  "showSidebarTooltip": "إظهار القائمة الجانبية",
   "tabSwipeActionLoopFirst": "الانتقال دائريًا إلى أول علامة تبويب",
   "tabSwipeActionLoopLast": "الانتقال دائريًا إلى آخر علامة تبويب",
   "tabSwipeActionNothing": "عدم فعل شيء",

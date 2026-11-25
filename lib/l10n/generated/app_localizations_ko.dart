@@ -10543,6 +10543,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => '사이드 메뉴 열기';
 
   @override
+  String get hideSidebarTooltip => '사이드 메뉴 숨기기';
+
+  @override
+  String get showSidebarTooltip => '사이드 메뉴 표시';
+
+  @override
   String get tabSwipeActionLoopFirst => '첫 번째 탭으로 순환';
 
   @override

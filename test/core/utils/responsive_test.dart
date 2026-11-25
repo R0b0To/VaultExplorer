@@ -150,6 +150,129 @@ void main() {
     });
   });
 
+  group('DockedSidebarToggle', () {
+    testWidgets('offers nothing without a scope', (tester) async {
+      // Windows too small to dock a sidebar, and routes pushed over the shell,
+      // have no scope: their menu button keeps opening the modal drawer.
+      VoidCallback? action = () {};
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              action = context.showSidebarAction;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      expect(action, isNull);
+    });
+
+    testWidgets('offers nothing while the sidebar is showing', (tester) async {
+      VoidCallback? action = () {};
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DockedSidebarToggle(
+            collapsed: false,
+            onToggle: () {},
+            child: Builder(
+              builder: (context) {
+                action = context.showSidebarAction;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+      expect(action, isNull);
+    });
+
+    testWidgets('offers the toggle while the sidebar is hidden', (
+      tester,
+    ) async {
+      var toggles = 0;
+      VoidCallback? action;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DockedSidebarToggle(
+            collapsed: true,
+            onToggle: () => toggles++,
+            child: Builder(
+              builder: (context) {
+                action = context.showSidebarAction;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(action, isNotNull);
+      action!();
+      expect(toggles, 1);
+    });
+
+    testWidgets('rebuilds menu buttons when the sidebar is hidden or shown', (
+      tester,
+    ) async {
+      final collapsed = ValueNotifier<bool>(false);
+      addTearDown(collapsed.dispose);
+      final seen = <bool>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ValueListenableBuilder<bool>(
+            valueListenable: collapsed,
+            builder: (context, value, child) => DockedSidebarToggle(
+              collapsed: value,
+              onToggle: () {},
+              child: child!,
+            ),
+            child: Builder(
+              builder: (context) {
+                seen.add(context.showSidebarAction != null);
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+      expect(seen.last, isFalse);
+
+      collapsed.value = true;
+      await tester.pump();
+      expect(seen.last, isTrue);
+
+     collapsed.value = false;
+      await tester.pump();
+      expect(seen.last, isFalse);
+    });
+
+    testWidgets('defers to title bar when hostedInTitleBar is true', (
+      tester,
+    ) async {
+      VoidCallback? action = () {};
+      bool? titleBarMenu;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DockedSidebarToggle(
+            collapsed: true,
+            hostedInTitleBar: true,
+            onToggle: () {},
+            child: Builder(
+              builder: (context) {
+                action = context.showSidebarAction;
+                titleBarMenu = context.titleBarHostsSidebarMenu;
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+      expect(action, isNull);
+      expect(titleBarMenu, isTrue);
+    });
+  });
+
   group('AdaptiveRouteFrame', () {
     Future<Size> childSizeIn(WidgetTester tester, Size window) async {
       tester.view.physicalSize = window;

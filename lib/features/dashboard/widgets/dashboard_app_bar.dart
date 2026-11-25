@@ -15,11 +15,17 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
-  Widget build(BuildContext context) => AppBar(
+  Widget build(BuildContext context) {
+    // A hidden docked sidebar comes back in place; there is no drawer to open.
+    final showSidebar = context.showSidebarAction;
+    final hideLeading =
+        DockedSidebarScope.of(context) || context.titleBarHostsSidebarMenu;
+    return AppBar(
     primary: false,
-    // Beside a docked sidebar there is no drawer to open, so no menu button.
+    // Beside a docked sidebar or under a Windows title bar toggle there is no
+    // menu button needed here.
     automaticallyImplyLeading: false,
-    leading: DockedSidebarScope.of(context)
+    leading: hideLeading
         ? null
         : Builder(
             builder: (ctx) => IconButton(
@@ -27,8 +33,12 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Icons.menu_rounded,
                 color: Theme.of(ctx).appBarTheme.foregroundColor,
               ),
-              tooltip: context.l10n.storageLocationsTitle,
+              tooltip: context.l10n.showSidebarTooltip,
               onPressed: () {
+                if (showSidebar != null) {
+                  showSidebar();
+                  return;
+                }
                 final drawer = FullScreenDragDrawerScope.maybeOf(ctx);
                 if (drawer != null) {
                   drawer.openDrawer();
@@ -48,5 +58,6 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       AppBarTransferButton(),
       SizedBox(width: 4),
     ],
-  );
+    );
+  }
 }

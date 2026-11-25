@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "Balayer vers la gauche n’importe où",
   "tabSwipeActionNewTab": "Ouvrir un nouvel onglet",
   "tabSwipeActionOpenDrawer": "Ouvrir le menu latéral",
+  "hideSidebarTooltip": "Masquer le menu latéral",
+  "showSidebarTooltip": "Afficher le menu latéral",
   "tabSwipeActionLoopFirst": "Boucler vers le premier onglet",
   "tabSwipeActionLoopLast": "Boucler vers le dernier onglet",
   "tabSwipeActionNothing": "Ne rien faire",

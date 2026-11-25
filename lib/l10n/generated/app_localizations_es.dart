@@ -11171,6 +11171,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'Abrir el menú lateral';
 
   @override
+  String get hideSidebarTooltip => 'Ocultar menú lateral';
+
+  @override
+  String get showSidebarTooltip => 'Mostrar menú lateral';
+
+  @override
   String get tabSwipeActionLoopFirst => 'Ir en bucle a la primera pestaña';
 
   @override

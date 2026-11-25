@@ -240,6 +240,7 @@ class DirectoryContentView extends ConsumerStatefulWidget {
   final String? initialPath;
   final ScrollController? scrollController;
   final bool isDualPane;
+  final bool showSidebarButton;
 
   const DirectoryContentView({
     super.key,
@@ -256,6 +257,7 @@ class DirectoryContentView extends ConsumerStatefulWidget {
     this.initialPath,
     this.scrollController,
     this.isDualPane = false,
+    this.showSidebarButton = true,
   });
 
   @override
@@ -8411,7 +8413,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                     children: [
                                       if (desktopFileManager)
                                         Builder(
-                                          builder: (toolbarContext) => LayoutBuilder(
+                                          builder: (toolbarContext) {
+                                            final showSidebar =
+                                                widget.showSidebarButton &&
+                                                        useBrowserTabs
+                                                    ? toolbarContext
+                                                          .showSidebarAction
+                                                    : null;
+                                            return LayoutBuilder(
                                             builder: (context, constraints) {
                                               final desktopBackAction = _atRoot
                                                   ? (!useBrowserTabs
@@ -8425,8 +8434,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               // each wants, and each side moves whatever does
                                               // not fit into its own "more" menu, so nothing
                                               // overlaps or needs scrolling to reach.
-                                              const fixedToolbarWidth =
-                                                  3 * 40.0 + 9 + 1 + 48 + 4;
+                                              final fixedToolbarWidth =
+                                                  (showSidebar != null ? 4 : 3) *
+                                                      40.0 +
+                                                  9 +
+                                                  1 +
+                                                  48 +
+                                                  4;
                                               const selectionWanted = 7 * 40.0;
                                               final actionsWanted = showActionBar
                                                   ? _visibleActions.length * 40.0
@@ -8469,6 +8483,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                     ),
                                                     child: Row(
                                                       children: [
+                                                        if (showSidebar != null)
+                                                          IconButton(
+                                                            icon: const Icon(Icons.menu_rounded),
+                                                            tooltip: context.l10n.showSidebarTooltip,
+                                                            onPressed: showSidebar,
+                                                          ),
                                                         IconButton(
                                                           icon: const Icon(Icons.arrow_back_rounded),
                                                           tooltip: context.l10n.backTooltip,
@@ -8540,10 +8560,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                       ],
                                                     ),
                                                   ),
-                                                ),
+                                                   ),
                                               );
                                             },
-                                          ),
+                                          );
+                                          },
                                         ),
                                       if (!widget.container.isLocalStorage &&
                                           _archiveContext == null)

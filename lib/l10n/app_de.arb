@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "Überall nach links wischen",
   "tabSwipeActionNewTab": "Neuen Tab öffnen",
   "tabSwipeActionOpenDrawer": "Seitenmenü öffnen",
+  "hideSidebarTooltip": "Seitenmenü ausblenden",
+  "showSidebarTooltip": "Seitenmenü einblenden",
   "tabSwipeActionLoopFirst": "Im Kreis zum ersten Tab",
   "tabSwipeActionLoopLast": "Im Kreis zum letzten Tab",
   "tabSwipeActionNothing": "Nichts tun",

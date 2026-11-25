@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "Свайп ліворуч будь-де",
   "tabSwipeActionNewTab": "Відкрити нову вкладку",
   "tabSwipeActionOpenDrawer": "Відкрити бічне меню",
+  "hideSidebarTooltip": "Приховати бічне меню",
+  "showSidebarTooltip": "Показати бічне меню",
   "tabSwipeActionLoopFirst": "По колу до першої вкладки",
   "tabSwipeActionLoopLast": "По колу до останньої вкладки",
   "tabSwipeActionNothing": "Нічого не робити",

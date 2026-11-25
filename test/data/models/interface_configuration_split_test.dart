@@ -99,6 +99,7 @@ AppSettings _customSettings() => AppSettings(
   defaultFileSortAscending: false,
   containerSortMode: ContainerSortMode.nameZA,
   showStorageLocationsInDrawer: false,
+  dockedSidebarCollapsed: true,
   categoryShortcutsEnabled: false,
   categoryShortcutOrder: AppSettings().categoryShortcutOrder.reversed.toList(),
   hiddenCategoryShortcuts: ['videos'],

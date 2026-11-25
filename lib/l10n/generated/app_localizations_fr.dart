@@ -11239,6 +11239,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'Ouvrir le menu latéral';
 
   @override
+  String get hideSidebarTooltip => 'Masquer le menu latéral';
+
+  @override
+  String get showSidebarTooltip => 'Afficher le menu latéral';
+
+  @override
   String get tabSwipeActionLoopFirst => 'Boucler vers le premier onglet';
 
   @override

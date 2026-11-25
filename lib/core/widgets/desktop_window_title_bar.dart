@@ -230,7 +230,15 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
                 width: widget.leadingWidth,
                 height: widget.height,
                 child: widget.leadingDraggable
-                    ? _dragRegion(child: widget.leading!)
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Positioned.fill(
+                            child: _dragRegion(child: const SizedBox.expand()),
+                          ),
+                          widget.leading!,
+                        ],
+                      )
                     : widget.leading!,
               ),
             Expanded(

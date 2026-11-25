@@ -194,6 +194,12 @@ class AppSettings {
   /// Whether the desktop file manager's preview pane is folded away (to a thin
   /// strip under or beside the folder view). Shared by every pane and tab.
   bool desktopPreviewPaneCollapsed;
+
+  /// Whether the navigation sidebar is hidden on windows wide enough to dock
+  /// it (tablets in landscape, desktop windows). The content then uses the
+  /// full width and a menu button in the app bar brings the sidebar back as a
+  /// docked panel. Has no effect where the menu is a modal drawer.
+  bool dockedSidebarCollapsed;
   TabSwipeGestures tabSwipeGestures;
   bool appBarAtBottom;
 
@@ -274,6 +280,7 @@ class AppSettings {
     this.newTabStorageId = kNewTabLocalStorageId,
     this.useDualPaneBrowsing = false,
     this.desktopPreviewPaneCollapsed = false,
+    this.dockedSidebarCollapsed = false,
     this.tabSwipeGestures = const TabSwipeGestures(),
     this.appBarAtBottom = false,
     this.predictiveBackAnimations = true,
@@ -418,6 +425,7 @@ class AppSettings {
     String? newTabStorageId,
     bool? useDualPaneBrowsing,
     bool? desktopPreviewPaneCollapsed,
+    bool? dockedSidebarCollapsed,
     TabSwipeGestures? tabSwipeGestures,
     bool? appBarAtBottom,
     bool? predictiveBackAnimations,
@@ -490,6 +498,8 @@ class AppSettings {
       useDualPaneBrowsing: useDualPaneBrowsing ?? this.useDualPaneBrowsing,
       desktopPreviewPaneCollapsed:
           desktopPreviewPaneCollapsed ?? this.desktopPreviewPaneCollapsed,
+      dockedSidebarCollapsed:
+          dockedSidebarCollapsed ?? this.dockedSidebarCollapsed,
       tabSwipeGestures: tabSwipeGestures ?? this.tabSwipeGestures,
       appBarAtBottom: appBarAtBottom ?? this.appBarAtBottom,
       predictiveBackAnimations:
@@ -629,6 +639,7 @@ class AppSettings {
     'containerSortMode': containerSortMode.toJson(),
     'dashboardLayoutMode': dashboardLayoutMode.toJson(),
     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
+    'dockedSidebarCollapsed': dockedSidebarCollapsed,
     'categoryShortcutsEnabled': categoryShortcutsEnabled,
     'categoryShortcutOrder': categoryShortcutOrder,
     'hiddenCategoryShortcuts': hiddenCategoryShortcuts,
@@ -714,6 +725,7 @@ class AppSettings {
     containerSortMode: other.containerSortMode,
     dashboardLayoutMode: other.dashboardLayoutMode,
     showStorageLocationsInDrawer: other.showStorageLocationsInDrawer,
+    dockedSidebarCollapsed: other.dockedSidebarCollapsed,
     categoryShortcutsEnabled: other.categoryShortcutsEnabled,
     categoryShortcutOrder: other.categoryShortcutOrder,
     hiddenCategoryShortcuts: other.hiddenCategoryShortcuts,
@@ -794,6 +806,7 @@ class AppSettings {
     useDualPaneBrowsing: j['useDualPaneBrowsing'] as bool? ?? false,
     desktopPreviewPaneCollapsed:
         j['desktopPreviewPaneCollapsed'] as bool? ?? false,
+    dockedSidebarCollapsed: j['dockedSidebarCollapsed'] as bool? ?? false,
     // Older versions saved one `tabEdgeSwipe` mode; it still seeds the three
     // gestures until the new value has been saved.
     tabSwipeGestures: TabSwipeGestures.fromJson(

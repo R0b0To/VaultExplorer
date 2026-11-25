@@ -10996,6 +10996,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'Open the side menu';
 
   @override
+  String get hideSidebarTooltip => 'Hide side menu';
+
+  @override
+  String get showSidebarTooltip => 'Show side menu';
+
+  @override
   String get tabSwipeActionLoopFirst => 'Loop to the first tab';
 
   @override

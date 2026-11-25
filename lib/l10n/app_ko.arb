@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "어디서나 왼쪽으로 스와이프",
   "tabSwipeActionNewTab": "새 탭 열기",
   "tabSwipeActionOpenDrawer": "사이드 메뉴 열기",
+  "hideSidebarTooltip": "사이드 메뉴 숨기기",
+  "showSidebarTooltip": "사이드 메뉴 표시",
   "tabSwipeActionLoopFirst": "첫 번째 탭으로 순환",
   "tabSwipeActionLoopLast": "마지막 탭으로 순환",
   "tabSwipeActionNothing": "아무 동작 안 함",

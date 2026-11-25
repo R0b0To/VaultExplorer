@@ -13068,6 +13068,14 @@
   "@tabSwipeActionOpenDrawer": {
     "description": "Option for the right swipe: opens the side menu (drawer)."
   },
+  "hideSidebarTooltip": "Hide side menu",
+  "@hideSidebarTooltip": {
+    "description": "Tooltip of the button that hides the docked navigation sidebar (tablet landscape, desktop)."
+  },
+  "showSidebarTooltip": "Show side menu",
+  "@showSidebarTooltip": {
+    "description": "Tooltip of the menu button that brings back the hidden docked navigation sidebar."
+  },
   "tabSwipeActionLoopFirst": "Loop to the first tab",
   "@tabSwipeActionLoopFirst": {
     "description": "Option for the left swipe on the last tab: wraps around to the first tab."

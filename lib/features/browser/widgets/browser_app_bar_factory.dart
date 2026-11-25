@@ -32,24 +32,34 @@ class BrowserAppBarFallback extends StatelessWidget
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
-  @override
+@override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final appBarTheme = theme.appBarTheme;
     final drawer = FullScreenDragDrawerScope.maybeOf(context);
+    // A hidden docked sidebar comes back in place; the browser has no drawer of
+    // its own then, so there would be nothing for [drawer] to open.
+    final showSidebar = context.showSidebarAction;
+    final titleBarOwnsMenu = context.titleBarHostsSidebarMenu;
+    final VoidCallback? openMenu =
+        titleBarOwnsMenu ? null : (showSidebar ?? drawer?.openDrawer);
     final foreground =
         appBarTheme.foregroundColor ?? theme.colorScheme.onSurface;
+    final hideLeading =
+        DockedSidebarScope.of(context) ||
+        (titleBarOwnsMenu && (!preferBackButton || !showBackButton));
     return AppBar(
       automaticallyImplyLeading: false,
-      leading: DockedSidebarScope.of(context)
+      leading: hideLeading
           ? null
           : Builder(
         builder: (context) {
-          if (drawer != null && !preferBackButton) {
+          final menuTooltip = context.l10n.showSidebarTooltip;
+          if (openMenu != null && !preferBackButton) {
             return IconButton(
               icon: Icon(Icons.menu_rounded, color: foreground),
-              tooltip: context.l10n.storageLocationsTitle,
-              onPressed: drawer.openDrawer,
+              tooltip: menuTooltip,
+              onPressed: openMenu,
             );
           }
           if (showBackButton) {
@@ -60,11 +70,11 @@ class BrowserAppBarFallback extends StatelessWidget
                   onBackPressed ?? () => Navigator.of(context).maybePop(),
             );
           }
-          if (drawer != null) {
+          if (openMenu != null) {
             return IconButton(
               icon: Icon(Icons.menu_rounded, color: foreground),
-              tooltip: context.l10n.storageLocationsTitle,
-              onPressed: drawer.openDrawer,
+              tooltip: menuTooltip,
+              onPressed: openMenu,
             );
           }
           return const SizedBox.shrink();

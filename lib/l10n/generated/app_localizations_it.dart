@@ -11159,6 +11159,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'Apri il menu laterale';
 
   @override
+  String get hideSidebarTooltip => 'Nascondi menu laterale';
+
+  @override
+  String get showSidebarTooltip => 'Mostra menu laterale';
+
+  @override
   String get tabSwipeActionLoopFirst => 'Passa ciclicamente alla prima scheda';
 
   @override

@@ -18482,6 +18482,18 @@ abstract class AppLocalizations {
   /// **'Open the side menu'**
   String get tabSwipeActionOpenDrawer;
 
+  /// Tooltip of the button that hides the docked navigation sidebar (tablet landscape, desktop).
+  ///
+  /// In en, this message translates to:
+  /// **'Hide side menu'**
+  String get hideSidebarTooltip;
+
+  /// Tooltip of the menu button that brings back the hidden docked navigation sidebar.
+  ///
+  /// In en, this message translates to:
+  /// **'Show side menu'**
+  String get showSidebarTooltip;
+
   /// Option for the left swipe on the last tab: wraps around to the first tab.
   ///
   /// In en, this message translates to:

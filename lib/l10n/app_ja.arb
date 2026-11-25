@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "どこでも左にスワイプ",
   "tabSwipeActionNewTab": "新しいタブを開く",
   "tabSwipeActionOpenDrawer": "サイドメニューを開く",
+  "hideSidebarTooltip": "サイドメニューを非表示",
+  "showSidebarTooltip": "サイドメニューを表示",
   "tabSwipeActionLoopFirst": "最初のタブにループ",
   "tabSwipeActionLoopLast": "最後のタブにループ",
   "tabSwipeActionNothing": "何もしない",

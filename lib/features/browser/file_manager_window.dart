@@ -361,9 +361,14 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
 
   /// The sidebar, the same menu as the main window's. [currentVolId] is the
   /// storage of the tab in front, which the menu highlights.
-  Widget _buildSidebar({int? currentVolId, bool docked = false}) {
+Widget _buildSidebar({
+    int? currentVolId,
+    bool docked = false,
+    bool hasTitleBar = false,
+  }) {
     return AppNavigationDrawer(
       docked: docked,
+      onHideSidebar: (docked && !hasTitleBar) ? _toggleSidebar : null,
       currentVolId: currentVolId,
       primaryLocalContainer: _env.primaryLocalContainer(),
       onOpenInNewTab: _tabsEnabled ? _openInNewTab : null,
@@ -373,6 +378,22 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
       onUnlockVault: _unlockVault,
       onOpenCategory: _openCategory,
       onOpenVaults: _openVaults,
+    );
+  }
+
+  /// Hides the docked sidebar, or brings it back. The same saved setting as in
+  /// the main window, so every window follows the person's choice.
+  void _toggleSidebar() {
+    final collapsed = !ref
+        .read(appSettingsControllerProvider)
+        .settings
+        .dockedSidebarCollapsed;
+    unawaited(
+      ref
+          .read(appSettingsControllerProvider.notifier)
+          .updateSettings(
+            (settings) => settings.copyWith(dockedSidebarCollapsed: collapsed),
+          ),
     );
   }
 
@@ -408,9 +429,17 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   @override
   Widget build(BuildContext context) {
     final entry = SecondaryWindowScope.maybeOf(context);
+    // [docked] means the window is big enough for the sidebar, so there is no
+    // modal drawer, whether or not the sidebar is currently shown.
     final docked = AppBreakpoints.useDockedSidebarFor(
       MediaQuery.sizeOf(context),
     );
+    final sidebarCollapsed = ref.watch(
+      appSettingsControllerProvider.select(
+        (state) => state.settings.dockedSidebarCollapsed,
+      ),
+    );
+    final sidebarShown = docked && !sidebarCollapsed;
     // Windows without a native title bar draw the main window's caption row,
     // with the tabs in it, across the whole width (sidebar included).
     final customCaption =
@@ -456,7 +485,7 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
       ),
     );
 
-    if (docked) {
+    if (sidebarShown) {
       final browser = body;
       body = LayoutBuilder(
         builder: (context, constraints) {
@@ -474,7 +503,11 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
               if (!mounted || (_sidebarWidth - extent).abs() < 0.5) return;
               setState(() => _sidebarWidth = extent);
             },
-            first: _buildSidebar(docked: true, currentVolId: activeVolId),
+          first: _buildSidebar(
+              docked: true,
+              currentVolId: activeVolId,
+              hasTitleBar: customCaption,
+            ),
             second: DockedContentFrame(
               consumedWidth: _sidebarWidth + 8,
               child: browser,
@@ -490,48 +523,67 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
             tabs: tabsEnabled
                 ? BrowserTitleBarTabs(
                     workspace: _workspace,
-                    docked: docked,
+                    docked: sidebarShown,
                     splitFraction: _dualPaneSplitFraction,
                     onNewTab: _openNewTab,
                     onDuplicate: _duplicateTab,
                   )
                 : const SizedBox.shrink(),
-            leadingWidth: docked ? _sidebarWidth + 8 : 48.0,
-            leadingDraggable: docked,
-            leading: docked
-                ? SizedBox(width: _sidebarWidth + 8)
-                : SizedBox(
-                    width: 48,
-                    child: Builder(
-                      builder: (buttonContext) => IconButton(
-                        icon: const Icon(Icons.menu_rounded, size: 18),
-                        tooltip: buttonContext.l10n.storageLocationsTitle,
-                        onPressed: () => Scaffold.of(buttonContext).openDrawer(),
-                        style: IconButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(32, 32),
-                          maximumSize: const Size(32, 32),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
+            leadingWidth: sidebarShown ? _sidebarWidth + 8 : 48.0,
+            leadingDraggable: sidebarShown,
+            leading: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: SizedBox(
+                width: 48,
+                height: 32,
+                child: Builder(
+                  builder: (buttonContext) => IconButton(
+                    icon: Icon(
+                      sidebarShown
+                          ? Icons.menu_open_rounded
+                          : Icons.menu_rounded,
+                      size: 18,
+                    ),
+                    tooltip: sidebarShown
+                        ? buttonContext.l10n.hideSidebarTooltip
+                        : buttonContext.l10n.showSidebarTooltip,
+                    onPressed: docked
+                        ? _toggleSidebar
+                        : () => Scaffold.of(buttonContext).openDrawer(),
+                    style: IconButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(32, 32),
+                      maximumSize: const Size(32, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ),
+                ),
+              ),
+            ),
           )
         : null;
 
-    final Widget layout = Scaffold(
-      key: _scaffoldKey,
-      resizeToAvoidBottomInset: false,
-      drawer: docked ? null : _buildSidebar(currentVolId: activeVolId),
-      body: titleBar == null
-          ? body
-          : Column(
-              children: [
-                titleBar,
-                Expanded(child: body),
-              ],
-            ),
+    // Always in the tree, so the Scaffold keeps its place when the window is
+    // resized across the docking breakpoint. Menu buttons in the pages read it
+    // to bring a hidden sidebar back.
+    final Widget layout = DockedSidebarToggle(
+      collapsed: docked && sidebarCollapsed,
+      onToggle: _toggleSidebar,
+      hostedInTitleBar: customCaption,
+      child: Scaffold(
+        key: _scaffoldKey,
+        resizeToAvoidBottomInset: false,
+        drawer: docked ? null : _buildSidebar(currentVolId: activeVolId),
+        body: titleBar == null
+            ? body
+            : Column(
+                children: [
+                  titleBar,
+                  Expanded(child: body),
+                ],
+              ),
+      ),
     );
 
     return Consumer(

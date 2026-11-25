@@ -156,6 +156,20 @@ extension ScreenInfoX on BuildContext {
   /// Shorthand for `ScreenInfo.of(context)`, mirroring the `context.colors`
   /// / `context.typography` getters in `AppThemeX`.
   ScreenInfo get screen => ScreenInfo.of(this);
+
+   /// What a menu button should do while the docked sidebar is hidden: show it
+  /// again, as a docked panel and not as an overlay. Null whenever the sidebar
+  /// is on screen, this window has none, or the window's top-left title bar
+  /// already hosts the toggle.
+  ///
+  /// Subscribes the caller to the sidebar being shown or hidden, so call it
+  /// from `build`, not from an event handler.
+  VoidCallback? get showSidebarAction => DockedSidebarToggle.showActionOf(this);
+
+  /// Whether an ancestor window title bar already hosts the top-left sidebar /
+  /// drawer button.
+  bool get titleBarHostsSidebarMenu =>
+      DockedSidebarToggle.titleBarHostsMenuOf(this);
 }
 
 /// Marks the part of the widget tree that sits beside a docked navigation
@@ -174,4 +188,59 @@ class DockedSidebarScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(DockedSidebarScope oldWidget) => false;
+}
+
+/// Lets page chrome bring back a docked sidebar that the person has hidden.
+///
+/// The shell provides it above its pages in every window, but with
+/// [collapsed] only true in windows wide enough to dock the sidebar. In a
+/// smaller window the menu is a modal drawer and nothing is ever "hidden", so
+/// [showActionOf] stays null there and menu buttons open the drawer as before.
+///
+/// Like [DockedSidebarScope], routes pushed on the root navigator are not
+/// descendants of the shell and never see it.
+class DockedSidebarToggle extends InheritedWidget {
+  const DockedSidebarToggle({
+    super.key,
+    required this.collapsed,
+    required this.onToggle,
+    this.hostedInTitleBar = false,
+    required super.child,
+  });
+
+  /// Whether the sidebar is hidden right now.
+  final bool collapsed;
+
+  /// Hides the sidebar while it is showing and shows it while it is hidden.
+  final VoidCallback onToggle;
+
+  /// Whether the window's top-left title bar already hosts the sidebar /
+  /// drawer toggle button (Windows custom caption). When true, pages inside
+  /// the content area do not render a second menu button underneath it.
+  final bool hostedInTitleBar;
+
+  /// The action for a menu button that should reveal the sidebar, or null when
+  /// there is nothing to reveal (no scope, the sidebar is already showing, or
+  /// the window title bar already hosts it).
+  static VoidCallback? showActionOf(BuildContext context) {
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<DockedSidebarToggle>();
+    return scope != null && scope.collapsed && !scope.hostedInTitleBar
+        ? scope.onToggle
+        : null;
+  }
+
+  /// Whether an ancestor window title bar already hosts the top-left
+  /// sidebar / drawer toggle button.
+  static bool titleBarHostsMenuOf(BuildContext context) {
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<DockedSidebarToggle>();
+    return scope?.hostedInTitleBar ?? false;
+  }
+
+  @override
+  bool updateShouldNotify(DockedSidebarToggle oldWidget) =>
+      collapsed != oldWidget.collapsed ||
+      onToggle != oldWidget.onToggle ||
+      hostedInTitleBar != oldWidget.hostedInTitleBar;
 }

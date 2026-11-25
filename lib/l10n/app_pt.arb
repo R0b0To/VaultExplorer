@@ -2889,6 +2889,8 @@
   "tabSwipeLeftAnywhere": "Deslizar para a esquerda em qualquer lugar",
   "tabSwipeActionNewTab": "Abrir uma nova aba",
   "tabSwipeActionOpenDrawer": "Abrir o menu lateral",
+  "hideSidebarTooltip": "Ocultar menu lateral",
+  "showSidebarTooltip": "Mostrar menu lateral",
   "tabSwipeActionLoopFirst": "Voltar em loop à primeira aba",
   "tabSwipeActionLoopLast": "Ir em loop à última aba",
   "tabSwipeActionNothing": "Não fazer nada",

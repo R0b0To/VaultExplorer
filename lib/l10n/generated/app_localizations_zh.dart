@@ -10380,6 +10380,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => '打开侧边菜单';
 
   @override
+  String get hideSidebarTooltip => '隐藏侧边菜单';
+
+  @override
+  String get showSidebarTooltip => '显示侧边菜单';
+
+  @override
   String get tabSwipeActionLoopFirst => '循环到第一个标签页';
 
   @override

@@ -11061,6 +11061,12 @@ class AppLocalizationsTr extends AppLocalizations {
   String get tabSwipeActionOpenDrawer => 'Yan menüyü aç';
 
   @override
+  String get hideSidebarTooltip => 'Yan menüyü gizle';
+
+  @override
+  String get showSidebarTooltip => 'Yan menüyü göster';
+
+  @override
   String get tabSwipeActionLoopFirst => 'İlk sekmeye dön';
 
   @override

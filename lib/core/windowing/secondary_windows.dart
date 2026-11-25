@@ -4,7 +4,6 @@ import 'package:flutter/src/widgets/_window.dart' as flutter_window;
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/windowing/desktop_windowing.dart';
-import 'package:vaultexplorer/core/windowing/main_window_host.dart';
 
 const String _kLogTag = 'SecondaryWindows';
 
@@ -27,6 +26,7 @@ class SecondaryWindowEntry {
   /// running, like an Explorer window outliving the one it was opened from; the
   /// app ends when the last such window closes. A window that only exists to
   /// serve the main one (a vault's settings) closes along with it.
+  /// See `DesktopWindowPolicy`.
   final bool survivesMainClose;
 
   String title;
@@ -69,7 +69,8 @@ class SecondaryWindowScope extends InheritedWidget {
 
   final SecondaryWindowEntry entry;
 
-  /// The window [context] is in, or null in the main window.
+  /// The window [context] is in, or null in the main window (or in a build
+  /// without native windows).
   static SecondaryWindowEntry? maybeOf(BuildContext context) =>
       context.getInheritedWidgetOfExactType<SecondaryWindowScope>()?.entry;
 
@@ -80,20 +81,14 @@ class SecondaryWindowScope extends InheritedWidget {
 
 /// Native windows other than the main one (Linux and Windows).
 ///
-/// The main window stays what the platform runner created and `runApp` draws
-/// into. Every window opened here is an extra view in the same widget tree,
-/// which means Riverpod state and every service are shared with the main window
-/// for free; only the `Navigator`, `Theme` and `Localizations` are per window
-/// (see `SecondaryWindowApp`).
-///
-/// That shared tree is also why the main window cannot simply be closed while
-/// another window is open: it hosts the engine they all run on. Windows that
-/// are opened with `survivesMainClose` therefore make the runner hide the main
-/// window when it is closed (see [MainWindowHost]), and the app ends once the
-/// last of them has closed.
-///
-/// [SecondaryWindowsHost] must sit below the `ProviderScope` and above the
-/// app's `MaterialApp`.
+/// Every window of the app, the main one included, is a view in one widget
+/// tree: Riverpod state and every service are shared between them for free, and
+/// only the `Navigator`, `Theme` and `Localizations` are per window (see
+/// `SecondaryWindowApp`). `DesktopAppHost` is the root of that tree and draws
+/// the views of this registry next to the main window's, from [buildViews].
+/// Because no window is the platform's own, none of them is the anchor the
+/// others hang from: closing any of them leaves the rest open, and
+/// `DesktopWindowPolicy` decides when the app ends.
 class SecondaryWindows extends ChangeNotifier {
   SecondaryWindows._();
 
@@ -109,7 +104,7 @@ class SecondaryWindows extends ChangeNotifier {
   /// [key] to the front.
   ///
   /// With [survivesMainClose] the window outlives the main window: closing the
-  /// main window then hides it, and the app ends when the last window opened
+  /// main window leaves it open, and the app ends when the last window opened
   /// this way closes.
   ///
   /// Returns false when native windows are not available (Android, a
@@ -156,7 +151,6 @@ class SecondaryWindows extends ChangeNotifier {
     }
     _entries[key] = entry;
     notifyListeners();
-    _syncMainWindow();
     return true;
   }
 
@@ -166,17 +160,48 @@ class SecondaryWindows extends ChangeNotifier {
     if (entry != null) _destroy(entry);
   }
 
+  /// Whether a window that can stand on its own (see
+  /// [SecondaryWindowEntry.survivesMainClose]) is open.
+  bool get hasIndependentWindows =>
+      _entries.values.any((entry) => entry.survivesMainClose);
+
+  /// How many windows that can stand on their own are open.
+  int get independentWindowCount =>
+      _entries.values.where((entry) => entry.survivesMainClose).length;
+
   /// Closes every secondary window. Called when the app locks: anything that
   /// was showing vault settings must not stay on screen behind the lock gate.
-  ///
-  /// The lock gate is drawn by the main window, which may be hidden because
-  /// other windows were keeping the app alive. It is brought back first, so
-  /// that closing them never leaves the app running with nothing on screen.
   void closeAll() {
-    MainWindowHost.revealIfHidden();
     for (final entry in List<SecondaryWindowEntry>.of(_entries.values)) {
       _destroy(entry);
     }
+  }
+
+  /// Closes the windows that only exist to serve the main window. Called when
+  /// the main window closes.
+  void closeWindowsServingMain() {
+    for (final entry in List<SecondaryWindowEntry>.of(_entries.values)) {
+      if (!entry.survivesMainClose) _destroy(entry);
+    }
+  }
+
+  /// The view of every open window, for the root `ViewCollection`.
+  ///
+  /// [windowBuilder] returns the content of one window; it is where the app
+  /// puts its per-window `MaterialApp`. It runs below the root, so it sees the
+  /// `ProviderScope` above it.
+  List<Widget> buildViews(
+    Widget Function(BuildContext context, SecondaryWindowEntry entry)
+    windowBuilder,
+  ) {
+    return <Widget>[
+      for (final entry in entries)
+        flutter_window.Window(
+          key: ValueKey<String>(entry.key),
+          controller: entry._controller,
+          child: Builder(builder: (context) => windowBuilder(context, entry)),
+        ),
+    ];
   }
 
   void _destroy(SecondaryWindowEntry entry) {
@@ -191,20 +216,10 @@ class SecondaryWindows extends ChangeNotifier {
     _forget(entry);
   }
 
-  /// Tells [MainWindowHost] whether a window that outlives the main one is
-  /// open, which is what decides if closing the main window hides it, and
-  /// whether the app ends when this was the last such window.
-  void _syncMainWindow() {
-    MainWindowHost.setIndependentWindowsOpen(
-      _entries.values.any((entry) => entry.survivesMainClose),
-    );
-  }
-
   void _forget(SecondaryWindowEntry entry) {
     if (!identical(_entries[entry.key], entry)) return;
     _entries.remove(entry.key);
     notifyListeners();
-    _syncMainWindow();
     // The window widget listens to the controller until the frame that drops
     // it from the tree, so the controller is disposed after that frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -230,72 +245,5 @@ class _EntryDelegate with flutter_window.WindowControllerDelegate {
   void onWindowDestroyed() {
     super.onWindowDestroyed();
     _windows._forget(_entry);
-  }
-}
-
-/// Draws every open [SecondaryWindows] entry as an extra view next to [child].
-///
-/// [windowBuilder] returns the content of one window; it is where the app puts
-/// its per-window `MaterialApp`. It runs below this widget, so it sees the
-/// `ProviderScope` above it.
-class SecondaryWindowsHost extends StatefulWidget {
-  const SecondaryWindowsHost({
-    super.key,
-    required this.windowBuilder,
-    required this.child,
-  });
-
-  final Widget Function(BuildContext context, SecondaryWindowEntry entry)
-  windowBuilder;
-
-  final Widget child;
-
-  @override
-  State<SecondaryWindowsHost> createState() => _SecondaryWindowsHostState();
-}
-
-class _SecondaryWindowsHostState extends State<SecondaryWindowsHost> {
-  final SecondaryWindows _windows = SecondaryWindows.instance;
-
-  @override
-  void initState() {
-    super.initState();
-    _windows.addListener(_onWindowsChanged);
-  }
-
-  @override
-  void dispose() {
-    _windows.removeListener(_onWindowsChanged);
-    super.dispose();
-  }
-
-  void _onWindowsChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final entries = _windows.entries;
-    // The ViewAnchor is always there (with a null view while nothing is open)
-    // so [child] keeps the same position in the tree and never loses its state
-    // when the first window opens.
-    return ViewAnchor(
-      view: entries.isEmpty
-          ? null
-          : ViewCollection(
-              views: [
-                for (final entry in entries)
-                  flutter_window.Window(
-                    key: ValueKey<String>(entry.key),
-                    controller: entry._controller,
-                    child: Builder(
-                      builder: (context) =>
-                          widget.windowBuilder(context, entry),
-                    ),
-                  ),
-              ],
-            ),
-      child: widget.child,
-    );
   }
 }

@@ -35,7 +35,15 @@ final ValueNotifier<bool> appUseDynamicColorNotifier = ValueNotifier(false);
 final ValueNotifier<Locale?> appLocaleNotifier = ValueNotifier(null);
 
 class VaultExplorerApp extends ConsumerStatefulWidget {
-  const VaultExplorerApp({super.key});
+  const VaultExplorerApp({super.key, this.ownsMouseNavigation = true});
+
+  /// Whether this app installs the mouse back/forward handler on start and
+  /// removes it on dispose.
+  ///
+  /// False for the main window of the desktop build: the handler serves every
+  /// window, so `DesktopAppHost` installs it once for the life of the app, and
+  /// it must not go when the main window is closed while others stay open.
+  final bool ownsMouseNavigation;
 
   @override
   ConsumerState<VaultExplorerApp> createState() => _VaultExplorerAppState();
@@ -48,12 +56,12 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
   void initState() {
     super.initState();
     // The mouse's back and forward buttons (desktop only).
-    MouseNavDispatcher.instance.install();
+    if (widget.ownsMouseNavigation) MouseNavDispatcher.instance.install();
   }
 
   @override
   void dispose() {
-    MouseNavDispatcher.instance.uninstall();
+    if (widget.ownsMouseNavigation) MouseNavDispatcher.instance.uninstall();
     super.dispose();
   }
 

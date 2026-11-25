@@ -246,9 +246,33 @@ http / https / mailto. The app's secret store (`readSecure` / `writeSecure` / ..
 the OS keyring, so saved vaults and credentials persist; without a keyring service the writes fail soft
 (`false`) and a one-time hint is printed.
 
-Closing the window runs a clean-up first (`AppLifecycleListener.onExitRequested`): every unlocked vault is
+Ending the app runs a clean-up first (`AppLifecycleListener.onExitRequested`): every unlocked vault is
 locked (its key material wiped in the engine) and any decrypted "open with" copies are deleted, rather than
-relying on the next start's purge. A crash or kill -9 still falls back to that purge.
+relying on the next start's purge. A crash or kill -9 still falls back to that purge. The app asks to exit
+when its last window closes with `ServicesBinding.exitApplication(AppExitType.cancelable)`, never
+`required`: a required exit skips the question and so skips this clean-up.
+
+### Windows of the app (Linux and Windows)
+
+Every window is a peer, as in a desktop file manager: closing the first one does not close the others, and the
+app ends when the last one is gone.
+
+- `main()` starts the app with `runWidget`, not `runApp`, when `DesktopWindowing.ensureReady()` succeeds. Nothing is
+  drawn in the runner's own window (it is never shown: the runners only show it after its first frame). The root
+  is `DesktopAppHost`, a `ViewCollection` of the main window (`VaultExplorerApp`) and the secondary windows
+  (`SecondaryWindows`: file manager windows, vault settings).
+- `DesktopWindowPolicy` holds the rules (pure Dart, tested without Flutter): the main window closing closes the
+  windows that only serve it (vault settings) and leaves the independent ones (file manager windows); the app ends
+  when no main window and no independent window is left; a lock brings the main window back (it draws the lock
+  gate) *before* closing the others, or the app would exit instead of locking.
+- `MainShell` is more than a page: while it is on screen it answers the file manager windows
+  (`FileManagerEnvironment`), forwards lifecycle changes to the auto-lock, and carries out the app lock. If the main
+  window is closed while file manager windows stay open, `DesktopSessionKeeper` takes those three jobs over from the
+  app's providers, so the remaining windows keep working and stay auto-locked. It lets go when a lock reopens the
+  main window.
+- Without native windows (Android, `VE_MULTI_WINDOW=0`, or an embedder that refuses them) the app runs in the
+  runner's single window exactly as before. If only the main window cannot be created, it is drawn in the runner's
+  window instead, and closing it ends the app.
 
 ## Folder vaults (gocryptfs / Cryptomator / CryFS) -- Linux and Windows
 

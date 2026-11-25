@@ -8,8 +8,9 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 /// volume id?" and "where is this device's local storage?", because those
 /// answers live in its widgets. A file manager window, which has no dashboard
 /// of its own, asks through here instead. The shell [attach]es while it is on
-/// screen; without it every answer is empty, which makes the window show what
-/// it was opened with and nothing more.
+/// screen (or `DesktopSessionKeeper`, when the main window has been closed and
+/// file manager windows keep the app running); without either, every answer is
+/// empty, which makes the window show what it was opened with and nothing more.
 ///
 /// It is also how menus anywhere in the app ask for a location to be opened
 /// in a new window ([canOpenWindow], [openWindow]) without importing the

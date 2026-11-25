@@ -8,6 +8,8 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
+import 'package:vaultexplorer/app/desktop_session_keeper.dart';
+import 'package:vaultexplorer/app/session_lock_wiring.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
@@ -484,23 +486,7 @@ class _MainShellState extends ConsumerState<MainShell>
 
   void _configureSessionLock() {
     final lockController = ref.read(sessionLockControllerProvider);
-    lockController.configure(
-      settings: () => _container.read(appSettingsControllerProvider).settings,
-      lockAllMountedContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockAllMountedContainersForAutoLock(),
-      // Containers set to "Immediately", locked on real background/screen-off
-      // events independently of the app-wide sweep (see SessionLockController).
-      lockImmediateOverrideContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockImmediatelyConfiguredContainers(),
-      // Containers set to "Screen Lock Only"; SessionLockController only calls
-      // this from handleScreenOff, never for mere backgrounding.
-      lockScreenLockOnlyContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockScreenLockOnlyConfiguredContainers(),
-      enforceAppLock: _enforceAppLock,
-    );
+    configureSessionLock(_container, enforceAppLock: _enforceAppLock);
     lockController.notifyAppUnlocked(preserveBackgroundState: true);
     unawaited(_resumePersistedVaultAutoLock());
   }
@@ -607,6 +593,17 @@ class _MainShellState extends ConsumerState<MainShell>
     FileManagerEnvironment.instance.detach();
     HardwareKeyboard.instance.removeHandler(_handleTabShortcutKey);
     WidgetsBinding.instance.removeObserver(this);
+    // The main window can be closed while file manager windows stay open
+    // (desktop). They still need the environment, the lifecycle -> auto-lock
+    // hand-over and the app lock this shell provides, so hand those on. This
+    // only does anything then, not when the shell is replaced by the lock gate
+    // in a main window that stays open. After the detach above, and before the
+    // notifiers below are disposed.
+    DesktopSessionKeeper.instance.takeOverIfNeeded(
+      container: _container,
+      localStorage:
+          _localStorageNotifier.value ?? _primaryLocalStorageContainer,
+    );
     OpenDrawerBackGuard.setDrawerOpen(this, false);
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();

@@ -11,28 +11,32 @@ import 'package:flutter/src/widgets/_window.dart' as flutter_window;
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 
-/// Gate for native secondary windows (Linux and Windows only).
+/// Gate for native windows (Linux and Windows only).
 ///
 /// On the stable channel `flutter config --enable-windowing` does not exist
 /// and the framework keeps `isWindowingEnabled` false, which makes every
 /// windowing API throw. The flag is a plain mutable variable though, so it is
-/// switched on here instead, and only when a window is actually about to be
-/// opened. That is deliberate:
+/// switched on here instead.
 ///
-///  * Nothing changes at startup, on any platform. The binding keeps its
-///    "unsupported" windowing owner until the first window is requested.
+/// `main()` calls [ensureReady] at startup on Linux and Windows. When it
+/// succeeds the app runs as a set of peer native windows (see
+/// `DesktopAppHost`); when it does not, [ensureReady] returns false and the app
+/// runs in the runner's single window, with the in-window routes it used before
+/// native windows existed.
+///
 ///  * Android never gets near any of this.
-///  * If the embedder cannot provide windows, [ensureReady] returns false and
-///    the caller keeps using the in-window route it used before.
+///  * A failed attempt is remembered, so a broken embedder costs one logged
+///    warning rather than an exception on every call.
 ///
-/// Set `VE_MULTI_WINDOW=0` in the environment to switch the feature off.
+/// Set `VE_MULTI_WINDOW=0` in the environment to switch native windows off and
+/// get the single-window app.
 abstract final class DesktopWindowing {
   static const String _logTag = 'DesktopWindowing';
 
   static bool _attempted = false;
   static bool _ready = false;
 
-  /// Whether this build can ever open a native secondary window.
+  /// Whether this build can ever open native windows.
   static bool get isSupportedPlatform =>
       !kIsWeb &&
       (Platform.isLinux || Platform.isWindows) &&

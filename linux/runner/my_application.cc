@@ -10,24 +10,6 @@
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
-
-  // The window the engine and the main widget tree live in. Not owned: GTK
-  // owns it, and the weak pointer below clears this when it is destroyed.
-  GtkWindow* main_window;
-
-  // Answers the "vaultexplorer/window" calls the Dart side makes about the
-  // main window (see lib/core/windowing/main_window_host.dart).
-  FlMethodChannel* window_channel;
-
-  // Whether closing the main window hides it instead of destroying it.
-  //
-  // The main window owns the Flutter engine and the widget tree that every
-  // secondary window is drawn into, so it cannot go while one of them is open.
-  // While the Dart side has a window that must outlive the main one it sets
-  // this ("setHideOnClose"), and a close request then only hides the window.
-  // The Dart side ends the app ("quitIfMainHidden") when the last such window
-  // has closed.
-  gboolean hide_main_on_close;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -57,88 +39,12 @@ static void set_window_icon(GtkWindow* window) {
   gtk_window_set_icon_name(window, APPLICATION_ID);
 }
 
-// Handles a request to close the main window (the close button, Alt+F4, the
-// window manager's close). While another window depends on this one it is
-// hidden instead of destroyed; returning TRUE stops GTK, and the Flutter
-// embedder's own close handling, from going on to destroy it.
-static gboolean main_window_delete_event_cb(GtkWidget* widget,
-                                            GdkEvent* event,
-                                            gpointer user_data) {
-  MyApplication* self = MY_APPLICATION(user_data);
-  if (!self->hide_main_on_close) {
-    return FALSE;
-  }
-  gtk_widget_hide(widget);
-  return TRUE;
-}
-
-// Implements the "vaultexplorer/window" channel.
-static void window_channel_cb(FlMethodChannel* channel,
-                              FlMethodCall* method_call,
-                              gpointer user_data) {
-  MyApplication* self = MY_APPLICATION(user_data);
-  const gchar* method = fl_method_call_get_name(method_call);
-  FlValue* args = fl_method_call_get_args(method_call);
-
-  g_autoptr(FlMethodResponse) response = nullptr;
-  if (g_strcmp0(method, "setHideOnClose") == 0) {
-    FlValue* enabled = nullptr;
-    if (args != nullptr && fl_value_get_type(args) == FL_VALUE_TYPE_MAP) {
-      enabled = fl_value_lookup_string(args, "enabled");
-    }
-    self->hide_main_on_close = enabled != nullptr &&
-                               fl_value_get_type(enabled) == FL_VALUE_TYPE_BOOL &&
-                               fl_value_get_bool(enabled);
-    g_autoptr(FlValue) result = fl_value_new_null();
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-  } else if (g_strcmp0(method, "revealMainWindow") == 0) {
-    // Brings the main window back if it was hidden on close, without taking
-    // the focus from the window the person is working in. A window that is
-    // merely minimized or behind others is left alone.
-    if (self->main_window != nullptr &&
-        !gtk_widget_get_visible(GTK_WIDGET(self->main_window))) {
-      gtk_window_set_focus_on_map(self->main_window, FALSE);
-      gtk_widget_show(GTK_WIDGET(self->main_window));
-      gtk_window_set_focus_on_map(self->main_window, TRUE);
-    }
-    g_autoptr(FlValue) result = fl_value_new_null();
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-  } else if (g_strcmp0(method, "quitIfMainHidden") == 0) {
-    // The last window that could stand on its own has closed. A main window
-    // that was hidden for its sake has no reason left to exist, so end the
-    // app. A main window that is on screen means the person never closed it:
-    // nothing to do.
-    if (self->main_window == nullptr ||
-        !gtk_widget_get_visible(GTK_WIDGET(self->main_window))) {
-      self->hide_main_on_close = FALSE;
-      g_application_quit(G_APPLICATION(self));
-    }
-    g_autoptr(FlValue) result = fl_value_new_null();
-    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-  } else {
-    response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
-  }
-
-  g_autoptr(GError) error = nullptr;
-  if (!fl_method_call_respond(method_call, response, &error)) {
-    g_warning("Failed to send window channel response: %s", error->message);
-  }
-}
-
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   set_window_icon(window);
-
-  // Connected before the Flutter view exists, so that this handler runs ahead
-  // of any close handling the embedder attaches to the window later.
-  self->main_window = window;
-  g_object_add_weak_pointer(G_OBJECT(window),
-                            reinterpret_cast<gpointer*>(&self->main_window));
-  g_signal_connect(window, "delete-event",
-                   G_CALLBACK(main_window_delete_event_cb), self);
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
@@ -190,16 +96,6 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
-  g_autoptr(FlPluginRegistrar) window_registrar =
-      fl_plugin_registry_get_registrar_for_plugin(FL_PLUGIN_REGISTRY(view),
-                                                  "VaultExplorerWindow");
-  g_autoptr(FlStandardMethodCodec) window_codec = fl_standard_method_codec_new();
-  self->window_channel = fl_method_channel_new(
-      fl_plugin_registrar_get_messenger(window_registrar),
-      "vaultexplorer/window", FL_METHOD_CODEC(window_codec));
-  fl_method_channel_set_method_call_handler(self->window_channel,
-                                            window_channel_cb, self, nullptr);
-
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
 
@@ -246,7 +142,6 @@ static void my_application_shutdown(GApplication* application) {
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
-  g_clear_object(&self->window_channel);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 

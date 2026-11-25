@@ -431,7 +431,13 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
       if (_dragReady || pendingDelta!.distance < kMouseDragStartSlop) return;
       _holding = false;
       _dragReady = true;
-      resolve(GestureDisposition.accepted);
+      final starter = _starter;
+      if (starter != null) {
+        _starter = null;
+        starter(_currentPosition);
+      } else {
+        resolve(GestureDisposition.accepted);
+      }
       return;
     }
     if (!_holding) return;

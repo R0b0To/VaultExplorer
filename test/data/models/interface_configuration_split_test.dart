@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/dashboard_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
@@ -13,6 +14,7 @@ import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/new_tab_behavior.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
@@ -86,6 +88,8 @@ AppSettings _customSettings() => AppSettings(
   quickActionLockMode: QuickActionLockMode.alwaysLock,
   enableAuthenticator: false,
   useBrowserTabs: false,
+  newTabBehavior: NewTabBehavior.specificStorage,
+  newTabStorageId: kNewTabVaultsPageId,
   useDualPaneBrowsing: true,
   tabSwipeGestures: TabSwipeGestures(
     leftSwipe: TabLeftSwipeAction.loopToFirst,
@@ -94,6 +98,7 @@ AppSettings _customSettings() => AppSettings(
   // interface
   themeMode: ThemeMode.dark,
   useDynamicColor: true,
+  dashboardLayoutMode: DashboardLayoutMode.details,
   defaultLayoutMode: BrowserLayoutMode.masonry,
   defaultFileSortBy: SortBy.size,
   defaultFileSortAscending: false,

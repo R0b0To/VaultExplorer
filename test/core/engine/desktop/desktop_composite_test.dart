@@ -321,9 +321,9 @@ void main() {
       expect(args.sublist(3), [0, 255, 255, ['/k/one'], false]);
 
       expect(h.slotRequests, ['composite:/data/ü b.png']);
-      expect(h.emitted, [
-        ('onUnlockStarted', {'volId': 4})
-      ]);
+      expect(h.emitted, hasLength(1));
+      expect(h.emitted.single.$1, 'onUnlockStarted');
+      expect(h.emitted.single.$2, {'volId': 4});
       final session = h.registered.single;
       expect((session.vol, session.key, session.displayName, session.format, session.readOnly),
           (4, 'composite:/data/ü b.png', 'Holiday', 'veracrypt', false));

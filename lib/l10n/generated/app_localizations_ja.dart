@@ -12505,7 +12505,4 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '場所を利用できません';
-
-  @override
-  String get copyImageAction => '画像をコピー';
 }

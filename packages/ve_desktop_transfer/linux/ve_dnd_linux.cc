@@ -199,6 +199,10 @@ gboolean DndLinux::OnButtonRelease(GtkWidget*, GdkEventButton* event, gpointer u
 gboolean DndLinux::OnDragMotion(
     GtkWidget*, GdkDragContext*, gint x, gint y, guint, gpointer user_data) {
   auto* st = static_cast<ViewState*>(user_data);
+  // Suppress self-drag: while an outbound drag is active, do not emit
+  // drop-target events back to Flutter (would show the import overlay on top
+  // of the source window and confuse drop handling).
+  if (st && st->owner && st->owner->active_drag_) return FALSE;
   if (st && st->owner && st->owner->callbacks_) {
     st->owner->callbacks_->EmitDropEvent(
         st->view_id, "onDropUpdated", static_cast<double>(x), static_cast<double>(y), {});
@@ -208,6 +212,7 @@ gboolean DndLinux::OnDragMotion(
 
 void DndLinux::OnDragLeave(GtkWidget*, GdkDragContext*, guint, gpointer user_data) {
   auto* st = static_cast<ViewState*>(user_data);
+  if (st && st->owner && st->owner->active_drag_) return;
   if (st && st->owner && st->owner->callbacks_) {
     st->owner->callbacks_->EmitDropEvent(st->view_id, "onDropExited", 0.0, 0.0, {});
   }

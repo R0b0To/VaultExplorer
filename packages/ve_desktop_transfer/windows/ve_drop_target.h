@@ -41,6 +41,7 @@ class VeDropTarget final : public IDropTarget {
   ~VeDropTarget() = default;
 
   bool AcceptsDataObject(IDataObject* pDataObj) const;
+  static bool IsOwnDataObject(IDataObject* pDataObj);
 
   HWND hwnd_;
   int64_t view_id_;

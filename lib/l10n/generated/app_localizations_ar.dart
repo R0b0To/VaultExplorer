@@ -13290,7 +13290,4 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'الموضع غير متاح';
-
-  @override
-  String get copyImageAction => 'نسخ الصورة';
 }

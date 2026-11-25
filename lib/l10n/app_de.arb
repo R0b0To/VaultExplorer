@@ -3644,6 +3644,5 @@
   "newTabBehaviorSpecificStorage": "Bestimmten Ort öffnen",
   "newTabBehaviorSpecificStorageDesc": "Öffnet immer den unten gewählten Ort. Lässt er sich nicht öffnen, wird stattdessen nachgefragt.",
   "newTabStorageLabel": "Ort für neue Tabs",
-  "newTabStorageUnavailable": "Ort nicht verfügbar",
-  "copyImageAction": "Bild kopieren"
+  "newTabStorageUnavailable": "Ort nicht verfügbar"
 }

@@ -390,6 +390,13 @@ std::string VeDesktopTransferPlugin::RunDrag(
     return "error";
   }
 
+  // Release Flutter's mouse capture before entering the OLE modal drag loop.
+  // The FLUTTERVIEW sets SetCapture on WM_LBUTTONDOWN; leaving it active while
+  // DoDragDrop runs its own message loop causes the cursor to stay captured,
+  // prevents subsequent WM_LBUTTONDOWN from reaching the view, and breaks
+  // drop-target registration for following drags.
+  ReleaseCapture();
+
   DWORD effect = DROPEFFECT_NONE;
   const HRESULT hr = DoDragDrop(data_obj, drop_src, DROPEFFECT_COPY, &effect);
   const bool async_started = data_obj->did_async_operation();

@@ -56,8 +56,26 @@ ULONG STDMETHODCALLTYPE VeDropTarget::Release() {
 
 bool VeDropTarget::AcceptsDataObject(IDataObject* pDataObj) const {
   if (!pDataObj) return false;
+  // Reject our own VeDataObject during outbound DoDragDrop to prevent the
+  // "drop files here to import" overlay from firing on the source window.
+  if (IsOwnDataObject(pDataObj)) return false;
   FORMATETC fmt{CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
   return pDataObj->QueryGetData(&fmt) == S_OK;
+}
+
+// static
+bool VeDropTarget::IsOwnDataObject(IDataObject* pDataObj) {
+  if (!pDataObj) return false;
+  // VeDataObject always advertises the vault-specific
+  // ExcludeClipboardContentFromMonitorProcessing clipboard format.
+  // No other application uses this format, so its presence is a reliable
+  // signal that the data object was created by this process's outbound drag.
+  static const UINT cf_exclude = RegisterClipboardFormatW(
+      L"ExcludeClipboardContentFromMonitorProcessing");
+  if (cf_exclude == 0) return false;
+  FORMATETC probe{static_cast<CLIPFORMAT>(cf_exclude), nullptr,
+                  DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+  return pDataObj->QueryGetData(&probe) == S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE VeDropTarget::DragEnter(

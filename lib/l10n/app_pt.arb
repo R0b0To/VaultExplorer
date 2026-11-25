@@ -3644,6 +3644,5 @@
   "newTabBehaviorSpecificStorage": "Abrir um local específico",
   "newTabBehaviorSpecificStorageDesc": "Abre sempre o local escolhido abaixo. Se não for possível abri-lo, você será perguntado.",
   "newTabStorageLabel": "Local das novas abas",
-  "newTabStorageUnavailable": "Local indisponível",
-  "copyImageAction": "Copiar imagem"
+  "newTabStorageUnavailable": "Local indisponível"
 }

@@ -4743,11 +4743,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                     onPlaylistChanged: _onPlaylistChanged,
                                     onMenuOpened: _menuOpened,
                                     onMenuClosed: _menuClosed,
-                                    onCopyImage: PlatformFeatures.isDesktop
-                                        ? () => unawaited(
-                                            _copyCurrentImageToClipboard(),
-                                          )
-                                        : null,
                                     isImage: MediaViewerConstants.isImage(
                                       _playlistController.currentFile,
                                     ),

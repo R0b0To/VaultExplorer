@@ -3644,6 +3644,5 @@
   "newTabBehaviorSpecificStorage": "Ouvrir un emplacement précis",
   "newTabBehaviorSpecificStorageDesc": "Ouvre toujours l'emplacement choisi ci-dessous. S'il est inaccessible, la question vous est posée.",
   "newTabStorageLabel": "Emplacement des nouveaux onglets",
-  "newTabStorageUnavailable": "Emplacement indisponible",
-  "copyImageAction": "Copier l'image"
+  "newTabStorageUnavailable": "Emplacement indisponible"
 }

@@ -1835,13 +1835,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           _setStatus(context.l10n.couldNotShareFiles, error: true);
         }
       },
-      onCopyImage: (PlatformFeatures.isDesktop &&
-              _archiveContext == null &&
-              targets.length == 1 &&
-              !entry.isDir &&
-              MediaViewerConstants.isImage(entry.name))
-          ? () => unawaited(_copyImageToOsClipboard(entry, fullPath))
-          : null,
       onEditImage: (!entry.isDir && MediaViewerConstants.isImage(entry.name))
           ? () => _editImage(entry.name, fullPath)
           : null,
@@ -2678,21 +2671,22 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     unawaited(
       DesktopTransferService.instance.copyFilesToOsClipboard(items: items),
     );
-  }
-
-  Future<void> _copyImageToOsClipboard(RawEntry entry, String fullPath) async {
-    final ok = await DesktopTransferService.instance.copyImageToOsClipboard(
-      container: widget.container,
-      vaultPath: fullPath,
-      fileIoApi: ref.read(vaultFileIoApiProvider),
-    );
-    if (!mounted) return;
-    _setStatus(
-      ok
-          ? context.l10n.copiedSuffix(entry.name)
-          : context.l10n.bookmarkTargetMissing,
-      error: !ok,
-    );
+    // When exactly one image file is copied, additionally place decoded PNG +
+    // bitmap data on the clipboard so the image can be pasted into apps that
+    // accept raw image formats (MS Paint, GIMP, browsers, messengers) without
+    // needing a dedicated "Copy image" menu item.
+    if (items.length == 1 &&
+        !items.first.isDir &&
+        MediaViewerConstants.isImage(items.first.name)) {
+      final item = items.first;
+      unawaited(
+        DesktopTransferService.instance.copyImageToOsClipboard(
+          container: item.container,
+          vaultPath: item.vaultPath,
+          fileIoApi: ref.read(vaultFileIoApiProvider),
+        ),
+      );
+    }
   }
 
   Future<void> _pasteClipboardImagePng(Uint8List pngBytes) async {

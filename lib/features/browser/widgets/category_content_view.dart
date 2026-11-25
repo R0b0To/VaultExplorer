@@ -2106,6 +2106,21 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               items: transferEntries,
             ),
           );
+          // When exactly one image file is copied, additionally place decoded
+          // PNG + bitmap data on the clipboard so the image can be pasted into
+          // apps that accept raw image formats without a dedicated menu item.
+          if (transferEntries.length == 1 &&
+              !transferEntries.first.isDir &&
+              MediaViewerConstants.isImage(transferEntries.first.name)) {
+            final te = transferEntries.first;
+            unawaited(
+              DesktopTransferService.instance.copyImageToOsClipboard(
+                container: te.container,
+                vaultPath: te.vaultPath,
+                fileIoApi: ref.read(vaultFileIoApiProvider),
+              ),
+            );
+          }
         }
       }
     }
@@ -2530,24 +2545,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     return false;
   }
 
-  Future<void> _copyImageToOsClipboard(
-    MountedContainer container,
-    CategoryEntry entry,
-  ) async {
-    final ok = await DesktopTransferService.instance.copyImageToOsClipboard(
-      container: container,
-      vaultPath: entry.path,
-      fileIoApi: ref.read(vaultFileIoApiProvider),
-    );
-    if (!mounted) return;
-    _notify(
-      ok
-          ? context.l10n.copiedSuffix(entry.baseName)
-          : context.l10n.bookmarkTargetMissing,
-      error: !ok,
-    );
-  }
-
   void _copyPath(CategoryEntry entry) {
     final container = _containers[entry.sourceVolId];
     if (container == null) return;
@@ -2641,9 +2638,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           : null,
       onEditMetadata: entry.isDir ? null : () => _editMetadata([entry]),
       onCopyPath: () => _copyPath(entry),
-      onCopyImage: (PlatformFeatures.isDesktop && isImg)
-          ? () => unawaited(_copyImageToOsClipboard(container, entry))
-          : null,
       onGoToLocation: widget.onShowInFolder != null
           ? () => _showInFolder(entry)
           : null,

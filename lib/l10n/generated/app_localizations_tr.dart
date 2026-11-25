@@ -13117,7 +13117,4 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Konum kullanılamıyor';
-
-  @override
-  String get copyImageAction => 'Resmi kopyala';
 }

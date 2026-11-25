@@ -50,7 +50,7 @@ jobs:
             clang cmake ninja-build pkg-config git perl curl unzip xz-utils zip \
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libsecret-1-dev libjsoncpp-dev \
-            libmpv-dev mpv libfuse3-dev zlib1g-dev \
+            libmpv-dev mpv libfuse3-dev zlib1g-dev nasm \
             dpkg-dev
 
       - name: Read version from pubspec.yaml
@@ -151,6 +151,7 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-nasm
 
       - name: Get WinFsp headers
         shell: pwsh

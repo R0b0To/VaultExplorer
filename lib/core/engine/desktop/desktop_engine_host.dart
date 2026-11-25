@@ -36,6 +36,7 @@ import 'desktop_images.dart';
 import 'desktop_media_server.dart';
 import 'desktop_method_support.dart';
 import 'desktop_mounts.dart';
+import 'desktop_native_thumbnails.dart';
 import 'desktop_repair.dart';
 import 'desktop_secure_store.dart';
 import 'desktop_storage.dart';
@@ -60,10 +61,19 @@ class _SessionMeta {
 }
 
 class DesktopEngineHost {
-  DesktopEngineHost({required this.pool, required this.emit, DesktopSecureStore? secureStore})
-      : secureStore = secureStore ?? DesktopSecureStore();
+  DesktopEngineHost({
+    required this.pool,
+    required this.emit,
+    DesktopSecureStore? secureStore,
+    DesktopNativeThumbnails? nativeThumbnails,
+  })  : secureStore = secureStore ?? DesktopSecureStore(),
+        _nativeThumbs = nativeThumbnails ?? DesktopNativeThumbnails.withOwnPool();
 
   final EngineWorkerPool pool;
+
+  /// Image and video-frame thumbnails made by the engine, in a pool of worker isolates of their own (so a screen
+  /// full of tiles never queues listings and unlocks behind it). The workers start on the first thumbnail.
+  final DesktopNativeThumbnails _nativeThumbs;
 
   /// Backs readSecure / writeSecure / ... (the OS keyring; see desktop_secure_store.dart).
   final DesktopSecureStore secureStore;
@@ -126,8 +136,9 @@ class DesktopEngineHost {
   /// Hashing / KDF / AEAD primitives backed by the native engine (see desktop_crypto.dart).
   late final DesktopCrypto _crypto = DesktopCrypto(pool);
 
-  /// Thumbnails / image export (Flutter codecs; see desktop_images.dart).
-  late final DesktopImages _images = DesktopImages(readWhole: _readWholeVaultFile);
+  /// Thumbnails (the engine's own decoder, Flutter's codecs for what it does not handle) and image export (see
+  /// desktop_images.dart).
+  late final DesktopImages _images = DesktopImages(readWhole: _readWholeVaultFile, native: _nativeThumbs);
 
   /// Video thumbnails: one frame out of libmpv, read through the loopback media server like playback is (see
   /// desktop_video_thumbnails.dart). Nothing is started until the first request.
@@ -139,7 +150,7 @@ class DesktopEngineHost {
       return VideoSource(url: session.url, close: session.close);
     },
     grab: grabFrameWithMpv,
-    decode: decodeVideoFrame,
+    decode: nativeFrameDecoder(_nativeThumbs),
     log: (message) => debugPrint('[desktop-thumbnail] $message'),
   );
 
@@ -432,15 +443,10 @@ class DesktopEngineHost {
 
       // ── images ──
       case ChannelMethods.getImageThumbnail:
-        {
-          final t = await _images.thumbnail(_vol(args['filePath']), args['fileName'] as String,
-              targetSize: (args['targetSize'] as num?)?.toInt() ?? 180);
-          return t?.bytes;
-        }
+        return (await _imageThumbnail(args))?.bytes;
       case ChannelMethods.getImageThumbnailWithSize:
         {
-          final t = await _images.thumbnail(_vol(args['filePath']), args['fileName'] as String,
-              targetSize: (args['targetSize'] as num?)?.toInt() ?? 180);
+          final t = await _imageThumbnail(args);
           return t == null ? null : {'bytes': t.bytes, 'width': t.width, 'height': t.height};
         }
       case ChannelMethods.encodeImage:
@@ -1489,7 +1495,9 @@ class DesktopEngineHost {
   Map<String, Object?> _capabilityProfile() {
     final cores = Platform.numberOfProcessors;
     const memoryClassMb = 512;
-    final tier = cores <= 4 ? 'LOW' : (cores >= 8 ? 'HIGH' : 'MEDIUM');
+    // A computer is not a phone: thumbnails are decoded natively now (a few MiB each) and the machine has the RAM,
+    // so only a 1-2 thread machine is "low". (The tier sizes the Dart-side thumbnail concurrency and caches.)
+    final tier = cores <= 2 ? 'LOW' : (cores >= 6 ? 'HIGH' : 'MEDIUM');
     return {'tier': tier, 'cores': cores, 'memoryClassMb': memoryClassMb, 'isLowRamDevice': false};
   }
 
@@ -1677,6 +1685,23 @@ class DesktopEngineHost {
 
   // ── helpers ────────────────────────────────────────────────────────────
 
+  /// Parses the arguments shared by `getImageThumbnail` and `getImageThumbnailWithSize` (the names Android's handler
+  /// reads) and runs the request. A vault file belongs to a mounted volume (NOT_MOUNTED otherwise, as for every other
+  /// call); a local one is a path on this machine: absolute already (archive previews), or relative to the folder
+  /// that was added.
+  Future<ThumbnailResult?> _imageThumbnail(Map<Object?, Object?> args) {
+    final fileName = args['fileName'] as String;
+    final isLocal = args['isLocalStorage'] == true;
+    return _images.thumbnail(
+      isLocal ? null : _vol(args['filePath']),
+      !isLocal ? fileName : (p.isAbsolute(fileName) ? fileName : p.join(args['filePath'] as String, fileName)),
+      targetSize: (args['targetSize'] as num?)?.toInt() ?? 180,
+      quality: (args['quality'] as num?)?.toInt() ?? 70,
+      preserveAlpha: args['preserveAlpha'] == true,
+      hostFile: isLocal,
+    );
+  }
+
   /// Parses the arguments shared by `getVideoThumbnail` and `getVideoThumbnailWithSize` (same names Android's
   /// handler reads) and runs the request.
   Future<VideoThumbnail?> _videoThumbnail(Map<Object?, Object?> args) {
@@ -1786,6 +1811,7 @@ class DesktopEngineHost {
     await _archive.cleanupAll();
     await DesktopTransferService.instance.dispose();
     await _hash.dispose();
+    await _nativeThumbs.dispose();
     await pool.dispose();
   }
 }

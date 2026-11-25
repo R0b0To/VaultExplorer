@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 14;
+const int kVeAbiVersion = 15;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -33,6 +33,8 @@ const int veErrDeviceNotFound = 11;
 const int veErrDevicePermission = 12;
 const int veErrDeviceBusy = 13;
 const int veErrDeviceOpen = 14;
+const int veErrTooLarge = 15; // refused by a size guard (image thumbnails)
+const int veErrNoMemory = 16; // ran out of memory (image thumbnails)
 
 // Folder-vault formats for ve_fv_* (VE_FV_*), and the container-format codes an unlocked folder-vault
 // slot reports (VE_FORMAT_*, see veFormatWireName).
@@ -635,6 +637,20 @@ class VeNative {
       _lib.lookupFunction<Int32 Function(Pointer<VeBuffer>), int Function(Pointer<VeBuffer>)>('ve_list_mounts');
   late final int Function(Pointer<Utf8>, int) _mountLastError =
       _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Size), int Function(Pointer<Utf8>, int)>('ve_mount_last_error');
+
+  // Image thumbnails (ABI 15): ve_image_thumbnail / ve_image_thumbnail_file / ve_image_thumbnail_mem (ve_engine.h).
+  late final int Function(int, Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>) _imageThumbnail =
+      _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Utf8>, Int32, Int32, Int32, Int64, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(int, Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>)>('ve_image_thumbnail');
+  late final int Function(Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>) _imageThumbnailFile =
+      _lib.lookupFunction<
+          Int32 Function(Pointer<Utf8>, Int32, Int32, Int32, Int64, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>)>('ve_image_thumbnail_file');
+  late final int Function(Pointer<Uint8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>) _imageThumbnailMem =
+      _lib.lookupFunction<
+          Int32 Function(Pointer<Uint8>, Size, Int32, Int32, Int32, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(Pointer<Uint8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>)>('ve_image_thumbnail_mem');
 
   // Archives (ABI 10): ve_archive_scan / ve_archive_extract_entry / ve_archive_extract_all (ve_engine.h).
   late final int Function(int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>) _archiveScan = _lib.lookupFunction<
@@ -2027,6 +2043,66 @@ class VeNative {
   /// Entries hidden from listings in [path] (>= 0), or a negative -veErr* code.
   int fvHiddenEntryCount(int volId, String path) => _withUtf8(path, (p) => _fvHidden(volId, p));
   int fvFinishWrite(int volId, String path) => _withUtf8(path, (p) => _fvFinishWrite(volId, p));
+
+  // ── image thumbnails (ABI 15) ───────────────────────────────────────────
+  // Each call answers (rc, thumbnail bytes, info). `info` is VE_IMAGE_INFO_COUNT ints, in this order:
+  // isPng (0 JPEG / 1 PNG), source width, source height, thumbnail width, thumbnail height, hasAlpha, isBlank.
+  // rc: veOk; veErrUnsupported when this decoder does not handle the format (use another one); veErrTooLarge;
+  // veErrNoMemory; veErrNotUnlocked / veErrInvalidArg; otherwise veErrFailed.
+
+  static const int _imageInfoCount = 8;
+
+  (int, Uint8List?, List<int>) _imageCall(int Function(Pointer<VeBuffer>, Pointer<Int32>) body) {
+    final info = calloc<Int32>(_imageInfoCount);
+    try {
+      final (rc, bytes) = _withBuffer((b) => body(b, info));
+      return (rc, bytes, rc == veOk ? List<int>.generate(_imageInfoCount, (i) => info[i]) : const <int>[]);
+    } finally {
+      calloc.free(info);
+    }
+  }
+
+  /// A thumbnail of the picture at [path] inside unlocked slot [volId].
+  (int, Uint8List?, List<int>) imageThumbnail(
+    int volId,
+    String path, {
+    required int targetSize,
+    required int quality,
+    required bool preserveAlpha,
+    required int maxSourceBytes,
+  }) =>
+      _withUtf8(
+        path,
+        (p) => _imageCall((b, info) =>
+            _imageThumbnail(volId, p, targetSize, quality, preserveAlpha ? 1 : 0, maxSourceBytes, b, info)),
+      );
+
+  /// A thumbnail of a picture file on this machine.
+  (int, Uint8List?, List<int>) imageThumbnailFile(
+    String hostPath, {
+    required int targetSize,
+    required int quality,
+    required bool preserveAlpha,
+    required int maxSourceBytes,
+  }) =>
+      _withUtf8(
+        hostPath,
+        (p) => _imageCall((b, info) =>
+            _imageThumbnailFile(p, targetSize, quality, preserveAlpha ? 1 : 0, maxSourceBytes, b, info)),
+      );
+
+  /// A thumbnail of a picture that is already in memory (a video frame).
+  (int, Uint8List?, List<int>) imageThumbnailMem(
+    Uint8List data, {
+    required int targetSize,
+    required int quality,
+    required bool preserveAlpha,
+  }) =>
+      _withBytes(
+        data,
+        (ptr, len) => _imageCall((b, info) =>
+            _imageThumbnailMem(ptr, len, targetSize, quality, preserveAlpha ? 1 : 0, b, info)),
+      );
 
   // ── archives (ABI 10) ───────────────────────────────────────────────────
   // Each call answers VE_OK with a result record (layout in ve_engine.h, decoded by ArchiveRecord in

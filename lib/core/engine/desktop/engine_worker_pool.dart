@@ -904,6 +904,41 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
           _wipe(password);
         }
       }
+    // Image thumbnails (ABI 15) -> [resultCode, thumbnail bytes?, info ints]. Run in the thumbnail pool (see
+    // DesktopEngineHost), never next to unlocks and listings.
+    case 'imageThumbnail':
+      {
+        final (rc, bytes, info) = n.imageThumbnail(
+          a[0] as int,
+          a[1] as String,
+          targetSize: a[2] as int,
+          quality: a[3] as int,
+          preserveAlpha: a[4] as bool,
+          maxSourceBytes: a[5] as int,
+        );
+        return [rc, bytes, info];
+      }
+    case 'imageThumbnailFile':
+      {
+        final (rc, bytes, info) = n.imageThumbnailFile(
+          a[0] as String,
+          targetSize: a[1] as int,
+          quality: a[2] as int,
+          preserveAlpha: a[3] as bool,
+          maxSourceBytes: a[4] as int,
+        );
+        return [rc, bytes, info];
+      }
+    case 'imageThumbnailMem':
+      {
+        final (rc, bytes, info) = n.imageThumbnailMem(
+          a[0] as Uint8List,
+          targetSize: a[1] as int,
+          quality: a[2] as int,
+          preserveAlpha: a[3] as bool,
+        );
+        return [rc, bytes, info];
+      }
     case 'opCancel':
       n.opCancel(a[0] as int);
       return null;

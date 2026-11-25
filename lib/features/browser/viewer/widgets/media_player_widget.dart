@@ -27,6 +27,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_seek_clai
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_seek_hud.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_dismiss_layer.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/audio_ambient_backdrop.dart';
 import 'package:vaultexplorer/features/library/tags/audio_tag_reader.dart';
 import 'package:vaultexplorer/features/library/tags/byte_source.dart';
 
@@ -261,6 +262,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   // Cover picture embedded in the audio file's tags (ID3 APIC, FLAC picture,
   // MP4 covr, Ogg METADATA_BLOCK_PICTURE). Held in memory only.
   Uint8List? _audioCover;
+  // Colours picked from [_audioCover] for the ambient backdrop.
+  List<Color>? _ambientColors;
   int _audioCoverToken = 0;
   late final ThumbnailCacheService _thumbnailCache;
 
@@ -405,10 +408,37 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       final bytes = art?.bytes;
       if (bytes != null && bytes.isNotEmpty) {
         setState(() => _audioCover = bytes);
+        unawaited(_loadAmbientColors(bytes, token));
       }
     } catch (_) {
       // No readable cover: keep the plain music-note visual.
     }
+  }
+
+  Future<void> _loadAmbientColors(Uint8List cover, int token) async {
+    try {
+      final colors = await CoverPalette.extract(cover);
+      if (!mounted || token != _audioCoverToken || colors.isEmpty) return;
+      setState(() => _ambientColors = colors);
+    } catch (_) {
+      // Undecodable picture: no backdrop, the cover itself still shows.
+    }
+  }
+
+  Widget _buildAmbientBackdrop(List<Color> colors) {
+    final controller = _boundController;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 700),
+      builder: (context, t, child) => Opacity(opacity: t, child: child),
+      child: controller == null
+          ? AudioAmbientBackdrop(colors: colors, isPlaying: false)
+          : ValueListenableBuilder<NativeVideoValue>(
+              valueListenable: controller,
+              builder: (context, val, _) =>
+                  AudioAmbientBackdrop(colors: colors, isPlaying: val.isPlaying),
+            ),
+    );
   }
 
   Future<void> _ensurePosterLoaded() async {
@@ -450,6 +480,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
           );
       _localPosterBytes = newPoster;
       _audioCover = null;
+      _ambientColors = null;
       _knownAspectRatio = MediaAspectRatioCache.get(
         widget.container,
         widget.fileName,
@@ -1701,6 +1732,12 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
+                if (widget.isAudio && _ambientColors != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: _buildAmbientBackdrop(_ambientColors!),
+                    ),
+                  ),
                 corePlayerWidget,
                 // Lets a curved or L-shaped swipe be claimed for the playlist
                 // pager before the zoom viewer under it takes the touch. Audio

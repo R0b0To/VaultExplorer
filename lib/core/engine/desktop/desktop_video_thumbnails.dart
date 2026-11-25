@@ -40,7 +40,7 @@ typedef FrameGrabber = Future<GrabbedFrame?> Function({
   required Duration timeout,
 });
 
-/// A frame ready to hand back: [png] fits the requested size, [sourceWidth] x [sourceHeight] are the frame's own
+/// A frame ready to hand back: [png] (a PNG, or a JPEG from the native decoder) fits the requested size, [sourceWidth] x [sourceHeight] are the frame's own
 /// pixels, [isBlank] says it is a poor thumbnail (see [isLikelyBlankFrame]).
 class DecodedFrame {
   const DecodedFrame({
@@ -56,7 +56,7 @@ class DecodedFrame {
   final bool isBlank;
 }
 
-/// Scales [encoded] to fit [targetSize] and encodes it as PNG; null when it cannot be decoded.
+/// Scales [encoded] to fit [targetSize] and encodes it (PNG or JPEG); null when it cannot be decoded.
 typedef FrameDecoder = Future<DecodedFrame?> Function(Uint8List encoded, int targetSize);
 
 /// Something a player can read: [url], and [close] to give it back (ends the media-server session).

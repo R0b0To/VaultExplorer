@@ -255,7 +255,7 @@ object ContainerLifecycleCore {
             }
 
             // SAF providers: use the provider's own descriptor when it is a
-            // plain seekable file (what VaultPony does). Only providers that
+            // plain seekable file. Only providers that
             // cannot hand one out -- cloud/document-backed ones whose
             // descriptors can be read but not pwrite()n -- go through the
             // proxy, where SplitFuseCallback can stage the file locally and

@@ -2,6 +2,7 @@
 
 #include <commctrl.h>
 
+#include <cwchar>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -9,6 +10,25 @@
 namespace {
 
 constexpr UINT_PTR kCustomCaptionSubclassId = 1;
+
+// Class of the windows the Flutter engine creates for every view of the app
+// (the main window included).
+constexpr wchar_t kEngineHostWindowClass[] = L"FLUTTER_HOST_WINDOW";
+
+// Gives the top of |client| back to the app: drops the OS caption but keeps
+// 1px so DWM still draws its border and the top edge stays grabbable.
+// |original_top| is the top of the window rect before the default calculation.
+void DropCaption(HWND hwnd, RECT* client, LONG original_top) {
+  if (IsZoomed(hwnd)) {
+    // A maximized window overhangs the monitor by the sizing-frame
+    // thickness, so push the client area back on screen.
+    const UINT dpi = GetDpiForWindow(hwnd);
+    client->top = original_top + GetSystemMetricsForDpi(SM_CYFRAME, dpi) +
+                  GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+  } else {
+    client->top = original_top + 1;
+  }
+}
 
 // Hides the OS caption of a window the Flutter engine created (a secondary
 // window), the way Win32Window does for the main one: the window keeps its
@@ -22,24 +42,24 @@ LRESULT CALLBACK CustomCaptionProc(HWND hwnd,
                                    DWORD_PTR /*ref_data*/) {
   switch (message) {
     case WM_NCCALCSIZE: {
-      if (wparam != TRUE) break;
-      auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
-      const LONG original_top = params->rgrc[0].top;
-      // Let Windows compute the left/right/bottom resize frame first.
-      const LRESULT result = DefSubclassProc(hwnd, message, wparam, lparam);
-      if (result != 0) return result;
-      if (IsZoomed(hwnd)) {
-        // A maximized window overhangs the monitor by the sizing-frame
-        // thickness, so push the client area back on screen.
-        const UINT dpi = GetDpiForWindow(hwnd);
-        params->rgrc[0].top = original_top +
-            GetSystemMetricsForDpi(SM_CYFRAME, dpi) +
-            GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
-      } else {
-        // Drop the OS caption. Keep 1px so DWM still draws its border and
-        // the top edge stays grabbable.
-        params->rgrc[0].top = original_top + 1;
+      if (wparam == TRUE) {
+        auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+        const LONG original_top = params->rgrc[0].top;
+        // Let Windows compute the left/right/bottom resize frame first.
+        const LRESULT result = DefSubclassProc(hwnd, message, wparam, lparam);
+        if (result != 0) return result;
+        DropCaption(hwnd, &params->rgrc[0], original_top);
+        return 0;
       }
+      // CreateWindowEx sends the very first calculation with wParam FALSE and
+      // a plain RECT. Handling it here is what lets a window come into
+      // existence without a caption, instead of being shown with one and
+      // corrected afterwards (which flashed the OS frame / an unpainted
+      // resize before the first themed frame).
+      auto* rect = reinterpret_cast<RECT*>(lparam);
+      const LONG original_top = rect->top;
+      DefSubclassProc(hwnd, message, wparam, lparam);
+      DropCaption(hwnd, rect, original_top);
       return 0;
     }
     case WM_NCDESTROY:
@@ -47,6 +67,47 @@ LRESULT CALLBACK CustomCaptionProc(HWND hwnd,
       break;
   }
   return DefSubclassProc(hwnd, message, wparam, lparam);
+}
+
+// The engine creates its windows hidden and shows them as soon as the first
+// frame of their view is ready, so the caption has to be gone before that
+// frame is laid out. A call from Dart after the view exists is too late: it
+// arrives once the first frame is already on its way, and the window then
+// resizes under a frame that was drawn for the old client area.
+//
+// This hook runs inside CreateWindowEx, before the window procedure sees any
+// message, and subclasses each captioned engine window right there. It is
+// thread-local: the engine creates its windows on the thread that runs the
+// message loop, which is where it is installed.
+HHOOK g_caption_hook = nullptr;
+
+LRESULT CALLBACK CaptionCbtProc(int code, WPARAM wparam, LPARAM lparam) {
+  if (code == HCBT_CREATEWND) {
+    const HWND hwnd = reinterpret_cast<HWND>(wparam);
+    const auto* create = reinterpret_cast<const CBT_CREATEWND*>(lparam);
+    // Only captioned windows: popups and tooltips have none to hide.
+    if (create != nullptr && create->lpcs != nullptr &&
+        (create->lpcs->style & WS_CAPTION) == WS_CAPTION) {
+      wchar_t class_name[64] = {};
+      if (GetClassNameW(hwnd, class_name, 64) > 0 &&
+          wcscmp(class_name, kEngineHostWindowClass) == 0) {
+        SetWindowSubclass(hwnd, CustomCaptionProc, kCustomCaptionSubclassId, 0);
+      }
+    }
+  }
+  return CallNextHookEx(g_caption_hook, code, wparam, lparam);
+}
+
+void InstallCaptionHook() {
+  if (g_caption_hook != nullptr) return;
+  g_caption_hook = SetWindowsHookExW(WH_CBT, CaptionCbtProc, nullptr,
+                                     GetCurrentThreadId());
+}
+
+void RemoveCaptionHook() {
+  if (g_caption_hook == nullptr) return;
+  UnhookWindowsHookEx(g_caption_hook);
+  g_caption_hook = nullptr;
 }
 
 }  // namespace
@@ -60,6 +121,9 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+
+  // Before the engine exists, so no window of it is ever created without it.
+  InstallCaptionHook();
 
   RECT frame = GetClientArea();
 
@@ -96,15 +160,21 @@ bool FlutterWindow::OnCreate() {
           // The Flutter title bar replaces the OS caption of a secondary
           // window. The main window already runs without one.
           if (hwnd != GetHandle()) {
-            if (!SetWindowSubclass(hwnd, CustomCaptionProc,
-                                   kCustomCaptionSubclassId, 0)) {
-              result->Error("subclass_failed",
-                            "The window caption could not be replaced.");
-              return;
+            // Normally the creation hook has done this already; this is the
+            // fallback for a window it did not see.
+            DWORD_PTR ref_data = 0;
+            if (!GetWindowSubclass(hwnd, CustomCaptionProc,
+                                   kCustomCaptionSubclassId, &ref_data)) {
+              if (!SetWindowSubclass(hwnd, CustomCaptionProc,
+                                     kCustomCaptionSubclassId, 0)) {
+                result->Error("subclass_failed",
+                              "The window caption could not be replaced.");
+                return;
+              }
+              SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                           SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE |
+                               SWP_NOZORDER | SWP_NOACTIVATE);
             }
-            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
-                         SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE |
-                             SWP_NOZORDER | SWP_NOACTIVATE);
           }
           result->Success(flutter::EncodableValue());
         } else if (method == "isMaximized") {
@@ -174,6 +244,7 @@ HWND FlutterWindow::TargetWindow(const flutter::EncodableValue* arguments) {
 }
 
 void FlutterWindow::OnDestroy() {
+  RemoveCaptionHook();
   if (window_channel_) {
     window_channel_->SetMethodCallHandler(nullptr);
   }

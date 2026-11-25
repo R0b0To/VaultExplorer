@@ -7,6 +7,7 @@
 # Needs: cmake (>= 3.22), ninja, git, network access (CMake fetches the engine's third-party sources),
 #   sudo apt install g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix        # the "posix" thread model
 #   sudo apt install wine64                                                        # optional: run the test
+#   sudo apt install nasm                                                          # optional: libjpeg-turbo SIMD (JPEG thumbnails)
 # Output: <output-dir>/vaultexplorer_engine.dll  (self-contained: only system DLLs are imported)
 #         <output-dir>/ve_smoke_test.exe
 # Building ON Windows instead? Use the MSYS2 UCRT64 shell (pacman -S mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}

@@ -709,6 +709,7 @@ if(VAULTEXPLORER_DESKTOP)
             ffi/ve_foldervault.cpp
             ffi/ve_callbacks.cpp
             ffi/ve_archive.cpp
+            ffi/ve_image.cpp
             ffi/ve_repair.cpp
             ffi/ve_tools.cpp
             ffi/ve_composite.cpp
@@ -722,6 +723,20 @@ if(VAULTEXPLORER_DESKTOP)
     else()
         list(APPEND VE_ENGINE_SOURCES ffi/ve_rawdev_posix.cpp)
     endif()
+    # Native image thumbnails (imaging/thumb.cpp) and the codecs behind them. Desktop only: Android decodes with
+    # BitmapFactory and does not build, fetch or link any of this. A static library of its own, so the codec
+    # headers (jpeglib.h, png.h, webp/) are visible to that one file and nothing else in the engine.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/imaging_deps.cmake)
+    add_library(ve_imaging STATIC imaging/thumb.cpp)
+    target_include_directories(ve_imaging PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${VE_IMAGING_INCLUDE_DIRS})
+    target_compile_features(ve_imaging PRIVATE cxx_std_17)
+    target_compile_options(ve_imaging PRIVATE -Wall -Wextra)
+    set_target_properties(ve_imaging PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+            C_VISIBILITY_PRESET hidden
+            CXX_VISIBILITY_PRESET hidden)
+    target_link_libraries(ve_imaging PUBLIC ${VE_JPEG_LIB} ${VE_PNG_LIB} ${VE_WEBP_DECODER_LIB})
+    add_dependencies(ve_imaging libjpeg_turbo_ep)  # its headers must be installed before thumb.cpp compiles
 endif()
 
 add_library(vaultexplorer SHARED ${VE_ENGINE_SOURCES})
@@ -844,7 +859,7 @@ target_link_libraries(
 
 if(VAULTEXPLORER_DESKTOP)
     find_package(Threads REQUIRED)
-    target_link_libraries(vaultexplorer Threads::Threads)
+    target_link_libraries(vaultexplorer Threads::Threads ve_imaging)
     # Lets session/session_prepare.cpp treat a whole raw device (no partition table) as one candidate volume.
     target_compile_definitions(vaultexplorer PRIVATE VE_DESKTOP_RAW_DEVICES=1)
     if(WIN32)
@@ -1110,6 +1125,18 @@ if(NOT ANDROID)
     target_link_libraries(ve_archive_test ${ARCHIVE_ENGINE_LIBRARY})
     list(APPEND VAULTEXPLORER_HOST_TESTS ve_archive_test)
 
+    # Native image thumbnails (imaging/thumb.cpp): every format and size, EXIF orientations, alpha, truncated and
+    # hostile input, size guards, many threads. Desktop engine builds only (it needs the codecs of
+    # imaging_deps.cmake, and the libwebp ENCODER for its fixtures). Compiles thumb.cpp into itself rather than
+    # linking ve_imaging, because it links libwebp's full library (encoder + decoder) instead of the decoder-only one.
+    if(VAULTEXPLORER_DESKTOP AND TARGET ve_png AND TARGET webp)
+        add_executable(thumb_test imaging/test/thumb_test.cpp imaging/thumb.cpp)
+        target_include_directories(thumb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${VE_IMAGING_INCLUDE_DIRS})
+        target_link_libraries(thumb_test ${VE_JPEG_LIB} ${VE_PNG_LIB} webp Threads::Threads)
+        add_dependencies(thumb_test libjpeg_turbo_ep)
+        list(APPEND VAULTEXPLORER_HOST_TESTS thumb_test)
+    endif()
+
     # Folder-vault core: known-answer vectors, per-format scenarios, tamper /
     # rollback / legacy-name handling and thread stress. The interop scripts in
     # foldervault/test/interop additionally drive `fvcli` against the real
@@ -1282,5 +1309,8 @@ if(NOT ANDROID)
     endif()
     if(TARGET ve_archive_test)
         add_test(NAME ve_archive_test COMMAND ve_archive_test)
+    endif()
+    if(TARGET thumb_test)
+        add_test(NAME thumb_test COMMAND thumb_test)
     endif()
 endif()

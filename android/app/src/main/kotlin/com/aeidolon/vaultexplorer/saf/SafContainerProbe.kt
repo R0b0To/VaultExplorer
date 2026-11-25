@@ -64,8 +64,7 @@ internal fun classifyOpenFailure(e: Throwable): OpenFailureKind {
  *
  * The native block layer wants a seekable descriptor it can pread/pwrite. Most
  * local providers (ExternalStorageProvider, Downloads, MediaProvider) hand out
- * exactly that, so the descriptor can be used directly -- which is also how
- * VaultPony opens containers. Only providers that cannot (cloud / network
+ * exactly that, so the descriptor can be used directly. Only providers that cannot (cloud / network
  * backed) need SplitFuseCallback and its staging logic.
  *
  * The probe is deliberately non-destructive: it never writes to the file.

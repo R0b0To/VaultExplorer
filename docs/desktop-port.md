@@ -150,6 +150,12 @@ Android is untouched: the JNI bridges and Kotlin are not involved on desktop, an
     scripts/build_desktop_engine.sh
     build/desktop-engine/ve_smoke_test fat exfat ntfs ext4     # expect: "N checks, 0 failed"
 
+Install `nasm` too (`sudo apt install nasm`): libjpeg-turbo, which the native image thumbnails use (see "Image
+thumbnails"), builds its SIMD code with it. Without NASM the build still works, with a CMake warning, and JPEG
+decoding is slower. The thumbnailer has its own host test:
+
+    cmake --build build/desktop-engine --target thumb_test && build/desktop-engine/thumb_test    # "N groups of checks passed"
+
 ## Run the app on Linux
 
 0. Linux packages for the secret store (saved vaults and credentials live in the OS keyring):
@@ -190,7 +196,7 @@ Build the engine (either way produces the same DLL):
 
     scripts/build_desktop_engine_windows.sh                # from Linux, cross-compiling with MinGW-w64
     # or, natively in an MSYS2 UCRT64 shell (install these tools once):
-    pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc git
+    pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-nasm git
     cmake -S android/app/src/main/cpp -B build/desktop-engine-win -G Ninja -DVAULTEXPLORER_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release
     cmake --build build/desktop-engine-win --target vaultexplorer ve_smoke_test
 
@@ -401,6 +407,46 @@ media viewer -> NativeVideoController -> VideoPlaybackBackend
   Without libmpv the app still runs; opening a video shows an "install libmpv" error. `pubspec.lock` was not
   regenerated.
 
+### Image thumbnails
+
+`getImageThumbnail` / `getImageThumbnailWithSize` (and the large-image preview, which asks for 2048 px) are made by
+the engine itself, in C++, the way Android's BitmapFactory path does it (ABI 15: `ve_image_thumbnail`,
+`ve_image_thumbnail_file`, `ve_image_thumbnail_mem`; the decoding is `imaging/thumb.cpp`, platform-neutral, with a
+host test):
+
+```
+host -> DesktopImages (desktop_images.dart)
+          |- DesktopNativeThumbnails (desktop_native_thumbnails.dart): a pool of its own, min(cores-1, 8) workers
+          |     '- one blocking native call: read through a 256 KiB read-ahead, decode, shrink, encode
+          '- Flutter's codecs, only for what the engine does not handle (GIF, BMP, ICO, animated WebP, CMYK JPEG)
+             or when the native pool cannot run: whole file read into Dart, dart:ui, PNG out
+```
+
+- **JPEG** is decoded at 1/2, 1/4 or 1/8 size straight from the DCT (libjpeg-turbo's scaled IDCT), as much as keeps
+  the result at least the thumbnail's size, then box-filtered to the exact size. The entropy decode still reads
+  every byte of the file, so a photo costs a few tens of milliseconds at 24 MP, not a few. **PNG** is decoded row by
+  row into a streaming box filter (memory is proportional to the thumbnail; only an interlaced PNG needs the whole
+  picture). **WebP** is scaled inside libwebp while decoding. EXIF orientation is applied and the reported source
+  size is the upright one, as on Android.
+- The answer is a JPEG of the requested quality, or a PNG when some pixel is really not opaque (the Flutter route
+  always answered PNG; a transparent picture still shows its transparency).
+- Thumbnails run in their own worker pool, so a screen full of tiles never queues a directory listing or an unlock
+  behind it, and no file is copied across an isolate boundary: only the few-KB result is.
+- Size guards mirror Android's contract: a source above 256 MiB, or one whose decode would need more than 1 GiB
+  (a progressive JPEG or interlaced PNG; a baseline JPEG and a plain PNG stream and have no such limit) answers
+  `IMAGE_TOO_LARGE`; running out of memory answers `OUT_OF_MEMORY`. All decoders in flight share a 1.5 GiB budget,
+  so several big ones take turns instead of exhausting the machine.
+- Local-storage items and the temp files of archive previews (`isLocalStorage`) are read from the host path. The
+  Flutter route ignored that flag and failed on them.
+- The desktop capability tier (which sizes the Dart-side thumbnail concurrency and caches) is now "LOW" only up to 2
+  logical processors, "HIGH" from 6 (it was 4 and 8): a computer is not a phone.
+- Codecs (desktop engine only, pinned, in `imaging_deps.cmake`): libjpeg-turbo (built through ExternalProject,
+  because its CMakeLists refuses `add_subdirectory`), libpng (compiled from source against the engine's zlib),
+  libwebp (decoder linked into the engine; the encoder only into the host test). They are listed in NOTICE.md.
+  Android builds none of this.
+- Not done natively: GIF / BMP / ICO / TIFF (Flutter fallback), animated WebP (Flutter shows the first frame), ICC
+  colour profiles, HEIC / AVIF / JPEG XL (neither route can decode them).
+
 ### Video thumbnails
 
 `getVideoThumbnail` / `getVideoThumbnailWithSize` take one frame out of the same libmpv the player uses (Android
@@ -410,8 +456,9 @@ uses MediaMetadataRetriever; the engine has no video decoder of its own):
 host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), slots, cancel on lock)
           |- grabFrameWithMpv   (mpv_frame_grabber.dart: fresh paused Player + VideoController, first picture,
           |                      Player.screenshot as JPEG, player disposed)
-          '- decodeVideoFrame   (video_frame_decoder.dart: scale-while-decoding to the target size, PNG out,
-                                  8x8 "is this frame blank" check)
+          '- nativeFrameDecoder (video_frame_decoder.dart: the frame goes to the thumbnail pool; the engine shrinks it,
+                                  runs the 8x8 "is this frame blank" check and answers a small JPEG. Flutter's
+                                  decodeVideoFrame -- PNG out -- is the fallback)
 ```
 
 - Source: the loopback media server session of the file (so nothing decrypted touches storage), or a `file:` URL
@@ -425,7 +472,8 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
   `framePosition`, 25% or 45%. An explicit `timeUs` (the video editor) is used as is.
 - At most 2 players at a time; a locked vault drops its queued requests. Any failure answers `null`, which the Dart
   side treats as "no thumbnail for this video" (placeholder icon), exactly as for an Android `FRAME_FAILED`.
-- Thumbnails are PNG (like image thumbnails), so they are larger than Android's JPEG ones in the cache.
+- Thumbnails are JPEG, like Android's (a frame with transparency would be PNG). Starting a libmpv player per frame is
+  still the dominant cost of a video thumbnail; the frame decode no longer is.
 - The pure parts (`video_thumbnail_logic.dart`, `desktop_video_thumbnails.dart`) are covered by
   `test/core/engine/desktop/video_thumbnail_logic_test.dart` and `desktop_video_thumbnails_test.dart`. The mpv and
   `dart:ui` adapters have **not been run inside Flutter**: they follow `desktop_video_backend.dart` and

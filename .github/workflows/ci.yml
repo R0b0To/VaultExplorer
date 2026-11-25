@@ -154,7 +154,7 @@ jobs:
             clang cmake ninja-build pkg-config git perl curl unzip xz-utils zip \
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libsecret-1-dev libjsoncpp-dev \
-            libmpv-dev mpv libfuse3-dev fuse3 zlib1g-dev
+            libmpv-dev mpv libfuse3-dev fuse3 zlib1g-dev nasm
 
       - name: Build the desktop engine and ve_smoke_test
         run: |
@@ -168,6 +168,13 @@ jobs:
       # folder vaults (gocryptfs / Cryptomator / CryFS), one-shot crypto, hashing and single-file crypto.
       - name: Run ve_smoke_test
         run: build/desktop-engine/ve_smoke_test fat exfat ntfs ext4
+
+      # Native image thumbnails (imaging/thumb.cpp): every format and size, EXIF orientations, alpha, truncated and
+      # hostile input, size guards, many threads -- against the pinned libjpeg-turbo / libpng / libwebp builds.
+      - name: Build and run thumb_test
+        run: |
+          cmake --build build/desktop-engine --target thumb_test
+          build/desktop-engine/thumb_test
 
       - name: Build ve_mount_test
         run: cmake --build build/desktop-engine --target ve_mount_test

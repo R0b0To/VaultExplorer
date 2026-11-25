@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 14 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 15 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -57,6 +57,8 @@ extern "C" {
 #define VE_ERR_DEVICE_PERMISSION 12  /* the OS refused: needs root / the disk group / an elevated process */
 #define VE_ERR_DEVICE_BUSY 13        /* a write open was refused because the OS has it (or a partition) mounted */
 #define VE_ERR_DEVICE_OPEN 14        /* anything else: not a disk or image, already open in another slot, I/O error */
+#define VE_ERR_TOO_LARGE 15          /* refused by a size guard (e.g. ve_image_thumbnail: the picture is too big to decode) */
+#define VE_ERR_NO_MEMORY 16          /* ran out of memory (ve_image_thumbnail) */
 
 /* ---- library info / logging -------------------------------------------- */
 VE_API int32_t ve_abi_version(void);
@@ -778,6 +780,31 @@ VE_API int32_t ve_archive_create(int32_t src_vol, const char* const* src_paths, 
                                  int32_t encrypt_filenames, int32_t compression_level,
                                  int32_t compression_method, uint64_t split_size, const char* temp_dir,
                                  int32_t op_id, ve_buffer* out);
+
+/* ---- image thumbnails (ABI 15) -----------------------------------------------------------------------
+ * Decodes a JPEG, PNG or WebP and answers a small picture that fits target_size x target_size (never enlarged),
+ * in ONE blocking call: the source is read through a read-ahead buffer (never loaded whole, except WebP), a JPEG
+ * is shrunk inside its DCT (1/2, 1/4, 1/8), a PNG is box-filtered row by row, and the result is a JPEG of the given
+ * quality (1..100) -- or a PNG when some pixel is really not opaque. EXIF orientation is applied, so the size
+ * reported is the picture as a viewer shows it. preserve_alpha is accepted for parity with Android and does not
+ * change the outcome. Thread-safe; run it in a worker isolate.
+ *   ve_image_thumbnail       a file inside an unlocked slot (container or folder vault)
+ *   ve_image_thumbnail_file  a file on the host (UTF-8 path)
+ *   ve_image_thumbnail_mem   a picture already in memory (e.g. a video frame)
+ * max_source_bytes > 0 refuses a larger file (VE_ERR_TOO_LARGE); <= 0 takes the 256 MiB default.
+ * `info` receives VE_IMAGE_INFO_COUNT int32 values:
+ *   [0] 1 = PNG, 0 = JPEG   [1] source width   [2] source height   [3] thumbnail width   [4] thumbnail height
+ *   [5] 1 = some pixel is not opaque   [6] 1 = the thumbnail looks blank (flat / black / white / low contrast)
+ * Results: VE_OK; VE_ERR_UNSUPPORTED (not one of the three formats, an animated WebP, a CMYK JPEG: the caller should
+ * use another decoder); VE_ERR_TOO_LARGE; VE_ERR_NO_MEMORY; VE_ERR_NOT_UNLOCKED / VE_ERR_INVALID_ARG; otherwise
+ * VE_ERR_FAILED (missing, unreadable or corrupt). *out is empty on every failure. */
+#define VE_IMAGE_INFO_COUNT 8
+VE_API int32_t ve_image_thumbnail(int32_t vol_id, const char* path, int32_t target_size, int32_t quality,
+                                  int32_t preserve_alpha, int64_t max_source_bytes, ve_buffer* out, int32_t* info);
+VE_API int32_t ve_image_thumbnail_file(const char* host_path_utf8, int32_t target_size, int32_t quality,
+                                       int32_t preserve_alpha, int64_t max_source_bytes, ve_buffer* out, int32_t* info);
+VE_API int32_t ve_image_thumbnail_mem(const uint8_t* data, size_t len, int32_t target_size, int32_t quality,
+                                      int32_t preserve_alpha, ve_buffer* out, int32_t* info);
 
 /* ---- OS mounts (Linux: FUSE 3; Windows: WinFsp, not built yet) -------------------------------------
  * Exposes an unlocked slot as a real folder / drive so any application and the file manager can use it --

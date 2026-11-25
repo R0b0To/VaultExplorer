@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/utils/secure_temp_file.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 
 /// Callback that checks whether any external process still holds an open handle
 /// to a file inside [dirPath].
@@ -94,6 +95,7 @@ class DesktopStagingManager {
 
   static const String batchDirPrefix = 'vaultexplorer-xfer-';
   static const String lockFileName = 'batch.lock';
+  static const String _logTag = 'DesktopStagingManager';
 
   final Directory? _baseDirOverride;
   StagingInUseProbe? _isBatchInUse;
@@ -201,16 +203,22 @@ class DesktopStagingManager {
       } on FileSystemException {
         try {
           await raf?.close();
-        } catch (_) {}
+        } catch (e) {
+          VeLog.w(_logTag, 'Could not close an orphaned batch lock file', e);
+        }
         return false; // Held by another running VaultExplorer instance.
       }
     }
     try {
       await raf?.unlock();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(_logTag, 'Could not unlock an orphaned batch lock file', e);
+    }
     try {
       await raf?.close();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(_logTag, 'Could not close an orphaned batch lock file', e);
+    }
     await SecureTempFile.wipeAndDeleteDir(dir);
     return !await dir.exists();
   }
@@ -250,7 +258,13 @@ class DesktopStagingManager {
       debugPrint('[desktop-staging] could not acquire batch.lock: $e');
       try {
         await lockRaf?.close();
-      } catch (_) {}
+      } catch (closeError) {
+        VeLog.w(
+          _logTag,
+          'Could not close an unacquired batch lock file',
+          closeError,
+        );
+      }
       lockRaf = null;
     }
 
@@ -330,7 +344,13 @@ class DesktopStagingManager {
     if (batch == null || batch.disposed) return;
     try {
       await _releaseClipboardBatch?.call(batchId);
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(
+        _logTag,
+        'Could not release expired clipboard ownership for $batchId',
+        e,
+      );
+    }
     if (!batch.realized) {
       await cleanupBatch(batchId);
       return;
@@ -382,10 +402,14 @@ class DesktopStagingManager {
 
     try {
       await _cancelNativeBatch?.call(batchId);
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(_logTag, 'Could not cancel native staging work for $batchId', e);
+    }
     try {
       await _releaseClipboardBatch?.call(batchId);
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(_logTag, 'Could not release clipboard ownership for $batchId', e);
+    }
 
     await batch.releaseLock();
     await SecureTempFile.wipeAndDeleteDir(batch.directory);

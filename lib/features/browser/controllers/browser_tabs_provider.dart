@@ -170,6 +170,14 @@ class BrowserTabsConfig {
   final String? initialPath;
   final bool includeDashboardTab;
 
+  /// A category to start on when there is no [initialContainer]: the window of
+  /// a tab that was dragged out of another window while it showed a category.
+  /// [initialCategoryContainer] and [initialCategoryIncludesVaults] are that
+  /// tab's own settings (see [CategoryTab]).
+  final FileCategory? initialCategory;
+  final MountedContainer? initialCategoryContainer;
+  final bool initialCategoryIncludesVaults;
+
   /// True when this workspace is the app's root surface (decoy mode): no route
   /// lies beneath it. Closing the last tab reopens the primary location instead
   /// of leaving, and back at the root of the visible tab leaves the app.
@@ -181,6 +189,9 @@ class BrowserTabsConfig {
     this.initialPath,
     this.includeDashboardTab = false,
     this.appRoot = false,
+    this.initialCategory,
+    this.initialCategoryContainer,
+    this.initialCategoryIncludesVaults = true,
   });
 
   factory BrowserTabsConfig.create({
@@ -188,12 +199,18 @@ class BrowserTabsConfig {
     String? initialPath,
     bool includeDashboardTab = false,
     bool appRoot = false,
+    FileCategory? initialCategory,
+    MountedContainer? initialCategoryContainer,
+    bool initialCategoryIncludesVaults = true,
   }) => BrowserTabsConfig._(
     sessionId: _nextSessionId++,
     initialContainer: initialContainer,
     initialPath: initialPath,
     includeDashboardTab: includeDashboardTab,
     appRoot: appRoot,
+    initialCategory: initialCategory,
+    initialCategoryContainer: initialCategoryContainer,
+    initialCategoryIncludesVaults: initialCategoryIncludesVaults,
   );
 
   @override
@@ -314,18 +331,30 @@ class BrowserTabs extends _$BrowserTabs {
       dashboard = BrowserTabState.home(tabId: TabId.allocate());
       tabs.add(dashboard);
     }
-    if (config.initialContainer == null && dashboard == null) {
+    final initialCategory = config.initialCategory;
+    if (config.initialContainer == null &&
+        initialCategory == null &&
+        dashboard == null) {
       throw ArgumentError(
         'A browser tab engine needs an initial location or Dashboard tab.',
       );
     }
     final initialContainer = config.initialContainer;
-    if (initialContainer != null) {
-      final firstFileTab = BrowserTabState.folder(
-        tabId: TabId.allocate(),
-        container: initialContainer,
-        initialPath: config.initialPath,
-      );
+    final BrowserTabState? firstFileTab = initialContainer != null
+        ? BrowserTabState.folder(
+            tabId: TabId.allocate(),
+            container: initialContainer,
+            initialPath: config.initialPath,
+          )
+        : initialCategory != null
+        ? BrowserTabState.category(
+            tabId: TabId.allocate(),
+            category: initialCategory,
+            primaryLocalContainer: config.initialCategoryContainer,
+            includeVaults: config.initialCategoryIncludesVaults,
+          )
+        : null;
+    if (firstFileTab != null) {
       tabs.add(firstFileTab);
       return BrowserTabsState(
         tabs: List.unmodifiable(tabs),

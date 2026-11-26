@@ -76,8 +76,9 @@ bool BoolArgument(const flutter::EncodableMap& map, const char* key) {
 int64_t IntArgument(const flutter::EncodableMap& map, const char* key) {
   const auto* value = FindArgument(map, key);
   if (value != nullptr) {
-    if (const auto* small = std::get_if<int32_t>(value)) return *small;
-    if (const auto* large = std::get_if<int64_t>(value)) return *large;
+    // (Not "small": rpcndr.h defines that as a macro for char.)
+    if (const auto* narrow = std::get_if<int32_t>(value)) return *narrow;
+    if (const auto* wide = std::get_if<int64_t>(value)) return *wide;
   }
   return 0;
 }

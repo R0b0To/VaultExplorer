@@ -208,10 +208,10 @@ class DesktopMediaSession::Impl {
       props.StartTime(Millis(0));
       props.MinSeekTime(Millis(0));
       props.Position(Millis(u.position_ms));
-      props.MaxSeekTime(Millis(u.duration_ms));
+      props.MaxSeekTime(Millis(u.can_seek ? u.duration_ms : 0));
       props.EndTime(Millis(u.duration_ms));
+      // Seeking is offered when the timeline has a range to seek in.
       controls_.UpdateTimelineProperties(props);
-      controls_.IsPlaybackPositionEnabled(u.can_seek);
     }
   }
 

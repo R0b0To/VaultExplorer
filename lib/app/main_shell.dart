@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
+import 'package:vaultexplorer/core/windowing/app_windows.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
@@ -288,8 +289,14 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!_tabShortcutsActive) return;
     final state = _browserWorkspaceState;
     final activeTabId = state?.activeTabId;
-    // The last tab stays: closing it would leave nothing to show.
-    if (state == null || activeTabId == null || state.tabs.length < 2) return;
+    if (state == null || activeTabId == null) return;
+    if (state.tabs.length < 2) {
+      // On desktop the last tab goes with its window, like in a browser. On
+      // other platforms there is no window to close, and the tab stays:
+      // closing it would leave nothing to show.
+      if (PlatformFeatures.isDesktop) closeWindowOf(context);
+      return;
+    }
     _browserWorkspaceActions?.closeTab(activeTabId);
   }
 
@@ -320,6 +327,12 @@ class _MainShellState extends ConsumerState<MainShell>
       openWindow: (container, initialPath) =>
           openFileManagerWindow(container: container, initialPath: initialPath),
       openVaultsWindow: (title) => openFileManagerWindow(title: title),
+      openTabWindow: (tab, initialPath, windowSize) =>
+          openFileManagerWindowForTab(
+            tab,
+            initialPath: initialPath,
+            windowSize: windowSize,
+          ),
     );
     // Cached so asynchronous lock callbacks stay safe after this widget is
     // unmounted.

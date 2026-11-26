@@ -42,6 +42,10 @@ class SecondaryWindowEntry {
 
   late final flutter_window.WindowController _controller;
 
+  /// The id of this window's view, which is how the platform runner knows the
+  /// window (see `windowChannelArgsFor`).
+  int get viewId => _controller.rootView.viewId;
+
   /// Closes this window.
   void close() => SecondaryWindows.instance.close(key);
 
@@ -107,6 +111,10 @@ class SecondaryWindows extends ChangeNotifier {
   /// main window leaves it open, and the app ends when the last window opened
   /// this way closes.
   ///
+  /// [onCreated] runs once, right after a new window exists (not when an
+  /// open one is brought forward), before its first frame. It is the moment to
+  /// place the window, since the platform only shows it after that frame.
+  ///
   /// Returns false when native windows are not available (Android, a
   /// `VE_MULTI_WINDOW=0` run, or an embedder that refused); the caller then
   /// shows the page inside the main window instead.
@@ -120,6 +128,7 @@ class SecondaryWindows extends ChangeNotifier {
       minWidth: 420,
       minHeight: 480,
     ),
+    void Function(SecondaryWindowEntry entry)? onCreated,
   }) {
     final existing = _entries[key];
     if (existing != null) {
@@ -151,6 +160,13 @@ class SecondaryWindows extends ChangeNotifier {
     }
     _entries[key] = entry;
     notifyListeners();
+    if (onCreated != null) {
+      try {
+        onCreated(entry);
+      } catch (error) {
+        VeLog.w(_kLogTag, 'Setting up window "$key" failed', error);
+      }
+    }
     return true;
   }
 

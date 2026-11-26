@@ -48,3 +48,28 @@ Future<void> declareRunnerWindowUnused() async {
     VeLog.w('WindowCaption', 'The runner did not accept the call', error);
   }
 }
+
+/// Moves the window that shows [viewId] so that the mouse cursor ends up
+/// [anchor] (logical pixels) inside its top-left corner, and keeps it on the
+/// screen the cursor is on.
+///
+/// Used for a window opened by dragging a tab out of another one, so that it
+/// appears where the tab was let go. Windows only: that is where the runner
+/// can answer. Elsewhere the window manager places new windows itself and this
+/// does nothing. Never throws; a runner that does not know the call (or a
+/// window that is already gone) leaves the window where the platform put it.
+Future<void> placeWindowAtCursor(
+  int viewId, {
+  Offset anchor = Offset.zero,
+}) async {
+  if (!PlatformFeatures.isWindows) return;
+  try {
+    await kWindowChannel.invokeMethod<void>('placeAtCursor', <String, Object?>{
+      'viewId': viewId,
+      'anchorX': anchor.dx,
+      'anchorY': anchor.dy,
+    });
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not place the window at the cursor', error);
+  }
+}

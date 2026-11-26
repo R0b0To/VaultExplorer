@@ -1,22 +1,18 @@
 import 'dart:async';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
-import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
-import 'package:vaultexplorer/data/models/video_playback_mode.dart';
-import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
-import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/encrypted_image_widget.dart';
+import 'package:vaultexplorer/features/browser/widgets/preview_pane_handoff.dart';
 
 /// Full-resolution image for the desktop preview pane.
 ///
@@ -173,75 +169,19 @@ class _PreviewPaneVideoState extends State<PreviewPaneVideo> {
   void _popOut() {
     final manager = _manager;
     final controller = _controller;
-    if (_handedOff ||
-        manager == null ||
-        controller == null ||
-        controller.isDisposed ||
-        controller.value.hasError) {
-      return;
-    }
-    final host = BackgroundPlaybackHost.instance;
-    final providers = ProviderScope.containerOf(context, listen: false);
-
-    // Where the video is on screen now, so the window takes off from it.
-    Rect? from;
-    final box = context.findRenderObject();
-    if (box is RenderBox && box.hasSize && controller.value.isInitialized) {
-      final fitted = applyBoxFit(
-        BoxFit.contain,
-        Size(controller.value.aspectRatio, 1),
-        box.size,
-      ).destination;
-      final origin = box.localToGlobal(
-        Offset(
-          (box.size.width - fitted.width) / 2,
-          (box.size.height - fitted.height) / 2,
-        ),
-      );
-      from = origin & fitted;
-    }
-
-    final session = BackgroundPlaybackSession(
-      providers: providers,
+    if (_handedOff || manager == null || controller == null) return;
+    final handedOff = handOffPreviewPlayback(
+      context: context,
       container: widget.container,
-      playlist: PlaylistController(
-        container: widget.container,
-        fileIoApi: providers.read(vaultFileIoApiProvider),
-        initialMediaFiles: <String>[widget.filePath],
-        initialIndex: 0,
-        startingFolder: widget.startingFolder,
-      ),
-      playbackManager: manager,
-      playbackMode: VideoPlaybackMode.playOnce,
-      playbackSpeed: 1,
-      isMuted: false,
-      thumbnailQuality: widget.quality,
-      thumbnailCacheMode: widget.cacheMode,
+      filePath: widget.filePath,
+      manager: manager,
+      controller: controller,
+      quality: widget.quality,
+      cacheMode: widget.cacheMode,
       startingFolder: widget.startingFolder,
-      mediaFilter: null,
-      sortBy: SortBy.name,
-      sortAscending: true,
-      pinnedPaths: null,
-      floatingPlayer: true,
+      floating: true,
     );
-
-    if (from != null && !from.isEmpty) {
-      host.beginFloatingEntry(
-        FloatingPlayerEntry(playbackManager: manager, from: from),
-      );
-    }
-    // False when the app is locked: the player stays here, to be disposed
-    // with the pane.
-    if (!host.adopt(session)) {
-      host.endFloatingEntry();
-      return;
-    }
-    // The window takes off from the entry's rectangle when it is created, which
-    // happens in the next frame; the entry may only end after that.
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => host.endFloatingEntry(),
-    );
-
+    if (!handedOff) return;
     controller.removeListener(_onTick);
     setState(() {
       _handedOff = true;

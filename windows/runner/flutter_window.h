@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "desktop_media_session.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -32,6 +33,16 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_channel_;
+
+  // The system media controls (media keys, the media overlay). Created by the
+  // first "update" of the "desktop_media" channel, on the window of the view it
+  // names; null until something plays.
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      media_channel_;
+  std::unique_ptr<DesktopMediaSession> media_session_;
+
+  // Passes the buttons pressed in the system media controls on to Dart.
+  void DispatchMediaCommands();
 
   // Looks up views other than the main one (secondary windows).
   FlutterDesktopPluginRegistrarRef window_registrar_ = nullptr;

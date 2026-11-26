@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/desktop_media/desktop_media_controls.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
@@ -49,6 +50,15 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
     unawaited(_initializeMediaSessionBridge());
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Linux and Windows have no media notification: the system media controls
+    // (media keys, the OS now-playing panel) are what steers background
+    // playback there. A no-op elsewhere, and after the first call.
+    DesktopMediaControls.instance.start(viewId: View.maybeOf(context)?.viewId);
+  }
+
   Future<void> _initializeMediaSessionBridge() async {
     await MediaSessionBridge.ensureInitialized();
     if (mounted) _onOpenPlayerRequest();
@@ -64,6 +74,7 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
     unawaited(_openPlayerSubscription?.cancel());
     final host = BackgroundPlaybackHost.instance;
     if (host.expandHandler == _reopenViewer) host.expandHandler = null;
+    DesktopMediaControls.instance.stop();
     super.dispose();
   }
 

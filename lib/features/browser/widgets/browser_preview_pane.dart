@@ -196,6 +196,11 @@ class BrowserPreviewPane extends StatelessWidget {
                         filePath: entryPath,
                         sizeBytes: entry.sizeBytes,
                         poster: thumbnailContent,
+                        startingFolder: currentDirPath.isEmpty
+                            ? null
+                            : currentDirPath,
+                        quality: quality,
+                        cacheMode: cacheMode,
                       ),
                       PreviewPaneKind.text ||
                       PreviewPaneKind.unknownText => PreviewPaneText(

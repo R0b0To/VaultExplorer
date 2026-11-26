@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart'
     show isDesktopEngineTarget;
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -118,6 +119,16 @@ class DesktopMediaControls {
   NativeVideoController? _controller;
   bool _started = false;
 
+  /// Keeps the toolbar settings provider alive while a session runs. It is an
+  /// auto-dispose provider whose every creation loads the settings from
+  /// encrypted storage, and without a listener each `read` below would build
+  /// (and load) a fresh one, several times a second.
+  ProviderSubscription<FileManagerToolbarSettingsState>? _settings;
+
+  /// The last state handed to the platform, to send only what changed.
+  DesktopMediaState? _lastSent;
+  DateTime _lastSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   /// Starts following the host. [viewId] is the Flutter view the app draws in
   /// (the system controls attach to its window on Windows). A no-op off Linux
   /// and Windows, and when already started.
@@ -165,9 +176,16 @@ class DesktopMediaControls {
       manager.activeControllerNotifier.addListener(_onController);
       manager.currentFileNotifier.addListener(_push);
       _bindController(manager.activeController);
+      _settings = session.providers.listen(
+        fileManagerToolbarSettingsProvider(null),
+        (previous, next) {},
+      );
       // Position changes are not worth a push each; a second is what the
-      // system panels can show.
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _push());
+      // system panels can show (they carry on counting by themselves).
+      _timer = Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => _push(fromTimer: true),
+      );
     }
     _push();
   }
@@ -191,6 +209,9 @@ class DesktopMediaControls {
     _timer = null;
     _safeRemove(_controller, _push);
     _controller = null;
+    _settings?.close();
+    _settings = null;
+    _lastSent = null;
     final session = _session;
     _session = null;
     if (session != null) {
@@ -214,10 +235,36 @@ class DesktopMediaControls {
     }
   }
 
-  void _push() {
+  /// What the system surfaces show, apart from the position they extrapolate.
+  static bool _sameShown(DesktopMediaState a, DesktopMediaState b) =>
+      a.active == b.active &&
+      a.title == b.title &&
+      a.artist == b.artist &&
+      a.album == b.album &&
+      a.playing == b.playing &&
+      a.duration == b.duration &&
+      a.canNext == b.canNext &&
+      a.canPrevious == b.canPrevious;
+
+  /// Sends the current state when it changed. The player reports its position
+  /// several times a second; those reports alone only reach the platform from
+  /// the one-second timer ([fromTimer]).
+  void _push({bool fromTimer = false}) {
     final platform = _platform;
     if (platform == null) return;
-    unawaited(platform.update(_currentState()));
+    final state = _currentState();
+    final last = _lastSent;
+    if (last != null && _sameShown(last, state)) {
+      if (!fromTimer) return;
+      if (!state.playing && state.position == last.position) return;
+      if (DateTime.now().difference(_lastSentAt) <
+          const Duration(milliseconds: 900)) {
+        return;
+      }
+    }
+    _lastSent = state;
+    _lastSentAt = DateTime.now();
+    unawaited(platform.update(state));
   }
 
   DesktopMediaState _currentState() {
@@ -232,11 +279,13 @@ class DesktopMediaControls {
         ? session.playlist.currentFile
         : (session.playbackManager.currentFileName ?? '');
 
-    final showNames = session.providers
-        .read(fileManagerToolbarSettingsProvider(null))
-        .config
-        .mediaViewerToolbarConfig
-        .showFileNamesInMediaNotification;
+    final showNames =
+        _settings
+            ?.read()
+            .config
+            .mediaViewerToolbarConfig
+            .showFileNamesInMediaNotification ??
+        false;
     var title = '';
     var artist = '';
     var album = '';
@@ -271,6 +320,7 @@ class DesktopMediaControls {
   }
 
   void _onCommand(DesktopMediaCommandEvent event) {
+    VeLog.i(_kTag, 'Command ${event.command.name} (session: ${_session != null})');
     if (_session == null) return;
     switch (event.command) {
       case DesktopMediaCommand.play:

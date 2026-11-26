@@ -369,6 +369,11 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return '\"$name\" yeniden adlandırılamadı — bu adda bir öğe zaten var olabilir';
   }

@@ -87,6 +87,7 @@
   "newNameHint": "Nuevo nombre",
   "baseNameHint": "Nombre base",
   "couldntCreateItem": "No se pudo crear \"{name}\" — comprueba que el contenedor siga montado",
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
   "couldntRenameSingle": "No se pudo renombrar \"{name}\" — puede que ya exista un elemento con ese nombre",
   "couldntRenameMultiWithReason": "{count, plural, =1{No se pudo renombrar 1 elemento: {reason}} other{No se pudieron renombrar {count} elementos: {reason}}}",
   "couldntRenameMultiNoReason": "{count, plural, =1{No se pudo renombrar 1 elemento} other{No se pudieron renombrar {count} elementos}}",

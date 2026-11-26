@@ -6,9 +6,12 @@ import android.os.ParcelFileDescriptor
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
+import com.aeidolon.vaultexplorer.OpenDiagnostics
+import com.aeidolon.vaultexplorer.SplitPartInfo
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.looksLikeRwModeUnsupported
 import java.io.FileNotFoundException
+import java.io.RandomAccessFile
 
 /**
  * What [SafContainerProbe.open] decided for a single-file SAF container.
@@ -89,7 +92,9 @@ internal object SafContainerProbe {
                 when (classifyOpenFailure(e)) {
                     OpenFailureKind.PERMISSION_DENIED -> {
                         writeDenied = true
-                        VeLog.w(TAG, e) { "Provider refused rw for $label; will mount read-only" }
+                        VeLog.diagW(TAG) {
+                            "provider refused rw (${OpenDiagnostics.failureTag(e)}); will mount read-only"
+                        }
                         null
                     }
                     OpenFailureKind.UNSUPPORTED_MODE ->
@@ -107,7 +112,7 @@ internal object SafContainerProbe {
                     Check.WRITE_NOT_ALLOWED -> {
                         closeQuietly(rw)
                         writeDenied = true
-                        VeLog.w(TAG) { "rw descriptor for $label is not opened for writing; will mount read-only" }
+                        VeLog.diagW(TAG) { "rw descriptor is not opened for writing (grant is read-only); will mount read-only" }
                     }
                     Check.NOT_RANDOM_ACCESS -> {
                         closeQuietly(rw)
@@ -131,6 +136,44 @@ internal object SafContainerProbe {
             closeQuietly(ro)
             SafContainerAccess.NeedsProxy("provider descriptor is not a seekable regular file", writeDenied)
         }
+    }
+
+    /**
+     * Proxy-path counterpart of the F_GETFL check in [open].
+     *
+     * SplitFuseCallback quietly falls back from "rw" to "r" when it opens a part
+     * to read, so without this a proxy mount whose parts cannot be written would
+     * be reported as writable and every later write would fail with EIO. Opens
+     * (and immediately closes) the first and last part read-write; it never
+     * writes, so the files' modification times are untouched.
+     *
+     * @return null when writing looks possible or cannot be decided (a provider
+     *         that does not implement "rw" at all is fine: the proxy stages a
+     *         local mirror for it), otherwise a short non-sensitive reason.
+     */
+    fun probePartsWritable(context: Context, parts: List<SplitPartInfo>): String? {
+        val sampled = if (parts.size > 1) listOf(parts.first(), parts.last()) else parts
+        for (part in sampled) {
+            val file = part.file
+            if (file != null) {
+                try {
+                    RandomAccessFile(file, "rw").close()
+                } catch (e: Exception) {
+                    return "local part not writable: ${OpenDiagnostics.failureTag(e)}"
+                }
+                continue
+            }
+            val pfd: ParcelFileDescriptor? = try {
+                context.contentResolver.openFileDescriptor(part.uri, "rw")
+            } catch (e: Exception) {
+                if (classifyOpenFailure(e) == OpenFailureKind.PERMISSION_DENIED) {
+                    return "provider refused rw: ${OpenDiagnostics.failureTag(e)}"
+                }
+                return null
+            }
+            if (pfd != null) closeQuietly(pfd)
+        }
+        return null
     }
 
     private fun checkRandomAccess(pfd: ParcelFileDescriptor, requireWrite: Boolean): Check {

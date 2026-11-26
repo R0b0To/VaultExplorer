@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.atomic.AtomicInteger
 import com.aeidolon.vaultexplorer.cancellation.ExportCancelledException
 import com.aeidolon.vaultexplorer.cancellation.ImportCancelledException
 import com.aeidolon.vaultexplorer.cancellation.UnlockCancelledException
@@ -29,14 +30,30 @@ class NativeOpSupport(
     private val activity: MainActivity,
     private val ioExecutor: ExecutorService,
 ) {
+    private companion object {
+        const val TAG = "NativeOpSupport"
+    }
+
+    // Rate limiters for the always-on boundary lines (see logWriteReturnedFalse and
+    // dispatchNativeError): a loop of failing calls (a folder of unreadable
+    // thumbnails, a failing import) must not flood logcat.
+    private val falseResultLogs = AtomicInteger(0)
+    private val errorLogs = AtomicInteger(0)
+
     /** Looks up [uriString]'s volId, runs [block] on [executor] (default:
      *  the shared ioExecutor), and reports success/failure back via
-     *  [result] on the UI thread. */
+     *  [result] on the UI thread.
+     *
+     *  [op] names a *write* operation. When such an op returns plain `false`
+     *  (an I/O failure below the JNI layer, as opposed to a READ_ONLY /
+     *  NOT_UNLOCKED exception) nothing else logs it, and the UI can only say
+     *  "check the container is still mounted"; see [logWriteReturnedFalse]. */
     fun <T> runNativeOp(
         uriString: String?,
         result: MethodChannel.Result,
         executor: ExecutorService = ioExecutor,
         label: String? = null,
+        op: String? = null,
         block: (volId: Int) -> T,
     ) {
         if (uriString == null) {
@@ -61,10 +78,25 @@ class NativeOpSupport(
                 }
                 val value = block(volId)
                 if (runStart != 0L) PerfLog.end("native.$label.run", runStart)
+                if (op != null && value is Boolean && !value) logWriteReturnedFalse(op, volId)
                 activity.runOnUiThread { result.success(value) }
             } catch (e: Exception) {
                 activity.runOnUiThread { dispatchNativeError(e, result) }
             }
+        }
+    }
+
+    /**
+     * One always-on line when a write op fails without throwing. The cause is in
+     * the preceding "pwrite64 failed" / "SplitFuseCallback" lines (errno, offset,
+     * fd access mode); this line ties it to the user-visible operation and states
+     * whether the session was flagged read-only. No paths or names.
+     */
+    private fun logWriteReturnedFalse(op: String, volId: Int) {
+        if (!OpenDiagnostics.shouldLogOccurrence(falseResultLogs)) return
+        val session = ContainerSessionRegistry.activeSessions[volId]
+        VeLog.diagW(TAG) {
+            "write op '$op' returned false: volId=$volId sessionReadOnly=${session?.readOnly ?: "no-session"}"
         }
     }
 
@@ -74,6 +106,18 @@ class NativeOpSupport(
         e is IllegalStateException && e.message?.startsWith("READ_ONLY") == true
 
     fun dispatchNativeError(e: Exception, result: MethodChannel.Result) {
+        // Cancellations are user actions. Everything else used to be handed to
+        // Dart without a trace on this side; log the code and the exception
+        // class/errno only (messages carry paths).
+        val cancelled = e is UnlockCancelledException || e is ImportCancelledException || e is ExportCancelledException
+        if (!cancelled && OpenDiagnostics.shouldLogOccurrence(errorLogs)) {
+            val code = when {
+                isNotUnlockedException(e) -> "NOT_UNLOCKED"
+                isReadOnlyException(e) -> "READ_ONLY"
+                else -> "C++_ERROR"
+            }
+            VeLog.diagW(TAG) { "native op failed: code=$code cause=${OpenDiagnostics.failureTag(e)}" }
+        }
         if (e is UnlockCancelledException || e is ImportCancelledException || e is ExportCancelledException) {
             result.error("CANCELLED", e.message, null)
         } else if (isNotUnlockedException(e)) {

@@ -155,7 +155,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "dirPath required", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, op = "createDirectory") { volId ->
             ContainerFileSystem.createDirectory(volId, dirPath)
         }
     }
@@ -180,7 +180,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "oldPath and newPath required", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, op = "renameFile") { volId ->
             ContainerFileSystem.renameFile(volId, oldPath, newPath)
         }
     }
@@ -197,7 +197,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "srcPath, destPath, srcUri, and destUri required", null)
             return
         }
-        nativeOps.runNativeOp(srcUri, result) { srcVolId ->
+        nativeOps.runNativeOp(srcUri, result, op = "copyFile") { srcVolId ->
             val destVolId = ContainerSessionRegistry.getVolumeIdByUri(destUri)
                 ?: throw IllegalStateException("NOT_UNLOCKED: dest")
             try {
@@ -249,7 +249,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "fileName and sourcePath required", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, op = "writeBackFile") { volId ->
             try {
                 ContainerFileSystem.writeBackFile(volId, fileName, sourcePath, opId, singlePass = true)
             } finally {
@@ -288,7 +288,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "fileName required", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, op = "deleteFile") { volId ->
             ContainerFileSystem.deleteFile(volId, fileName)
         }
     }
@@ -305,7 +305,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "Chunk too large (max $MAX_CHUNK_BYTES bytes)", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, op = "writeFileChunk") { volId ->
             ContainerFileSystem.writeFileChunk(volId, fileName, offset, data)
         }
     }

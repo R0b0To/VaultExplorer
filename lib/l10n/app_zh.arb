@@ -87,6 +87,7 @@
   "newNameHint": "新名称",
   "baseNameHint": "基础名称",
   "couldntCreateItem": "无法创建“{name}”——请检查容器是否仍处于挂载状态",
+  "couldntCreateItemWriteFailed": "无法创建“{name}”——写入容器失败",
   "couldntRenameSingle": "无法重命名“{name}”——可能已存在同名项目",
   "couldntRenameMultiWithReason": "{count, plural, other{无法重命名{count}个项目：{reason}}}",
   "couldntRenameMultiNoReason": "{count, plural, other{无法重命名{count}个项目}}",

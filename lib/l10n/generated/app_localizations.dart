@@ -650,6 +650,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t create \"{name}\" — check the container is still mounted'**
   String couldntCreateItem(String name);
 
+  /// Error shown when creating a folder or file fails because the write to the container itself failed (the container is mounted and not read-only, but the storage refused or failed the write)
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t create \"{name}\" — writing to the container failed'**
+  String couldntCreateItemWriteFailed(String name);
+
   /// Error shown when a single-item rename fails
   ///
   /// In en, this message translates to:

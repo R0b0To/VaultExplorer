@@ -588,37 +588,26 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
             if (!packageName.isNullOrEmpty()) {
                 try {
                     activity.startActivity(intent)
+                    result.success(true)
+                    return
                 } catch (e: Exception) {
+                    // The remembered app can't take the file here (gone, disabled,
+                    // or installed only in another profile). Log it and fall back
+                    // to the chooser; the caller passes a requestId in that case
+                    // so the app picked next is remembered in its place.
+                    OpenWithChooser.logReplayFailure(packageName, e)
                     intent.setPackage(null)
-                    val receiverIntent = Intent(activity.ACTION_CHOOSER).apply {
-                        val ext = fileName.substringAfterLast('.', "")
-                        putExtra("extension", ext)
-                        `package` = activity.packageName
-                    }
-                    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                    } else {
-                        PendingIntent.FLAG_UPDATE_CURRENT
-                    }
-                    val pendingIntent = PendingIntent.getBroadcast(activity, 0, receiverIntent, flags)
-                    val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
-                    activity.startActivity(chooser)
                 }
-            } else {
-                val receiverIntent = Intent(activity.ACTION_CHOOSER).apply {
-                    val ext = fileName.substringAfterLast('.', "")
-                    putExtra("extension", ext)
-                    `package` = activity.packageName
-                }
-                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                }
-                val pendingIntent = PendingIntent.getBroadcast(activity, 0, receiverIntent, flags)
-                val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
-                activity.startActivity(chooser)
             }
+            val ext = fileName.substringAfterLast('/').substringAfterLast('.', "")
+            val chooser = OpenWithChooser.build(
+                activity,
+                intent,
+                "Open file with…",
+                ext,
+                call.argument<String>("requestId")
+            )
+            activity.startActivity(chooser)
             result.success(true)
         } catch (e: Exception) {
             result.error("OPEN_WITH_ERROR", e.message, null)

@@ -14,6 +14,7 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/features/browser/remembered_app_capture.dart';
 import 'package:vaultexplorer/features/browser/viewer/close_on_container_lock.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -4179,7 +4180,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       case OpenInEpubReader():
         await _openBook(openName, fullPath, BookKind.epub);
       case OpenWithSystemApp(packageName: final packageName):
-        _openFileWithApp(openName, fullPath, packageName: packageName);
+        _openFileWithApp(
+          openName,
+          fullPath,
+          packageName: packageName,
+          // A saved external-app preference can fall back to the chooser (the
+          // app is gone, lives in another profile, or was never captured).
+          // Learn the app picked there so the preference repairs itself.
+          appPickRequestId: (mounted && isExternalAppPreference(pref))
+              ? armRememberedAppCapture(ref, ext)
+              : null,
+        );
       case InstallApk():
         await _installApk(openName, fullPath);
       case OpenAsArchive():
@@ -4700,20 +4711,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       if (!mounted) return;
       await _openMediaViewer(fileName, fullPath);
     } else if (choice.action == 'external') {
+      String? appPickRequestId;
       if (choice.remember && cleanExt.isNotEmpty) {
+        // Saved as plain 'external' first so the choice sticks even if the
+        // system chooser never reports which app was picked; the pick, when it
+        // does arrive, upgrades it to that app (see armRememberedAppCapture).
         await _saveExtensionPreference(cleanExt, 'external');
-        _vaultEvents.onAppSelectedCallback = (selectedExt, pkg) async {
-          final normalized = selectedExt
-              .toLowerCase()
-              .replaceFirst(RegExp(r'^\.+'), '')
-              .trim();
-          if (normalized == cleanExt) {
-            await _saveExtensionPreference(cleanExt, 'package:$pkg');
-            _vaultEvents.onAppSelectedCallback = null;
-          }
-        };
+        if (!mounted) return;
+        appPickRequestId = armRememberedAppCapture(ref, cleanExt);
       }
-      _openFileWithApp(fileName, fullPath);
+      _openFileWithApp(fileName, fullPath, appPickRequestId: appPickRequestId);
     } else if (choice.action == 'open_as') {
       final mime = choice.mimeType;
       if (mime == null) return;
@@ -5029,26 +5036,30 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  /// Hands the file to another app: [packageName] directly when given,
+  /// otherwise through the system chooser. [appPickRequestId] (from
+  /// [armRememberedAppCapture]) makes the chooser report the app picked there
+  /// so it can be remembered.
   Future<void> _openFileWithApp(
     String cleanName,
     String fullPath, {
     String? packageName,
     String? mimeType,
+    String? appPickRequestId,
   }) async {
     _signalActivity();
     try {
       // Local storage has no vault session to serve the file from --
       // VaultLocalShareApi exposes the real path directly via its own
-      // FileProvider instead (see vault_local_share_api.dart). It has no
-      // packageName param (no native support for pre-picking an app for a
-      // real file), so that preference is simply not applied for local
-      // storage rather than failing outright.
+      // FileProvider instead (see vault_local_share_api.dart).
       final ok = widget.container.isLocalStorage
           ? await ref
                 .read(vaultLocalShareApiProvider)
                 .openLocalFileWithApp(
                   p.join(widget.container.uri, fullPath),
                   mimeType: mimeType,
+                  packageName: packageName,
+                  requestId: appPickRequestId,
                 )
           : await ref
                 .read(vaultFileIoApiProvider)
@@ -5057,6 +5068,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                   fullPath,
                   packageName: packageName,
                   mimeType: mimeType,
+                  requestId: appPickRequestId,
                 );
       if (!ok && mounted) {
         _setStatus(context.l10n.noAppFoundForFileType, error: true);

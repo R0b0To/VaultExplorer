@@ -87,6 +87,7 @@
   "newNameHint": "새 이름",
   "baseNameHint": "기본 이름",
   "couldntCreateItem": "\"{name}\"을(를) 만들 수 없습니다 — 컨테이너가 계속 마운트되어 있는지 확인하세요",
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
   "couldntRenameSingle": "\"{name}\"의 이름을 변경할 수 없습니다 — 같은 이름의 항목이 이미 있을 수 있습니다",
   "couldntRenameMultiWithReason": "{count, plural, other{항목 {count}개의 이름을 변경할 수 없습니다: {reason}}}",
   "couldntRenameMultiNoReason": "{count, plural, other{항목 {count}개의 이름을 변경할 수 없습니다}}",

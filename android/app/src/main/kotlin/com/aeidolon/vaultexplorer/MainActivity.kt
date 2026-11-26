@@ -17,6 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
+import com.aeidolon.vaultexplorer.handlers.OpenWithChooser
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.VaultPathUtils
 import androidx.documentfile.provider.DocumentFile
@@ -394,7 +395,7 @@ open class MainActivity : FlutterFragmentActivity() {
 
     protected val CHANNEL = "com.aeidolon.vaultexplorer/engine"
     private val DISGUISE_CHANNEL = "com.aeidolon.vaultexplorer/disguise_channel"
-    internal val ACTION_CHOOSER = "com.aeidolon.vaultexplorer.ACTION_CHOOSER"
+    internal val ACTION_CHOOSER = OpenWithChooser.ACTION
     private var chooserReceiver: BroadcastReceiver? = null
     internal var methodChannel: MethodChannel? = null
     internal val usbManager: UsbManager by lazy {
@@ -1101,12 +1102,19 @@ open class MainActivity : FlutterFragmentActivity() {
                         @Suppress("DEPRECATION")
                         intent.getParcelableExtra<ComponentName>(Intent.EXTRA_CHOSEN_COMPONENT)
                     }
-                    selectedComponent?.let {
-                        val pkg = it.packageName
-                        val ext = intent.getStringExtra("extension") ?: ""
+                    if (selectedComponent != null) {
+                        val pkg = selectedComponent.packageName
+                        val ext = intent.getStringExtra(OpenWithChooser.EXTRA_EXTENSION) ?: ""
+                        val requestId = intent.getStringExtra(OpenWithChooser.EXTRA_REQUEST_ID) ?: ""
+                        VeLog.i("MainActivity") { "Open-with chooser: picked $pkg (request $requestId)" }
                         runOnUiThread {
-                            methodChannel?.invokeMethod("onAppSelected", mapOf("extension" to ext, "package" to pkg))
+                            methodChannel?.invokeMethod(
+                                "onAppSelected",
+                                mapOf("extension" to ext, "package" to pkg, "requestId" to requestId)
+                            )
                         }
+                    } else {
+                        VeLog.w("MainActivity") { "Open-with chooser finished without reporting a chosen app" }
                     }
                 }
             }
@@ -1437,7 +1445,8 @@ open class MainActivity : FlutterFragmentActivity() {
                     val filePath = call.argument<String>("filePath") ?: ""
                     val mimeType = call.argument<String>("mimeType")
                     val packageName = call.argument<String>("packageName")
-                    val ok = safStorageManager.openWithApp(treeUri, filePath, mimeType, packageName)
+                    val requestId = call.argument<String>("requestId")
+                    val ok = safStorageManager.openWithApp(treeUri, filePath, mimeType, packageName, requestId)
                     result.success(ok)
                 }
                 ChannelMethods.SAF_SHARE_FILES -> {

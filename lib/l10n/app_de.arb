@@ -87,6 +87,7 @@
   "newNameHint": "Neuer Name",
   "baseNameHint": "Basisname",
   "couldntCreateItem": "\"{name}\" konnte nicht erstellt werden — prüfen Sie, ob der Container noch eingebunden ist",
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
   "couldntRenameSingle": "\"{name}\" konnte nicht umbenannt werden — möglicherweise existiert bereits ein Element mit diesem Namen",
   "couldntRenameMultiWithReason": "{count, plural, =1{1 Element konnte nicht umbenannt werden: {reason}} other{{count} Elemente konnten nicht umbenannt werden: {reason}}}",
   "couldntRenameMultiNoReason": "{count, plural, =1{1 Element konnte nicht umbenannt werden} other{{count} Elemente konnten nicht umbenannt werden}}",

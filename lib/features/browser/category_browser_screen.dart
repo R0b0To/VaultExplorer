@@ -36,6 +36,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/models/category_index.dart';
 import 'package:vaultexplorer/features/browser/models/category_source.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
+import 'package:vaultexplorer/features/browser/remembered_app_capture.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/services/category_listing.dart';
 import 'package:vaultexplorer/features/browser/services/category_walk_policy.dart';
@@ -834,7 +835,17 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
           ),
         );
       case OpenWithSystemApp(packageName: final package):
-        await _openWithApp(container, entry, packageName: package);
+        await _openWithApp(
+          container,
+          entry,
+          packageName: package,
+          // See directory_content_view: a saved external-app preference that
+          // falls back to the chooser re-learns the app picked there.
+          appPickRequestId:
+              isExternalAppPreference(settings.extensionPreferences[ext])
+              ? armRememberedAppCapture(ref, ext)
+              : null,
+        );
       default:
         // The readers and viewers that need a folder to work in (books,
         // archives, HTML) live in the ordinary file manager; here the system
@@ -1055,15 +1066,25 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     MountedContainer container,
     CategoryEntry entry, {
     String? packageName,
+    String? appPickRequestId,
   }) async {
     try {
       final ok = container.isLocalStorage
           ? await ref
                 .read(vaultLocalShareApiProvider)
-                .openLocalFileWithApp(p.join(container.uri, entry.path))
+                .openLocalFileWithApp(
+                  p.join(container.uri, entry.path),
+                  packageName: packageName,
+                  requestId: appPickRequestId,
+                )
           : await ref
                 .read(vaultFileIoApiProvider)
-                .openWithApp(container, entry.path, packageName: packageName);
+                .openWithApp(
+                  container,
+                  entry.path,
+                  packageName: packageName,
+                  requestId: appPickRequestId,
+                );
       if (!ok && mounted) {
         _notify(context.l10n.noAppFoundForFileType, error: true);
       }

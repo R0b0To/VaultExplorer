@@ -41,11 +41,18 @@ class VaultFileIoApi {
 
   // ── File I/O ──────────────────────────────────────────────────────────────
 
+  /// Opens [fileName] in another app: [packageName] directly when given (and
+  /// able to take the file), otherwise through the system chooser.
+  ///
+  /// A non-null [requestId] makes the chooser report the app the person picks
+  /// back to Dart as `onAppSelected` under that id (see
+  /// `VaultEngineEvents.expectAppSelection`), so the pick can be remembered.
   Future<bool> openWithApp(
     MountedContainer container,
     String fileName, {
     String? packageName,
     String? mimeType,
+    String? requestId,
   }) async {
     if (_isSaf(container)) {
       final result = await _channel
@@ -54,6 +61,7 @@ class VaultFileIoApi {
             'filePath': fileName,
             'packageName': packageName,
             'mimeType': mimeType,
+            'requestId': requestId,
           });
       return result ?? false;
     }
@@ -61,12 +69,14 @@ class VaultFileIoApi {
       // Plain on-device storage has no vault session to stream from, so
       // the vault `openWithApp` channel can't serve it. Hand the real path
       // to the FileProvider-backed local handler instead (same route the
-      // file browser uses). packageName isn't supported there.
+      // file browser uses).
       try {
         final result = await _channel
             .invokeMethod<bool>(ChannelMethods.openLocalFileWithApp, {
               'filePath': p.join(container.uri, fileName),
               'mimeType': ?mimeType,
+              'packageName': ?packageName,
+              'requestId': ?requestId,
             });
         return result ?? false;
       } catch (e) {
@@ -80,6 +90,7 @@ class VaultFileIoApi {
           'fileName': fileName,
           'packageName': packageName,
           'mimeType': mimeType,
+          'requestId': requestId,
         });
     return result ?? false;
   }

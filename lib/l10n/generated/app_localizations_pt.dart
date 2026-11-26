@@ -370,6 +370,11 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return 'Não foi possível renomear \"$name\" — pode já existir um item com esse nome';
   }

@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/entry_conflict.dart';
@@ -24,6 +26,51 @@ import 'package:vaultexplorer/features/browser/widgets/vault_target_picker_dialo
 import 'package:vaultexplorer/features/browser/widgets/create_archive_bottom_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+
+/// How a create attempt ended.
+///
+/// The native layer reports an I/O failure below the filesystem as a plain
+/// `false`, and a read-only or unmounted container as a [PlatformException].
+/// Both used to surface as the same "check the container is still mounted"
+/// message (or, for the exception, as no message at all, because nothing here
+/// caught it), which sent people to check the wrong thing.
+enum _CreateOutcome { created, readOnly, notMounted, writeFailed }
+
+Future<_CreateOutcome> _attemptCreate(
+  String op,
+  Future<bool> Function() create,
+) async {
+  try {
+    return await create() ? _CreateOutcome.created : _CreateOutcome.writeFailed;
+  } on PlatformException catch (e) {
+    switch (e.code) {
+      case 'READ_ONLY':
+        return _CreateOutcome.readOnly;
+      case 'NOT_MOUNTED':
+      case 'NOT_UNLOCKED':
+        return _CreateOutcome.notMounted;
+      default:
+        logSwallowed(op, e);
+        return _CreateOutcome.writeFailed;
+    }
+  }
+}
+
+String _createFailureMessage(
+  AppLocalizations l10n,
+  _CreateOutcome outcome,
+  String name,
+) {
+  switch (outcome) {
+    case _CreateOutcome.readOnly:
+      return l10n.readOnlyContainerWarning;
+    case _CreateOutcome.writeFailed:
+      return l10n.couldntCreateItemWriteFailed(name);
+    case _CreateOutcome.notMounted:
+    case _CreateOutcome.created:
+      return l10n.couldntCreateItem(name);
+  }
+}
 
 abstract class BrowserDialogs {
   static void _blockedReadOnly(BuildContext context) {
@@ -438,14 +485,17 @@ class _CreateFolderDialogState extends ConsumerState<_CreateFolderDialog>
     final parentContext = context;
     final opService = ref.read(fileOperationServiceProvider);
     Navigator.pop(context);
-    final ok = await _fileIoApi.createDirectory(widget.container, built.path);
-    if (ok) {
+    final outcome = await _attemptCreate(
+      'createDirectory',
+      () => _fileIoApi.createDirectory(widget.container, built.path),
+    );
+    if (outcome == _CreateOutcome.created) {
       opService.notifyVolumeContentChanged(widget.container.volId);
       widget.onSuccess();
     } else if (parentContext.mounted) {
       showAppSnackBar(
         parentContext,
-        message: l10n.couldntCreateItem(name),
+        message: _createFailureMessage(l10n, outcome, name),
         tone: AppBannerTone.error,
       );
     }
@@ -654,23 +704,17 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
     final parentContext = context;
     final opService = ref.read(fileOperationServiceProvider);
     Navigator.pop(context);
-    var ok = false;
-    try {
-      ok = await _fileIoApi.createVaultSymlink(
-        widget.container,
-        built.path,
-        target,
-      );
-    } catch (_) {
-      ok = false; // shown below like any other refusal
-    }
-    if (ok) {
+    final outcome = await _attemptCreate(
+      'createVaultSymlink',
+      () => _fileIoApi.createVaultSymlink(widget.container, built.path, target),
+    );
+    if (outcome == _CreateOutcome.created) {
       opService.notifyVolumeContentChanged(widget.container.volId);
       widget.onSuccess();
     } else if (parentContext.mounted) {
       showAppSnackBar(
         parentContext,
-        message: l10n.couldntCreateItem(name),
+        message: _createFailureMessage(l10n, outcome, name),
         tone: AppBannerTone.error,
       );
     }
@@ -834,14 +878,17 @@ class _CreateFileDialogState extends ConsumerState<_CreateFileDialog>
     final parentContext = context;
     final opService = ref.read(fileOperationServiceProvider);
     Navigator.pop(context);
-    final ok = await _fileIoApi.createEmptyFile(widget.container, built.path);
-    if (ok) {
+    final outcome = await _attemptCreate(
+      'createEmptyFile',
+      () => _fileIoApi.createEmptyFile(widget.container, built.path),
+    );
+    if (outcome == _CreateOutcome.created) {
       opService.notifyVolumeContentChanged(widget.container.volId);
       widget.onSuccess();
     } else if (parentContext.mounted) {
       showAppSnackBar(
         parentContext,
-        message: l10n.couldntCreateItem(name),
+        message: _createFailureMessage(l10n, outcome, name),
         tone: AppBannerTone.error,
       );
     }

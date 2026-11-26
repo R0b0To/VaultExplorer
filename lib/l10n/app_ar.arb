@@ -87,6 +87,7 @@
   "newNameHint": "اسم جديد",
   "baseNameHint": "الاسم الأساسي",
   "couldntCreateItem": "تعذّر إنشاء \"{name}\" — تحقق من أن الحاوية لا تزال مثبَّتة",
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
   "couldntRenameSingle": "تعذّر إعادة تسمية \"{name}\" — قد يوجد بالفعل عنصر بهذا الاسم",
   "couldntRenameMultiWithReason": "{count, plural, zero{تعذّرت إعادة تسمية لا عناصر: {reason}} one{تعذّرت إعادة تسمية عنصر واحد: {reason}} two{تعذّرت إعادة تسمية عنصرين: {reason}} few{تعذّرت إعادة تسمية {count} عناصر: {reason}} many{تعذّرت إعادة تسمية {count} عنصرًا: {reason}} other{تعذّرت إعادة تسمية {count} عنصر: {reason}}}",
   "couldntRenameMultiNoReason": "{count, plural, zero{تعذّرت إعادة تسمية لا عناصر} one{تعذّرت إعادة تسمية عنصر واحد} two{تعذّرت إعادة تسمية عنصرين} few{تعذّرت إعادة تسمية {count} عناصر} many{تعذّرت إعادة تسمية {count} عنصرًا} other{تعذّرت إعادة تسمية {count} عنصر}}",

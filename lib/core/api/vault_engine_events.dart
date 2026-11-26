@@ -18,8 +18,64 @@ import 'vault_engine_types.dart';
 
 const _kLogTag = 'VaultEngineEvents';
 
+/// Upper bound on app-selection listeners waiting at once. A remembered app
+/// that opens fine never reports a pick, so its listener would otherwise sit
+/// until its timeout; the oldest are dropped first.
+const _kMaxPendingAppPicks = 32;
+
+class _PendingAppPick {
+  _PendingAppPick(this.onSelected, this.timer);
+  final void Function(String packageName) onSelected;
+  final Timer timer;
+}
+
 class VaultEngineEvents {
-  void Function(String ext, String pkg)? onAppSelectedCallback;
+  final Map<String, _PendingAppPick> _pendingAppPicks = {};
+  int _appPickSeq = 0;
+
+  /// Listens for the app the person picks in ONE specific system "Open with"
+  /// chooser, so it can be remembered for that file type.
+  ///
+  /// Returns the id to hand to the native open call (`requestId`); the pick is
+  /// reported back under that id and [onSelected] runs at most once, for that
+  /// request only. Matching on an id rather than on the file extension means a
+  /// cancelled chooser can never leave a listener behind that credits some
+  /// later, unrelated pick. The listener is dropped after [timeout] if no pick
+  /// ever arrives (chooser dismissed, or a system chooser that doesn't report).
+  String expectAppSelection(
+    void Function(String packageName) onSelected, {
+    Duration timeout = const Duration(minutes: 10),
+  }) {
+    final id = 'pick-${DateTime.now().microsecondsSinceEpoch}-${_appPickSeq++}';
+    _pendingAppPicks[id] = _PendingAppPick(
+      onSelected,
+      Timer(timeout, () => _pendingAppPicks.remove(id)),
+    );
+    while (_pendingAppPicks.length > _kMaxPendingAppPicks) {
+      cancelAppSelection(_pendingAppPicks.keys.first);
+    }
+    return id;
+  }
+
+  /// Drops the listener registered under [requestId], if it is still waiting.
+  void cancelAppSelection(String requestId) {
+    _pendingAppPicks.remove(requestId)?.timer.cancel();
+  }
+
+  /// Hands [packageName] to the listener registered under [requestId].
+  /// Returns whether one was waiting (an unknown, expired or already-served
+  /// id returns false and does nothing).
+  bool deliverAppSelection(String requestId, String packageName) {
+    final pending = _pendingAppPicks.remove(requestId);
+    if (pending == null) return false;
+    pending.timer.cancel();
+    try {
+      pending.onSelected(packageName);
+    } catch (e) {
+      VeLog.e(_kLogTag, 'App-selection listener failed', e);
+    }
+    return true;
+  }
 
   Completer<bool>? _cameraPermissionCompleter;
   Completer<bool>? _storagePermissionCompleter;
@@ -328,10 +384,11 @@ class VaultEngineEvents {
         final args = call.arguments as Map<Object?, Object?>?;
         _setMirrorPushActivity((args?['activeCount'] as num?)?.toInt() ?? 0);
       } else if (call.method == 'onAppSelected') {
-        final ext = call.arguments['extension'] as String?;
-        final pkg = call.arguments['package'] as String?;
-        if (ext != null && pkg != null) {
-          onAppSelectedCallback?.call(ext, pkg);
+        final args = call.arguments as Map<Object?, Object?>?;
+        final requestId = args?['requestId'] as String?;
+        final pkg = args?['package'] as String?;
+        if (requestId != null && requestId.isNotEmpty && pkg != null) {
+          deliverAppSelection(requestId, pkg);
         }
       } else if (call.method == 'onUsbContainerDetached') {
         final volId = call.arguments['volId'] as int?;

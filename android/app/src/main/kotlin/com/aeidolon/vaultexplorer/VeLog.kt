@@ -34,6 +34,25 @@ object VeLog {
         if (error != null) Log.w(tag, msg(), error) else Log.w(tag, msg())
     }
 
+    /**
+     * Always-on diagnostic line, NOT gated by [enabled].
+     *
+     * Reserved for the handful of decisions a "container opens but cannot be written"
+     * report is impossible to diagnose without (how the file was opened, why a write
+     * path was refused). Everything else stays behind [enabled] so normal use is quiet.
+     * Keep each call to one short line, rate-limit anything that can repeat, and never
+     * put paths, file names, URIs or credentials in the message: use
+     * [OpenDiagnostics.failureTag] rather than an exception's message, which carries paths.
+     */
+    inline fun diag(tag: String, msg: () -> String) {
+        Log.i(tag, msg())
+    }
+
+    /** Warning-level counterpart of [diag] (same rules). */
+    inline fun diagW(tag: String, msg: () -> String) {
+        Log.w(tag, msg())
+    }
+
     /** Error (matches Dart's `VeLog.e`).  Pass the caught [error] for a stack trace in logcat. */
     inline fun e(tag: String, error: Throwable? = null, msg: () -> String) {
         if (!enabled) return

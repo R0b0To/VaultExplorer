@@ -87,6 +87,7 @@
   "newNameHint": "Нова назва",
   "baseNameHint": "Базова назва",
   "couldntCreateItem": "Не вдалося створити \"{name}\" — перевірте, чи контейнер змонтовано",
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
   "couldntRenameSingle": "Не вдалося перейменувати \"{name}\" — можливо, елемент із такою назвою вже існує",
   "couldntRenameMultiWithReason": "{count, plural, one{Не вдалося перейменувати 1 елемент: {reason}} few{Не вдалося перейменувати {count} елементи: {reason}} many{Не вдалося перейменувати {count} елементів: {reason}} other{Не вдалося перейменувати {count} елементів: {reason}}}",
   "couldntRenameMultiNoReason": "{count, plural, one{Не вдалося перейменувати 1 елемент} few{Не вдалося перейменувати {count} елементи} many{Не вдалося перейменувати {count} елементів} other{Не вдалося перейменувати {count} елементів}}",

@@ -381,6 +381,11 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return 'Не вдалося перейменувати \"$name\" — можливо, елемент із такою назвою вже існує';
   }

@@ -357,6 +357,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return '无法创建“$name”——写入容器失败';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return '无法重命名“$name”——可能已存在同名项目';
   }

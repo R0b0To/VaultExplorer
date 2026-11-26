@@ -83,6 +83,7 @@
   "newNameHint": "Yeni ad",
   "baseNameHint": "Temel ad",
   "couldntCreateItem": "\"{name}\" oluşturulamadı — kapsayıcının hâlâ bağlı olduğunu kontrol edin",
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
   "couldntRenameSingle": "\"{name}\" yeniden adlandırılamadı — bu adda bir öğe zaten var olabilir",
   "couldntRenameMultiWithReason": "{count, plural, =1{Yeniden adlandırılamadı: 1 öğe — {reason}} other{Yeniden adlandırılamadı: {count} öğe — {reason}}}",
   "couldntRenameMultiNoReason": "{count, plural, =1{Yeniden adlandırılamadı: 1 öğe} other{Yeniden adlandırılamadı: {count} öğe}}",

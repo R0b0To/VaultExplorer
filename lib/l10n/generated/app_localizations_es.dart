@@ -370,6 +370,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return 'No se pudo renombrar \"$name\" — puede que ya exista un elemento con ese nombre';
   }

@@ -371,6 +371,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Impossibile creare \"$name\" — scrittura nel contenitore non riuscita';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return 'Impossibile rinominare \"$name\" — potrebbe esistere già un elemento con questo nome';
   }

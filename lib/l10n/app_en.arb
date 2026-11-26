@@ -529,6 +529,15 @@
       }
     }
   },
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
+  "@couldntCreateItemWriteFailed": {
+    "description": "Error shown when creating a folder or file fails because the write to the container itself failed (the container is mounted and not read-only, but the storage refused or failed the write)",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "couldntRenameSingle": "Couldn't rename \"{name}\" — an item with that name may already exist",
   "@couldntRenameSingle": {
     "description": "Error shown when a single-item rename fails",

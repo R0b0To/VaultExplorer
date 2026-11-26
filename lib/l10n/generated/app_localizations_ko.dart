@@ -357,6 +357,11 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return '\"$name\"의 이름을 변경할 수 없습니다 — 같은 이름의 항목이 이미 있을 수 있습니다';
   }

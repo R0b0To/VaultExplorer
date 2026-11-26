@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/diagnostics/stall_diagnostics.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/features/browser/viewer/desktop_media/desktop_media_controls.dart';
 
@@ -35,6 +36,7 @@ class WindowsMediaPlatform implements DesktopMediaPlatform {
     if (args is! Map) return null;
     final name = args['command'];
     final positionMs = args['positionMs'];
+    final pressedAtMs = args['pressedAtMs'];
     final command = switch (name) {
       'play' => DesktopMediaCommand.play,
       'pause' => DesktopMediaCommand.pause,
@@ -50,6 +52,9 @@ class WindowsMediaPlatform implements DesktopMediaPlatform {
       DesktopMediaCommandEvent(
         command,
         position: positionMs is int ? Duration(milliseconds: positionMs) : null,
+        pressedAt: pressedAtMs is int
+            ? DateTime.fromMillisecondsSinceEpoch(pressedAtMs)
+            : null,
       ),
     );
     return null;
@@ -58,8 +63,9 @@ class WindowsMediaPlatform implements DesktopMediaPlatform {
   @override
   Future<void> update(DesktopMediaState state) async {
     if (_unavailable) return;
+    final watch = Stopwatch()..start();
     try {
-      await _channel.invokeMethod<void>('update', <String, Object?>{
+      final nativeMicros = await _channel.invokeMethod<int>('update', <String, Object?>{
         if (viewId != null) 'viewId': viewId,
         'active': state.active,
         'title': state.title,
@@ -72,6 +78,16 @@ class WindowsMediaPlatform implements DesktopMediaPlatform {
         'canPrevious': state.canPrevious,
         'canSeek': state.canSeek,
       });
+      StallDiagnostics.bump('smtc.update');
+      final roundTripMs = watch.elapsedMilliseconds;
+      final nativeMs = (nativeMicros ?? 0) ~/ 1000;
+      if (roundTripMs >= 50 || nativeMs >= 20) {
+        StallDiagnostics.log(
+          'smtc',
+          'update round trip ${roundTripMs}ms, of which ${nativeMs}ms '
+              'inside the native controls',
+        );
+      }
     } on MissingPluginException {
       // A build without the native part (an older runner): stop trying.
       _unavailable = true;

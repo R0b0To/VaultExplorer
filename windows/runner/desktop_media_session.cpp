@@ -123,7 +123,11 @@ class DesktopMediaSession::Impl {
   void Post(const char* name, int64_t position_ms) {
     {
       std::lock_guard<std::mutex> lock(mutex_);
-      commands_.push_back(DesktopMediaCommand{name, position_ms});
+      const int64_t now_ms =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count();
+      commands_.push_back(DesktopMediaCommand{name, position_ms, now_ms});
     }
     PostMessageW(message_window_, kDesktopMediaCommandMessage, 0, 0);
   }

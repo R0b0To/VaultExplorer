@@ -8,6 +8,8 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:vaultexplorer/core/diagnostics/stall_diagnostics.dart';
+
 import 've_native.dart';
 
 class EngineWorkerPool {
@@ -33,7 +35,13 @@ class EngineWorkerPool {
     for (final w in _workers) {
       if (w.load < best.load) best = w;
     }
-    return best.call(op, args);
+    final diag = StallDiagnostics.poolBegin(op, best.load);
+    var execMicros = -1;
+    try {
+      return await best.call(op, args, (micros) => execMicros = micros);
+    } finally {
+      StallDiagnostics.poolEnd(diag, execMicros: execMicros);
+    }
   }
 
   Future<void> dispose() async {
@@ -52,6 +60,7 @@ class _Worker {
   final SendPort _send;
   final ReceivePort _recv;
   final Map<int, Completer<Object?>> _pending = {};
+  final Map<int, void Function(int)> _onExec = {};
   int _nextId = 0;
 
   int get load => _pending.length;
@@ -65,6 +74,8 @@ class _Worker {
         ready.complete(msg);
       } else if (msg is List<Object?>) {
         final c = worker._pending.remove(msg[0] as int);
+        final onExec = worker._onExec.remove(msg[0] as int);
+        if (onExec != null && msg.length > 3) onExec(msg[3] as int);
         if (c == null) return;
         final err = msg[2];
         if (err != null) {
@@ -80,10 +91,17 @@ class _Worker {
     return worker;
   }
 
-  Future<Object?> call(String op, List<Object?> args) {
+  /// [onExec] is told how long the worker spent inside the engine, in
+  /// microseconds (diagnostics: the rest of the time was spent queued).
+  Future<Object?> call(
+    String op,
+    List<Object?> args, [
+    void Function(int)? onExec,
+  ]) {
     final id = _nextId++;
     final c = Completer<Object?>();
     _pending[id] = c;
+    if (onExec != null) _onExec[id] = onExec;
     _send.send(<Object?>[id, op, args]);
     return c.future;
   }
@@ -95,6 +113,7 @@ class _Worker {
       c.completeError(StateError('engine worker disposed'));
     }
     _pending.clear();
+    _onExec.clear();
   }
 }
 
@@ -120,11 +139,12 @@ void _workerMain(List<Object?> init) {
       reply.send(<Object?>[id, null, loadError ?? 'engine library not loaded']);
       return;
     }
+    final watch = Stopwatch()..start();
     try {
       final result = veExecute(n, m[1] as String, (m[2] as List<Object?>));
-      reply.send(<Object?>[id, result, null]);
+      reply.send(<Object?>[id, result, null, watch.elapsedMicroseconds]);
     } on Object catch (e) {
-      reply.send(<Object?>[id, null, '$e']);
+      reply.send(<Object?>[id, null, '$e', watch.elapsedMicroseconds]);
     }
   });
 }

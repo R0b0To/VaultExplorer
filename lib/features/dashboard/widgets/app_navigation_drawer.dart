@@ -26,6 +26,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
+import 'package:vaultexplorer/features/browser/widgets/sidebar_drop_target.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_page_windows.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
@@ -754,7 +755,13 @@ class AppNavigationDrawer extends ConsumerWidget {
 
                         return Padding(
                           padding: const EdgeInsets.only(left: 6, bottom: 4),
-                          child: _DrawerVaultRow(
+                          // Items dragged out of a file manager pane can be
+                          // dropped on an unlocked vault; a locked one refuses.
+                          child: SidebarDropTarget(
+                            container: item is MountedVaultItem
+                                ? item.container
+                                : null,
+                            child: _DrawerVaultRow(
                             key: ValueKey('drawer_vault_${item.uri}'),
                             item: item,
                             isCurrent: isCurrent,
@@ -817,6 +824,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               _closeDrawer(context);
                               _handleDeleteVault(context, ref, item);
                             },
+                            ),
                           ),
                         );
                       })(),
@@ -876,7 +884,9 @@ class AppNavigationDrawer extends ConsumerWidget {
                     // Keeps the drives' free space current while the list is on screen.
                     if (PlatformFeatures.isDesktop) const DriveListRefresher(),
                     Builder(
-                      builder: (tileContext) => ContextMenuRegion(
+                      builder: (tileContext) => SidebarDropTarget(
+                        container: primary,
+                        child: ContextMenuRegion(
                         onOpen: (onOpenInNewTab != null && primary != null)
                             ? (pos) =>
                                   _showOpenInNewTabMenu(context, pos, primary)
@@ -935,13 +945,20 @@ class AppNavigationDrawer extends ConsumerWidget {
                           }
                         },
                         ),
+                        ),
                       ),
                     ),
 
                     for (final loc in externalStorages) ...[
                       Builder(
                         builder: (tileContext) {
-                          return GestureDetector(
+                          return SidebarDropTarget(
+                            container: buildExternalStorageContainer(
+                              rootPath: loc.resolvedUri,
+                              displayName: loc.displayName,
+                              volId: loc.volId,
+                            ),
+                            child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onSecondaryTapDown: (details) =>
                                 _showLocationContextMenu(
@@ -1068,6 +1085,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 _closeDrawer(context);
                                 onSelectContainer?.call(container);
                               },
+                            ),
                             ),
                           );
                         },

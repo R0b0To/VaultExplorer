@@ -2,6 +2,7 @@
 
 #include <commctrl.h>
 
+#include <chrono>
 #include <optional>
 #include <string>
 #include <utility>
@@ -252,8 +253,15 @@ bool FlutterWindow::OnCreate() {
         update.can_next = BoolArgument(*args, "canNext");
         update.can_previous = BoolArgument(*args, "canPrevious");
         update.can_seek = BoolArgument(*args, "canSeek");
+        const auto started = std::chrono::steady_clock::now();
         media_session_->Update(update);
-        result->Success(flutter::EncodableValue());
+        // The time spent inside the system media controls, in microseconds
+        // (diagnostics).
+        const int64_t micros =
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - started)
+                .count();
+        result->Success(flutter::EncodableValue(micros));
       });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -313,6 +321,10 @@ void FlutterWindow::DispatchMediaCommands() {
     if (command.position_ms >= 0) {
       arguments[flutter::EncodableValue("positionMs")] =
           flutter::EncodableValue(command.position_ms);
+    }
+    if (command.pressed_unix_ms > 0) {
+      arguments[flutter::EncodableValue("pressedAtMs")] =
+          flutter::EncodableValue(command.pressed_unix_ms);
     }
     media_channel_->InvokeMethod(
         "command",

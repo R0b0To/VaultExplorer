@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/diagnostics/stall_diagnostics.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart'
     show isDesktopEngineTarget;
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -26,7 +27,11 @@ class DesktopMediaCommandEvent {
   /// For [DesktopMediaCommand.seekTo]: where to go.
   final Duration? position;
 
-  const DesktopMediaCommandEvent(this.command, {this.position});
+  /// When the system reported the button press (diagnostics: how late it got
+  /// here), where the platform says.
+  final DateTime? pressedAt;
+
+  const DesktopMediaCommandEvent(this.command, {this.position, this.pressedAt});
 }
 
 /// What the system media surfaces (media keys, the taskbar / lock screen
@@ -137,6 +142,14 @@ class DesktopMediaControls {
     final platform = _createPlatform(viewId);
     if (platform == null) return;
     _started = true;
+    unawaited(StallDiagnostics.start());
+    StallDiagnostics.registerContext(
+      'media',
+      () =>
+          'session=${_session != null} playing=${_host.playing.value} '
+          'controller=${_controller != null} lastSentAgoMs='
+          '${DateTime.now().difference(_lastSentAt).inMilliseconds}',
+    );
     _platform = platform;
     _commands = platform.commands.listen(_onCommand);
     _host.activeSession.addListener(_onSession);
@@ -171,6 +184,14 @@ class DesktopMediaControls {
     if (identical(session, _session)) return;
     _unbind();
     _session = session;
+    StallDiagnostics.log(
+      'media',
+      session == null
+          ? 'session ended'
+          : 'session started (library=${session.libraryPlayback}, '
+                'floating=${session.floatingPlayer}, '
+                'items=${session.playlist.playlist.length})',
+    );
     if (session != null) {
       final manager = session.playbackManager;
       manager.activeControllerNotifier.addListener(_onController);
@@ -252,7 +273,8 @@ class DesktopMediaControls {
   void _push({bool fromTimer = false}) {
     final platform = _platform;
     if (platform == null) return;
-    final state = _currentState();
+    StallDiagnostics.bump('media.push');
+    final state = StallDiagnostics.time('media.state', _currentState, warnMs: 5);
     final last = _lastSent;
     if (last != null && _sameShown(last, state)) {
       if (!fromTimer) return;
@@ -264,6 +286,7 @@ class DesktopMediaControls {
     }
     _lastSent = state;
     _lastSentAt = DateTime.now();
+    StallDiagnostics.bump('media.sent');
     unawaited(platform.update(state));
   }
 
@@ -319,29 +342,51 @@ class DesktopMediaControls {
     );
   }
 
+  /// Logs when [work] (a command's effect) is done and how long it took.
+  void _track(String what, Future<void> work) {
+    final watch = Stopwatch()..start();
+    unawaited(
+      work.whenComplete(() {
+        StallDiagnostics.log(
+          'media',
+          '$what done in ${watch.elapsedMilliseconds}ms',
+        );
+      }),
+    );
+  }
+
   void _onCommand(DesktopMediaCommandEvent event) {
-    VeLog.i(_kTag, 'Command ${event.command.name} (session: ${_session != null})');
+    final pressedAt = event.pressedAt;
+    final delay = pressedAt == null
+        ? 'unknown'
+        : '${DateTime.now().difference(pressedAt).inMilliseconds}ms';
+    StallDiagnostics.log(
+      'media',
+      'command ${event.command.name} reached Dart $delay after the press '
+          '(session: ${_session != null})',
+    );
     if (_session == null) return;
     switch (event.command) {
       case DesktopMediaCommand.play:
-        if (!_host.playing.value) unawaited(_host.togglePlayback());
+        if (!_host.playing.value) _track('play', _host.togglePlayback());
       case DesktopMediaCommand.pause:
-        if (_host.playing.value) unawaited(_host.togglePlayback());
+        if (_host.playing.value) _track('pause', _host.togglePlayback());
       case DesktopMediaCommand.toggle:
-        unawaited(_host.togglePlayback());
+        _track('toggle', _host.togglePlayback());
       case DesktopMediaCommand.next:
         MediaSessionBridge.dispatch('next');
       case DesktopMediaCommand.previous:
         MediaSessionBridge.dispatch('previous');
       case DesktopMediaCommand.stop:
-        unawaited(_host.closeAndWait());
+        _track('stop', _host.closeAndWait());
       case DesktopMediaCommand.seekTo:
         final target = event.position;
         final controller = _controller;
         if (target == null || controller == null || controller.isDisposed) {
           return;
         }
-        unawaited(
+        _track(
+          'seek',
           controller.seekTo(target).catchError((Object e) {
             VeLog.w(_kTag, 'Could not seek', e);
           }),

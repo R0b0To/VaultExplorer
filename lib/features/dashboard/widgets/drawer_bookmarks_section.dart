@@ -18,6 +18,7 @@ import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/sidebar_drop_target.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
@@ -354,7 +355,12 @@ class _DrawerBookmarksSectionState
                       ? skin.folderIconColor(cs)
                       : skin.fileIconColor(cs, name),
                 );
-                return ContextMenuRegion(
+                // A bookmarked folder takes items dragged out of a file
+                // manager pane; a bookmarked file refuses them.
+                return SidebarDropTarget(
+                  container: isDir ? vault : null,
+                  path: isDir ? bookmark.path : '',
+                  child: ContextMenuRegion(
                   onOpen: (pos) =>
                       _showMenu(tileContext, vault, bookmark, at: pos),
                   child: ListTile(
@@ -396,6 +402,7 @@ class _DrawerBookmarksSectionState
                       _open(tileContext, vault, bookmark, inNewTab: false),
                   onLongPress: touchOnlyLongPress(
                     () => _showMenu(tileContext, vault, bookmark),
+                  ),
                   ),
                   ),
                 );

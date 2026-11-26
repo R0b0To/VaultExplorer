@@ -18,6 +18,9 @@ constexpr UINT kDesktopMediaCommandMessage = WM_APP + 0x4D;
 struct DesktopMediaCommand {
   std::string name;
   int64_t position_ms = -1;
+  // When the press was reported by the system (ms since the Unix epoch),
+  // for measuring how late it reaches Dart.
+  int64_t pressed_unix_ms = 0;
 };
 
 // What the system media controls should show.

@@ -941,7 +941,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // Still on the first load: that load already reads the new state.
     if (nav.pathStack.isEmpty) return;
     FolderThumbnailPreview.clearSessionCache();
-    _loadDirectoryContents(nav.currentDirPath, refresh: true);
+    // The service keeps the operation's placeholders until this re-list is
+    // done, so they hand over to the real entries without a gap.
+    change.trackRefresh(
+      _loadDirectoryContents(nav.currentDirPath, refresh: true),
+    );
   }
 
   // ── Drop reveal ──────────────────────────────────────────────────────────
@@ -5467,7 +5471,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       if (!done) return;
       op.removeListener(listener);
       if (op.isCut && !op.isDelete) _syncMarksAfterMove(op);
-      if (!_opNeedsAttention(op)) _opSvc.dismiss(op.id);
+      // Not dismissed yet: the placeholders in the destination folder must
+      // outlive the re-list that swaps them for the real entries, or they
+      // vanish for its duration (see FileOperationService.dismissWhenRefreshed).
+      if (!_opNeedsAttention(op)) _opSvc.dismissWhenRefreshed(op.id);
     }
 
     op.addListener(listener);

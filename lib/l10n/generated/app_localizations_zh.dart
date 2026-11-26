@@ -12355,4 +12355,52 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return '已完成 $percent%';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb：$items（$source → $destination）';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb：$items（$source）';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb：$items → $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return '速度：$speed/秒';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return '剩余时间：$time';
+  }
+
+  @override
+  String get fileOpWinCalculating => '正在计算…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return '剩余项目：$count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return '剩余项目：$count';
+  }
 }

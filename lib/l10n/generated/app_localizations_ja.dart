@@ -12548,4 +12548,52 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return '$percent% 完了';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb: $items ($source → $destination)';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb: $items ($source)';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb: $items → $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return '速度: $speed/秒';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return '残り時間: $time';
+  }
+
+  @override
+  String get fileOpWinCalculating => '計算中…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return '残りの項目: $count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return '残りの項目: $count';
+  }
 }

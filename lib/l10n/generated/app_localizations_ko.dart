@@ -12550,4 +12550,52 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return '$percent% 완료';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb: $items ($source → $destination)';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb: $items ($source)';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb: $items → $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return '속도: $speed/초';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return '남은 시간: $time';
+  }
+
+  @override
+  String get fileOpWinCalculating => '계산 중…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return '남은 항목: $count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return '남은 항목: $count';
+  }
 }

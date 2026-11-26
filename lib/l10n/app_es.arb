@@ -3656,5 +3656,14 @@
   "noDrivesDetectedTitle": "No drives found",
   "drivesNeedAccessNote": "Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.",
   "driveInUseLabel": "Mounted by the system",
-  "driveSystemLabel": "System drive"
+  "driveSystemLabel": "System drive",
+  "fileOpWinPercentComplete": "{percent}% completado",
+  "fileOpWinFromTo": "{verb} {items} de {source} a {destination}",
+  "fileOpWinFrom": "{verb} {items} de {source}",
+  "fileOpWinTo": "{verb} {items} a {destination}",
+  "fileOpWinSpeed": "Velocidad: {speed}/s",
+  "fileOpWinTimeRemaining": "Tiempo restante: {time}",
+  "fileOpWinCalculating": "Calculando…",
+  "fileOpWinItemsRemaining": "Elementos restantes: {count} ({size})",
+  "fileOpWinItemsRemainingNoSize": "Elementos restantes: {count}"
 }

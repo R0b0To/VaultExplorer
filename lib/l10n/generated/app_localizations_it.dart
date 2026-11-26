@@ -13287,4 +13287,52 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return '$percent% completato';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb $items da $source a $destination';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb $items da $source';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb $items in $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return 'Velocità: $speed/s';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return 'Tempo rimanente: $time';
+  }
+
+  @override
+  String get fileOpWinCalculating => 'Calcolo in corso…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return 'Elementi rimanenti: $count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return 'Elementi rimanenti: $count';
+  }
 }

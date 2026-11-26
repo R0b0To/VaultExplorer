@@ -15298,5 +15298,105 @@
   "driveSystemLabel": "System drive",
   "@driveSystemLabel": {
     "description": "Tag on the drive in the desktop drive list that carries the running operating system"
+  },
+  "fileOpWinPercentComplete": "{percent}% complete",
+  "@fileOpWinPercentComplete": {
+    "description": "Progress of a file operation in its own window, and that window's title. Example: \"4% complete\".",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "fileOpWinFromTo": "{verb} {items} from {source} to {destination}",
+  "@fileOpWinFromTo": {
+    "description": "Summary line of the file operation window for a copy or move. verb is the in-progress verb (Copying, Moving), items is a count of items (1 item), source and destination are the names of the places. Example: \"Copying 1 item from Documents to Backup\".",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "items": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinFrom": "{verb} {items} from {source}",
+  "@fileOpWinFrom": {
+    "description": "Summary line of the file operation window for an operation that has a source only (delete, export, extract). Example: \"Deleting 3 items from Documents\".",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "items": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinTo": "{verb} {items} to {destination}",
+  "@fileOpWinTo": {
+    "description": "Summary line of the file operation window for an operation that has a destination only (import). Example: \"Importing 3 items to Documents\".",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "items": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinSpeed": "Speed: {speed}/s",
+  "@fileOpWinSpeed": {
+    "description": "Current transfer speed in the file operation window. speed is a size such as \"37.9 MB\". Example: \"Speed: 37.9 MB/s\".",
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinTimeRemaining": "Time remaining: {time}",
+  "@fileOpWinTimeRemaining": {
+    "description": "Estimated time left in the file operation window. time is a duration such as \"2m 15s\". Example: \"Time remaining: 2m 15s\".",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinCalculating": "Calculating…",
+  "@fileOpWinCalculating": {
+    "description": "Shown instead of the time remaining while there is not yet enough progress to estimate it."
+  },
+  "fileOpWinItemsRemaining": "Items remaining: {count} ({size})",
+  "@fileOpWinItemsRemaining": {
+    "description": "Items left in the file operation window, with the size still to go. Example: \"Items remaining: 1 (1.93 GB)\".",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinItemsRemainingNoSize": "Items remaining: {count}",
+  "@fileOpWinItemsRemainingNoSize": {
+    "description": "Items left in the file operation window when the total size is not known. Example: \"Items remaining: 3\".",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

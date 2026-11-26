@@ -3650,5 +3650,14 @@
   "noDrivesDetectedTitle": "Sürücü bulunamadı",
   "drivesNeedAccessNote": "Bazı sürücüler listeleniyor ancak açılamıyor. Bir diski doğrudan okumak için Linux'ta root yetkisi veya \"disk\" grubu üyeliği, Windows'ta ise VaultExplorer'ın yönetici olarak çalıştırılması gerekir.",
   "driveInUseLabel": "Sistem tarafından bağlandı",
-  "driveSystemLabel": "Sistem sürücüsü"
+  "driveSystemLabel": "Sistem sürücüsü",
+  "fileOpWinPercentComplete": "%{percent} tamamlandı",
+  "fileOpWinFromTo": "{verb}: {items} ({source} → {destination})",
+  "fileOpWinFrom": "{verb}: {items} ({source})",
+  "fileOpWinTo": "{verb}: {items} → {destination}",
+  "fileOpWinSpeed": "Hız: {speed}/s",
+  "fileOpWinTimeRemaining": "Kalan süre: {time}",
+  "fileOpWinCalculating": "Hesaplanıyor…",
+  "fileOpWinItemsRemaining": "Kalan öğe: {count} ({size})",
+  "fileOpWinItemsRemainingNoSize": "Kalan öğe: {count}"
 }

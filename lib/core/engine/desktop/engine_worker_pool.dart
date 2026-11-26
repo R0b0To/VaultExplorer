@@ -515,6 +515,8 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         final (rc, map) = n.vaultInfo(a[0] as int);
         return [rc, map];
       }
+    case 'containerFormat':
+      return n.containerFormat(a[0] as int);
     case 'fileSize':
       return n.fileSize(a[0] as int, a[1] as String);
     case 'folderSize':

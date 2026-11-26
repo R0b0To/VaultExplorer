@@ -502,8 +502,13 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 - PDF, camera, video/audio editing -- need their
   desktop backends (they are platform code on Android). Video **playback** and **thumbnails** are done (below);
   scrub-preview frames, picture-in-picture and background playback / media session are not.
-- Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification
-  (the engine still rejects an illegal name when it writes it).
+- Import (`desktop_transfers.dart`, rules in `desktop_import_policy.dart`): names are checked with Android's two
+  rule sets (encrypted vault for a folder vault, the conservative union for a disk-image container); a name that
+  cannot be held is skipped and reported (`onImportItemSkipped`); siblings that differ only by case on a
+  case-insensitive destination get unique names; every file is hashed before it is written and read back out of the
+  vault afterwards, and "delete after import" is only offered after a complete run whose read-back matched. The
+  rules are checked against the same known-answer table as Android (`test/fixtures/import_policy_golden.tsv`). Not
+  yet: progress events while the read-back runs, and the same checks for export.
 - Share sheet; JPEG/WebP encoding for the image editor (PNG only for now).
 - Pre-flight free-space check on create (Android reports `INSUFFICIENT_SPACE`; desktop just fails).
 - Windows: the engine was validated under Wine on v1.39 (see "Windows" above; re-run it after the rebase); the

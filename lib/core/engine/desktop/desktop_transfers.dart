@@ -15,16 +15,22 @@
 // the engine's own per-chunk callbacks (drained by the host's event pump); entry counts are kept
 // here.
 //
-// Differences from Android, deliberately left for later: per-filesystem file-name validation
-// (the engine rejects an illegal name when it writes it) and the post-import SHA-256 read-back
-// verification. A source is therefore only offered for "delete after import" when every picked
-// item was written successfully.
+// The import rules are Android's (ImportExportHandlers.kt), kept as pure functions in
+// desktop_import_policy.dart: a name the destination filesystem cannot hold is skipped and reported
+// (`onImportItemSkipped`); siblings that differ only by case on a case-insensitive destination are
+// imported under unique names instead of replacing each other; every file is hashed (SHA-256) before
+// it is written and read back out of the vault afterwards, and a mismatch fails the import. A source
+// is only offered for "delete after import" when every picked item was written, the read-back
+// matched, and the import ran to the end.
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
 
+import 'desktop_import_policy.dart';
 import 'dropped_paths.dart';
 import 'engine_worker_pool.dart';
 import 've_native.dart';
@@ -58,6 +64,18 @@ class _Progress {
   int transferred = 0;
   int totalBytes = 0;
   String currentName = '';
+}
+
+/// What one import run needs while it walks the picked entries.
+class _ImportRun {
+  _ImportRun(this.fsType, this.caseSensitive);
+
+  /// The rule set the destination's names are checked against (see [DesktopTransfers._nameRules]).
+  final FilesystemType? fsType;
+  final bool caseSensitive;
+
+  /// Every file written so far, with the SHA-256 of the source bytes it was written from.
+  final List<({String vaultPath, Uint8List sha256})> verifications = [];
 }
 
 class _ImportSources {
@@ -126,22 +144,13 @@ class DesktopTransfers {
 
   // ── helpers ─────────────────────────────────────────────────────────────
 
-  static String _fold(String name, bool caseSensitive) => caseSensitive ? name : name.toLowerCase();
+  static String _fold(String name, bool caseSensitive) => foldName(name, caseSensitive);
 
   static String _join(String dir, String name) => dir.isEmpty ? name : '$dir/$name';
 
   /// "name" -> "name (1)" -> "name (2)" ... keeping the extension (same scheme as Android).
-  static String _unique(Set<String> takenFolded, String name, bool caseSensitive) {
-    if (!takenFolded.contains(_fold(name, caseSensitive))) return name;
-    final dot = name.lastIndexOf('.');
-    final hasExt = dot > 0 && dot < name.length - 1;
-    final base = hasExt ? name.substring(0, dot) : name;
-    final ext = hasExt ? name.substring(dot) : '';
-    for (var n = 1;; n++) {
-      final candidate = '$base ($n)$ext';
-      if (!takenFolded.contains(_fold(candidate, caseSensitive))) return candidate;
-    }
-  }
+  static String _unique(Set<String> takenFolded, String name, bool caseSensitive) =>
+      uniqueNameAgainst(takenFolded, name, caseSensitive: caseSensitive);
 
   /// Parses the engine's directory-entry wire string: "<F|D>|<size>|<mtime>|<name>".
   static _VaultEntry? _parseEntry(String wire) {
@@ -206,7 +215,7 @@ class DesktopTransfers {
     final r = await pool.call('space', [vol]) as List<Object?>;
     if (r[0] != veOk) return;
     final free = (r[1] as List<Object?>).cast<int>()[1];
-    if (neededBytes * 1.01 <= free) return;
+    if (fitsWithinSafetyMargin(neededBytes, free)) return;
     throw PlatformException(
       code: 'INSUFFICIENT_SPACE',
       message: 'Not enough free space in the vault: need $neededBytes bytes, only $free available',
@@ -304,6 +313,7 @@ class DesktopTransfers {
       for (final e in ((args['conflictPlan'] as Map?) ?? const {}).entries) '${e.key}': '${e.value}',
     };
     final vol = pick.vol;
+    final run = _ImportRun(await _nameRules(vol), pick.caseSensitive);
 
     // Totals up front, so progress has a denominator and the space check can run first.
     var total = 0;
@@ -338,6 +348,12 @@ class DesktopTransfers {
         for (var i = 0; i < pick.entries.length; i++) {
           if (_isCancelled(opId)) break;
           final entry = pick.entries[i];
+          final issues = importNameIssues(entry.name, run.fsType, isDir: entry.isDir);
+          if (issues.isNotEmpty) {
+            _reportSkipped(opId, entry.name, issues);
+            reports.add((source: entry.name, resolved: entry.name, isDir: entry.isDir, success: false));
+            continue;
+          }
           final key = _fold(entry.name, pick.caseSensitive);
 
           String? name;
@@ -360,7 +376,8 @@ class DesktopTransfers {
           }
 
           progress.currentName = entry.name;
-          final count = await _importEntry(vol, entry.hostPath, _join(pick.targetDir, name), entry.isDir, opId, progress);
+          final count =
+              await _importEntry(vol, entry.hostPath, _join(pick.targetDir, name), entry.isDir, opId, progress, run);
           successCount += count;
           reports.add((
             source: entry.name,
@@ -369,6 +386,10 @@ class DesktopTransfers {
             success: count == expected[i] && (count > 0 || !entry.isDir),
           ));
         }
+
+        // Read every written file back out of the vault and compare it with its source. Throws on a mismatch;
+        // false when the import was cancelled before everything could be checked.
+        final verified = await _verifyImports(vol, run.verifications, opId);
 
         for (final r in reports) {
           if (opId > 0) {
@@ -381,7 +402,13 @@ class DesktopTransfers {
             });
           }
         }
-        if (opId > 0 && reports.isNotEmpty && reports.every((r) => r.success)) {
+        // Only a complete, verified run makes the sources deletable: every picked entry was processed (a
+        // cancelled run leaves some untouched), every one was written, and the read-back matched.
+        if (opId > 0 &&
+            verified &&
+            !_isCancelled(opId) &&
+            reports.length == pick.entries.length &&
+            reports.every((r) => r.success)) {
           _importSources[opId] = _ImportSources([for (final e in pick.entries) e.hostPath], true);
         }
         return successCount;
@@ -395,27 +422,148 @@ class DesktopTransfers {
     }
   }
 
-  Future<int> _importEntry(int vol, String hostPath, String vaultPath, bool isDir, int opId, _Progress progress) async {
+  Future<int> _importEntry(
+    int vol,
+    String hostPath,
+    String vaultPath,
+    bool isDir,
+    int opId,
+    _Progress progress,
+    _ImportRun run,
+  ) async {
     if (!isDir) {
+      // Hash the bytes about to be written; the read-back after the import is compared with this.
+      final expected = await _sha256OfHostFile(hostPath, opId);
+      if (expected == null) return 0; // cancelled while reading the source
       final rc = await pool.call('import', [vol, vaultPath, hostPath, opId]) as int;
       progress.done++;
       if (opId > 0) _emitProgress('onImportProgress', opId, progress);
-      return rc == veOk ? 1 : 0;
+      if (rc != veOk) return 0;
+      run.verifications.add((vaultPath: vaultPath, sha256: expected));
+      return 1;
     }
     if ((await pool.call('mkdir', [vol, vaultPath]) as int) != veOk) return 0;
     var count = 1;
     progress.done++;
+
+    // The whole listing first: which children collide on this destination depends on all of them. Sorted, so
+    // the same folder always gives the same result (the later of two colliding names is the one renamed).
+    final children = <({String name, String path, bool isDir})>[];
     await for (final child in Directory(hostPath).list(followLinks: false)) {
       if (_isCancelled(opId)) break;
-      final name = p.basename(child.path);
       if (child is Directory) {
-        count += await _importEntry(vol, child.path, _join(vaultPath, name), true, opId, progress);
+        children.add((name: p.basename(child.path), path: child.path, isDir: true));
       } else if (child is File) {
-        progress.currentName = name;
-        count += await _importEntry(vol, child.path, _join(vaultPath, name), false, opId, progress);
+        children.add((name: p.basename(child.path), path: child.path, isDir: false));
       }
     }
+    children.sort((a, b) => a.name.compareTo(b.name));
+
+    final plans = planChildImports(
+      [for (final c in children) ImportChild(c.name, isDir: c.isDir)],
+      fsType: run.fsType,
+      caseSensitive: run.caseSensitive,
+    );
+    for (var i = 0; i < children.length; i++) {
+      if (_isCancelled(opId)) break;
+      final child = children[i];
+      final plan = plans[i];
+      if (plan.isSkipped) {
+        _reportSkipped(opId, child.name, plan.skipReasons);
+        continue;
+      }
+      if (!child.isDir) progress.currentName = child.name;
+      count += await _importEntry(vol, child.path, _join(vaultPath, plan.destName!), child.isDir, opId, progress, run);
+    }
     return count;
+  }
+
+  /// Which rules a name must satisfy to be imported into [vol] -- Android's `FilesystemNameValidator.kindFor`: a
+  /// folder vault (gocryptfs / Cryptomator / CryFS, native format codes from 10) takes the encrypted-vault
+  /// rules; every disk-image container takes the conservative union of FAT / exFAT / NTFS / ext, so a name that
+  /// imports can also be exported to any of them.
+  Future<FilesystemType> _nameRules(int vol) async {
+    final format = await pool.call('containerFormat', [vol]) as int;
+    return format >= 10 ? FilesystemType.encryptedVault : FilesystemType.unknownConservative;
+  }
+
+  /// Tells the UI layer an entry was left out because the destination cannot hold its name (Android sends the
+  /// same `onImportItemSkipped`).
+  void _reportSkipped(int opId, String name, List<String> reasons) {
+    if (opId <= 0) return;
+    emit('onImportItemSkipped', {'opId': opId, 'name': name, 'reason': reasons.join('; ')});
+  }
+
+  // ── read-back verification ──────────────────────────────────────────────
+
+  static const int _hashStep = 4 << 20;
+
+  static PlatformException _verifyFailure(String message) => PlatformException(code: 'C++_ERROR', message: message);
+
+  /// SHA-256 of a host file, or null when [opId] was cancelled while reading it.
+  Future<Uint8List?> _sha256OfHostFile(String path, int opId) async {
+    final handle = await pool.call('hashBegin', [1 << veHashSha256]) as int;
+    if (handle == 0) throw _verifyFailure('could not open a hash session');
+    RandomAccessFile? raf;
+    try {
+      raf = await File(path).open();
+      while (true) {
+        if (_isCancelled(opId)) return null;
+        final chunk = await raf.read(_hashStep);
+        if (chunk.isEmpty) break;
+        if (await pool.call('hashUpdate', [handle, chunk]) != veOk) throw _verifyFailure('hash update failed');
+      }
+      return await _finishSha256(handle);
+    } on FileSystemException catch (e) {
+      throw PlatformException(code: 'IO_ERROR', message: e.message);
+    } finally {
+      await raf?.close();
+      await pool.call('hashFree', [handle]);
+    }
+  }
+
+  /// SHA-256 of the plaintext of a vault file, read back in [_hashStep] pieces; null when [opId] was cancelled.
+  Future<Uint8List?> _sha256OfVaultFile(int vol, String path, int opId) async {
+    final size = await pool.call('fileSize', [vol, path]) as int;
+    if (size < 0) throw _verifyFailure('Imported file could not be verified');
+    final handle = await pool.call('hashBegin', [1 << veHashSha256]) as int;
+    if (handle == 0) throw _verifyFailure('could not open a hash session');
+    try {
+      var offset = 0;
+      while (offset < size) {
+        if (_isCancelled(opId)) return null;
+        final want = size - offset < _hashStep ? size - offset : _hashStep;
+        final r = await pool.call('read', [vol, path, offset, want]) as List<Object?>;
+        final chunk = r[1] as Uint8List?;
+        if (r[0] != veOk || chunk == null || chunk.isEmpty) {
+          throw _verifyFailure('Imported file could not be verified');
+        }
+        if (await pool.call('hashUpdate', [handle, chunk]) != veOk) throw _verifyFailure('hash update failed');
+        offset += chunk.length;
+      }
+      return await _finishSha256(handle);
+    } finally {
+      await pool.call('hashFree', [handle]);
+    }
+  }
+
+  Future<Uint8List> _finishSha256(int handle) async {
+    final r = await pool.call('hashFinish', [handle, veHashSha256]) as List<Object?>;
+    if (r[0] != veOk) throw _verifyFailure('digest failed');
+    return r[1] as Uint8List;
+  }
+
+  /// Compares every imported file with the digest taken from its source (Android:
+  /// ImportExportHandlers.verifyCommittedImports). Throws when one differs; returns false when the import was
+  /// cancelled before all of them were checked.
+  Future<bool> _verifyImports(int vol, List<({String vaultPath, Uint8List sha256})> items, int opId) async {
+    for (final item in items) {
+      if (_isCancelled(opId)) return false;
+      final actual = await _sha256OfVaultFile(vol, item.vaultPath, opId);
+      if (actual == null) return false;
+      if (!digestsEqual(item.sha256, actual)) throw _verifyFailure('Imported file integrity verification failed');
+    }
+    return true;
   }
 
   /// Delete-after-import: only offered (non-zero) when every picked item was written.

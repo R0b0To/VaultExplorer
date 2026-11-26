@@ -85,7 +85,9 @@ bool isVisibleInListing(
 /// add what that pass could not find (an Item Vault entry matched by username
 /// or email), so a name search never waits on the scan. In deep-search mode
 /// the scan results already span every matched folder and are used as they
-/// are.
+/// are, with the matches in the folder itself (already loaded) shown at once
+/// rather than after the scan: it takes a moment, and an empty list while it
+/// runs reads as "nothing found".
 List<RawEntry> searchAwareVisibleItems(
   List<RawEntry> localItems, {
   required String query,
@@ -108,9 +110,20 @@ List<RawEntry> searchAwareVisibleItems(
     return localItems.where(visible).toList();
   }
   if (deepSearch) {
-    return deepSearchResults
+    final scanned = deepSearchResults
         .where((item) => visible(item, skipQueryCheck: true))
         .toList();
+    // The scan lists this folder too, so what it already returned for it is
+    // not shown a second time. Its entries from subfolders carry a relative
+    // path (`sub/name`) and never clash with the folder's own names.
+    final scannedHere = <String>{
+      for (final item in scanned)
+        if (!item.name.contains('/')) item.lowercaseName,
+    };
+    final instant = localItems.where(
+      (item) => visible(item) && !scannedHere.contains(item.lowercaseName),
+    );
+    return [...instant, ...scanned];
   }
   final instant = localItems.where(visible).toList();
   final instantLowerNames = instant.map((e) => e.lowercaseName).toSet();

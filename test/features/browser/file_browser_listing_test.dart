@@ -183,6 +183,31 @@ void main() {
       expect(_names(listing), ['sub/found.txt']);
     });
 
+    test('deep search shows this folder\'s matches before the scan lands', () {
+      final listing = buildBrowserListing(
+        _inputs(
+          [_file('report.pdf'), _file('notes.txt')],
+          query: 'rep',
+          searchActive: true,
+          deepSearch: true,
+        ),
+      );
+      expect(_names(listing), ['report.pdf']);
+    });
+
+    test('deep search does not list this folder\'s matches twice', () {
+      final listing = buildBrowserListing(
+        _inputs(
+          [_file('report.pdf')],
+          query: 'rep',
+          searchActive: true,
+          deepSearch: true,
+          deepSearchResults: [_file('report.pdf'), _file('sub/report2.pdf')],
+        ),
+      );
+      expect(_names(listing), ['report.pdf', 'sub/report2.pdf']);
+    });
+
     test('an empty query shows the whole directory even while searching', () {
       final listing = buildBrowserListing(
         _inputs([_file('a.txt'), _file('b.txt')], searchActive: true),

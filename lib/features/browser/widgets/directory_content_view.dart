@@ -8804,7 +8804,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                                 .readOnly) &&
                                                         _archiveContext ==
                                                             null &&
-                                                        !_isDeepSearch,
+                                                        // Subfolder search is
+                                                        // on by default on
+                                                        // desktop: only an
+                                                        // open search shows
+                                                        // entries from other
+                                                        // folders.
+                                                        !(_searchActive &&
+                                                            _isDeepSearch),
                                                     onFileDrop:
                                                         _handleBrowserItemDrop,
                                                     onGridColumnCountChanged: (count) {

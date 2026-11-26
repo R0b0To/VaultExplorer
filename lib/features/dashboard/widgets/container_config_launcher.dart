@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
+import 'package:vaultexplorer/core/windowing/window_caption.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -11,10 +14,11 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.
 
 /// Opens the settings of the vault [uri].
 ///
-/// On Linux and Windows this is a native window of its own (opening the same
-/// vault's settings again brings that window forward). Everywhere else, and
-/// wherever native windows turn out to be unavailable, it is the full-screen
-/// page it has always been.
+/// On Linux and Windows this is a native window of its own, centered over the
+/// window it was opened from like the unlock window (on Windows; on Linux the
+/// window manager places it). Opening the same vault's settings again brings
+/// that window forward. Everywhere else, and wherever native windows turn out
+/// to be unavailable, it is the full-screen page it has always been.
 void openContainerConfig(
   BuildContext context, {
   required String uri,
@@ -48,6 +52,8 @@ void openContainerConfig(
   );
 
   final l10n = context.l10n;
+  // The window this was opened from: the new one is centered over it.
+  final openedFrom = View.maybeOf(context)?.viewId;
   final baseTitle = uri.startsWith('usb:')
       ? l10n.usbVaultSettingsTitle
       : l10n.vaultSettingsTitle;
@@ -55,6 +61,8 @@ void openContainerConfig(
     key: 'config:$uri',
     title: currentLabel.isEmpty ? baseTitle : '$baseTitle – $currentLabel',
     builder: (_) => buildScreen(),
+    onCreated: (entry) =>
+        unawaited(centerWindowOver(entry.viewId, overViewId: openedFrom)),
   );
   if (opened) return;
 

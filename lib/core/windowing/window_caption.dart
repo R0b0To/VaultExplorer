@@ -102,3 +102,28 @@ Future<void> centerWindowOver(int viewId, {int? overViewId}) async {
     }
   }
 }
+
+/// Puts a window into real fullscreen (no frame, covering its whole monitor,
+/// taskbar included) or back, and returns whether the runner did it.
+///
+/// [windowArgs] names the window, as [windowChannelArgsFor] gives it. Taking
+/// them rather than a context lets a page that is being disposed leave
+/// fullscreen again. Windows only: where the runner cannot (Linux), this
+/// returns false and the caller keeps whatever it did to its own chrome. Never
+/// throws.
+Future<bool> setWindowFullscreen(
+  Map<String, Object?>? windowArgs,
+  bool fullscreen,
+) async {
+  if (!PlatformFeatures.isWindows) return false;
+  try {
+    await kWindowChannel.invokeMethod<bool>('setFullscreen', <String, Object?>{
+      ...?windowArgs,
+      'fullscreen': fullscreen,
+    });
+    return true;
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not change fullscreen', error);
+    return false;
+  }
+}

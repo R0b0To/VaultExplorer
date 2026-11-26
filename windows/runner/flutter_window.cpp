@@ -3,6 +3,7 @@
 #include <commctrl.h>
 
 #include <chrono>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -12,6 +13,22 @@
 namespace {
 
 constexpr UINT_PTR kCustomCaptionSubclassId = 1;
+
+// What a window looked like before it went fullscreen, to put it back.
+struct FullscreenState {
+  LONG_PTR style;
+  WINDOWPLACEMENT placement;
+};
+std::map<HWND, FullscreenState>& FullscreenWindows() {
+  static std::map<HWND, FullscreenState> windows;
+  return windows;
+}
+
+// A fullscreen window has no OS frame at all, so there is no caption for the
+// WM_NCCALCSIZE hook to hide.
+bool HasOsFrame(HWND hwnd) {
+  return (GetWindowLongPtr(hwnd, GWL_STYLE) & WS_CAPTION) == WS_CAPTION;
+}
 
 // Hides the OS caption of a window the Flutter engine created (a secondary
 // window), the way Win32Window does for the main one: the window keeps its
@@ -25,7 +42,7 @@ LRESULT CALLBACK CustomCaptionProc(HWND hwnd,
                                    DWORD_PTR /*ref_data*/) {
   switch (message) {
     case WM_NCCALCSIZE: {
-      if (wparam != TRUE) break;
+      if (wparam != TRUE || !HasOsFrame(hwnd)) break;
       auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
       const LONG original_top = params->rgrc[0].top;
       // Let Windows compute the left/right/bottom resize frame first.
@@ -46,6 +63,7 @@ LRESULT CALLBACK CustomCaptionProc(HWND hwnd,
       return 0;
     }
     case WM_NCDESTROY:
+      FullscreenWindows().erase(hwnd);
       RemoveWindowSubclass(hwnd, CustomCaptionProc, subclass_id);
       break;
   }
@@ -157,6 +175,45 @@ bool FlutterWindow::OnCreate() {
           ReleaseCapture();
           SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
           result->Success(flutter::EncodableValue());
+        } else if (method == "setFullscreen") {
+          // Real fullscreen: no frame, covering the whole monitor the window
+          // is on (taskbar included). The way back restores the style and the
+          // placement (maximized or not) it had.
+          bool want = false;
+          if (const auto* args = call.arguments() == nullptr
+                                     ? nullptr
+                                     : std::get_if<flutter::EncodableMap>(
+                                           call.arguments())) {
+            if (const auto* value = FindArgument(*args, "fullscreen")) {
+              if (const bool* flag = std::get_if<bool>(value)) want = *flag;
+            }
+          }
+          auto& windows = FullscreenWindows();
+          const auto it = windows.find(hwnd);
+          if (want && it == windows.end()) {
+            FullscreenState saved = {GetWindowLongPtr(hwnd, GWL_STYLE), {}};
+            saved.placement.length = sizeof(WINDOWPLACEMENT);
+            GetWindowPlacement(hwnd, &saved.placement);
+            MONITORINFO monitor = {sizeof(MONITORINFO)};
+            GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                           &monitor);
+            if (IsZoomed(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+            SetWindowLongPtr(hwnd, GWL_STYLE, saved.style & ~WS_OVERLAPPEDWINDOW);
+            const RECT& r = monitor.rcMonitor;
+            SetWindowPos(hwnd, HWND_TOP, r.left, r.top, r.right - r.left,
+                         r.bottom - r.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            windows[hwnd] = saved;
+          } else if (!want && it != windows.end()) {
+            const FullscreenState saved = it->second;
+            windows.erase(it);
+            SetWindowLongPtr(hwnd, GWL_STYLE, saved.style);
+            SetWindowPlacement(hwnd, &saved.placement);
+            SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                             SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+          }
+          result->Success(flutter::EncodableValue(want));
         } else if (method == "centerOverWindow") {
           // Centers this window over the window that shows `overViewId` (the
           // one it was opened from), kept inside the work area of the screen

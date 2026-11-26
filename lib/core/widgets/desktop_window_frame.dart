@@ -232,3 +232,72 @@ class _DesktopModalWindowDragState extends State<DesktopModalWindowDrag> {
     );
   }
 }
+
+/// Collapses the caption row of the enclosing [DesktopCaptionFrame] while
+/// [hidden] (a player in fullscreen), without rebuilding the page under it: the
+/// page keeps its state, the row just gets no height.
+class DesktopCaptionHider extends StatefulWidget {
+  final bool hidden;
+  final Widget child;
+
+  const DesktopCaptionHider({
+    super.key,
+    required this.hidden,
+    required this.child,
+  });
+
+  @override
+  State<DesktopCaptionHider> createState() => _DesktopCaptionHiderState();
+}
+
+class _DesktopCaptionHiderState extends State<DesktopCaptionHider> {
+  DesktopCaptionClaims? _claims;
+  bool _claimed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final claims = DesktopCaptionClaimsScope.maybeOf(context);
+    if (!identical(claims, _claims)) {
+      _letGo();
+      _claims = claims;
+    }
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(DesktopCaptionHider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.hidden && !_claimed) {
+      // Claiming relays out the frame, which must not happen mid-build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final claims = _claims;
+        if (mounted && widget.hidden && !_claimed && claims != null) {
+          claims.claim();
+          _claimed = true;
+        }
+      });
+    } else if (!widget.hidden) {
+      _letGo();
+    }
+  }
+
+  void _letGo() {
+    if (!_claimed) return;
+    _claimed = false;
+    _claims?.release();
+  }
+
+  @override
+  void dispose() {
+    _letGo();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}

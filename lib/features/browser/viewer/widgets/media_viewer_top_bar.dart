@@ -32,6 +32,11 @@ class MediaViewerTopBar extends StatelessWidget {
   final bool isImage;
   final bool isAudio;
 
+  /// Desktop only: puts the window into fullscreen and back. Null hides the
+  /// button.
+  final VoidCallback? onToggleFullscreen;
+  final bool isFullscreen;
+
   const MediaViewerTopBar({
     super.key,
     required this.playlistController,
@@ -51,6 +56,8 @@ class MediaViewerTopBar extends StatelessWidget {
     this.onMenuClosed,
     required this.isImage,
     required this.isAudio,
+    this.onToggleFullscreen,
+    this.isFullscreen = false,
   });
 
   @override
@@ -177,6 +184,20 @@ class MediaViewerTopBar extends StatelessWidget {
               ),
             );
           }),
+          if (onToggleFullscreen != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 6.0),
+              child: MediaViewerActionButton(
+                action: MediaViewerAction.playPause,
+                customIcon: isFullscreen
+                    ? Icons.fullscreen_exit_rounded
+                    : Icons.fullscreen_rounded,
+                customTooltip: isFullscreen
+                    ? 'Esc'
+                    : '${context.l10n.enterFullscreenMenu} (F)',
+                onTap: onToggleFullscreen!,
+              ),
+            ),
           // More MenuAnchor
           Padding(
             padding: const EdgeInsets.only(left: 6.0),

@@ -17,6 +17,8 @@ import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
+import 'package:vaultexplorer/core/windowing/window_caption.dart';
 import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
@@ -357,6 +359,43 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   Timer? _slideshowTimer;
   Timer? _hideTimer;
+
+  /// The desktop window is in fullscreen. Only then does the chrome hide on
+  /// its own, like a media player: in a normal window the controls stay.
+  bool _desktopFullscreen = false;
+
+  /// Names the window to the runner, kept so fullscreen can be left from
+  /// dispose, where there is no context any more.
+  Map<String, Object?>? _fullscreenWindowArgs;
+
+  /// Measured heights of the top bar and of the bottom controls (with the
+  /// carousel when it is open). On desktop, outside fullscreen, the media is
+  /// laid out between them instead of under them.
+  double _topChromeHeight = 72;
+  double _bottomChromeHeight = 150;
+
+  /// Whether the controls take space of their own (a desktop window) rather
+  /// than float over the media (a phone, or fullscreen).
+  bool get _chromeDocked =>
+      PlatformFeatures.isDesktop && !_desktopFullscreen && _showUI;
+
+  void _setChromeHeight({double? top, double? bottom}) {
+    if (!mounted) return;
+    final newTop = top ?? _topChromeHeight;
+    final newBottom = bottom ?? _bottomChromeHeight;
+    if ((newTop - _topChromeHeight).abs() < 0.5 &&
+        (newBottom - _bottomChromeHeight).abs() < 0.5) {
+      return;
+    }
+    setState(() {
+      _topChromeHeight = newTop;
+      _bottomChromeHeight = newBottom;
+    });
+  }
+
+  /// Whether the controls hide by themselves (a phone, or a desktop window in
+  /// fullscreen) rather than stay up (a desktop window).
+  bool get _chromeAutoHides => !PlatformFeatures.isDesktop || _desktopFullscreen;
   Timer? _prefetchDebounceTimer;
   Future<void> _playbackModeSaveQueue = Future<void>.value();
   int _playbackModeInteractionRevision = 0;
@@ -624,6 +663,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   @override
   void initState() {
     super.initState();
+    // A phone opens the viewer with the controls tucked away (tap to show);
+    // a desktop window opens it with them up and keeps them there.
+    if (PlatformFeatures.isDesktop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _sessionController.setShowUI(true);
+      });
+    }
     // Warm the adjustment shader so the first slider drag already uses the
     // gamma-capable path instead of the matrix fallback.
     unawaited(ViewerAdjustShader.ensureLoaded());
@@ -2731,6 +2777,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _startHideTimer() {
     _hideTimer?.cancel();
+    if (!_chromeAutoHides) return;
     if (_activeMenuCount > 0) return;
     _hideTimer = Timer(MediaViewerConstants.uiHideDelay, () {
       final controller = _playbackManager.activeController;
@@ -2756,6 +2803,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   void _setUIVisibility(bool show) {
     // Nothing may bring the chrome back while locked; unlocking does.
     if (show && _controlsLocked) return;
+    // A desktop window in its normal state keeps its controls up.
+    if (!show && !_chromeAutoHides) return;
     if (mounted) {
       _sessionController.setShowUI(show);
       if (show) {
@@ -2767,6 +2816,27 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       }
     }
   }
+
+  /// Real fullscreen for the desktop window: no frame, the whole monitor, the
+  /// caption row and (after the usual delay) the controls gone. Where the
+  /// runner cannot (Linux) only the viewer's own chrome follows.
+  Future<void> _setDesktopFullscreen(bool on) async {
+    if (!PlatformFeatures.isDesktop || !mounted || _desktopFullscreen == on) {
+      return;
+    }
+    _fullscreenWindowArgs = windowChannelArgsFor(context);
+    setState(() => _desktopFullscreen = on);
+    if (on) {
+      _startHideTimer();
+    } else {
+      _hideTimer?.cancel();
+      _setUIVisibility(true);
+    }
+    await setWindowFullscreen(_fullscreenWindowArgs, on);
+  }
+
+  void _toggleDesktopFullscreen() =>
+      unawaited(_setDesktopFullscreen(!_desktopFullscreen));
 
   void _menuOpened() {
     _activeMenuCount++;
@@ -3892,6 +3962,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       if (!isRepeat) _setUIVisibility(!_showUI);
       return markHandled();
     }
+    if (PlatformFeatures.isDesktop &&
+        !primary &&
+        (key == LogicalKeyboardKey.keyF || key == LogicalKeyboardKey.f11)) {
+      if (!isRepeat) _toggleDesktopFullscreen();
+      return markHandled();
+    }
     if (key == LogicalKeyboardKey.escape) {
       if (!isRepeat) unawaited(Navigator.of(context).maybePop());
       return markHandled();
@@ -4094,6 +4170,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _abLoopToastTimer?.cancel();
     _abLoopToast.dispose();
     _scrubPreviewHost.dispose();
+    if (_desktopFullscreen) {
+      // The window is the person's file manager again: give it its frame back.
+      unawaited(setWindowFullscreen(_fullscreenWindowArgs, false));
+    }
     if (!widget.startInMiniPlayer) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       SystemChrome.setPreferredOrientations(DeviceOrientation.values);
@@ -4375,6 +4455,30 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final viewer = _buildViewer(context);
+    if (!PlatformFeatures.isDesktop) return viewer;
+    // On Windows the viewer is a root-navigator route built by hand, which the
+    // theme's caption frame never sees, so it gets the title bar here (a no-op
+    // where the window keeps its native one). Fullscreen folds the bar away
+    // without touching the viewer's state, and moving the mouse brings the
+    // controls back.
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerHover: (_) {
+        if (!_desktopFullscreen) return;
+        if (_showUI) {
+          _startHideTimer();
+        } else {
+          _setUIVisibility(true);
+        }
+      },
+      child: DesktopCaptionFrame(
+        child: DesktopCaptionHider(hidden: _desktopFullscreen, child: viewer),
+      ),
+    );
+  }
+
+  Widget _buildViewer(BuildContext context) {
     ref.watch(mediaViewerSessionProvider(_sessionKey));
     ref.watch(fileBrowserPinsBookmarksProvider(widget.container.volId));
     final toolbarSettings = ref.watch(fileManagerToolbarSettingsProvider(null));
@@ -4449,6 +4553,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         if (didPop) return;
         // A menu is open: this press closes it (BackDismissibleMenuAnchor).
         if (OpenMenuBackGuard.hasOpenMenu) return;
+        // Escape / back in fullscreen leaves fullscreen, like any player.
+        if (_desktopFullscreen) {
+          unawaited(_setDesktopFullscreen(false));
+          return;
+        }
         // A back press is as likely a misstap as any other touch: it only
         // points at the lock button.
         if (_controlsLocked) {
@@ -4489,7 +4598,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
             extendBody: true, // Draws content under bottom navigation bar
             extendBodyBehindAppBar: true,
             body: LayoutBuilder(
-              builder: (context, constraints) {
+              builder: (context, outerConstraints) {
+                // The media's own area: the window less the controls that
+                // have a space of their own (see _chromeDocked).
+                final dockTop = _chromeDocked ? _topChromeHeight : 0.0;
+                final dockBottom = _chromeDocked ? _bottomChromeHeight : 0.0;
+                final constraints = outerConstraints.deflate(
+                  EdgeInsets.only(top: dockTop, bottom: dockBottom),
+                );
                 final newWidth = constraints.maxWidth;
                 final newHeight = constraints.maxHeight;
                 final bool dimsChanged =
@@ -4761,7 +4877,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   transformChild: minimizeMusicPlayer,
                   child: Stack(
                     children: [
-                      Listener(
+                      Positioned.fill(
+                        top: dockTop,
+                        bottom: dockBottom,
+                        child: Listener(
                         behavior: HitTestBehavior.translucent,
                         onPointerDown: _handleTouchPointerDown,
                         onPointerMove: _handleTouchPointerMove,
@@ -4837,6 +4956,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           },
                         ),
                       ),
+                      ),
                       // Fullscreen scrub preview: above the media, below the
                       // chrome, so the seekbar stays visible while dragging.
                       // Not built at all in mini-box mode or during layout editing.
@@ -4844,6 +4964,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           mediaViewerConfig.scrubPreviewStyle ==
                               ScrubPreviewStyle.fullscreen)
                         Positioned.fill(
+                          top: dockTop,
+                          bottom: dockBottom,
                           child: fadeDuringDismiss(
                             VideoScrubFullscreenLayer(
                               previewHost: _scrubPreviewHost,
@@ -4948,13 +5070,20 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                     : const Offset(0, -1),
                                 child: ListenableBuilder(
                                   listenable: _playlistController,
-                                  builder: (context, _) => MediaViewerTopBar(
+                                  builder: (context, _) => _ChromeSizeProbe(
+                                    onHeight: (h) => _setChromeHeight(top: h),
+                                    child: MediaViewerTopBar(
                                     playlistController: _playlistController,
                                     currentFileName:
                                         _playlistController.currentFile,
                                     totalCount:
                                         _playlistController.playlist.length,
                                     toolbarConfig: mediaViewerConfig,
+                                    isFullscreen: _desktopFullscreen,
+                                    onToggleFullscreen:
+                                        PlatformFeatures.isDesktop
+                                        ? _toggleDesktopFullscreen
+                                        : null,
                                     currentTransitionEffect: _transitionEffect,
                                     onTransitionEffectChanged:
                                         (newEffect) async {
@@ -5008,6 +5137,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                       _playlistController.currentFile,
                                     ),
                                   ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -5037,7 +5167,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                         _isCarouselVisible &&
                                         _showUI;
 
-                                    return Container(
+                                    return _ChromeSizeProbe(
+                                      onHeight: (h) =>
+                                          _setChromeHeight(bottom: h),
+                                      child: Container(
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           begin: Alignment.bottomCenter,
@@ -5153,6 +5286,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                           ),
                                         ],
                                       ),
+                                    ),
                                     );
                                   },
                                 ),
@@ -5177,6 +5311,52 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Reports the height of [child] once it is laid out and whenever it changes.
+class _ChromeSizeProbe extends StatefulWidget {
+  final ValueChanged<double> onHeight;
+  final Widget child;
+
+  const _ChromeSizeProbe({required this.onHeight, required this.child});
+
+  @override
+  State<_ChromeSizeProbe> createState() => _ChromeSizeProbeState();
+}
+
+class _ChromeSizeProbeState extends State<_ChromeSizeProbe> {
+  void _report() {
+    if (!mounted) return;
+    final height = (context.findRenderObject() as RenderBox?)?.size.height;
+    if (height != null && height > 0) widget.onHeight(height);
+  }
+
+  void _reportAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _report());
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _reportAfterFrame();
+  }
+
+  @override
+  void didUpdateWidget(_ChromeSizeProbe oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _reportAfterFrame();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<SizeChangedLayoutNotification>(
+      onNotification: (_) {
+        _reportAfterFrame();
+        return true;
+      },
+      child: SizeChangedLayoutNotifier(child: widget.child),
     );
   }
 }

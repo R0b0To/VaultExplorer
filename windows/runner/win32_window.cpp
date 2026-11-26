@@ -189,7 +189,12 @@ Win32Window::MessageHandler(HWND hwnd,
                             LPARAM const lparam) noexcept {
   switch (message) {
     case WM_NCCALCSIZE: {
-      if (wparam != TRUE) break;
+      // A fullscreen window has no OS frame (see FlutterWindow's
+      // setFullscreen): there is no caption to hide.
+      if (wparam != TRUE ||
+          (GetWindowLongPtr(hwnd, GWL_STYLE) & WS_CAPTION) != WS_CAPTION) {
+        break;
+      }
       auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
       const LONG original_top = params->rgrc[0].top;
       // Let Windows compute the left/right/bottom resize frame first.

@@ -142,9 +142,6 @@ AutoLockPolicy computeAutoLockPolicy(ContainerRecord? record, AppSettings settin
   return AutoLockPolicy(status: explicitStatus, isCustomOverride: explicitStatus != defaultStatus);
 }
 
-AutoLockStatus computeAutoLockStatus(ContainerRecord? record, AppSettings settings) =>
-    computeAutoLockPolicy(record, settings).status;
-
 class _AutoLockVisual {
   const _AutoLockVisual({required this.icon, required this.label, required this.tooltip});
   final IconData icon;

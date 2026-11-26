@@ -176,9 +176,6 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
   ConsumerState<BrowserTabsShell> createState() => _BrowserTabsShellState();
 }
 
-/// Compatibility name retained for existing route builders and integrations.
-typedef BrowserTabsHost = BrowserTabsShell;
-
 class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     with TickerProviderStateMixin {
   /// How far past the first or last tab a drag has to go before it counts as

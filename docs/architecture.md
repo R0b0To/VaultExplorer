@@ -517,8 +517,8 @@ decoy's local explorer); native side builds `ACTION_SEND` /
 
 ### 1.6 Category browser (Images / Videos / Audio / Documents)
 
-The drawer's CATEGORIES section opens `CategoryBrowserScreen`, a virtual view
-that gathers one kind of file from every storage the person can reach: phone
+The drawer's CATEGORIES section opens a category tab (`CategoryContentView`), a
+virtual view that gathers one kind of file from every storage the person can reach: phone
 storage, configured storage locations and **unlocked** vaults. Nothing is
 copied or moved; it is a listing over the real files.
 

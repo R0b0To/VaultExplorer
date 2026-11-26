@@ -21,14 +21,6 @@ part 'lock_gate_controller.g.dart';
 
 const _kLogTag = 'LockGateController';
 
-typedef _UnlockResult = ({
-  int volId,
-  List<String> files,
-  int matchedCipherId,
-  int matchedHashId,
-  String containerFormat,
-});
-
 const _kDuressPurgeErrorMessage =
     'Decryption failed: Invalid credential. 2 attempts remaining.';
 

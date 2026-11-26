@@ -110,9 +110,6 @@ class RedactAnnotation extends EditAnnotation {
   }
 }
 
-/// Type alias so both `RedactAnnotation` and `RedactionAnnotation` resolve.
-typedef RedactionAnnotation = RedactAnnotation;
-
 class TextStylePreset {
   final String id;
   final String label;
@@ -456,6 +453,3 @@ class DrawingAnnotation extends EditAnnotation {
     canvas.drawPath(path, paint);
   }
 }
-
-typedef PenStrokeAnnotation = DrawingAnnotation;
-typedef StrokeAnnotation = DrawingAnnotation;

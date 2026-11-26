@@ -212,23 +212,6 @@ int _skipLinkWhitespace(String text, int i) {
   return (destination: raw, title: null, end: j + 1);
 }
 
-/// Resolves backslash escapes (`\[` -> `[`), for image alt text.
-String unescapeMarkdown(String text) {
-  if (!text.contains('\\')) return text;
-  final out = StringBuffer();
-  for (var i = 0; i < text.length; i++) {
-    if (text[i] == '\\' &&
-        i + 1 < text.length &&
-        isAsciiPunctuation(text.codeUnitAt(i + 1))) {
-      out.write(text[i + 1]);
-      i++;
-    } else {
-      out.write(text[i]);
-    }
-  }
-  return out.toString();
-}
-
 final RegExp _percentRun = RegExp(r'(?:%[0-9A-Fa-f]{2})+');
 
 /// Percent-decodes a destination into a vault path (`my%20image.png` ->

@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';

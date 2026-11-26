@@ -2,27 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
-import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
-
-String repairPlatformErrorMessage(PlatformException e, AppLocalizations l10n) {
-  switch (e.code) {
-    case 'PASSWORD_INCORRECT':
-      return l10n.incorrectPassword;
-    case 'PASSWORD_REQUIRED':
-      return l10n.passwordOrKeyfilesRequired;
-    case 'INVALID_VAULT':
-      return l10n.noVaultFolderFormatDetected;
-    case 'NOTHING_TO_REPAIR':
-      return l10n.repairActionFailedMessage;
-    case 'UNSUPPORTED_FORMAT':
-      return l10n.repairActionFailedMessage;
-    case 'IO_ERROR':
-      return l10n.cannotOpenFile;
-    default:
-      return e.message ?? e.toString();
-  }
-}
 
 /// Native diagnosis result: [diagnosisCode] matches RepairDiagnosis's
 /// ordinal (0=healthy, 1=headerCorrupted, 2=filesystemDirty); [format] is

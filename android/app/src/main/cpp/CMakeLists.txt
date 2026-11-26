@@ -6,8 +6,9 @@ project("vaultexplorer")
 # C ABI (ffi/ve_engine.h) for dart:ffi, instead of the Android JNI library. The
 # engine core is shared; only the platform glue differs:
 #   Android: jni/*.cpp                    (JNI bridges + JVM callbacks)
-#   Desktop: ffi/ve_engine.cpp + ffi/ve_callbacks.cpp, with ffi/compat/ first on the
-#            include path (stand-ins for <jni.h> / <android/log.h>).
+#   Desktop: ffi/ve_engine.cpp + ffi/ve_callbacks.cpp (no JNI or NDK header is needed any more: logging goes
+#            through platform/engine_log.h, callbacks through platform/engine_hooks.h; ffi/compat/ holds only
+#            the Windows POSIX shims).
 # Off by default, so the Android build is exactly what it was.
 option(VAULTEXPLORER_DESKTOP "Build the desktop (dart:ffi) engine library instead of the Android JNI library" OFF)
 if(VAULTEXPLORER_DESKTOP)
@@ -701,6 +702,18 @@ if(TARGET volman_core)
 endif()
 
 if(VAULTEXPLORER_DESKTOP)
+    # Unicode NFC for Cryptomator names (fv::setNfcNormalizer, ffi/ve_nfc.cpp). Android asks java.text.Normalizer;
+    # the desktop engine has no JVM, so it carries utf8proc (MIT; the Unicode data tables fall under the Unicode
+    # license -- see NOTICE.md). Static, and PIC through CMAKE_POSITION_INDEPENDENT_CODE above.
+    FetchContent_Declare(
+        utf8proc
+        URL https://github.com/JuliaStrings/utf8proc/archive/refs/tags/v2.10.0.tar.gz
+        URL_HASH SHA256=6f4f1b639daa6dca9f80bc5db1233e9cbaa31a67790887106160b33ef743f136
+    )
+    set(UTF8PROC_INSTALL OFF CACHE BOOL "" FORCE)
+    set(UTF8PROC_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(utf8proc)
     # Drop every JNI bridge / JVM-callback file and add the C ABI + desktop callbacks.
     list(FILTER VE_ENGINE_SOURCES EXCLUDE REGEX "^jni/")
     list(APPEND VE_ENGINE_SOURCES
@@ -708,6 +721,7 @@ if(VAULTEXPLORER_DESKTOP)
             ffi/ve_crypto.cpp
             ffi/ve_foldervault.cpp
             ffi/ve_callbacks.cpp
+            ffi/ve_nfc.cpp
             ffi/ve_archive.cpp
             ffi/ve_image.cpp
             ffi/ve_repair.cpp
@@ -785,7 +799,8 @@ target_compile_definitions(vaultexplorer PRIVATE
 
 # 5. Header search paths
 if(VAULTEXPLORER_DESKTOP)
-    # BEFORE: the stand-in <jni.h> / <android/log.h> must win over any JDK/NDK header.
+    # BEFORE: ffi/compat now only holds the Windows POSIX shims (ve_win_compat.h, ve_win_types.h) and the FatFs
+    # stand-ins; it must win over any system header of the same name.
     target_include_directories(vaultexplorer BEFORE PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat)
     target_include_directories(vaultexplorer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi ${VE_ZLIB_INCLUDE_DIRS})
@@ -859,7 +874,7 @@ target_link_libraries(
 
 if(VAULTEXPLORER_DESKTOP)
     find_package(Threads REQUIRED)
-    target_link_libraries(vaultexplorer Threads::Threads ve_imaging)
+    target_link_libraries(vaultexplorer Threads::Threads ve_imaging utf8proc)
     # Lets session/session_prepare.cpp treat a whole raw device (no partition table) as one candidate volume.
     target_compile_definitions(vaultexplorer PRIVATE VE_DESKTOP_RAW_DEVICES=1)
     if(WIN32)

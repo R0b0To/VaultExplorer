@@ -38,6 +38,7 @@ All entries below were checked directly against upstream sources/licenses
 | e2fsprogs -- `lib/ext2fs`, `lib/e2p` | tytso/e2fsprogs | LGPL-2.0 | 7ee1d505 (v1.47.4) | OK |
 | dislocker (BitLocker) | Aorimn/dislocker | GPL-2.0-or-later | 38dab031 | OK |
 | cJSON | DaveGamble/cJSON | MIT | acc76239 (v1.7.18) | OK |
+| utf8proc (Unicode NFC for Cryptomator file names in the **desktop engine only**, `ffi/ve_nfc.cpp`; Android uses `java.text.Normalizer`) | JuliaStrings/utf8proc | MIT, plus the Unicode data-file license for the bundled tables (both permissive; full text in the upstream `LICENSE.md`) | v2.10.0, tarball pinned by SHA-256 `6f4f1b63...f136` in `CMakeLists.txt` | OK, added -- needs the license text shipped with desktop builds (see Distribution notes) |
 | ZXing-C++ (offline QR/barcode decoding, `jni/qr_bridge.cpp`) | zxing-cpp/zxing-cpp | Apache-2.0 | 287c85df (v3.1.1); readers only, writers/examples disabled in `CMakeLists.txt` | OK, added -- was previously missing from this table |
 | libarchive (archive/ZIP/7-Zip/RAR/TAR browser engine, `archive/`) | libarchive/libarchive | BSD-2-Clause | 27cbc782 (v3.8.9) | OK |
 | bzip2 (libarchive filter) | libarchive/bzip2 | bzip2 license (BSD-style permissive) | tag `bzip2-1.0.8` | OK |
@@ -161,6 +162,10 @@ these test or build-time tools ship in the release APK.
   `libvaultexplorer.so` (`android/app/src/main/cpp/CMakeLists.txt`) are built from
   original, unmodified upstream source at pinned Git commits via CMake `FetchContent`.
   Nothing is shipped as a prebuilt binary in the `cpp/` directory of this repository.
+- **Desktop engine (`VAULTEXPLORER_DESKTOP`)**: built from the same pinned sources, plus utf8proc, which is
+  fetched as a release tarball whose SHA-256 is pinned in `CMakeLists.txt`. Its MIT notice and Unicode data-file
+  notice (upstream `LICENSE.md`) must accompany any desktop bundle that ships `libvaultexplorer_engine`; the
+  Android library does not contain it.
 - **Prebuilt native libraries from Maven Central (`nextlib-media3ext`)**:
   `nextlib-media3ext` is consumed as a prebuilt AAR artifact from Maven Central
   (`io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.16.0`). This is permitted under

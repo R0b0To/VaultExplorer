@@ -41,7 +41,6 @@ int ve_win_open_utf8(const char* path, int writable, int create);
 #  include <unistd.h>
 #endif
 
-#include <android/log.h>
 #include <mbedtls/platform_util.h>
 
 #include "container_create.h"
@@ -49,9 +48,10 @@ int ve_win_open_utf8(const char* path, int writable, int create);
 #include "container_utils.h"
 #include "crypto/single_file_crypto.h"
 #include "crypto/user_entropy.h"
+#include "platform/engine_log.h"
 #include "filesystems/fs_ops.h"
 #include "filesystems/stream_handles.h"
-#include "jni_callbacks.h"
+#include "platform/engine_hooks.h"
 #include "session_guard.h"
 #include "session_prepare.h"
 #include "virtual_block_device.h"
@@ -76,7 +76,22 @@ extern "C" void ve_log_dispatch(int prio, const char* tag, const char* message) 
     }
 }
 
-#define VE_LOG(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define VE_LOG(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
+
+namespace {
+// The portable engine (session/, io/, filesystems/, ...) logs through platform/engine_log.h, which on desktop
+// goes to a sink the host installs. This one hands each line to ve_log_dispatch() -- the host's callback, or
+// stderr -- but only while the host has switched logging on (ve_set_log_enabled): the lines can name volume ids,
+// paths and sizes, so logging stays off by default. The callback keeps receiving Android-style priorities.
+void desktopLogSink(int level, const char* tag, const char* message) {
+    if (!g_logEnabled.load(std::memory_order_relaxed)) return;
+    constexpr int kPrioInfo = 4, kPrioWarn = 5, kPrioError = 6;   // android/log.h's ANDROID_LOG_INFO / WARN / ERROR
+    const int prio = level >= ENGINE_LOG_LEVEL_ERROR ? kPrioError : level == ENGINE_LOG_LEVEL_WARN ? kPrioWarn : kPrioInfo;
+    ve_log_dispatch(prio, tag, message);
+}
+// Installed when the library loads, so the lines of an unlock in progress are not lost.
+[[maybe_unused]] const bool g_logSinkInstalled = (engineLogSetSink(&desktopLogSink), true);
+}  // namespace
 
 extern "C" VE_API void ve_set_log_enabled(int32_t enabled) { g_logEnabled.store(enabled ? 1 : 0); }
 extern "C" VE_API void ve_set_log_callback(void (*cb)(int32_t, const char*, const char*)) {

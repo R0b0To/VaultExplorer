@@ -798,6 +798,20 @@ static void runFolderVaults() {
         CHECK(listContains(root1, "docs"));
         CHECK(listContains(docs, "hello.txt") && listContains(docs, "big.bin"));
 
+        if (fmt == 1) {
+            // Cryptomator stores names NFC-normalised. A decomposed name ("e" + U+0301) written by one host must be
+            // the same file as the composed one (U+00E9) on every other, so the engine needs a Unicode normaliser
+            // (ffi/ve_nfc.cpp; Android asks java.text.Normalizer).
+            const std::string nfdPath = "/docs/e\xCC\x81.txt";
+            const std::string nfcPath = "/docs/\xC3\xA9.txt";
+            CHECK_RC(ve_write_file_chunk(kFvVol, nfdPath.c_str(), 0, (const uint8_t*)payload.data(), payload.size()), VE_OK);
+            CHECK_RC(ve_fv_finish_write(kFvVol, nfdPath.c_str()), VE_OK);
+            CHECK(readAll(kFvVol, nfcPath.c_str()) == payload);
+            const auto nfcDocs = listDir(kFvVol, "/docs");
+            CHECK(listContains(nfcDocs, "\xC3\xA9.txt") && !listContains(nfcDocs, "e\xCC\x81.txt"));
+            CHECK_RC(ve_delete_file(kFvVol, nfcPath.c_str()), VE_OK);
+        }
+
         CHECK_RC(ve_rename_file(kFvVol, "/docs/hello.txt", "/docs/renamed.txt"), VE_OK);
         CHECK(readAll(kFvVol, "/docs/renamed.txt") == payload);
         CHECK_RC(ve_set_last_modified(kFvVol, "/docs/renamed.txt", 1700000000), VE_OK);

@@ -353,8 +353,9 @@ a link to a folder is listed as `LD|0|mtime|name`.
   `<app support>/cryfs-state` (it must survive restarts). A wrong password surfaces as `AUTH_FAIL` /
   `INCORRECT_PASSWORD`, anything else as `INVALID_VAULT`.
 - The CryFS derived key (Android's "remember" fast path) is not surfaced: there is no keystore on desktop.
-- The NFC filename normaliser hook (`fv::setNfcNormalizer`) is not installed, so only non-ASCII names that
-  arrive in decomposed form are affected (see `foldervault/README.md`).
+- The NFC filename normaliser hook (`fv::setNfcNormalizer`) is installed by `ffi/ve_nfc.cpp` (utf8proc, fetched in
+  `CMakeLists.txt`, desktop only), so Cryptomator names written in decomposed form open by their composed form as
+  on Android; `ve_smoke_test fv` checks it. A name that is not valid UTF-8 is left as it is (see `foldervault/README.md`).
 - **Windows:** `foldervault/fv_storage_win.cpp` is the Win32 twin of the POSIX-only `fv_storage.cpp` (same
   `fv::PosixStorage` interface; UTF-16 paths in the `\\?\` form, so no MAX_PATH limit and no DOS device names;
   path segments with `\`, `:` or wildcards are refused; only real symlinks / junctions count as links, not OneDrive

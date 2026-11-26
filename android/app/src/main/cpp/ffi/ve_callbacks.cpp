@@ -1,4 +1,4 @@
-// Desktop implementation of the engine's callback API (jni/jni_callbacks.h).
+// Desktop implementation of the engine's callback API (platform/engine_hooks.h).
 //
 // On Android these functions call into the JVM (Kotlin registries decide whether
 // an operation was cancelled, progress goes to Dart through event channels). On
@@ -12,7 +12,7 @@
 // The engine core calls these from worker threads; everything here is guarded
 // by one mutex and is cheap (no allocation on the cancellation-poll path).
 
-#include "jni_callbacks.h"
+#include "platform/engine_hooks.h"
 #include "ve_engine.h"
 #include "ve_raw_device.h"
 
@@ -21,44 +21,6 @@
 #include <deque>
 #include <mutex>
 #include <unordered_map>
-
-// ── JNI globals declared extern in jni_callbacks.h ───────────────────────
-// Never dereferenced on desktop; defined (null) so engine translation units
-// that still reference them (e.g. session_guard.cpp's throw helpers) link.
-JavaVM* g_vm = nullptr;
-jclass g_usbBridgeClass = nullptr;
-jmethodID g_usbReadMethod = nullptr;
-jmethodID g_usbWriteMethod = nullptr;
-jmethodID g_usbSyncMethod = nullptr;
-jclass g_progressBridgeClass = nullptr;
-jmethodID g_progressReportMethod = nullptr;
-jclass g_hiddenVolumeProtectionBridgeClass = nullptr;
-jmethodID g_hiddenVolumeProtectionTriggeredMethod = nullptr;
-jclass g_illegalStateExceptionClass = nullptr;
-jclass g_unlockCancelledExceptionClass = nullptr;
-jclass g_splitJoinProgressBridgeClass = nullptr;
-jmethodID g_splitJoinProgressReportMethod = nullptr;
-jclass g_splitJoinCancellationClass = nullptr;
-jmethodID g_splitJoinIsCancelledMethod = nullptr;
-jclass g_repairLogBridgeClass = nullptr;
-jmethodID g_repairLogReportMethod = nullptr;
-jclass g_copyProgressBridgeClass = nullptr;
-jmethodID g_copyProgressReportMethod = nullptr;
-jclass g_copyCancellationClass = nullptr;
-jmethodID g_copyIsCancelledMethod = nullptr;
-jclass g_importProgressBridgeClass = nullptr;
-jmethodID g_importChunkReportMethod = nullptr;
-jmethodID g_importIsTrackingMethod = nullptr;
-jclass g_importCancellationClass = nullptr;
-jmethodID g_importIsCancelledMethod = nullptr;
-jclass g_exportProgressBridgeClass = nullptr;
-jmethodID g_exportChunkReportMethod = nullptr;
-jmethodID g_exportIsTrackingMethod = nullptr;
-jclass g_exportCancellationClass = nullptr;
-jmethodID g_exportIsCancelledMethod = nullptr;
-jclass g_containerSessionRegistryClass = nullptr;
-jmethodID g_yieldWriteLockBrieflyMethod = nullptr;
-jmethodID g_yieldCopyLocksBrieflyMethod = nullptr;
 
 namespace {
 
@@ -171,7 +133,7 @@ extern "C" void ve_op_unregister(int32_t op_id) {
     g_ops.erase(op_id);
 }
 
-// ── jni_callbacks.h API, desktop implementation ──────────────────────────
+// ── engine_hooks.h API, desktop implementation ──────────────────────────
 
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
                           int cipherId, int format, int slot) {

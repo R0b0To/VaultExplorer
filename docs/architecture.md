@@ -128,7 +128,10 @@ cancellation polling, lock yielding, raw USB sector I/O -- with no JNI type in t
 `jni/jni_callbacks.cpp` defines them by calling into Kotlin, while `engine_hooks_default.cpp` is the
 do-nothing set for a host with no use for them (never compiled into the Android library). `engine_log.h`
 turns the engine's `LOGI(...)`-style macros into the *same* `__android_log_print` call on Android, and
-into a sink the host installs with `engineLogSetSink()` (a no-op until it does) everywhere else.
+into a sink the host installs with `engineLogSetSink()` (a no-op until it does) everywhere else. The desktop
+engine installs one when the library loads (`ffi/ve_engine.cpp`); it forwards to the host's log callback, or to
+stderr, only after `ve_set_log_enabled(1)` -- engine log lines can name volume ids, paths and sizes, so logging
+is off by default.
 `jni/jni_callbacks.h` now only holds the JVM globals; the two helpers that throw Kotlin exceptions
 (`throwNotUnlocked`, `throwReadOnly`) moved from `session/session_guard.cpp` to
 `jni/session_guard_jni.cpp`. `scripts/check_engine_portable.py` (also a CTest entry) fails if any file

@@ -274,6 +274,13 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   final Map<int, Offset> _edgeTapStartPositions = {};
   final Map<int, bool> _edgeTapDirections = {};
   double _tapViewportWidth = 0;
+
+  /// The box this player is laid out in. The viewer may leave room for its
+  /// controls around the media, so this is smaller than the window; zoom and
+  /// pan limits are worked out against it, not against the window.
+  Size _boxSize = Size.zero;
+  Size get _viewportSize =>
+      _boxSize.isEmpty ? MediaQuery.sizeOf(context) : _boxSize;
   double? _brightnessDragStartLevel;
   double _brightnessLevel = 0.5;
   bool _showBrightnessHud = false;
@@ -765,7 +772,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   void _onVideoTransformationChanged() {
     if (_isClampingMatrix || !mounted) return;
     _scheduleVideoRectReport();
-    final vpSize = MediaQuery.of(context).size;
+    final vpSize = _viewportSize;
     if (vpSize.width <= 0 || vpSize.height <= 0) return;
 
     final matrix = _videoTransformationController.value;
@@ -899,7 +906,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
     }
 
-    final vpSize = MediaQuery.of(context).size;
+    final vpSize = _viewportSize;
     final clampedMatrix = _clampVideoMatrix(
       targetMatrix,
       vpSize.width,
@@ -1627,7 +1634,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
           )
         : SizedBox.expand(child: MediaSwipeDismissTarget(child: stackContent));
     if (!widget.isAudio && widget.enableZoom) {
-      final vpSize = MediaQuery.of(context).size;
+      final vpSize = _viewportSize;
       corePlayerWidget = InteractiveViewer(
         key: _interactiveViewerKey,
         transformationController: _videoTransformationController,
@@ -1677,7 +1684,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
     // Capture this during build because the tap recognizer can finish after
     // this playlist item is deactivated.
-    final tapViewportWidth = MediaQuery.sizeOf(context).width;
+    final tapViewportWidth = _viewportSize.width;
 
     // Outer detector captures double-taps anywhere across the entire viewport
     // (including the black letterbox bars and out-of-bounds space) to reset zoom.
@@ -1721,6 +1728,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       child: LayoutBuilder(
         builder: (context, outerConstraints) {
           _tapViewportWidth = outerConstraints.maxWidth;
+          _boxSize = outerConstraints.biggest;
           final rawEdgeWidth =
               outerConstraints.maxWidth * widget.edgeSwipeWidthFraction;
           final edgeWidth = rawEdgeWidth.clamp(

@@ -2824,15 +2824,47 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (!PlatformFeatures.isDesktop || !mounted || _desktopFullscreen == on) {
       return;
     }
-    _fullscreenWindowArgs = windowChannelArgsFor(context);
-    setState(() => _desktopFullscreen = on);
-    if (on) {
-      _startHideTimer();
-    } else {
-      _hideTimer?.cancel();
-      _setUIVisibility(true);
+    if (_fullscreenSwitching) return;
+    _fullscreenSwitching = true;
+    try {
+      _fullscreenWindowArgs = windowChannelArgsFor(context);
+      // Change the window first and the viewer's layout only once the window
+      // has its new size, so the media is laid out once, for the final size.
+      // Switching the layout first would stretch the media to a window that
+      // has not grown yet and then again when it has.
+      final resized = _nextViewMetrics();
+      final changed = await setWindowFullscreen(_fullscreenWindowArgs, on);
+      _nativeFullscreen = changed && on;
+      if (changed) await resized;
+      if (!mounted) return;
+      setState(() => _desktopFullscreen = on);
+      if (on) {
+        _startHideTimer();
+      } else {
+        _hideTimer?.cancel();
+        _setUIVisibility(true);
+      }
+    } finally {
+      _fullscreenSwitching = false;
     }
-    await setWindowFullscreen(_fullscreenWindowArgs, on);
+  }
+
+  bool _fullscreenSwitching = false;
+
+  /// The window itself (not just the viewer's layout) is in fullscreen.
+  bool _nativeFullscreen = false;
+
+  /// Completes when the window's size next changes (or after a short while if
+  /// it never does, e.g. it was already that size).
+  Future<void> _nextViewMetrics() {
+    final done = Completer<void>();
+    final observer = _MetricsOnce(() {
+      if (!done.isCompleted) done.complete();
+    });
+    WidgetsBinding.instance.addObserver(observer);
+    return done.future
+        .timeout(const Duration(milliseconds: 400), onTimeout: () {})
+        .whenComplete(() => WidgetsBinding.instance.removeObserver(observer));
   }
 
   void _toggleDesktopFullscreen() =>
@@ -4170,7 +4202,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _abLoopToastTimer?.cancel();
     _abLoopToast.dispose();
     _scrubPreviewHost.dispose();
-    if (_desktopFullscreen) {
+    if (_nativeFullscreen || _desktopFullscreen) {
       // The window is the person's file manager again: give it its frame back.
       unawaited(setWindowFullscreen(_fullscreenWindowArgs, false));
     }
@@ -5359,4 +5391,14 @@ class _ChromeSizeProbeState extends State<_ChromeSizeProbe> {
       child: SizeChangedLayoutNotifier(child: widget.child),
     );
   }
+}
+
+/// Calls [onChange] when the window's metrics (its size) change.
+class _MetricsOnce with WidgetsBindingObserver {
+  final VoidCallback onChange;
+
+  _MetricsOnce(this.onChange);
+
+  @override
+  void didChangeMetrics() => onChange();
 }

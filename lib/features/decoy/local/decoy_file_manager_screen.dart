@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/app/session_lock_wiring.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -144,17 +145,9 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       appLockScreenLockOnly: false,
     );
     final lockController = ref.read(sessionLockControllerProvider);
-    lockController.configure(
+    configureSessionLock(
+      _container,
       settings: () => decoySettings,
-      lockAllMountedContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockAllMountedContainersForAutoLock(),
-      lockImmediateOverrideContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockImmediatelyConfiguredContainers(),
-      lockScreenLockOnlyContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockScreenLockOnlyConfiguredContainers(),
       enforceAppLock: () {},
     );
 

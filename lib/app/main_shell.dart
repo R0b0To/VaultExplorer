@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/app/desktop_session_keeper.dart';
+import 'package:vaultexplorer/app/session_lock_wiring.dart';
 import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -515,24 +517,8 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   void _configureSessionLock() {
+    configureSessionLock(_container, enforceAppLock: _enforceAppLock);
     final lockController = ref.read(sessionLockControllerProvider);
-    lockController.configure(
-      settings: () => _container.read(appSettingsControllerProvider).settings,
-      lockAllMountedContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockAllMountedContainersForAutoLock(),
-      // Containers set to "Immediately", locked on real background/screen-off
-      // events independently of the app-wide sweep (see SessionLockController).
-      lockImmediateOverrideContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockImmediatelyConfiguredContainers(),
-      // Containers set to "Screen Lock Only"; SessionLockController only calls
-      // this from handleScreenOff, never for mere backgrounding.
-      lockScreenLockOnlyContainers: () => _container
-          .read(vaultDashboardControllerProvider.notifier)
-          .lockScreenLockOnlyConfiguredContainers(),
-      enforceAppLock: _enforceAppLock,
-    );
     lockController.notifyAppUnlocked(preserveBackgroundState: true);
     unawaited(_resumePersistedVaultAutoLock());
   }
@@ -637,6 +623,15 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void dispose() {
     FileManagerEnvironment.instance.detach();
+    // Closing the main window while file manager windows stay open (Linux and
+    // Windows) must not leave them without auto-lock: the keeper takes over the
+    // shell's jobs until the app locks. It does nothing when the window is
+    // being replaced, e.g. by the lock gate. Must come after detach(), which
+    // it re-attaches.
+    DesktopSessionKeeper.instance.takeOverIfNeeded(
+      container: _container,
+      localStorage: _localStorageNotifier.value,
+    );
     HardwareKeyboard.instance.removeHandler(_handleTabShortcutKey);
     WidgetsBinding.instance.removeObserver(this);
     OpenDrawerBackGuard.setDrawerOpen(this, false);

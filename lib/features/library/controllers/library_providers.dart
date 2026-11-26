@@ -13,6 +13,7 @@ import 'package:vaultexplorer/features/library/controllers/music_mode.dart';
 import 'package:vaultexplorer/features/library/data/library_index_store.dart';
 import 'package:vaultexplorer/features/library/data/library_store_platform.dart';
 import 'package:vaultexplorer/features/library/index/library_scanner.dart';
+import 'package:vaultexplorer/features/library/index/local_tree_walker.dart';
 import 'package:vaultexplorer/features/library/widgets/music_covers.dart';
 
 /// Saves and loads music mode config, indexes and custom covers. The saved
@@ -114,5 +115,17 @@ LibraryFileAccess libraryFileAccess(
     },
     read: (path, offset, length) =>
         fileIo.readFileChunk(container, path, offset, length),
+    // Plain folders (this device, external storage): one background walk
+    // instead of an isolate and a stat of every entry per folder, which takes
+    // minutes over a home folder. SAF folders and vaults list as before.
+    walkTree: container.isRawLocal
+        ? (startPaths, token, onProgress) => walkLocalAudioTree(
+            rootPath: container.uri,
+            startPaths: startPaths,
+            isAudioFile: MediaViewerConstants.isAudio,
+            token: token,
+            onProgress: onProgress,
+          )
+        : null,
   );
 }

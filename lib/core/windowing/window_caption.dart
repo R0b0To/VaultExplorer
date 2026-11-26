@@ -73,3 +73,32 @@ Future<void> placeWindowAtCursor(
     VeLog.w('WindowCaption', 'Could not place the window at the cursor', error);
   }
 }
+
+/// Moves the window that shows [viewId] to the middle of the window that shows
+/// [overViewId] (the one it was opened from), keeping it on that window's
+/// screen. Without [overViewId], or when that window is hidden or minimized, it
+/// is centered on the screen it is already on.
+///
+/// Windows only: the Linux window manager places new windows itself, and the
+/// window API has no way to ask it for more. Never throws. The native window of
+/// a view that was only just created can take a moment to exist, so a call that
+/// finds none is tried again a few times.
+Future<void> centerWindowOver(int viewId, {int? overViewId}) async {
+  if (!PlatformFeatures.isWindows) return;
+  const attempts = 4;
+  for (var attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await kWindowChannel.invokeMethod<void>('centerOverWindow', <String, Object?>{
+        'viewId': viewId,
+        if (overViewId != null) 'overViewId': overViewId,
+      });
+      return;
+    } catch (error) {
+      if (attempt == attempts) {
+        VeLog.w('WindowCaption', 'Could not center the window', error);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+  }
+}

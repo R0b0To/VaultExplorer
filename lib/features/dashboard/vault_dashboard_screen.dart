@@ -47,6 +47,9 @@ import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/layout/adaptive_page_route.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
+import 'package:vaultexplorer/core/windowing/window_caption.dart';
+import 'package:vaultexplorer/core/windowing/windowed_page.dart';
 import 'package:vaultexplorer/core/widgets/sheets/adaptive_sheet.dart';
 
 const _kLogTag = 'VaultDashboardScreen';
@@ -641,45 +644,56 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
             .getPassword(uri);
       }
       if (!mounted) return;
-      await Navigator.push(
+      final l10n = context.l10n;
+      final windowTitle = uri == null
+          ? l10n.mountContainerTitle
+          : (name == null || name.isEmpty)
+          ? l10n.unlockContainerTitle
+          : '${l10n.unlockContainerTitle} – $name';
+      // On Linux and Windows the unlock page is a window of its own; elsewhere
+      // it is the page / dialog it has always been. A new mount needs room for
+      // the file picker and the container-kind switch.
+      final inWindow = await pushWindowedPage(
         context,
-        adaptivePageRoute(
-          context,
-          builder: (_) => SkinAreaScope(
-            area: SkinArea.dashboard,
-            child: UnlockSheet(
-              onMounted: (container, {record}) {
-                dashboardController.onContainerMounted(
-                  container,
-                  record: record,
-                );
-                newlyMountedContainer = container;
-                if (autoOpen && widget.onOpenBrowser != null) {
-                  widget.onOpenBrowser!(
-                    container,
-                    origin: BrowserTabOrigin.home,
-                  );
-                }
-              },
-              openBrowserRoute: autoOpen && widget.onOpenBrowser == null
-                  ? (container) => _buildBrowserRoute(container)
-                  : null,
-              initialUri: uri,
-              initialName: name,
-              droppedPaths: droppedPaths,
-              prefillPassword: rememberedPassword,
-              documentProvider: docProvider,
-              autoMountFolders: autoMountFolders,
-              mountedUris: state.mounted.map((c) => c.uri).toList(),
-            ),
+        key: 'unlock:${uri ?? 'new'}',
+        title: windowTitle,
+        size: uri == null ? const Size(520, 600) : const Size(460, 500),
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: UnlockSheet(
+            onMounted: (container, {record}) {
+              dashboardController.onContainerMounted(
+                container,
+                record: record,
+              );
+              newlyMountedContainer = container;
+              if (autoOpen && widget.onOpenBrowser != null) {
+                widget.onOpenBrowser!(container, origin: BrowserTabOrigin.home);
+              }
+            },
+            openBrowserRoute: autoOpen && widget.onOpenBrowser == null
+                ? (container) => _buildBrowserRoute(container)
+                : null,
+            initialUri: uri,
+            initialName: name,
+            droppedPaths: droppedPaths,
+            prefillPassword: rememberedPassword,
+            documentProvider: docProvider,
+            autoMountFolders: autoMountFolders,
+            mountedUris: state.mounted.map((c) => c.uri).toList(),
           ),
         ),
       );
       await dashboardController.loadAll();
-      if (newlyMountedContainer != null) {
-        await dashboardController.refreshContainerSpace(
-          newlyMountedContainer!.volId,
-        );
+      final unlocked = newlyMountedContainer;
+      if (unlocked != null) {
+        await dashboardController.refreshContainerSpace(unlocked.volId);
+        // The unlock window cannot open the vault in the main window's
+        // navigator itself (a window has its own), so do it now that the
+        // window is gone. In-window pages replace themselves with the route.
+        if (inWindow && mounted && autoOpen && widget.onOpenBrowser == null) {
+          await Navigator.push(context, _buildBrowserRoute(unlocked));
+        }
       }
     } finally {
       // Opening a vault can replace the dashboard tab while this route is
@@ -821,15 +835,52 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
     try {
       if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => SkinAreaScope(
-            area: SkinArea.dashboard,
-            child: const CreateContainerSheet(),
+      final l10n = context.l10n;
+      final messengerContext = context;
+      // On Linux and Windows the wizard is a window of its own; elsewhere it is
+      // the full-screen page it has always been.
+      final inWindow = SecondaryWindows.instance.open(
+        key: 'create:vault',
+        title: l10n.createEncryptedContainerTitle,
+        size: const Size(580, 700),
+        constraints: const BoxConstraints(minWidth: 500, minHeight: 540),
+        onCreated: (entry) => unawaited(
+          centerWindowOver(
+            entry.viewId,
+            overViewId: View.maybeOf(messengerContext)?.viewId,
+          ),
+        ),
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: CreateContainerSheet(
+            // The window closes itself and takes its snackbar with it, so the
+            // dashboard reports the success.
+            onCreated: (isFolderVault) {
+              if (!mounted) return;
+              showAppSnackBar(
+                messengerContext,
+                message: isFolderVault
+                    ? l10n.vaultCreatedSuccessfully
+                    : l10n.containerFileCreatedSuccessfully,
+                tone: AppBannerTone.success,
+              );
+            },
           ),
         ),
       );
+      if (inWindow) {
+        await SecondaryWindows.instance.entryFor('create:vault')?.closed;
+      } else {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SkinAreaScope(
+              area: SkinArea.dashboard,
+              child: const CreateContainerSheet(),
+            ),
+          ),
+        );
+      }
       if (mounted) {
         await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
       }

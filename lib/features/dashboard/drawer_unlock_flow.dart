@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/layout/adaptive_page_route.dart';
+import 'package:vaultexplorer/core/windowing/windowed_page.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -83,29 +84,35 @@ Future<void> showDrawerUnlock({
         ),
       );
     } else {
-      await navigator.push<void>(
-        adaptivePageRoute<void>(
-          context,
-          builder: (_) => SkinAreaScope(
-            area: SkinArea.dashboard,
-            child: UnlockSheet(
-              initialUri: record.uri,
-              initialName: record.label,
-              prefillPassword: rememberedPassword,
-              documentProvider: record.documentProvider,
-              autoMountFolders: record.documentProviderFolders
-                  .where((folder) => folder.autoMount)
-                  .map((folder) => folder.path)
-                  .toList(),
-              mountedUris: state.mounted
-                  .map((container) => container.uri)
-                  .toList(),
-              onMounted: (container, {record}) {
-                controller.onContainerMounted(container, record: record);
-                newlyMountedContainer = container;
-                if (isMounted()) onOpen(container);
-              },
-            ),
+      // On Linux and Windows the unlock page is a window of its own, in front
+      // of whichever window the sidebar is in; elsewhere it is the page or
+      // dialog it has always been.
+      await pushWindowedPage(
+        context,
+        key: 'unlock:${record.uri}',
+        title: record.label.isEmpty
+            ? context.l10n.unlockContainerTitle
+            : '${context.l10n.unlockContainerTitle} – ${record.label}',
+        size: const Size(460, 500),
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: UnlockSheet(
+            initialUri: record.uri,
+            initialName: record.label,
+            prefillPassword: rememberedPassword,
+            documentProvider: record.documentProvider,
+            autoMountFolders: record.documentProviderFolders
+                .where((folder) => folder.autoMount)
+                .map((folder) => folder.path)
+                .toList(),
+            mountedUris: state.mounted
+                .map((container) => container.uri)
+                .toList(),
+            onMounted: (container, {record}) {
+              controller.onContainerMounted(container, record: record);
+              newlyMountedContainer = container;
+              if (isMounted()) onOpen(container);
+            },
           ),
         ),
       );

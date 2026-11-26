@@ -1,15 +1,22 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/widgets/wizard/wizard_step_indicator.dart';
+import 'package:vaultexplorer/core/widgets/wizard/wizard_window_style.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 
 /// Full-screen chrome for a linear, multi-step creation wizard.
 ///
 /// In portrait mode, navigation buttons render in a traditional bottom bar.
 /// In landscape mode, the bottom bar disappears and converts into a compact
 /// right-hand sidebar, freeing up 100% of the screen's vertical space for content.
+///
+/// In a native desktop window (see `pushWindowedPage`) it is laid out like a
+/// desktop dialog instead: the step title on the left, the form on the plain
+/// window surface, and Back / Next pinned to a footer, right-aligned.
 class WizardScaffold extends StatelessWidget {
   final String appBarTitle;
   final int currentStep;
@@ -96,6 +103,9 @@ class WizardScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (SecondaryWindowScope.maybeOf(context) != null) {
+      return _buildWindowed(context);
+    }
     final cs = context.colors;
     final size = MediaQuery.sizeOf(context);
     final isLandscape = size.width > size.height;
@@ -283,6 +293,142 @@ class WizardScaffold extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// The desktop window layout: header, scrolling form, pinned footer.
+  Widget _buildWindowed(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final l10n = context.l10n;
+    final counterText = l10n.xOfYCounter(currentStep + 1, totalSteps);
+    final buttonShape = WidgetStatePropertyAll<OutlinedBorder>(
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(kWizardWindowRadius)),
+    );
+    const buttonSize = WidgetStatePropertyAll<Size>(Size(112, 40));
+
+    return WizardWindowStyle(
+      child: Semantics(
+        label: appBarTitle,
+        container: true,
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            _handleBackOrExit(context);
+          },
+          child: CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              // Escape closes the window from the first step; later it would
+              // throw away what has been entered, so it does nothing there.
+              if (currentStep == 0)
+                const SingleActivator(LogicalKeyboardKey.escape): () => _handleBackOrExit(context),
+            },
+            child: Scaffold(
+              backgroundColor: cs.surface,
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                    child: SizedBox(
+                      height: 4,
+                      child: busy
+                          ? LinearProgressIndicator(color: cs.primary, backgroundColor: cs.primaryContainer)
+                          : WizardStepIndicator(currentStep: currentStep, totalSteps: totalSteps),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          counterText,
+                          style: textTheme.labelMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          stepTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Scrollbar(
+                      child: SingleChildScrollView(
+                        primary: true,
+                        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 640),
+                            child: stepContent,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                      child: InlineErrorBanner(errorMessage!),
+                    ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: wizardWindowOutline(cs))),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      child: Row(
+                        children: [
+                          if (busy)
+                            Expanded(
+                              child: Text(
+                                busyMessage,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          else
+                            const Spacer(),
+                          TextButton(
+                            onPressed: busy ? null : () => _handleBackOrExit(context),
+                            style: ButtonStyle(minimumSize: buttonSize, shape: buttonShape),
+                            child: Text(currentStep == 0 ? l10n.cancel : l10n.wizardBackButton),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton(
+                            onPressed: (busy || !canProceed) ? null : onNext,
+                            style: ButtonStyle(minimumSize: buttonSize, shape: buttonShape),
+                            child: busy && isLastStep
+                                ? SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2.2, color: cs.onPrimary),
+                                  )
+                                : Text(nextLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

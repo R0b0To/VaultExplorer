@@ -59,6 +59,9 @@ class FlutterWindow : public Win32Window {
   // hosts the Flutter view named by a "viewId" argument, or this window when
   // there is none. Null when the view is gone.
   HWND TargetWindow(const flutter::EncodableValue* arguments);
+
+  // The top-level window that shows the view [view_id], or null.
+  HWND WindowForView(int64_t view_id);
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

@@ -156,6 +156,46 @@ bool FlutterWindow::OnCreate() {
           ReleaseCapture();
           SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
           result->Success(flutter::EncodableValue());
+        } else if (method == "centerOverWindow") {
+          // Centers this window over the window that shows `overViewId` (the
+          // one it was opened from), kept inside the work area of the screen
+          // that window is on. Without such a window (or while it is hidden
+          // or minimized) it centers on the screen the window is already on.
+          RECT own;
+          GetWindowRect(hwnd, &own);
+          const int width = own.right - own.left;
+          const int height = own.bottom - own.top;
+
+          HWND over = nullptr;
+          if (const auto* args = call.arguments() == nullptr
+                                     ? nullptr
+                                     : std::get_if<flutter::EncodableMap>(
+                                           call.arguments())) {
+            if (FindArgument(*args, "overViewId") != nullptr) {
+              over = WindowForView(IntArgument(*args, "overViewId"));
+            }
+          }
+          RECT anchor = own;
+          if (over != nullptr && over != hwnd && IsWindowVisible(over) &&
+              !IsIconic(over)) {
+            GetWindowRect(over, &anchor);
+          }
+          MONITORINFO monitor = {sizeof(MONITORINFO)};
+          GetMonitorInfo(MonitorFromRect(&anchor, MONITOR_DEFAULTTONEAREST),
+                         &monitor);
+          const RECT work = monitor.rcWork;
+          const bool centered_on_screen = EqualRect(&anchor, &own);
+          const RECT& target = centered_on_screen ? work : anchor;
+
+          int x = target.left + ((target.right - target.left) - width) / 2;
+          int y = target.top + ((target.bottom - target.top) - height) / 2;
+          if (x + width > work.right) x = work.right - width;
+          if (y + height > work.bottom) y = work.bottom - height;
+          if (x < work.left) x = work.left;
+          if (y < work.top) y = work.top;
+          SetWindowPos(hwnd, nullptr, x, y, 0, 0,
+                       SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+          result->Success(flutter::EncodableValue());
         } else if (method == "implicitWindowUnused") {
           // The app draws its windows (the main one included) as views of
           // their own, so this window shows nothing and must stay hidden. If
@@ -228,6 +268,15 @@ bool FlutterWindow::OnCreate() {
   flutter_controller_->ForceRedraw();
 
   return true;
+}
+
+HWND FlutterWindow::WindowForView(int64_t view_id) {
+  if (window_registrar_ == nullptr) return nullptr;
+  FlutterDesktopViewRef view =
+      FlutterDesktopPluginRegistrarGetViewById(window_registrar_, view_id);
+  if (view == nullptr) return nullptr;
+  const HWND content = FlutterDesktopViewGetHWND(view);
+  return content != nullptr ? GetAncestor(content, GA_ROOT) : nullptr;
 }
 
 HWND FlutterWindow::TargetWindow(const flutter::EncodableValue* arguments) {

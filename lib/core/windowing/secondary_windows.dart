@@ -1,5 +1,7 @@
 // See desktop_windowing.dart for why this file imports Flutter internals.
 // ignore_for_file: invalid_use_of_internal_member, implementation_imports
+import 'dart:async';
+
 import 'package:flutter/src/widgets/_window.dart' as flutter_window;
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -41,6 +43,15 @@ class SecondaryWindowEntry {
   );
 
   late final flutter_window.WindowController _controller;
+
+  final Completer<void> _closedCompleter = Completer<void>();
+
+  /// Completes once this window is gone, however it was closed (its own
+  /// close button, the page popping, a lock, or the main window closing).
+  ///
+  /// A page that is shown in a window instead of in-window can await this
+  /// the way it awaited `Navigator.push`.
+  Future<void> get closed => _closedCompleter.future;
 
   /// The id of this window's view, which is how the platform runner knows the
   /// window (see `windowChannelArgsFor`).
@@ -103,6 +114,9 @@ class SecondaryWindows extends ChangeNotifier {
 
   List<SecondaryWindowEntry> get entries =>
       List<SecondaryWindowEntry>.unmodifiable(_entries.values);
+
+  /// The window open under [key], if any.
+  SecondaryWindowEntry? entryFor(String key) => _entries[key];
 
   /// Opens a window showing [builder], or brings the one already open under
   /// [key] to the front.
@@ -235,6 +249,7 @@ class SecondaryWindows extends ChangeNotifier {
   void _forget(SecondaryWindowEntry entry) {
     if (!identical(_entries[entry.key], entry)) return;
     _entries.remove(entry.key);
+    if (!entry._closedCompleter.isCompleted) entry._closedCompleter.complete();
     notifyListeners();
     // The window widget listens to the controller until the frame that drops
     // it from the tree, so the controller is disposed after that frame.

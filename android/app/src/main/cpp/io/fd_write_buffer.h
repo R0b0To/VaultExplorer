@@ -162,6 +162,12 @@ public:
     // "RDONLY" / "WRONLY" / "RDWR" as the fd was actually opened, or "?" when
     // fcntl itself fails (closed / revoked fd).
     static const char* fdAccessName(int fd) {
+#if defined(_WIN32)
+        // MinGW's CRT has no F_GETFL/fcntl equivalent for querying a descriptor's
+        // access mode. Keep the write-failure log useful without guessing.
+        (void)fd;
+        return "?";
+#else
         const int fl = fcntl(fd, F_GETFL);
         if (fl < 0) return "?";
         switch (fl & O_ACCMODE) {
@@ -170,6 +176,7 @@ public:
             case O_RDWR:   return "RDWR";
             default:       return "?";
         }
+#endif
     }
 
 private:

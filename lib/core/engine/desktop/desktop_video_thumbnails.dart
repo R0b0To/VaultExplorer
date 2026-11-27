@@ -19,6 +19,12 @@ import 'dart:typed_data';
 
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 
+import 'desktop_native_thumbnails.dart' show
+    NativeImageFailed,
+    NativeImageOutcome,
+    NativeImageRefused,
+    NativeImageThumb,
+    NativeImageUnsupported;
 import 'video_thumbnail_logic.dart';
 
 /// One frame out of a video: encoded (JPEG or PNG) at the video's own resolution, plus the video's length

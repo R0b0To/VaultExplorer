@@ -652,7 +652,7 @@ void _handleDoubleTap() {
         final pageWidth = (constraints.maxWidth - _pageHorizontalMargin * 2)
             .clamp(80.0, constraints.maxWidth)
             .toDouble();
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         final renderWidthPx = (pageWidth * dpr).clamp(1, 2200).round();
 
         final topInset = MediaQuery.paddingOf(context).top + 60;

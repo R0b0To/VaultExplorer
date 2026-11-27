@@ -294,7 +294,7 @@ class _ApplyAllChip extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final color = isDestructive ? cs.error : cs.onSurfaceVariant;
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Material(
       color: cs.surfaceContainerHigh,

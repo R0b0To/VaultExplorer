@@ -173,7 +173,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
         widget.playlist.isEmpty) {
       return;
     }
-    final viewportWidth = _viewportWidth ?? MediaQuery.of(context).size.width;
+    final viewportWidth = _viewportWidth ?? MediaQuery.sizeOf(context).width;
     final target =
         (widget.currentIndex * (_tileWidth + _tileSpacing)) -
         (viewportWidth / 2) +

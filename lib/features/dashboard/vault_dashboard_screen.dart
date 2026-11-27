@@ -922,13 +922,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
 
     final cs = Theme.of(context).colorScheme;
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     showAdaptiveSheet(
       context: context,
       isScrollControlled: isLandscape,
       constraints: isLandscape
-          ? BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.5)
+          ? BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.5)
           : null,
       builder: (sheetContext) => AppBottomSheet(
         child: Column(

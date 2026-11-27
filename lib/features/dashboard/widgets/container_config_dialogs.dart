@@ -26,7 +26,7 @@ class _PatternVerifySheetState extends ConsumerState<_PatternVerifySheet> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     Widget header = Column(
       mainAxisSize: MainAxisSize.min,

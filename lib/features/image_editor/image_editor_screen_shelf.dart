@@ -393,7 +393,7 @@ class _EditorToolsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final tools = [
       _buildToolItem(
         icon: Icons.filter_vintage_rounded,
@@ -473,7 +473,7 @@ class _EditorToolActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     if (isLandscape) {
       return Container(
         width: double.infinity,
@@ -584,7 +584,7 @@ class _EditorToolActionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.of(context).orientation == Orientation.landscape;
+    final compact = MediaQuery.orientationOf(context) == Orientation.landscape;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -854,7 +854,7 @@ class _CropShelf extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final currentAspect = cropBoxSize == null
         ? 1.0
         : cropBoxSize!.width / cropBoxSize!.height;
@@ -1377,7 +1377,7 @@ class _LooksShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     if (isLandscape) {
       return Container(
         color: const Color(0xFF161616),
@@ -1425,7 +1425,7 @@ Future<void> _showImageEditorColorPicker(
     backgroundColor: const Color(0xFF202020),
     isScrollControlled: true,
     builder: (sheetContext) {
-      final maxHeight = MediaQuery.of(sheetContext).size.height * 0.9;
+      final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.9;
       return SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: maxHeight),
@@ -1552,7 +1552,7 @@ class _ImageEditorColorPickerState extends State<_ImageEditorColorPicker> {
     builder: (context, constraints) {
       final availableWidth = constraints.maxWidth.isFinite
           ? constraints.maxWidth
-          : MediaQuery.of(context).size.width;
+          : MediaQuery.sizeOf(context).width;
       final diameter = math.min(
         widget.maxWheelDiameter,
         math.max(120.0, availableWidth - 24),
@@ -1710,7 +1710,7 @@ class _TextShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     switch (tab) {
       case _TextShelfTab.style:
         return Container(
@@ -1905,7 +1905,7 @@ class _DrawShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     switch (tab) {
       case _DrawShelfTab.color:
         return Container(
@@ -2124,7 +2124,7 @@ class _RedactShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return Container(
       color: const Color(0xFF161616),
       padding: EdgeInsets.symmetric(
@@ -2240,7 +2240,7 @@ class _LandscapeLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final panelWidth = (MediaQuery.of(context).size.width * 0.32).clamp(
+    final panelWidth = (MediaQuery.sizeOf(context).width * 0.32).clamp(
       220.0,
       360.0,
     );

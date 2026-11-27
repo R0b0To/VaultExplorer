@@ -36,8 +36,9 @@ xfer::joinFiles("out/disk.hc.002", "disk-joined.hc", &observer);      // any pic
 ## Two deliberate differences (fixes)
 
 - A failed split or join removes the unfinished part / output on **any** failure. The Android
-  handlers did so only on cancel and left a truncated file after an I/O error. Parts that were
-  completed stay.
+  handlers (`SplitJoinHandlers.kt`) used to do so only on cancel and left a truncated file after an
+  I/O error; they now match. Parts that were completed stay -- including when the *next* part
+  cannot be opened, because a finished part stops counting as "in progress" the moment it is closed.
 - The next part is opened only when a byte is about to go into it, so an exact multiple of the part
   size never creates an empty trailing part that then has to be deleted.
 

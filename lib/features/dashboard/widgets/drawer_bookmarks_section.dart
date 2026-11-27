@@ -19,6 +19,7 @@ import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_r
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/sidebar_drop_target.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
@@ -256,15 +257,12 @@ class _DrawerBookmarksSectionState
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    // Same tinted panel as the vaults, storage and categories sections, with
+    // the title laid out like the categories one.
+    return DrawerGroup(
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 1),
-          child: Divider(),
-        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
           child: Text(
             context.l10n.drawerBookmarksSectionTitle.toUpperCase(),
             style: textTheme.labelSmall?.copyWith(

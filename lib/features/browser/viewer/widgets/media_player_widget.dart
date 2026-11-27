@@ -732,7 +732,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     final box = context.findRenderObject();
     final width = box is RenderBox && box.hasSize
         ? box.size.width
-        : MediaQuery.of(context).size.width;
+        : MediaQuery.sizeOf(context).width;
     final isLeft = details.localPosition.dx < width * 0.35;
 
     final double targetSpeed;
@@ -1087,7 +1087,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         fit = BoxFit.cover;
       case VideoAspectRatioMode.centre:
         fit = BoxFit.none;
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         if (dpr > 0) {
           sizedWidth = rawSize.width / dpr;
           sizedHeight = rawSize.height / dpr;
@@ -1132,7 +1132,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         fit = BoxFit.cover;
       case VideoAspectRatioMode.centre:
         fit = BoxFit.none;
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         if (dpr > 0 && rawSize.width > 0 && rawSize.height > 0) {
           sizedWidth = rawSize.width / dpr;
           sizedHeight = rawSize.height / dpr;
@@ -1192,8 +1192,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         _thumbnailCache.peekMemory(widget.container, widget.fileName);
 
     final posterCacheWidth =
-        (MediaQuery.of(context).size.width *
-                MediaQuery.of(context).devicePixelRatio)
+        (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
             .round()
             .clamp(1, 1 << 20);
 
@@ -1239,7 +1239,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       }
 
       if (mode == VideoAspectRatioMode.centre) {
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         if (rawW > 0 && rawH > 0 && dpr > 0) {
           imageWidget = SizedBox(
             width: rawW / dpr,

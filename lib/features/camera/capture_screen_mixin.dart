@@ -777,7 +777,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
     });
     scrollToEndOfTray();
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final frameAspectRatio = isLandscape
         ? captureControls.aspectRatio
         : 1 / captureControls.aspectRatio;
@@ -826,7 +826,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   }
 
   Widget buildCapturedMediaTray() {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final totalCount = capturedMedia.length + pendingPhotoCount;
 
     return Container(
@@ -978,7 +978,7 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   }
 
   Widget buildBottomControls() {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Container(
       decoration: const BoxDecoration(

@@ -237,6 +237,20 @@ class VaultFileIoApi {
     return result ?? -1;
   }
 
+  /// Whether [path] exists in plain device storage, from one stat of the entry
+  /// itself. [entryExists] answers the same question for a folder by opening
+  /// and reading all of it (its strict readability probe), which for a big
+  /// folder costs far more than the question is worth. Only for containers
+  /// where [MountedContainer.isRawLocal] holds.
+  Future<bool> rawLocalEntryExists(
+    MountedContainer container,
+    String path, {
+    required bool isDir,
+  }) {
+    assert(container.isRawLocal);
+    return _local.entryExists(container.uri, path, isDir: isDir);
+  }
+
   /// Returns whether an entry (file or folder) exists at [path] within [container].
   Future<bool> entryExists(
     MountedContainer container,
@@ -409,6 +423,18 @@ class VaultFileIoApi {
       {'filePath': container.uri, 'dirPath': dirPath},
     );
     return result ?? 0;
+  }
+
+  /// [getFolderSize] as a job the caller can abandon. Plain device storage is
+  /// read on a worker isolate and the walk stops when the job is cancelled, so
+  /// a scan of a big tree does not keep running after the user has moved on.
+  /// Every other source is a single call that cannot be interrupted: cancelling
+  /// then only means nobody is waiting for the answer any more.
+  ListingJob<int> startFolderSize(MountedContainer container, String dirPath) {
+    if (container.isRawLocal) {
+      return _local.getFolderSizeJob(container.uri, dirPath);
+    }
+    return ListingJob<int>.uninterruptible(getFolderSize(container, dirPath));
   }
 
   Future<int> _safFolderSize(MountedContainer container, String dirPath) async {

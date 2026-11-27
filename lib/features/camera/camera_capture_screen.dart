@@ -1371,7 +1371,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     ref.watch(cameraCaptureControlsProvider(_captureControlsKey));
     ref.watch(cameraCaptureSessionProvider(captureSessionKey));
     final lockProvider = cameraCaptureLockProvider(widget.container.volId);

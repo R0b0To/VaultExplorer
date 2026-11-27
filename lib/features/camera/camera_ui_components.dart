@@ -71,7 +71,7 @@ class _CameraPopupMenuButtonState<T> extends State<CameraPopupMenuButton<T>> {
 
     final buttonRect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final screenSize = overlay?.size ?? MediaQuery.of(context).size;
+    final screenSize = overlay?.size ?? MediaQuery.sizeOf(context);
 
     final route = _CameraPopupMenuRoute<T>(
       buttonRect: buttonRect,
@@ -1049,11 +1049,11 @@ class CameraFocusExposureOverlay extends StatelessWidget {
         if (minExposureEv < maxExposureEv)
           Positioned(
             right: 16,
-            top: MediaQuery.of(context).size.height * 0.3,
+            top: MediaQuery.sizeOf(context).height * 0.3,
             child: RotatedBox(
               quarterTurns: 3,
               child: SizedBox(
-                width: MediaQuery.of(context).size.height * 0.4,
+                width: MediaQuery.sizeOf(context).height * 0.4,
                 child: Slider(
                   value: currentExposureEv,
                   min: minExposureEv,

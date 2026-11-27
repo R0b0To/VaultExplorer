@@ -157,6 +157,12 @@ class LocalFileIoBackend {
   Future<int> getFolderSize(String rootPath, String dirPath) =>
       _repo.folderSize(_resolve(rootPath, dirPath));
 
+  /// [getFolderSize] as a job that can be abandoned: the walk stops when it is
+  /// cancelled instead of reading the rest of the tree for nobody. See
+  /// [DecoyLocalRepository.folderSizeJob].
+  ListingJob<int> getFolderSizeJob(String rootPath, String dirPath) =>
+      _repo.folderSizeJob(_resolve(rootPath, dirPath));
+
   Future<Uint8List?> readFileChunk(
     String rootPath,
     String fileName,

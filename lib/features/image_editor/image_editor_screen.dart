@@ -2109,7 +2109,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       child: Builder(
         builder: (context) {
           final isLandscape =
-              MediaQuery.of(context).orientation == Orientation.landscape;
+              MediaQuery.orientationOf(context) == Orientation.landscape;
           final hasError =
               _document.isLoading || _document.errorMessage != null;
 
@@ -2257,7 +2257,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
 
     final isCropping = _controls.activeTool == EditorTool.crop;
 
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     if (_lastOrientation != null && _lastOrientation != orientation) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _resetZoom(animate: false);

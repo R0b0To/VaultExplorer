@@ -2843,7 +2843,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     final appearance = _effectiveAppearance(
       ref.watch(textEditorAppearanceProvider),
     );
-    final softKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    final softKeyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     final bgLuminance = syntaxStyle.backgroundColor.computeLuminance();
     final primaryLuminance = cs.primary.computeLuminance();

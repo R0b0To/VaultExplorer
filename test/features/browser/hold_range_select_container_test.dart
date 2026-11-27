@@ -1,3 +1,5 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
@@ -597,6 +599,139 @@ void main() {
       expect(selectedNameRect.left, equals(unselectedNameRect.left));
       expect(selectedNameRect.width, closeTo(unselectedNameRect.width, 2.1));
       expect(find.byType(TileSelectionIndicator), findsOneWidget);
+    });
+  });
+
+  group('HoldRangeSelectContainer Ctrl+wheel zoom', () {
+    final longItems = List.generate(
+      40,
+      (i) => RawEntry.parse('F|1024|1690000000|file_$i.txt'),
+    );
+
+    // Records every scale callback as 'start' / 'update:<scale>' / 'end'.
+    Widget buildZoomHarness({
+      required List<String> log,
+      required ScrollController controller,
+      bool withScaleCallbacks = true,
+    }) {
+      return MaterialApp(
+        home: Scaffold(
+          body: HoldRangeSelectContainer(
+            items: longItems,
+            selectedItems: const {},
+            isSelectionMode: false,
+            onSelectionChanged: (_) {},
+            onScaleStart: withScaleCallbacks ? (_) => log.add('start') : null,
+            onScaleUpdate: withScaleCallbacks
+                ? (d) => log.add('update:${d.scale.toStringAsFixed(2)}')
+                : null,
+            onScaleEnd: withScaleCallbacks ? (_) => log.add('end') : null,
+            child: ListView.builder(
+              controller: controller,
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: longItems.length,
+              itemBuilder: (context, index) => HoldSelectableItem(
+                index: index,
+                entry: longItems[index],
+                child: SizedBox(height: 60, child: Text('row_$index')),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Future<void> wheel(WidgetTester tester, double dy) async {
+      final pointer = TestPointer(1, PointerDeviceKind.mouse);
+      final center = tester.getCenter(find.byType(HoldRangeSelectContainer));
+      await tester.sendEventToBinding(pointer.hover(center));
+      await tester.sendEventToBinding(pointer.scroll(Offset(0, dy)));
+    }
+
+    // Lets the idle timer that ends the wheel gesture fire.
+    Future<void> settle(WidgetTester tester) =>
+        tester.pump(const Duration(milliseconds: 400));
+
+    testWidgets('Ctrl+wheel up zooms in and does not scroll', (tester) async {
+      final log = <String>[];
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(buildZoomHarness(log: log, controller: controller));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      addTearDown(() => tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft));
+      await wheel(tester, -100);
+      await settle(tester);
+
+      expect(log, ['start', 'update:1.30', 'end']);
+      expect(controller.offset, 0.0);
+    });
+
+    testWidgets('Ctrl+wheel down zooms out', (tester) async {
+      final log = <String>[];
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(buildZoomHarness(log: log, controller: controller));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      addTearDown(() => tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft));
+      await wheel(tester, 100);
+      await settle(tester);
+
+      expect(log, ['start', 'update:0.77', 'end']);
+      expect(controller.offset, 0.0);
+    });
+
+    testWidgets('Plain wheel still scrolls and never zooms', (tester) async {
+      final log = <String>[];
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(buildZoomHarness(log: log, controller: controller));
+
+      await wheel(tester, 100);
+      await settle(tester);
+
+      expect(log, isEmpty);
+      expect(controller.offset, greaterThan(0.0));
+    });
+
+    testWidgets('Small wheel deltas accumulate into one step', (tester) async {
+      final log = <String>[];
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(buildZoomHarness(log: log, controller: controller));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      addTearDown(() => tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft));
+      await wheel(tester, -25);
+      expect(log, isEmpty);
+      await wheel(tester, -25);
+      expect(log, ['start', 'update:1.30']);
+      await settle(tester);
+
+      expect(log.last, 'end');
+    });
+
+    testWidgets('Without scale callbacks Ctrl+wheel scrolls as before',
+        (tester) async {
+      final log = <String>[];
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        buildZoomHarness(
+          log: log,
+          controller: controller,
+          withScaleCallbacks: false,
+        ),
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      addTearDown(() => tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft));
+      await wheel(tester, 100);
+      await settle(tester);
+
+      expect(log, isEmpty);
+      expect(controller.offset, greaterThan(0.0));
     });
   });
 }

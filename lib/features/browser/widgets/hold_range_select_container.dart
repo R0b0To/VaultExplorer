@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
@@ -144,6 +145,21 @@ class HoldSelectableItem extends StatelessWidget {
 /// would let the tile's no-op win and hold-select never fire.
 const Duration kHoldSelectDelay = Duration(milliseconds: 400);
 
+/// Wheel distance (logical px) that counts as one Ctrl+scroll zoom step. A
+/// mouse notch is well above it (about 53 px on Linux, 100+ on Windows), so
+/// each notch is one step, while free-spinning or high-resolution wheels with
+/// tiny deltas accumulate up to it.
+const double _kWheelZoomStepDistance = 40.0;
+
+/// Scale handed to the pinch handlers for one wheel step. It must clear the
+/// grid/masonry column thresholds (1.18 in, 0.82 out) in both directions, and
+/// is a comfortable step for the list's continuous zoom.
+const double _kWheelZoomStepScale = 1.3;
+
+/// Quiet time after the last wheel step before the zoom gesture is ended
+/// (this is when the list persists its zoom level).
+const Duration _kWheelZoomIdle = Duration(milliseconds: 300);
+
 /// A container that coordinates hold-to-select and hold-to-range-select across
 /// any layout (List, Compact, Grid, Masonry) without interfering with native scrolling.
 ///
@@ -207,6 +223,9 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   final Set<int> _downPointers = <int>{};
   final Set<int> _scrollInterruptPointers = <int>{};
   bool _scaleStarted = false;
+  bool _wheelZoomActive = false;
+  double _wheelZoomAccum = 0.0;
+  Timer? _wheelZoomTimer;
   bool _isScrollActive = false;
   bool _scrollEndPending = false;
   bool _scrollEndResetScheduled = false;
@@ -259,6 +278,8 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   @override
   void dispose() {
+    _wheelZoomTimer?.cancel();
+    _wheelZoomTimer = null;
     if (_rangeHoldPointer != null) {
       _setDrawerDragBlocked?.call(false);
       _rangeHoldPointer = null;
@@ -608,6 +629,77 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     }
   }
 
+  // ── Ctrl + mouse wheel zoom ────────────────────────────────────────────────
+
+  /// Ctrl+scroll is the desktop pinch: it drives the same scale callbacks as a
+  /// two-finger gesture, one step per wheel notch.
+  ///
+  /// The event is registered with the pointer-signal resolver, which hands it
+  /// to the first registrant only. This listener is stacked above the scroll
+  /// view (see [build]), so it is reached before the scrollable and wins; a
+  /// plain wheel is never registered here and still scrolls.
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    if (widget.onScaleUpdate == null) return;
+    if (!HardwareKeyboard.instance.isControlPressed) return;
+    // A touch pinch owns the zoom, or items are being dragged.
+    if (_scaleStarted || _isFrozen()) return;
+    // Horizontal-only wheel: leave it to the scrollable.
+    if (event.scrollDelta.dy == 0.0) return;
+    GestureBinding.instance.pointerSignalResolver.register(
+      event,
+      (PointerSignalEvent e) => _applyWheelZoom(e as PointerScrollEvent),
+    );
+  }
+
+  void _applyWheelZoom(PointerScrollEvent event) {
+    if (!mounted) return;
+    final dy = event.scrollDelta.dy;
+    // Reversing direction drops what was accumulated the other way.
+    if (_wheelZoomAccum != 0.0 && (_wheelZoomAccum > 0.0) != (dy > 0.0)) {
+      _wheelZoomAccum = 0.0;
+    }
+    _wheelZoomAccum += dy;
+    if (_wheelZoomAccum.abs() >= _kWheelZoomStepDistance) {
+      // Wheel up (negative dy) zooms in, like pinching out.
+      final zoomIn = _wheelZoomAccum < 0.0;
+      _wheelZoomAccum = 0.0;
+      _wheelZoomActive = true;
+      // Each step is its own start + update so every view measures it from
+      // its current zoom: nothing accumulates past a limit, and reversing is
+      // instant. The gesture is ended once, after the wheel goes quiet.
+      widget.onScaleStart?.call(
+        ScaleStartDetails(
+          focalPoint: event.position,
+          localFocalPoint: event.localPosition,
+          pointerCount: 2,
+        ),
+      );
+      final scale = zoomIn ? _kWheelZoomStepScale : 1.0 / _kWheelZoomStepScale;
+      widget.onScaleUpdate?.call(
+        ScaleUpdateDetails(
+          focalPoint: event.position,
+          localFocalPoint: event.localPosition,
+          scale: scale,
+          horizontalScale: scale,
+          verticalScale: scale,
+          pointerCount: 2,
+        ),
+      );
+    }
+    _wheelZoomTimer?.cancel();
+    _wheelZoomTimer = Timer(_kWheelZoomIdle, _endWheelZoom);
+  }
+
+  void _endWheelZoom() {
+    _wheelZoomTimer = null;
+    _wheelZoomAccum = 0.0;
+    if (!_wheelZoomActive) return;
+    _wheelZoomActive = false;
+    if (!mounted) return;
+    widget.onScaleEnd?.call(ScaleEndDetails(pointerCount: 0));
+  }
+
   void _handleScaleEnd(ScaleEndDetails details) {
     if (_scaleStarted) {
       _scaleStarted = false;
@@ -670,6 +762,16 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
                         color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
+                  ),
+                ),
+              // Last child = hit-tested first. Translucent, so it never blocks
+              // taps or hover below it, but its pointer-signal handler runs
+              // before the scrollable's and can claim Ctrl+wheel for zoom.
+              if (widget.onScaleUpdate != null)
+                Positioned.fill(
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerSignal: _handlePointerSignal,
                   ),
                 ),
             ],

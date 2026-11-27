@@ -103,6 +103,66 @@ Future<void> centerWindowOver(int viewId, {int? overViewId}) async {
   }
 }
 
+/// Makes the window that shows [viewId] impossible to resize: the runner takes
+/// away its sizing border and its maximize box, so dragging an edge, snapping
+/// it and maximizing it all do nothing.
+///
+/// Windows only. Elsewhere the window is pinned to its size by its constraints
+/// alone (see `SecondaryWindows.open`). Never throws; a runner that does not
+/// know the call leaves the window as it was, and the constraints still hold.
+Future<void> lockWindowSize(int viewId) async {
+  if (!PlatformFeatures.isWindows) return;
+  try {
+    await kWindowChannel.invokeMethod<void>('lockSize', <String, Object?>{
+      'viewId': viewId,
+    });
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not lock the window size', error);
+  }
+}
+
+/// Puts the window that shows [viewId] in the bottom-right corner of the work
+/// area of the screen it is on (clear of the taskbar), like a notification.
+///
+/// Windows only; elsewhere the window manager places new windows itself. Never
+/// throws. The native window of a view that was only just created can take a
+/// moment to exist, so a call that finds none is tried again a few times.
+Future<void> dockWindowBottomRight(int viewId) async {
+  if (!PlatformFeatures.isWindows) return;
+  const attempts = 4;
+  for (var attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await kWindowChannel.invokeMethod<void>('dockBottomRight', <String, Object?>{
+        'viewId': viewId,
+      });
+      return;
+    } catch (error) {
+      if (attempt == attempts) {
+        VeLog.w('WindowCaption', 'Could not dock the window', error);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+  }
+}
+
+/// Sets the height of the window that shows [viewId] to [height] logical
+/// pixels of content, keeping its width and its bottom edge where they are (so
+/// a window docked in a corner grows upward), and keeping it on the screen.
+///
+/// Windows only. Never throws.
+Future<void> setWindowContentHeight(int viewId, double height) async {
+  if (!PlatformFeatures.isWindows) return;
+  try {
+    await kWindowChannel.invokeMethod<void>('setContentHeight', <String, Object?>{
+      'viewId': viewId,
+      'height': height,
+    });
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not resize the window', error);
+  }
+}
+
 /// Puts a window into real fullscreen (no frame, covering its whole monitor,
 /// taskbar included) or back, and returns whether the runner did it.
 ///

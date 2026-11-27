@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/core/windowing/window_caption.dart';
 
 const double kDesktopTitleBarHeight = 32;
@@ -102,6 +103,16 @@ class DesktopWindowTitleBar extends StatefulWidget {
   final bool leadingDraggable;
   final double height;
 
+  /// Background of the bar. Defaults to the tab strip colour; a page with its
+  /// own backdrop (the media viewer's black) passes its own so the bar blends
+  /// into it.
+  final Color? backgroundColor;
+
+  /// Colour of the minimize / maximize / close glyphs. Defaults to the
+  /// theme's `onSurface`; pass it together with [backgroundColor] when the
+  /// bar is not drawn on a themed surface.
+  final Color? foregroundColor;
+
   const DesktopWindowTitleBar({
     super.key,
     required this.tabs,
@@ -109,6 +120,8 @@ class DesktopWindowTitleBar extends StatefulWidget {
     this.leadingWidth = 0,
     this.leadingDraggable = false,
     this.height = 34,
+    this.backgroundColor,
+    this.foregroundColor,
   });
 
   @override
@@ -177,6 +190,16 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
     }
   }
 
+  /// Whether the window can be maximized: false for a fixed-size window (the
+  /// file operations window). The main window and every other one can.
+  bool get _canMaximize =>
+      SecondaryWindowScope.maybeOf(context)?.resizable ?? true;
+
+  Future<void> _toggleMaximize() async {
+    if (!_canMaximize) return;
+    await _invoke('toggleMaximize');
+  }
+
   Future<void> _startDragging() async {
     await _invoke('startDragging');
     await _refreshMaximized();
@@ -187,7 +210,10 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
     required String tooltip,
     required VoidCallback onPressed,
     bool close = false,
-  }) => SizedBox(
+  }) {
+    final foreground =
+        widget.foregroundColor ?? Theme.of(context).colorScheme.onSurface;
+    return SizedBox(
     width: kDesktopTitleBarCaptionButtonWidth,
     height: widget.height,
     child: IconButton(
@@ -195,11 +221,11 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
       tooltip: tooltip,
       icon: Icon(icon, size: 15),
       style: IconButton.styleFrom(
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
+        foregroundColor: foreground,
         backgroundColor: Colors.transparent,
         hoverColor: close
             ? const Color(0xFFE81123)
-            : Theme.of(context).colorScheme.onSurface.withValues(alpha: .08),
+            : foreground.withValues(alpha: .08),
         shape: const RoundedRectangleBorder(),
         padding: EdgeInsets.zero,
         minimumSize: Size(kDesktopTitleBarCaptionButtonWidth, widget.height),
@@ -208,11 +234,12 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
       ),
     ),
   );
+  }
 
   Widget _dragRegion({required Widget child}) => GestureDetector(
     behavior: HitTestBehavior.opaque,
     onPanStart: (_) => _startDragging(),
-    onDoubleTap: () => _invoke('toggleMaximize'),
+    onDoubleTap: _toggleMaximize,
     child: child,
   );
 
@@ -220,7 +247,7 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Material(
-      color: desktopTabStripColor(cs),
+      color: widget.backgroundColor ?? desktopTabStripColor(cs),
       child: SizedBox(
         height: widget.height,
         child: Row(
@@ -252,7 +279,7 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
                   ),
                   DesktopWindowTitleBarScope(
                     onDragStart: _startDragging,
-                    onDoubleTap: () => _invoke('toggleMaximize'),
+                    onDoubleTap: _toggleMaximize,
                     child: widget.tabs,
                   ),
                 ],
@@ -268,13 +295,14 @@ class _DesktopWindowTitleBarState extends State<DesktopWindowTitleBar> {
               tooltip: 'Minimize',
               onPressed: () => _invoke('minimize'),
             ),
-            _captionButton(
-              icon: _maximized
-                  ? Icons.filter_none_rounded
-                  : Icons.crop_square_rounded,
-              tooltip: _maximized ? 'Restore' : 'Maximize',
-              onPressed: () => _invoke('toggleMaximize'),
-            ),
+            if (_canMaximize)
+              _captionButton(
+                icon: _maximized
+                    ? Icons.filter_none_rounded
+                    : Icons.crop_square_rounded,
+                tooltip: _maximized ? 'Restore' : 'Maximize',
+                onPressed: _toggleMaximize,
+              ),
             _captionButton(
               icon: Icons.close_rounded,
               tooltip: 'Close',

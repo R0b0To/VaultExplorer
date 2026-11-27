@@ -322,7 +322,71 @@ bool FlutterWindow::OnCreate() {
         } else if (method == "minimize") {
           ShowWindow(hwnd, SW_MINIMIZE);
           result->Success(flutter::EncodableValue());
+        } else if (method == "lockSize") {
+          // A fixed-size window (the file operations window): no sizing
+          // border and no maximize box, so dragging an edge, snapping the
+          // window to a screen edge and maximizing it all do nothing. The
+          // caption and the DWM shadow stay (WS_CAPTION is kept).
+          if (IsZoomed(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+          const LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+          SetWindowLongPtr(hwnd, GWL_STYLE,
+                           style & ~(WS_THICKFRAME | WS_MAXIMIZEBOX));
+          SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                       SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE |
+                           SWP_NOZORDER | SWP_NOACTIVATE);
+          result->Success(flutter::EncodableValue());
+        } else if (method == "dockBottomRight") {
+          // Bottom-right corner of the work area of the screen the window is
+          // on, a little clear of the taskbar and the screen edge.
+          RECT own;
+          GetWindowRect(hwnd, &own);
+          MONITORINFO monitor = {sizeof(MONITORINFO)};
+          GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                         &monitor);
+          const RECT work = monitor.rcWork;
+          const int margin = static_cast<int>(
+              16.0 * GetDpiForWindow(hwnd) / 96.0 + 0.5);
+          int x = work.right - (own.right - own.left) - margin;
+          int y = work.bottom - (own.bottom - own.top) - margin;
+          if (x < work.left) x = work.left;
+          if (y < work.top) y = work.top;
+          SetWindowPos(hwnd, nullptr, x, y, 0, 0,
+                       SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+          result->Success(flutter::EncodableValue());
+        } else if (method == "setContentHeight") {
+          // Gives the window the content height the app asks for, keeping
+          // its width and its bottom edge (a window docked in a corner grows
+          // upward), and keeping it inside the work area.
+          const double wanted = ReadNumber(call.arguments(), "height", 0);
+          if (wanted <= 0) {
+            result->Success(flutter::EncodableValue());
+            return;
+          }
+          RECT win;
+          RECT client;
+          GetWindowRect(hwnd, &win);
+          GetClientRect(hwnd, &client);
+          const int chrome =
+              (win.bottom - win.top) - (client.bottom - client.top);
+          const int height = static_cast<int>(
+                                 wanted * GetDpiForWindow(hwnd) / 96.0 + 0.5) +
+                             chrome;
+          MONITORINFO monitor = {sizeof(MONITORINFO)};
+          GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                         &monitor);
+          const RECT work = monitor.rcWork;
+          int top = win.bottom - height;
+          if (top < work.top) top = work.top;
+          if (top + height > work.bottom) top = work.bottom - height;
+          SetWindowPos(hwnd, nullptr, win.left, top, win.right - win.left,
+                       height, SWP_NOZORDER | SWP_NOACTIVATE);
+          result->Success(flutter::EncodableValue());
         } else if (method == "toggleMaximize") {
+          if ((GetWindowLongPtr(hwnd, GWL_STYLE) & WS_MAXIMIZEBOX) == 0) {
+            // A window that cannot be maximized (see lockSize).
+            result->Success(flutter::EncodableValue(false));
+            return;
+          }
           ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
           result->Success(flutter::EncodableValue(IsZoomed(hwnd) != FALSE));
         } else if (method == "close") {

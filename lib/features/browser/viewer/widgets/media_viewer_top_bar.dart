@@ -37,6 +37,12 @@ class MediaViewerTopBar extends StatelessWidget {
   final VoidCallback? onToggleFullscreen;
   final bool isFullscreen;
 
+  /// Desktop only: the bar is drawn inside the window's title bar (between the
+  /// window edge and the minimize / maximize / close buttons) instead of as a
+  /// gradient strip over the media. It is compact, has no backdrop of its own
+  /// and leaves empty stretches to the title bar's drag area.
+  final bool inTitleBar;
+
   const MediaViewerTopBar({
     super.key,
     required this.playlistController,
@@ -58,7 +64,13 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.isAudio,
     this.onToggleFullscreen,
     this.isFullscreen = false,
+    this.inTitleBar = false,
   });
+
+  double get _buttonSize => inTitleBar ? 30.0 : 40.0;
+  double get _iconSize =>
+      inTitleBar ? AppIconSize.small : AppIconSize.standard;
+  double get _gap => inTitleBar ? 4.0 : 6.0;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +94,26 @@ class MediaViewerTopBar extends StatelessWidget {
       );
     }).toList();
 
+    final actions = _buildActions(context, cs, pinnedTopActions, moreActions);
+
+    if (inTitleBar) {
+      return Row(
+        children: [
+          const SizedBox(width: AppSpacing.sm),
+          _buildBackButton(context),
+          const SizedBox(width: AppSpacing.sm),
+          // Not hit-testable, so a press on the name drags the window like
+          // the rest of the title bar.
+          Expanded(
+            child: IgnorePointer(child: _buildTitle(context, textTheme)),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          ...actions,
+          const SizedBox(width: AppSpacing.sm),
+        ],
+      );
+    }
+
     return Container(
       padding: EdgeInsets.only(
         top: topInset + AppSpacing.sm,
@@ -102,110 +134,177 @@ class MediaViewerTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          MediaViewerActionButton(
-            action: MediaViewerAction.playPause,
-            customIcon: Icons.arrow_back_rounded,
-            customTooltip: context.l10n.backTooltip,
-            // maybePop, not pop: the viewer tells a deliberate close (which
-            // may keep audio playing in the background) from a forced one by it.
-            onTap: () => Navigator.maybePop(context),
-          ),
+          _buildBackButton(context),
           const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  currentFileName.split('/').last,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.2,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (playlistController.isPlaylistMode ||
-                    playlistController.isScanningSubfolders) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    playlistController.isPlaylistMode
-                        ? (playlistController.isScanningSubfolders
-                            ? context.l10n
-                                .mediaViewerPlaylistPositionScanningLabel(
-                                    playlistController.currentIndex + 1,
-                                    totalCount)
-                            : context.l10n.mediaViewerPlaylistPositionLabel(
-                                playlistController.currentIndex + 1,
-                                totalCount))
-                        : context.l10n.mediaViewerScanningLabel,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+          Expanded(child: _buildTitle(context, textTheme)),
           const SizedBox(width: AppSpacing.sm),
-          ...pinnedTopActions.map((action) {
-            if (action == MediaViewerAction.playlistMenu) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 6.0),
-                child: _buildPlaylistMenu(context, cs),
-              );
-            }
-            if (action == MediaViewerAction.screenOrientation) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 6.0),
-                child: MediaViewerActionButton(
-                  action: action,
-                  onTap: () => onExecuteAction(action),
-                ),
-              );
-            }
-
-            final isMute = action == MediaViewerAction.mute;
-            return Padding(
-              padding: const EdgeInsets.only(left: 6.0),
-              child: MediaViewerActionButton(
-                action: action,
-                isHighlighted:
-                    (action == MediaViewerAction.bookmark && isBookmark) ||
-                    (isMute && isMuted),
-                highlightColor:
-                    isMute ? cs.error : context.semanticColors.bookmark,
-                customIcon: isMute
-                    ? (isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded)
-                    : null,
-                onTap: () => onExecuteAction(action),
-              ),
-            );
-          }),
-          if (onToggleFullscreen != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 6.0),
-              child: MediaViewerActionButton(
-                action: MediaViewerAction.playPause,
-                customIcon: isFullscreen
-                    ? Icons.fullscreen_exit_rounded
-                    : Icons.fullscreen_rounded,
-                customTooltip: isFullscreen
-                    ? 'Esc'
-                    : '${context.l10n.enterFullscreenMenu} (F)',
-                onTap: onToggleFullscreen!,
-              ),
-            ),
-          // More MenuAnchor
-          Padding(
-            padding: const EdgeInsets.only(left: 6.0),
-            child: _buildMoreMenu(context, cs, moreActions),
-          ),
+          ...actions,
         ],
       ),
     );
+  }
+
+  Widget _buildBackButton(BuildContext context) => MediaViewerActionButton(
+    action: MediaViewerAction.playPause,
+    customIcon: Icons.arrow_back_rounded,
+    customTooltip: context.l10n.backTooltip,
+    size: _buttonSize,
+    iconSize: _iconSize,
+    flat: inTitleBar,
+    // maybePop, not pop: the viewer tells a deliberate close (which
+    // may keep audio playing in the background) from a forced one by it.
+    onTap: () => Navigator.maybePop(context),
+  );
+
+  String? _positionLabel(BuildContext context) {
+    if (!playlistController.isPlaylistMode &&
+        !playlistController.isScanningSubfolders) {
+      return null;
+    }
+    if (!playlistController.isPlaylistMode) {
+      return context.l10n.mediaViewerScanningLabel;
+    }
+    return playlistController.isScanningSubfolders
+        ? context.l10n.mediaViewerPlaylistPositionScanningLabel(
+            playlistController.currentIndex + 1,
+            totalCount,
+          )
+        : context.l10n.mediaViewerPlaylistPositionLabel(
+            playlistController.currentIndex + 1,
+            totalCount,
+          );
+  }
+
+  Widget _buildTitle(BuildContext context, TextTheme textTheme) {
+    final name = currentFileName.split('/').last;
+    final position = _positionLabel(context);
+
+    if (inTitleBar) {
+      // One line: the name, then the playlist position next to it.
+      return Row(
+        children: [
+          Flexible(
+            child: Text(
+              name,
+              style: textTheme.titleSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (position != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              position,
+              style: textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.65),
+              ),
+              maxLines: 1,
+            ),
+          ],
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          name,
+          style: textTheme.titleMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.2,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (position != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            position,
+            style: textTheme.bodySmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _buildActions(
+    BuildContext context,
+    ColorScheme cs,
+    List<MediaViewerAction> pinnedTopActions,
+    List<MediaViewerAction> moreActions,
+  ) {
+    return [
+      ...pinnedTopActions.map((action) {
+        if (action == MediaViewerAction.playlistMenu) {
+          return Padding(
+            padding: EdgeInsets.only(left: _gap),
+            child: _buildPlaylistMenu(context, cs),
+          );
+        }
+        if (action == MediaViewerAction.screenOrientation) {
+          return Padding(
+            padding: EdgeInsets.only(left: _gap),
+            child: MediaViewerActionButton(
+              action: action,
+              size: _buttonSize,
+              iconSize: _iconSize,
+              flat: inTitleBar,
+              onTap: () => onExecuteAction(action),
+            ),
+          );
+        }
+
+        final isMute = action == MediaViewerAction.mute;
+        return Padding(
+          padding: EdgeInsets.only(left: _gap),
+          child: MediaViewerActionButton(
+            action: action,
+            size: _buttonSize,
+            iconSize: _iconSize,
+            flat: inTitleBar,
+            isHighlighted:
+                (action == MediaViewerAction.bookmark && isBookmark) ||
+                (isMute && isMuted),
+            highlightColor: isMute ? cs.error : context.semanticColors.bookmark,
+            customIcon: isMute
+                ? (isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded)
+                : null,
+            onTap: () => onExecuteAction(action),
+          ),
+        );
+      }),
+      if (onToggleFullscreen != null)
+        Padding(
+          padding: EdgeInsets.only(left: _gap),
+          child: MediaViewerActionButton(
+            action: MediaViewerAction.playPause,
+            size: _buttonSize,
+            iconSize: _iconSize,
+            flat: inTitleBar,
+            customIcon: isFullscreen
+                ? Icons.fullscreen_exit_rounded
+                : Icons.fullscreen_rounded,
+            customTooltip: isFullscreen
+                ? 'Esc'
+                : '${context.l10n.enterFullscreenMenu} (F)',
+            onTap: onToggleFullscreen!,
+          ),
+        ),
+      // More MenuAnchor
+      Padding(
+        padding: EdgeInsets.only(left: _gap),
+        child: _buildMoreMenu(context, cs, moreActions),
+      ),
+    ];
   }
 
   Widget _buildMoreMenu(
@@ -289,17 +388,19 @@ class MediaViewerTopBar extends StatelessWidget {
         ),
       ],
       child: SizedBox(
-        width: 40,
-        height: 40,
+        width: _buttonSize,
+        height: _buttonSize,
         child: Material(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: inTitleBar
+              ? Colors.transparent
+              : Colors.white.withValues(alpha: 0.12),
           shape: const CircleBorder(),
           clipBehavior: Clip.antiAlias,
           child: Center(
             child: MediaViewerActionGlyph(
               action: MediaViewerAction.advancedSettings,
               icon: Icons.more_vert_rounded,
-              size: AppIconSize.standard,
+              size: _iconSize,
               color: Colors.white,
             ),
           ),
@@ -320,6 +421,9 @@ class MediaViewerTopBar extends StatelessWidget {
       onClose: onMenuClosed,
       builder: (ctx, controller, child) => MediaViewerActionButton(
         action: MediaViewerAction.playlistMenu,
+        size: _buttonSize,
+        iconSize: _iconSize,
+        flat: inTitleBar,
         customIcon: isPlaylist
             ? Icons.playlist_play_rounded
             : Icons.playlist_add_rounded,

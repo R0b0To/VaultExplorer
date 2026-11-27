@@ -68,6 +68,9 @@ class _SecondaryWindowAppState extends ConsumerState<SecondaryWindowApp> {
       );
       if (mounted) setState(() => _nativeCaption = true);
     }
+    // A fixed-size window loses its sizing border and maximize box, whichever
+    // caption it ended up with.
+    if (!widget.entry.resizable) await lockWindowSize(viewId);
   }
 
   @override

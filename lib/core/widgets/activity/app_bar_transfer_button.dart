@@ -38,7 +38,7 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
   // Store reference in a field instead of reading 'ref' on every getter access
   late final FileOperationService _svc;
 
-  /// Where file operations have a window of their own (Linux and Windows, see
+  /// Where file operations have a shared window (Linux and Windows, see
   /// `FileOperationWindows`) the ring leaves them to it and only shows the
   /// mirror sync, which has no window.
   final bool _opsHaveWindows = FileOperationWindows.isAvailable;

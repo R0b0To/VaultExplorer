@@ -18,6 +18,7 @@ class SecondaryWindowEntry {
     required this.title,
     required this.contentBuilder,
     required this.survivesMainClose,
+    required this.resizable,
   });
 
   /// Identifies what the window shows (for example `config:<vault uri>`), so
@@ -32,6 +33,11 @@ class SecondaryWindowEntry {
   /// serve the main one (a vault's settings) closes along with it.
   /// See `DesktopWindowPolicy`.
   final bool survivesMainClose;
+
+  /// Whether the person can change this window's size: drag its edges,
+  /// maximize it or snap it. A fixed-size window (the file operations window)
+  /// has no maximize button either. See [SecondaryWindows.open].
+  final bool resizable;
 
   String title;
 
@@ -156,6 +162,13 @@ class SecondaryWindows extends ChangeNotifier {
   /// open one is brought forward), before its first frame. It is the moment to
   /// place the window, since the platform only shows it after that frame.
   ///
+  /// With [resizable] false the window keeps exactly [size], or stays within
+  /// [fixedConstraints] when the app itself changes its size (the file
+  /// operations window grows with its cards): [constraints] is ignored, the
+  /// runner
+  /// takes away the resize border and the maximize box where it can (see
+  /// `lockWindowSize`), and the caption row shows no maximize button.
+  ///
   /// Returns false when native windows are not available (Android, a
   /// `VE_MULTI_WINDOW=0` run, or an embedder that refused); the caller then
   /// shows the page inside the main window instead.
@@ -164,6 +177,8 @@ class SecondaryWindows extends ChangeNotifier {
     required String title,
     required WidgetBuilder builder,
     bool survivesMainClose = false,
+    bool resizable = true,
+    BoxConstraints? fixedConstraints,
     Size size = const Size(560, 780),
     BoxConstraints constraints = const BoxConstraints(
       minWidth: 420,
@@ -187,11 +202,14 @@ class SecondaryWindows extends ChangeNotifier {
       title: title,
       contentBuilder: builder,
       survivesMainClose: survivesMainClose,
+      resizable: resizable,
     );
     try {
       entry._controller = flutter_window.WindowController(
         size: size,
-        constraints: constraints,
+        constraints: resizable
+            ? constraints
+            : (fixedConstraints ?? BoxConstraints.tight(size)),
         title: title,
         delegate: _EntryDelegate(this, entry),
       );

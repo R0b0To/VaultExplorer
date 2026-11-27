@@ -18,6 +18,7 @@ import 'package:vaultexplorer/core/engine/desktop/desktop_transfer_service.dart'
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
+import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/core/windowing/window_caption.dart';
 import 'package:vaultexplorer/core/windowing/view_focus.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -399,6 +400,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _bottomChromeHeight = newBottom;
     });
   }
+
+  /// Whether the top bar (back, file name, actions) is drawn in the window's
+  /// own title bar, between the window edge and the caption buttons. True for
+  /// a desktop window that draws its caption row itself (Windows), except in
+  /// fullscreen, where the title bar is gone and the bar floats over the media.
+  /// Set by [build] before the viewer is built.
+  bool _topBarInTitleBar = false;
 
   /// Whether the controls hide by themselves (a phone, or a desktop window in
   /// fullscreen) rather than stay up (a desktop window).
@@ -2357,13 +2365,54 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final viewer = _buildViewer(context);
-    if (!PlatformFeatures.isDesktop) return viewer;
+    if (!PlatformFeatures.isDesktop) {
+      _topBarInTitleBar = false;
+      return _buildViewer(context);
+    }
     // On Windows the viewer is a root-navigator route built by hand, which the
     // theme's caption frame never sees, so it gets the title bar here (a no-op
     // where the window keeps its native one). Fullscreen folds the bar away
     // without touching the viewer's state, and moving the mouse brings the
     // controls back.
+    //
+    // Where the window draws its own caption row, the viewer's top bar (back
+    // button, file name, actions) is drawn in that row, left of the minimize /
+    // maximize / close buttons, so nothing is left over the media at the top.
+    // A window with a native title bar cannot host it and keeps the bar over
+    // the media.
+    final ownCaption =
+        PlatformFeatures.isWindows && !NativeWindowChrome.of(context);
+    _topBarInTitleBar = ownCaption && !_desktopFullscreen;
+    final viewer = _buildViewer(context);
+    final Widget page;
+    if (ownCaption) {
+      final toolbarSettings = ref.watch(fileManagerToolbarSettingsProvider(null));
+      final config = _effectiveToolbarConfig(
+        toolbarSettings.config.mediaViewerToolbarConfig,
+      );
+      // The viewer keeps its slot (and so its state: players, scroll
+      // positions) when the title bar goes away in fullscreen: both children
+      // are keyed, so the list can shrink without the viewer being rebuilt.
+      page = Column(
+        children: [
+          if (_topBarInTitleBar)
+            DesktopWindowTitleBar(
+              key: const ValueKey('media-viewer-title-bar'),
+              height: _kViewerTitleBarHeight,
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              tabs: ListenableBuilder(
+                listenable: _playlistController,
+                builder: (context, _) =>
+                    _buildTopBar(context, config, inTitleBar: true),
+              ),
+            ),
+          Expanded(key: const ValueKey('media-viewer-body'), child: viewer),
+        ],
+      );
+    } else {
+      page = viewer;
+    }
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerHover: (_) {
@@ -2375,8 +2424,59 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         }
       },
       child: DesktopCaptionFrame(
-        child: DesktopCaptionHider(hidden: _desktopFullscreen, child: viewer),
+        child: DesktopCaptionHider(hidden: _desktopFullscreen, child: page),
       ),
+    );
+  }
+
+  /// The viewer's top bar. On desktop it sits in the window's title bar
+  /// ([inTitleBar]) when the window draws its own caption row; elsewhere (a
+  /// phone, fullscreen, a window with a native title bar) it floats over the
+  /// media as before.
+  Widget _buildTopBar(
+    BuildContext context,
+    MediaViewerToolbarConfig config, {
+    bool inTitleBar = false,
+  }) {
+    return MediaViewerTopBar(
+      playlistController: _playlistController,
+      currentFileName: _playlistController.currentFile,
+      totalCount: _playlistController.playlist.length,
+      toolbarConfig: config,
+      inTitleBar: inTitleBar,
+      isFullscreen: _desktopFullscreen,
+      onToggleFullscreen:
+          PlatformFeatures.isDesktop ? _toggleDesktopFullscreen : null,
+      currentTransitionEffect: _transitionEffect,
+      onTransitionEffectChanged: (newEffect) async {
+        _sessionController.setTransitionEffect(newEffect);
+        final toolbarService = ref.read(fileManagerToolbarServiceProvider);
+        final saved = await toolbarService.load();
+        await toolbarService.save(
+          saved.copyWith(playlistTransitionEffect: newEffect),
+        );
+      },
+      currentScrollMode: _scrollMode,
+      onScrollModeChanged: (newMode) async {
+        _sessionController.setScrollMode(newMode);
+        final appSettingsService = ref.read(appSettingsServiceProvider);
+        final appSettings = await appSettingsService.loadSettings();
+        await appSettingsService.saveSettings(
+          appSettings.copyWith(playlistScrollMode: newMode),
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scrollToCurrentIndex(animate: false);
+        });
+      },
+      isMuted: _isMuted,
+      onExecuteAction: _executeMediaAction,
+      onCustomizeControls: _openCustomizeControls,
+      isBookmark: _isCurrentFileBookmark,
+      onPlaylistChanged: _onPlaylistChanged,
+      onMenuOpened: _menuOpened,
+      onMenuClosed: _menuClosed,
+      isImage: MediaViewerConstants.isImage(_playlistController.currentFile),
+      isAudio: MediaViewerConstants.isAudio(_playlistController.currentFile),
     );
   }
 
@@ -2503,7 +2603,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               builder: (context, outerConstraints) {
                 // The media's own area: the window less the controls that
                 // have a space of their own (see _chromeDocked).
-                final dockTop = _chromeDocked ? _topChromeHeight : 0.0;
+                // The top bar has no space of its own when it is in the title bar:
+                // the title bar sits above the whole viewer.
+                final dockTop =
+                    _chromeDocked && !_topBarInTitleBar ? _topChromeHeight : 0.0;
                 final dockBottom = _chromeDocked ? _bottomChromeHeight : 0.0;
                 final constraints = outerConstraints.deflate(
                   EdgeInsets.only(top: dockTop, bottom: dockBottom),
@@ -2953,6 +3056,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           ),
                         )
                       else ...[
+                        // On a desktop window with its own caption row the top bar
+                        // lives in the title bar instead (see build()).
+                        if (!_topBarInTitleBar)
                         Positioned(
                           top: 0,
                           left: 0,
@@ -2974,71 +3080,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                   listenable: _playlistController,
                                   builder: (context, _) => _ChromeSizeProbe(
                                     onHeight: (h) => _setChromeHeight(top: h),
-                                    child: MediaViewerTopBar(
-                                    playlistController: _playlistController,
-                                    currentFileName:
-                                        _playlistController.currentFile,
-                                    totalCount:
-                                        _playlistController.playlist.length,
-                                    toolbarConfig: mediaViewerConfig,
-                                    isFullscreen: _desktopFullscreen,
-                                    onToggleFullscreen:
-                                        PlatformFeatures.isDesktop
-                                        ? _toggleDesktopFullscreen
-                                        : null,
-                                    currentTransitionEffect: _transitionEffect,
-                                    onTransitionEffectChanged:
-                                        (newEffect) async {
-                                          _sessionController
-                                              .setTransitionEffect(newEffect);
-                                          final toolbarService = ref.read(
-                                            fileManagerToolbarServiceProvider,
-                                          );
-                                          final config = await toolbarService
-                                              .load();
-                                          await toolbarService.save(
-                                            config.copyWith(
-                                              playlistTransitionEffect:
-                                                  newEffect,
-                                            ),
-                                          );
-                                        },
-                                    currentScrollMode: _scrollMode,
-                                    onScrollModeChanged: (newMode) async {
-                                      _sessionController.setScrollMode(newMode);
-                                      final appSettingsService = ref.read(
-                                        appSettingsServiceProvider,
-                                      );
-                                      final appSettings =
-                                          await appSettingsService
-                                              .loadSettings();
-                                      await appSettingsService.saveSettings(
-                                        appSettings.copyWith(
-                                          playlistScrollMode: newMode,
-                                        ),
-                                      );
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            if (mounted)
-                                              _scrollToCurrentIndex(
-                                                animate: false,
-                                              );
-                                          });
-                                    },
-                                    isMuted: _isMuted,
-                                    onExecuteAction: _executeMediaAction,
-                                    onCustomizeControls: _openCustomizeControls,
-                                    isBookmark: _isCurrentFileBookmark,
-                                    onPlaylistChanged: _onPlaylistChanged,
-                                    onMenuOpened: _menuOpened,
-                                    onMenuClosed: _menuClosed,
-                                    isImage: MediaViewerConstants.isImage(
-                                      _playlistController.currentFile,
+                                    child: _buildTopBar(
+                                      context,
+                                      mediaViewerConfig,
                                     ),
-                                    isAudio: MediaViewerConstants.isAudio(
-                                      _playlistController.currentFile,
-                                    ),
-                                  ),
                                   ),
                                 ),
                               ),
@@ -3152,6 +3197,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                                   ),
                                           ),
                                           MediaViewerBottomControls(
+                                            compact: PlatformFeatures.isDesktop,
                                             playlistController:
                                                 _playlistController,
                                             playbackManager: _playbackManager,
@@ -3216,6 +3262,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     );
   }
 }
+
+/// Height of the title bar that hosts the viewer's top bar on a desktop window.
+const double _kViewerTitleBarHeight = 40;
 
 /// Reports the height of [child] once it is laid out and whenever it changes.
 class _ChromeSizeProbe extends StatefulWidget {

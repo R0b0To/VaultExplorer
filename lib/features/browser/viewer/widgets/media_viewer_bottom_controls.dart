@@ -42,6 +42,10 @@ class MediaViewerBottomControls extends StatelessWidget {
   final VoidCallback? onMenuOpened;
   final VoidCallback? onMenuClosed;
 
+  /// Smaller buttons and tighter spacing for a pointer-driven desktop window,
+  /// where the phone-sized touch targets look oversized.
+  final bool compact;
+
   const MediaViewerBottomControls({
     super.key,
     required this.playlistController,
@@ -65,7 +69,11 @@ class MediaViewerBottomControls extends StatelessWidget {
     this.isCarouselVisible = false,
     this.onMenuOpened,
     this.onMenuClosed,
+    this.compact = false,
   });
+
+  double get _buttonSize => compact ? 32.0 : 40.0;
+  double get _glyphSize => compact ? AppIconSize.small : AppIconSize.standard;
 
   Widget _buildActionItem(
     BuildContext context,
@@ -78,10 +86,12 @@ class MediaViewerBottomControls extends StatelessWidget {
     if (action == MediaViewerAction.previous) {
       final bool isFirst = playlistController.currentIndex == 0;
       return IconButton(
-        icon: const Icon(
+        iconSize: compact ? 22 : 26,
+        visualDensity: compact ? VisualDensity.compact : null,
+        icon: Icon(
           Icons.skip_previous_rounded,
           color: Colors.white,
-          size: 26,
+          size: compact ? 22 : 26,
         ),
         onPressed: isFirst && !toolbarConfig.loopPlaylist
             ? null
@@ -93,10 +103,12 @@ class MediaViewerBottomControls extends StatelessWidget {
           playlistController.currentIndex ==
           playlistController.playlist.length - 1;
       return IconButton(
-        icon: const Icon(
+        iconSize: compact ? 22 : 26,
+        visualDensity: compact ? VisualDensity.compact : null,
+        icon: Icon(
           Icons.skip_next_rounded,
           color: Colors.white,
-          size: 26,
+          size: compact ? 22 : 26,
         ),
         onPressed: isLast && !toolbarConfig.loopPlaylist
             ? null
@@ -106,6 +118,8 @@ class MediaViewerBottomControls extends StatelessWidget {
     if (action == MediaViewerAction.screenOrientation) {
       return MediaViewerActionButton(
         action: action,
+        size: _buttonSize,
+        iconSize: _glyphSize,
         customIcon: screenOrientationIcon,
         onTap: () => onExecuteAction(action),
       );
@@ -116,6 +130,8 @@ class MediaViewerBottomControls extends StatelessWidget {
         valueListenable: abLoopNotifier,
         builder: (context, loop, _) => MediaViewerActionButton(
           action: action,
+          size: _buttonSize,
+          iconSize: _glyphSize,
           isHighlighted: !loop.isEmpty,
           highlightColor: cs.primary,
           // Drawn as the text "A-B" (see MediaViewerActionGlyph); only the
@@ -152,6 +168,8 @@ class MediaViewerBottomControls extends StatelessWidget {
 
     return MediaViewerActionButton(
       action: action,
+      size: _buttonSize,
+      iconSize: _glyphSize,
       isHighlighted: isHighlighted,
       highlightColor: highlightColor,
       customIcon: customIcon,
@@ -181,10 +199,10 @@ class MediaViewerBottomControls extends StatelessWidget {
 
   Widget _buildPlayPauseCircle(ColorScheme cs, bool isPlaying) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 4),
       child: SizedBox(
-        width: 48,
-        height: 48,
+        width: compact ? 40 : 48,
+        height: compact ? 40 : 48,
         child: Material(
           color: cs.primary,
           shape: const CircleBorder(),
@@ -198,7 +216,7 @@ class MediaViewerBottomControls extends StatelessWidget {
             child: Center(
               child: Icon(
                 isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                size: 28,
+                size: compact ? 24 : 28,
                 color: cs.onPrimary,
               ),
             ),
@@ -232,8 +250,10 @@ class MediaViewerBottomControls extends StatelessWidget {
       padding: EdgeInsets.only(
         left: AppSpacing.sm,
         right: AppSpacing.sm,
-        bottom: bottomInset + AppSpacing.md,
-        top: isCarouselVisible ? AppSpacing.xs : AppSpacing.md,
+        bottom: bottomInset + (compact ? AppSpacing.sm : AppSpacing.md),
+        top: isCarouselVisible
+            ? AppSpacing.xs
+            : (compact ? AppSpacing.sm : AppSpacing.md),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -309,7 +329,7 @@ class MediaViewerBottomControls extends StatelessWidget {
             ],
             for (final action in pinned)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
+                padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 3),
                 child: _buildActionItem(context, action, cs),
               ),
           ],

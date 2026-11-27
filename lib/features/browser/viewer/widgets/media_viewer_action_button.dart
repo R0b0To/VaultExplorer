@@ -16,6 +16,13 @@ class MediaViewerActionButton extends StatelessWidget {
 
   final double size;
 
+  /// Glyph size; the compact title-bar buttons pass a smaller one.
+  final double iconSize;
+
+  /// No filled circle behind the glyph, only a hover tint, so the button reads
+  /// as part of the bar it sits in (the window title bar).
+  final bool flat;
+
   const MediaViewerActionButton({
     super.key,
     required this.action,
@@ -26,6 +33,8 @@ class MediaViewerActionButton extends StatelessWidget {
     this.customTooltip,
     this.customIcon,
     this.size = 40.0,
+    this.iconSize = AppIconSize.standard,
+    this.flat = false,
   });
 
   @override
@@ -42,12 +51,17 @@ class MediaViewerActionButton extends StatelessWidget {
         width: size,
         height: size,
         child: Material(
-          color: isHighlighted
+          color: flat
+              ? Colors.transparent
+              : isHighlighted
               ? _legibleOnDark(activeColor).withValues(alpha: 0.22)
               : Colors.white.withValues(alpha: 0.12),
-          shape: const CircleBorder(),
+          shape: flat
+              ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))
+              : const CircleBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
+            hoverColor: flat ? Colors.white.withValues(alpha: 0.12) : null,
             onTap: () {
               HapticFeedback.lightImpact();
               onTap();
@@ -62,7 +76,7 @@ class MediaViewerActionButton extends StatelessWidget {
               child: MediaViewerActionGlyph(
                 action: action,
                 icon: customIcon,
-                size: AppIconSize.standard,
+                size: iconSize,
                 color: iconColor,
               ),
             ),

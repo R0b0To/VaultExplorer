@@ -140,7 +140,8 @@ class DesktopEngineHost {
   /// desktop_images.dart).
   late final DesktopImages _images = DesktopImages(readWhole: _readWholeVaultFile, native: _nativeThumbs);
 
-  /// Video thumbnails: one frame out of libmpv, read through the loopback media server like playback is (see
+  /// Video thumbnails: one frame, decoded by the engine itself where it can (FFmpeg, in the thumbnail pool) and out
+  /// of libmpv, read through the loopback media server like playback is, where it cannot (see
   /// desktop_video_thumbnails.dart). Nothing is started until the first request.
   late final DesktopVideoThumbnails _videoThumbs = DesktopVideoThumbnails(
     openVaultFile: (vol, path) async {
@@ -148,6 +149,27 @@ class DesktopEngineHost {
       if (size <= 0) return null; // missing, unreadable or empty: no point starting a player
       final session = await mediaServer.open(volId: vol, filePath: path);
       return VideoSource(url: session.url, close: session.close);
+    },
+    // The engine decodes the picture itself (FFmpeg, one keyframe, no player). libmpv below stays for what it cannot
+    // open: AV1, exotic containers and codecs, or an engine built without FFmpeg.
+    native: (r) {
+      final strategy = r.strategy.index; // firstFrame, frameAtPercentage, hybrid: the order ve_video_thumbnail takes
+      const timeout = Duration(seconds: 20);
+      return r.isLocalFile
+          ? _nativeThumbs.videoHostFile(r.path,
+              targetSize: r.targetSize,
+              quality: kNativeVideoFrameQuality,
+              strategy: strategy,
+              framePosition: r.framePosition,
+              explicitTimeUs: r.explicitTimeUs,
+              timeout: timeout)
+          : _nativeThumbs.videoVaultFile(r.volId!, r.path,
+              targetSize: r.targetSize,
+              quality: kNativeVideoFrameQuality,
+              strategy: strategy,
+              framePosition: r.framePosition,
+              explicitTimeUs: r.explicitTimeUs,
+              timeout: timeout);
     },
     grab: grabFrameWithMpv,
     decode: nativeFrameDecoder(_nativeThumbs),

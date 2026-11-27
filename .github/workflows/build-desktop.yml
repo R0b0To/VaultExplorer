@@ -152,6 +152,8 @@ jobs:
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-nasm
+            make
+            diffutils
 
       - name: Get WinFsp headers
         shell: pwsh

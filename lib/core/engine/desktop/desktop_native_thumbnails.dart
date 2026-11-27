@@ -116,6 +116,35 @@ class DesktopNativeThumbnails {
   }) =>
       _run('imageThumbnailMem', [data, targetSize, quality, preserveAlpha]);
 
+  /// One picture of the video at [path] inside the unlocked slot [vol] (see ve_video_thumbnail in ve_engine.h):
+  /// [strategy] is a ThumbnailGenerationStrategy index, [explicitTimeUs] (>= 0) an exact point that wins over it.
+  /// [NativeImageUnsupported] means this engine cannot open or decode that video: use another route.
+  Future<NativeImageOutcome> videoVaultFile(
+    int vol,
+    String path, {
+    required int targetSize,
+    required int quality,
+    required int strategy,
+    required double framePosition,
+    int? explicitTimeUs,
+    required Duration timeout,
+  }) =>
+      _run('videoThumbnail',
+          [vol, path, targetSize, quality, strategy, framePosition, explicitTimeUs ?? -1, timeout.inMilliseconds]);
+
+  /// The same for a video file on this machine.
+  Future<NativeImageOutcome> videoHostFile(
+    String path, {
+    required int targetSize,
+    required int quality,
+    required int strategy,
+    required double framePosition,
+    int? explicitTimeUs,
+    required Duration timeout,
+  }) =>
+      _run('videoThumbnailFile',
+          [path, targetSize, quality, strategy, framePosition, explicitTimeUs ?? -1, timeout.inMilliseconds]);
+
   Future<NativeImageOutcome> _run(String op, List<Object?> args) async {
     final List<Object?> r;
     try {

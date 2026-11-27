@@ -176,6 +176,14 @@ jobs:
           cmake --build build/desktop-engine --target thumb_test
           build/desktop-engine/thumb_test
 
+      # Native video thumbnails (imaging/video_thumb.cpp, FFmpeg built minimal by ffmpeg_deps.cmake): every container
+      # and codec of that build, rotation, pixel aspect, blank-start retries, what must be refused, many threads --
+      # on the tiny videos of imaging/test/fixtures.
+      - name: Build and run video_thumb_test
+        run: |
+          cmake --build build/desktop-engine --target video_thumb_test
+          build/desktop-engine/video_thumb_test android/app/src/main/cpp/imaging/test/fixtures
+
       - name: Build ve_mount_test
         run: cmake --build build/desktop-engine --target ve_mount_test
 

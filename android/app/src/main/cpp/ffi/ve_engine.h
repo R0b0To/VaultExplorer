@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 15 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 16 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -805,6 +805,31 @@ VE_API int32_t ve_image_thumbnail_file(const char* host_path_utf8, int32_t targe
                                        int32_t preserve_alpha, int64_t max_source_bytes, ve_buffer* out, int32_t* info);
 VE_API int32_t ve_image_thumbnail_mem(const uint8_t* data, size_t len, int32_t target_size, int32_t quality,
                                       int32_t preserve_alpha, ve_buffer* out, int32_t* info);
+
+/* ---- video thumbnails (ABI 16) ---------------------------------------------------------------------
+ * One picture of a video, decoded by the engine itself (FFmpeg: software, no player, no loopback server) in ONE
+ * blocking call: the container header is read through a read-ahead buffer, a single keyframe is decoded and scaled to
+ * fit target_size x target_size (rotation and pixel aspect applied), and the answer is a JPEG of the given quality.
+ * The result layout and result codes are those of the image calls above; info[7] is the duration in milliseconds
+ * (0 when the container does not say), and info[1]/[2] are the picture as shown (what an aspect ratio wants).
+ *   strategy        0 = the start; 1 = the picture at frame_position; 2 = the start, and when that looks blank
+ *                   (black leader, fade-in, slate) the first not-blank picture at frame_position, 25% or 45%
+ *   frame_position  fraction of the duration, clamped to 0.05 .. 0.90
+ *   explicit_time_us >= 0: exactly that point (0 = the start), strategy ignored, nothing retried
+ *   timeout_ms      for the whole call (retries included); <= 0 takes 20000
+ * VE_ERR_UNSUPPORTED means this build cannot open or decode it (an unknown container, a codec that is not compiled
+ * in, or an engine built without FFmpeg): the caller should use another route. VE_ERR_FAILED: a video it understands
+ * but no picture could be made (corrupt, no video stream, timed out, unreadable). Thread-safe; run it in a worker.
+ *   ve_video_thumbnail       a file inside an unlocked slot
+ *   ve_video_thumbnail_file  a file on the host (UTF-8 path)
+ *   ve_video_thumbnails_available  1 when this engine was built with FFmpeg, else 0 */
+VE_API int32_t ve_video_thumbnail(int32_t vol_id, const char* path, int32_t target_size, int32_t quality,
+                                  int32_t strategy, double frame_position, int64_t explicit_time_us,
+                                  int32_t timeout_ms, ve_buffer* out, int32_t* info);
+VE_API int32_t ve_video_thumbnail_file(const char* host_path_utf8, int32_t target_size, int32_t quality,
+                                       int32_t strategy, double frame_position, int64_t explicit_time_us,
+                                       int32_t timeout_ms, ve_buffer* out, int32_t* info);
+VE_API int32_t ve_video_thumbnails_available(void);
 
 /* ---- OS mounts (Linux: FUSE 3; Windows: WinFsp, not built yet) -------------------------------------
  * Exposes an unlocked slot as a real folder / drive so any application and the file manager can use it --

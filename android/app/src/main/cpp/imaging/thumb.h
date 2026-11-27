@@ -92,6 +92,12 @@ struct Thumbnail {
 // thumbnail, which video thumbnails use to decide whether to try another frame.
 bool isLikelyBlank(const uint8_t* px, int w, int h, int ch);
 
+// For decoders that bring their own pixels (video frames): turns an RGB raster (w x h, 3 bytes per pixel) that is
+// already the thumbnail's size into a finished [Thumbnail]. `orientation` (EXIF 1..8) is applied first;
+// storedW x storedH is the picture's size before it. Runs the blank check and encodes a JPEG.
+Status finishThumbnail(std::vector<uint8_t>&& rgb, int w, int h, int orientation, int storedW, int storedH, int quality,
+                       Thumbnail& out);
+
 // Decodes [src] and fills [out]. Thread-safe: any number of calls may run at once (they share only the memory
 // budget below).
 Status makeThumbnail(ByteSource& src, const Options& opt, Thumbnail& out);

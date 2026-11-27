@@ -17,6 +17,7 @@
 #include <string>
 
 #include "../imaging/thumb.h"
+#include "../imaging/video_thumb.h"
 
 namespace {
 
@@ -131,7 +132,60 @@ int32_t run(veimg::ByteSource& src, int32_t targetSize, int32_t quality, int32_t
     return VE_OK;
 }
 
+// Runs the video thumbnailer on `src` and fills `out` / `info`.
+int32_t runVideo(veimg::ByteSource& src, int32_t targetSize, int32_t quality, int32_t strategy, double framePosition,
+                 int64_t explicitTimeUs, int32_t timeoutMs, ve_buffer* out, int32_t* info) {
+    veimg::VideoOptions opt;
+    opt.targetSize = std::clamp(targetSize, 1, 16384);
+    opt.quality = std::clamp(quality, 1, 100);
+    opt.strategy = strategy == 0   ? veimg::VideoStrategy::kFirstFrame
+                   : strategy == 1 ? veimg::VideoStrategy::kFrameAtPercentage
+                                   : veimg::VideoStrategy::kHybrid;
+    opt.framePosition = framePosition;
+    opt.explicitTimeUs = explicitTimeUs;
+    opt.timeoutMs = timeoutMs > 0 ? timeoutMs : 20000;
+
+    veimg::VideoThumbnail v;
+    const int32_t rc = toCode(veimg::makeVideoThumbnail(src, opt, v));
+    if (rc != VE_OK) return rc;
+    const veimg::Thumbnail& t = v.thumb;
+    auto* mem = static_cast<uint8_t*>(std::malloc(t.bytes.size()));
+    if (!mem) return VE_ERR_NO_MEMORY;
+    std::memcpy(mem, t.bytes.data(), t.bytes.size());
+    out->data = mem;
+    out->len = t.bytes.size();
+    if (info) {
+        info[0] = t.isPng ? 1 : 0;
+        info[1] = t.sourceWidth;
+        info[2] = t.sourceHeight;
+        info[3] = t.width;
+        info[4] = t.height;
+        info[5] = t.hasAlpha ? 1 : 0;
+        info[6] = t.isBlank ? 1 : 0;
+        info[7] = static_cast<int32_t>(std::min<int64_t>(v.durationUs / 1000, INT32_MAX));
+    }
+    return VE_OK;
+}
+
 }  // namespace
+
+// Opens `path` in slot `vol_id` and calls fn(source) on it. The stream is closed afterwards.
+template <class Fn>
+int32_t withVaultSource(int32_t vol_id, const char* path, int64_t maxSourceBytes, Fn&& fn) {
+    const int64_t size = ve_get_file_size(vol_id, path);
+    if (size < -1) return static_cast<int32_t>(-size);  // a session error (not unlocked, invalid argument, ...)
+    if (size <= 0) return VE_ERR_FAILED;                // missing, a folder, or empty
+    if (maxSourceBytes > 0 && size > maxSourceBytes) return VE_ERR_TOO_LARGE;
+    const int64_t handle = ve_open_stream(vol_id, path);
+    if (handle == 0) return VE_ERR_FAILED;
+    struct Closer {
+        int32_t vol;
+        int64_t handle;
+        ~Closer() { ve_close_stream(vol, handle); }
+    } closer{vol_id, handle};
+    VaultSource src(vol_id, handle, size);
+    return fn(src);
+}
 
 extern "C" VE_API int32_t ve_image_thumbnail(int32_t vol_id, const char* path, int32_t target_size, int32_t quality,
                                              int32_t preserve_alpha, int64_t max_source_bytes, ve_buffer* out,
@@ -140,19 +194,9 @@ extern "C" VE_API int32_t ve_image_thumbnail(int32_t vol_id, const char* path, i
     clearOut(out, info);
     if (!path) return VE_ERR_INVALID_ARG;
     try {
-        const int64_t size = ve_get_file_size(vol_id, path);
-        if (size < -1) return static_cast<int32_t>(-size);  // a session error (not unlocked, invalid argument, ...)
-        if (size <= 0) return VE_ERR_FAILED;                // missing, a folder, or empty
-        if (max_source_bytes > 0 && size > max_source_bytes) return VE_ERR_TOO_LARGE;
-        const int64_t handle = ve_open_stream(vol_id, path);
-        if (handle == 0) return VE_ERR_FAILED;
-        struct Closer {
-            int32_t vol;
-            int64_t handle;
-            ~Closer() { ve_close_stream(vol, handle); }
-        } closer{vol_id, handle};
-        VaultSource src(vol_id, handle, size);
-        return run(src, target_size, quality, preserve_alpha, max_source_bytes, out, info);
+        return withVaultSource(vol_id, path, max_source_bytes, [&](veimg::ByteSource& src) {
+            return run(src, target_size, quality, preserve_alpha, max_source_bytes, out, info);
+        });
     } catch (const std::bad_alloc&) {
         return VE_ERR_NO_MEMORY;
     } catch (...) {
@@ -191,3 +235,42 @@ extern "C" VE_API int32_t ve_image_thumbnail_mem(const uint8_t* data, size_t len
         return VE_ERR_EXCEPTION;
     }
 }
+
+extern "C" VE_API int32_t ve_video_thumbnail(int32_t vol_id, const char* path, int32_t target_size, int32_t quality,
+                                             int32_t strategy, double frame_position, int64_t explicit_time_us,
+                                             int32_t timeout_ms, ve_buffer* out, int32_t* info) {
+    if (!out) return VE_ERR_INVALID_ARG;
+    clearOut(out, info);
+    if (!path) return VE_ERR_INVALID_ARG;
+    if (!veimg::videoThumbnailsAvailable()) return VE_ERR_UNSUPPORTED;
+    try {
+        // No size cap: a video is read as far as its header and one keyframe need, however large the file is.
+        return withVaultSource(vol_id, path, 0, [&](veimg::ByteSource& src) {
+            return runVideo(src, target_size, quality, strategy, frame_position, explicit_time_us, timeout_ms, out, info);
+        });
+    } catch (const std::bad_alloc&) {
+        return VE_ERR_NO_MEMORY;
+    } catch (...) {
+        return VE_ERR_EXCEPTION;
+    }
+}
+
+extern "C" VE_API int32_t ve_video_thumbnail_file(const char* host_path_utf8, int32_t target_size, int32_t quality,
+                                                  int32_t strategy, double frame_position, int64_t explicit_time_us,
+                                                  int32_t timeout_ms, ve_buffer* out, int32_t* info) {
+    if (!out) return VE_ERR_INVALID_ARG;
+    clearOut(out, info);
+    if (!host_path_utf8) return VE_ERR_INVALID_ARG;
+    if (!veimg::videoThumbnailsAvailable()) return VE_ERR_UNSUPPORTED;
+    try {
+        HostSource src{std::string(host_path_utf8)};
+        if (!src.ok() || src.size() <= 0) return VE_ERR_FAILED;
+        return runVideo(src, target_size, quality, strategy, frame_position, explicit_time_us, timeout_ms, out, info);
+    } catch (const std::bad_alloc&) {
+        return VE_ERR_NO_MEMORY;
+    } catch (...) {
+        return VE_ERR_EXCEPTION;
+    }
+}
+
+extern "C" VE_API int32_t ve_video_thumbnails_available(void) { return veimg::videoThumbnailsAvailable() ? 1 : 0; }

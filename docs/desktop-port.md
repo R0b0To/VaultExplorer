@@ -150,11 +150,15 @@ Android is untouched: the JNI bridges and Kotlin are not involved on desktop, an
     scripts/build_desktop_engine.sh
     build/desktop-engine/ve_smoke_test fat exfat ntfs ext4     # expect: "N checks, 0 failed"
 
-Install `nasm` too (`sudo apt install nasm`): libjpeg-turbo, which the native image thumbnails use (see "Image
-thumbnails"), builds its SIMD code with it. Without NASM the build still works, with a CMake warning, and JPEG
-decoding is slower. The thumbnailer has its own host test:
+Install `nasm` and `make` too (`sudo apt install nasm make`; MSYS2: `nasm`, `make`, `diffutils`): libjpeg-turbo (image
+thumbnails, see "Image thumbnails") and FFmpeg (video thumbnails, see "Video thumbnails") build their SIMD / assembly
+code with NASM, and FFmpeg has its own `./configure` + `make`. Without NASM the build still works, with a CMake
+warning, and decoding is slower; without `make` the engine is built without native video thumbnails (CMake warns, the
+desktop code uses libmpv for them). The native thumbnailers have host tests:
 
-    cmake --build build/desktop-engine --target thumb_test && build/desktop-engine/thumb_test    # "N groups of checks passed"
+    cmake --build build/desktop-engine --target thumb_test video_thumb_test
+    build/desktop-engine/thumb_test                                                              # images
+    build/desktop-engine/video_thumb_test android/app/src/main/cpp/imaging/test/fixtures         # videos
 
 ## Run the app on Linux
 
@@ -196,7 +200,7 @@ Build the engine (either way produces the same DLL):
 
     scripts/build_desktop_engine_windows.sh                # from Linux, cross-compiling with MinGW-w64
     # or, natively in an MSYS2 UCRT64 shell (install these tools once):
-    pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-nasm git
+    pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-nasm make diffutils git
     cmake -S android/app/src/main/cpp -B build/desktop-engine-win -G Ninja -DVAULTEXPLORER_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release
     cmake --build build/desktop-engine-win --target vaultexplorer ve_smoke_test
 
@@ -450,36 +454,57 @@ host -> DesktopImages (desktop_images.dart)
 
 ### Video thumbnails
 
-`getVideoThumbnail` / `getVideoThumbnailWithSize` take one frame out of the same libmpv the player uses (Android
-uses MediaMetadataRetriever; the engine has no video decoder of its own):
+`getVideoThumbnail` / `getVideoThumbnailWithSize` are made by the engine itself where it can (ABI 16:
+`ve_video_thumbnail`, `ve_video_thumbnail_file`; `imaging/video_thumb.cpp` on a minimal static FFmpeg, built by
+`ffmpeg_deps.cmake`), and by libmpv only for what the engine cannot open. Android uses MediaMetadataRetriever, which
+is also a native decode with no player.
 
 ```
 host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), slots, cancel on lock)
+          |- native: DesktopNativeThumbnails.videoVaultFile / videoHostFile   (the thumbnail pool; one blocking call)
+          |     '- ve_video_thumbnail: open the container through the vault stream, decode ONE keyframe, scale, rotate,
+          |        blank check, JPEG out -- the whole frame-selection strategy runs in that one call
           |- grabFrameWithMpv   (mpv_frame_grabber.dart: fresh paused Player + VideoController, first picture,
-          |                      Player.screenshot as JPEG, player disposed)
-          '- nativeFrameDecoder (video_frame_decoder.dart: the frame goes to the thumbnail pool; the engine shrinks it,
-                                  runs the 8x8 "is this frame blank" check and answers a small JPEG. Flutter's
-                                  decodeVideoFrame -- PNG out -- is the fallback)
+          |                      Player.screenshot as JPEG, player disposed)      <- only when native says "unsupported"
+          '- nativeFrameDecoder (video_frame_decoder.dart: that mpv frame goes to the thumbnail pool for scaling,
+                                  the 8x8 blank check and a small JPEG; Flutter's decodeVideoFrame is its fallback)
 ```
 
-- Source: the loopback media server session of the file (so nothing decrypted touches storage), or a `file:` URL
-  for local-storage items and the temp copies archive previews use. The player gets the same lock-down as
-  playback (`cache-on-disk` off and verified, sidecar loading off, protocol whitelist) plus: software decode and
-  rendering, no audio output, and a 16 MiB read-ahead cap (mpv's default would pull ~150 MiB of the vault through
-  the decryption per thumbnail).
-- Frame choice follows Android: `firstFrame` = time 0; `frameAtPercentage` = `framePosition` of the duration
-  (clamped to 5%..90%, needs a second open once the duration is known); `hybrid` (default) = time 0, and if that
-  frame is blank (`isLikelyBlankFrame`, a port of the Kotlin heuristic) the first non-blank frame at
-  `framePosition`, 25% or 45%. An explicit `timeUs` (the video editor) is used as is.
-- At most 2 players at a time; a locked vault drops its queued requests. Any failure answers `null`, which the Dart
-  side treats as "no thumbnail for this video" (placeholder icon), exactly as for an Android `FRAME_FAILED`.
-- Thumbnails are JPEG, like Android's (a frame with transparency would be PNG). Starting a libmpv player per frame is
-  still the dominant cost of a video thumbnail; the frame decode no longer is.
-- The pure parts (`video_thumbnail_logic.dart`, `desktop_video_thumbnails.dart`) are covered by
-  `test/core/engine/desktop/video_thumbnail_logic_test.dart` and `desktop_video_thumbnails_test.dart`. The mpv and
-  `dart:ui` adapters have **not been run inside Flutter**: they follow `desktop_video_backend.dart` and
-  `desktop_images.dart` closely, but `Player.screenshot` and the first-frame signal of an off-screen
-  `VideoController` are the first things to check on a real Linux / Windows build.
+- **Why**: the libmpv route started a whole player (software renderer, texture, a media-server session, 20 s timeout)
+  for every frame it wanted -- the start of the video, and again for every blank-frame retry -- driven from the UI
+  isolate, two at a time. The native route costs the container header plus one keyframe, with no UI-isolate work and
+  no media server, and several run at once on worker threads. Measured on one slow core of a cloud Xeon (not
+  representative of a desktop): about 20-35 ms per thumbnail for 1080p H.264 and about 110-160 ms for 4K HEVC; the
+  libmpv route was not measured.
+- **What the engine decodes** (`ffmpeg_deps.cmake`, software only): MP4/MOV, Matroska/WebM, AVI, MPEG-PS/TS, FLV,
+  ASF, Ogg, IVF with H.264, HEVC, VP8, VP9, MPEG-4 part 2, MPEG-1/2, H.263, WMV/VC-1, MJPEG, Theora, ProRes. **AV1 is
+  not in the list** (FFmpeg's own AV1 decoder is hardware-only; software needs dav1d): the engine answers
+  "unsupported" and the libmpv route makes that thumbnail, as it does for any other container or codec outside the
+  list. An engine built without `make` has no FFmpeg at all and answers "unsupported" for everything.
+- Rotation recorded in the container (phones), the pixel aspect ratio and the colour matrix / range (BT.601, BT.709,
+  BT.2020) are applied, so a portrait phone video is upright and HD video has the right colours; the reported source
+  size is the picture as shown. HDR is not tone-mapped (it looks flatter than in a player). It decodes the nearest
+  keyframe at or before the chosen point (never a delta frame), skips the loop filter and decodes on one thread.
+- Frame choice follows Android: `firstFrame` = the start; `frameAtPercentage` = `framePosition` of the duration
+  (clamped to 5%..90%); `hybrid` (default) = the start, and if that frame is blank (`isLikelyBlank`, a port of the
+  Kotlin heuristic) the first non-blank frame at `framePosition`, 25% or 45%. An explicit `timeUs` (the video editor)
+  is used as is and never retried; one past the end gives the last keyframe.
+- At most 2 native video thumbnails at a time (so a burst, such as the editor's film strip, cannot fill the thumbnail
+  pool and hold image tiles back), and 2 libmpv players for the fallback. A locked vault drops its queued requests
+  and the result of a running one. A source that cannot be read, or a video with no decodable picture, answers
+  `null` (placeholder icon), as for an Android `FRAME_FAILED`; the whole call has a 20 s deadline.
+- The libmpv route: the loopback media server session of the file (so nothing decrypted touches storage), or a
+  `file:` URL for local-storage items and the temp copies archive previews use; the player gets the same lock-down as
+  playback (`cache-on-disk` off and verified, sidecar loading off, protocol whitelist) plus software decode and
+  rendering, no audio output and a 16 MiB read-ahead cap.
+- Tests: `imaging/test/video_thumb_test.cpp` on the tiny videos of `imaging/test/fixtures` (regenerated by
+  `make_fixtures.sh`): every container and codec, the three rotations, pixel aspect, colours, frame selection with a
+  black start, AV1 / audio-only / garbage / truncated / unreadable sources, many threads. The Dart side:
+  `desktop_native_thumbnails_test.dart` (native first, libmpv only on "unsupported", the concurrency cap, cancel on
+  lock), `video_thumbnail_logic_test.dart` and `desktop_video_thumbnails_test.dart`. The mpv and `dart:ui` adapters
+  have **not been run inside Flutter**: they follow `desktop_video_backend.dart` and `desktop_images.dart` closely, but
+  `Player.screenshot` and the first-frame signal of an off-screen `VideoController` are the first things to check on
+  a real Linux / Windows build -- and they matter much less now that they are only the fallback.
 
 ## Not yet
 

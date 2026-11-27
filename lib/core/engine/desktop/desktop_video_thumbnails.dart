@@ -104,6 +104,11 @@ class VideoThumbnailRequest {
   final int? explicitTimeUs;
 }
 
+/// The engine's own video thumbnailer (ve_video_thumbnail): the whole request in one native call, no player.
+/// [NativeImageUnsupported] (an unknown container, a codec that is not built in, an engine without FFmpeg) sends the
+/// request on to libmpv; every other outcome is final.
+typedef NativeVideoThumbnailer = Future<NativeImageOutcome> Function(VideoThumbnailRequest request);
+
 class _Candidate {
   const _Candidate(this.frame, this.duration);
 
@@ -127,15 +132,25 @@ class DesktopVideoThumbnails {
     required this.openVaultFile,
     required this.grab,
     required this.decode,
+    this.native,
     this.maxConcurrent = 2,
+    this.maxNativeConcurrent = 2,
     this.grabTimeout = const Duration(seconds: 20),
     void Function(String message)? log,
   })  : assert(maxConcurrent > 0),
+        assert(maxNativeConcurrent > 0),
         _log = log ?? ((_) {});
 
   final VaultVideoOpener openVaultFile;
   final FrameGrabber grab;
   final FrameDecoder decode;
+
+  /// Tried first for every request; null (tests) means libmpv only.
+  final NativeVideoThumbnailer? native;
+
+  /// Native video thumbnails running at once. They are cheap (a keyframe each), but this keeps a burst of them (the
+  /// editor's film strip) from filling the thumbnail pool and holding image tiles back.
+  final int maxNativeConcurrent;
 
   /// Players alive at once. Each one is a whole libmpv instance, so this stays small however many tiles are
   /// waiting for a thumbnail.
@@ -147,6 +162,8 @@ class DesktopVideoThumbnails {
   final void Function(String message) _log;
 
   int _slotsInUse = 0;
+  int _nativeInUse = 0;
+  final List<_Run> _nativeWaiting = [];
   final List<_Run> _waiting = [];
   final Set<_Run> _active = {};
   bool _disposed = false;
@@ -155,6 +172,20 @@ class DesktopVideoThumbnails {
   /// cannot be shown: a missing or locked file, a format libmpv cannot decode, a timeout.
   Future<VideoThumbnail?> thumbnail(VideoThumbnailRequest request) async {
     if (_disposed) return null;
+    final nativeGrab = native;
+    if (nativeGrab != null) {
+      final outcome = await _runNative(nativeGrab, request);
+      switch (outcome) {
+        case null:
+        case NativeImageFailed():
+        case NativeImageRefused():
+          return null; // cancelled, or a video this engine understands but cannot make a picture of
+        case NativeImageThumb():
+          return VideoThumbnail(bytes: outcome.bytes, width: outcome.sourceWidth, height: outcome.sourceHeight);
+        case NativeImageUnsupported():
+          break; // not something the engine can open or decode: libmpv below
+      }
+    }
     final run = _Run(request.volId);
     if (!await _acquire(run)) return null;
     _active.add(run);
@@ -169,9 +200,40 @@ class DesktopVideoThumbnails {
     }
   }
 
+  Future<NativeImageOutcome?> _runNative(NativeVideoThumbnailer grab, VideoThumbnailRequest request) async {
+    final run = _Run(request.volId);
+    if (_nativeInUse >= maxNativeConcurrent) {
+      _nativeWaiting.add(run);
+      if (!await run.turn.future) return null;
+    } else {
+      _nativeInUse++;
+    }
+    _active.add(run);
+    try {
+      if (run.cancelled || _disposed) return null;
+      final outcome = await grab(request);
+      return run.cancelled || _disposed ? null : outcome; // the vault locked meanwhile: the picture is dropped
+    } on Object catch (e) {
+      _log('native video thumbnail for ${request.path} failed: $e');
+      return const NativeImageUnsupported(); // let libmpv try
+    } finally {
+      _active.remove(run);
+      if (_nativeWaiting.isNotEmpty) {
+        _nativeWaiting.removeAt(0).turn.complete(true); // the slot passes on without being given back
+      } else {
+        _nativeInUse--;
+      }
+    }
+  }
+
   /// The vault [volId] is going away: queued requests for it are dropped and running ones stop at their next
   /// step (the media server has already cut their stream off).
   void cancelVolume(int volId) {
+    for (final run in _nativeWaiting.where((r) => r.volId == volId).toList()) {
+      _nativeWaiting.remove(run);
+      run.cancelled = true;
+      run.turn.complete(false);
+    }
     for (final run in _waiting.where((r) => r.volId == volId).toList()) {
       _waiting.remove(run);
       run.cancelled = true;
@@ -185,6 +247,11 @@ class DesktopVideoThumbnails {
   /// Drops everything queued and stops accepting requests (app exit).
   void dispose() {
     _disposed = true;
+    for (final run in _nativeWaiting) {
+      run.cancelled = true;
+      run.turn.complete(false);
+    }
+    _nativeWaiting.clear();
     for (final run in _waiting) {
       run.cancelled = true;
       run.turn.complete(false);

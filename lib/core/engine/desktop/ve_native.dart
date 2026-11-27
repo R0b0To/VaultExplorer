@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 15;
+const int kVeAbiVersion = 16;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -637,6 +637,19 @@ class VeNative {
       _lib.lookupFunction<Int32 Function(Pointer<VeBuffer>), int Function(Pointer<VeBuffer>)>('ve_list_mounts');
   late final int Function(Pointer<Utf8>, int) _mountLastError =
       _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Size), int Function(Pointer<Utf8>, int)>('ve_mount_last_error');
+
+  // Video thumbnails (ABI 16): ve_video_thumbnail / ve_video_thumbnail_file (ve_engine.h).
+  late final int Function(int, Pointer<Utf8>, int, int, int, double, int, int, Pointer<VeBuffer>, Pointer<Int32>)
+      _videoThumbnail = _lib.lookupFunction<
+          Int32 Function(
+              Int32, Pointer<Utf8>, Int32, Int32, Int32, Double, Int64, Int32, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(int, Pointer<Utf8>, int, int, int, double, int, int, Pointer<VeBuffer>,
+              Pointer<Int32>)>('ve_video_thumbnail');
+  late final int Function(Pointer<Utf8>, int, int, int, double, int, int, Pointer<VeBuffer>, Pointer<Int32>)
+      _videoThumbnailFile = _lib.lookupFunction<
+          Int32 Function(Pointer<Utf8>, Int32, Int32, Int32, Double, Int64, Int32, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(Pointer<Utf8>, int, int, int, double, int, int, Pointer<VeBuffer>,
+              Pointer<Int32>)>('ve_video_thumbnail_file');
 
   // Image thumbnails (ABI 15): ve_image_thumbnail / ve_image_thumbnail_file / ve_image_thumbnail_mem (ve_engine.h).
   late final int Function(int, Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>) _imageThumbnail =
@@ -2043,6 +2056,45 @@ class VeNative {
   /// Entries hidden from listings in [path] (>= 0), or a negative -veErr* code.
   int fvHiddenEntryCount(int volId, String path) => _withUtf8(path, (p) => _fvHidden(volId, p));
   int fvFinishWrite(int volId, String path) => _withUtf8(path, (p) => _fvFinishWrite(volId, p));
+
+  // ── video thumbnails (ABI 16) ───────────────────────────────────────────
+  // Same reply as the image calls (rc, bytes, info), with info[7] = the duration in milliseconds (0 = unknown) and
+  // info[1]/[2] the picture as shown. [strategy]: 0 the start, 1 the picture at [framePosition], 2 the start and, when
+  // it looks blank, the first not-blank one at [framePosition] / 25% / 45%. [explicitTimeUs] >= 0 wins over all of it.
+  // rc veErrUnsupported: this engine cannot open or decode it (or was built without FFmpeg): use another route.
+
+  /// A thumbnail of the video at [path] inside unlocked slot [volId].
+  (int, Uint8List?, List<int>) videoThumbnail(
+    int volId,
+    String path, {
+    required int targetSize,
+    required int quality,
+    required int strategy,
+    required double framePosition,
+    required int explicitTimeUs,
+    required int timeoutMs,
+  }) =>
+      _withUtf8(
+        path,
+        (p) => _imageCall((b, info) => _videoThumbnail(
+            volId, p, targetSize, quality, strategy, framePosition, explicitTimeUs, timeoutMs, b, info)),
+      );
+
+  /// A thumbnail of a video file on this machine.
+  (int, Uint8List?, List<int>) videoThumbnailFile(
+    String hostPath, {
+    required int targetSize,
+    required int quality,
+    required int strategy,
+    required double framePosition,
+    required int explicitTimeUs,
+    required int timeoutMs,
+  }) =>
+      _withUtf8(
+        hostPath,
+        (p) => _imageCall((b, info) => _videoThumbnailFile(
+            p, targetSize, quality, strategy, framePosition, explicitTimeUs, timeoutMs, b, info)),
+      );
 
   // ── image thumbnails (ABI 15) ───────────────────────────────────────────
   // Each call answers (rc, thumbnail bytes, info). `info` is VE_IMAGE_INFO_COUNT ints, in this order:

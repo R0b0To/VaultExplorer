@@ -961,6 +961,34 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         );
         return [rc, bytes, info];
       }
+    // Video thumbnails (ABI 16) -> [resultCode, thumbnail bytes?, info ints]. Same pool as the image thumbnails.
+    case 'videoThumbnail':
+      {
+        final (rc, bytes, info) = n.videoThumbnail(
+          a[0] as int,
+          a[1] as String,
+          targetSize: a[2] as int,
+          quality: a[3] as int,
+          strategy: a[4] as int,
+          framePosition: (a[5] as num).toDouble(),
+          explicitTimeUs: a[6] as int,
+          timeoutMs: a[7] as int,
+        );
+        return [rc, bytes, info];
+      }
+    case 'videoThumbnailFile':
+      {
+        final (rc, bytes, info) = n.videoThumbnailFile(
+          a[0] as String,
+          targetSize: a[1] as int,
+          quality: a[2] as int,
+          strategy: a[3] as int,
+          framePosition: (a[4] as num).toDouble(),
+          explicitTimeUs: a[5] as int,
+          timeoutMs: a[6] as int,
+        );
+        return [rc, bytes, info];
+      }
     case 'opCancel':
       n.opCancel(a[0] as int);
       return null;

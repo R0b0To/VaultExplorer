@@ -816,6 +816,55 @@ bool isLikelyBlank(const uint8_t* px, int w, int h, int ch) {
     return std::sqrt(variance / kTotal) < 8.0;  // low contrast / low detail
 }
 
+// Orientation, blank verdict and encoding: the last stage for every decoder.
+static Status finishRaster(Raster& r, int quality, Thumbnail& out) {
+    applyOrientation(r);
+    const bool sideways = r.orientation >= 5 && r.orientation <= 8;
+    out.sourceWidth = sideways ? r.storedH : r.storedW;
+    out.sourceHeight = sideways ? r.storedW : r.storedH;
+    out.width = r.w;
+    out.height = r.h;
+    out.hasAlpha = r.hasAlpha;
+    out.isBlank = isLikelyBlank(r.px.data(), r.w, r.h, r.ch);
+
+    if (r.ch == 4 && r.hasAlpha) {
+        out.isPng = true;
+        return encodePng(r.px.data(), r.w, r.h, 4, out.bytes) ? Status::kOk : Status::kFailed;
+    }
+    out.isPng = false;
+    if (r.ch == 4) {  // opaque after all: drop the alpha channel
+        std::vector<uint8_t> rgb(static_cast<size_t>(r.w) * r.h * 3);
+        for (size_t i = 0, o = 0; i < r.px.size(); i += 4, o += 3) {
+            rgb[o] = r.px[i];
+            rgb[o + 1] = r.px[i + 1];
+            rgb[o + 2] = r.px[i + 2];
+        }
+        r.px.swap(rgb);
+        r.ch = 3;
+    }
+    return encodeJpeg(r.px.data(), r.w, r.h, quality, out.bytes) ? Status::kOk : Status::kFailed;
+}
+
+Status finishThumbnail(std::vector<uint8_t>&& rgb, int w, int h, int orientation, int storedW, int storedH, int quality,
+                       Thumbnail& out) {
+    try {
+        if (w <= 0 || h <= 0 || rgb.size() != static_cast<size_t>(w) * h * 3) return Status::kFailed;
+        Raster r;
+        r.px = std::move(rgb);
+        r.w = w;
+        r.h = h;
+        r.ch = 3;
+        r.storedW = storedW;
+        r.storedH = storedH;
+        r.orientation = orientation;
+        return finishRaster(r, quality, out);
+    } catch (const std::bad_alloc&) {
+        return Status::kNoMemory;
+    } catch (...) {
+        return Status::kFailed;
+    }
+}
+
 Status makeThumbnail(ByteSource& src, const Options& optIn, Thumbnail& out) {
     try {
         Options opt = optIn;
@@ -838,31 +887,7 @@ Status makeThumbnail(ByteSource& src, const Options& optIn, Thumbnail& out) {
         }
         if (st != Status::kOk) return st;
 
-        applyOrientation(r);
-        const bool sideways = r.orientation >= 5 && r.orientation <= 8;
-        out.sourceWidth = sideways ? r.storedH : r.storedW;
-        out.sourceHeight = sideways ? r.storedW : r.storedH;
-        out.width = r.w;
-        out.height = r.h;
-        out.hasAlpha = r.hasAlpha;
-        out.isBlank = isLikelyBlank(r.px.data(), r.w, r.h, r.ch);
-
-        if (r.ch == 4 && r.hasAlpha) {
-            out.isPng = true;
-            return encodePng(r.px.data(), r.w, r.h, 4, out.bytes) ? Status::kOk : Status::kFailed;
-        }
-        out.isPng = false;
-        if (r.ch == 4) {  // opaque after all: drop the alpha channel
-            std::vector<uint8_t> rgb(static_cast<size_t>(r.w) * r.h * 3);
-            for (size_t i = 0, o = 0; i < r.px.size(); i += 4, o += 3) {
-                rgb[o] = r.px[i];
-                rgb[o + 1] = r.px[i + 1];
-                rgb[o + 2] = r.px[i + 2];
-            }
-            r.px.swap(rgb);
-            r.ch = 3;
-        }
-        return encodeJpeg(r.px.data(), r.w, r.h, opt.quality, out.bytes) ? Status::kOk : Status::kFailed;
+        return finishRaster(r, opt.quality, out);
     } catch (const std::bad_alloc&) {
         return Status::kNoMemory;
     } catch (...) {

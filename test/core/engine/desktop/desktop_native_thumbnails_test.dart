@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:test/test.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_images.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_native_thumbnails.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_video_thumbnails.dart';
 import 'package:vaultexplorer/core/engine/desktop/ve_native.dart';
 import 'package:vaultexplorer/core/engine/desktop/video_frame_decoder.dart';
 
@@ -189,6 +190,117 @@ void main() {
       final pool = _FakePool((op, args) => _error(veErrFailed));
       final decode = nativeFrameDecoder(DesktopNativeThumbnails(call: pool.call));
       expect(await decode(Uint8List.fromList([1]), 180), isNull);
+    });
+  });
+
+  group('DesktopVideoThumbnails with the native thumbnailer', () {
+    var mpvGrabs = 0;
+    var opens = 0;
+
+    NativeImageThumb nativeThumb() => NativeImageThumb(
+          bytes: Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]),
+          isPng: false,
+          sourceWidth: 1080,
+          sourceHeight: 1920,
+          width: 101,
+          height: 180,
+          hasAlpha: false,
+          isBlank: false,
+        );
+
+    DesktopVideoThumbnails make(NativeVideoThumbnailer native, {int maxNative = 2}) {
+      mpvGrabs = 0;
+      opens = 0;
+      return DesktopVideoThumbnails(
+        openVaultFile: (vol, path) async {
+          opens++;
+          return VideoSource(url: 'http://127.0.0.1/$path', close: () async {});
+        },
+        grab: ({required url, required isLocalFile, start, required timeout}) async {
+          mpvGrabs++;
+          return GrabbedFrame(encoded: Uint8List.fromList([7]), duration: const Duration(seconds: 10));
+        },
+        decode: (encoded, targetSize) async =>
+            DecodedFrame(png: encoded, sourceWidth: 640, sourceHeight: 360, isBlank: false),
+        native: native,
+        maxNativeConcurrent: maxNative,
+        grabTimeout: const Duration(seconds: 1),
+      );
+    }
+
+    VideoThumbnailRequest request({int vol = 1, String path = 'a.mp4'}) => VideoThumbnailRequest(volId: vol, path: path);
+
+    test('a native thumbnail is the answer: no player is started and no media-server session opened', () async {
+      final service = make((r) async => nativeThumb());
+      final t = await service.thumbnail(request());
+      expect(t, isNotNull);
+      expect(t!.bytes, [0xFF, 0xD8, 0xFF, 0xD9]);
+      expect((t.width, t.height), (1080, 1920));
+      expect((mpvGrabs, opens), (0, 0));
+    });
+
+    test('a video the engine understands but cannot picture is no thumbnail, and libmpv is not asked either', () async {
+      final service = make((r) async => const NativeImageFailed());
+      expect(await service.thumbnail(request()), isNull);
+      expect(mpvGrabs, 0);
+    });
+
+    test('"unsupported" (AV1, an exotic container, an engine without FFmpeg) falls through to libmpv', () async {
+      final service = make((r) async => const NativeImageUnsupported());
+      final t = await service.thumbnail(request());
+      expect(t, isNotNull);
+      expect(t!.bytes, [7]);
+      expect(mpvGrabs, greaterThan(0));
+    });
+
+    test('a native call that throws falls through to libmpv instead of failing the tile', () async {
+      final service = make((r) async => throw StateError('worker gone'));
+      expect((await service.thumbnail(request()))?.bytes, [7]);
+    });
+
+    test('native thumbnails are capped, so a burst cannot fill the thumbnail pool', () async {
+      final gates = <Completer<void>>[];
+      var running = 0, peak = 0;
+      final service = make((r) async {
+        running++;
+        peak = running > peak ? running : peak;
+        final gate = Completer<void>();
+        gates.add(gate);
+        await gate.future;
+        running--;
+        return nativeThumb();
+      }, maxNative: 2);
+      final results = [for (var i = 0; i < 5; i++) service.thumbnail(request(path: 'v$i.mp4'))];
+      await Future<void>.delayed(Duration.zero);
+      expect(running, 2); // two started, three queued
+      for (var i = 0; i < 20 && !(gates.length == 5 && gates.every((g) => g.isCompleted)); i++) {
+        for (final g in gates) {
+          if (!g.isCompleted) g.complete();
+        }
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect((await Future.wait(results)).every((t) => t != null), isTrue);
+      expect(peak, 2);
+    });
+
+    test('a locked vault drops its queued native requests', () async {
+      final gate = Completer<void>();
+      var started = 0;
+      final service = make((r) async {
+        started++;
+        await gate.future;
+        return nativeThumb();
+      }, maxNative: 1);
+      final running = service.thumbnail(request(vol: 1, path: 'a.mp4'));
+      final queued = service.thumbnail(request(vol: 1, path: 'b.mp4'));
+      final other = service.thumbnail(request(vol: 2, path: 'c.mp4'));
+      await Future<void>.delayed(Duration.zero);
+      service.cancelVolume(1);
+      expect(await queued, isNull);
+      gate.complete();
+      expect(await running, isNull); // cancelled while running: its result is dropped by the caller's volume lock
+      expect(await other, isNotNull);
+      expect(started, 2); // 'b.mp4' never started
     });
   });
 }

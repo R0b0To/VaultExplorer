@@ -741,8 +741,16 @@ if(VAULTEXPLORER_DESKTOP)
     # BitmapFactory and does not build, fetch or link any of this. A static library of its own, so the codec
     # headers (jpeglib.h, png.h, webp/) are visible to that one file and nothing else in the engine.
     include(${CMAKE_CURRENT_SOURCE_DIR}/imaging_deps.cmake)
-    add_library(ve_imaging STATIC imaging/thumb.cpp)
+    # Video thumbnails (imaging/video_thumb.cpp) additionally need FFmpeg; without it (ffmpeg_deps.cmake could not
+    # build it) that file compiles to a stub that answers "unsupported" and the desktop code uses libmpv instead.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg_deps.cmake)
+    add_library(ve_imaging STATIC imaging/thumb.cpp imaging/video_thumb.cpp)
     target_include_directories(ve_imaging PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${VE_IMAGING_INCLUDE_DIRS})
+    if(VE_HAVE_FFMPEG)
+        target_compile_definitions(ve_imaging PRIVATE VE_HAVE_FFMPEG)
+        target_link_libraries(ve_imaging PUBLIC ${VE_FFMPEG_LIBS})
+        add_dependencies(ve_imaging ffmpeg_ep)  # its headers must be installed before video_thumb.cpp compiles
+    endif()
     target_compile_features(ve_imaging PRIVATE cxx_std_17)
     target_compile_options(ve_imaging PRIVATE -Wall -Wextra)
     set_target_properties(ve_imaging PROPERTIES
@@ -1152,6 +1160,19 @@ if(NOT ANDROID)
         list(APPEND VAULTEXPLORER_HOST_TESTS thumb_test)
     endif()
 
+    # Native video thumbnails (imaging/video_thumb.cpp): every container and codec of the minimal FFmpeg build,
+    # rotation, pixel aspect, frame selection, what must be refused, many threads -- on the tiny videos of
+    # imaging/test/fixtures. Only when FFmpeg is part of this build.
+    if(VAULTEXPLORER_DESKTOP AND VE_HAVE_FFMPEG AND TARGET ve_png)
+        add_executable(video_thumb_test imaging/test/video_thumb_test.cpp imaging/video_thumb.cpp imaging/thumb.cpp)
+        target_include_directories(video_thumb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${VE_IMAGING_INCLUDE_DIRS})
+        target_compile_definitions(video_thumb_test PRIVATE VE_HAVE_FFMPEG)
+        target_link_libraries(video_thumb_test ${VE_JPEG_LIB} ${VE_PNG_LIB} ${VE_WEBP_DECODER_LIB} ${VE_FFMPEG_LIBS}
+                              Threads::Threads)
+        add_dependencies(video_thumb_test libjpeg_turbo_ep ffmpeg_ep)
+        list(APPEND VAULTEXPLORER_HOST_TESTS video_thumb_test)
+    endif()
+
     # Folder-vault core: known-answer vectors, per-format scenarios, tamper /
     # rollback / legacy-name handling and thread stress. The interop scripts in
     # foldervault/test/interop additionally drive `fvcli` against the real
@@ -1327,5 +1348,8 @@ if(NOT ANDROID)
     endif()
     if(TARGET thumb_test)
         add_test(NAME thumb_test COMMAND thumb_test)
+    endif()
+    if(TARGET video_thumb_test)
+        add_test(NAME video_thumb_test COMMAND video_thumb_test ${CMAKE_CURRENT_SOURCE_DIR}/imaging/test/fixtures)
     endif()
 endif()

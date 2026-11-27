@@ -21,6 +21,20 @@ MountedContainer _vaultContainer({int volId = 2}) => MountedContainer(
   freeSpace: 500,
 );
 
+Future<void> _waitUntil(
+  Future<bool> Function() condition, {
+  required String description,
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final stopwatch = Stopwatch()..start();
+  while (!(await condition())) {
+    if (stopwatch.elapsed >= timeout) {
+      fail('Timed out waiting for $description');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
 void main() {
   late Directory tempRoot;
   late DesktopStagingManager staging;
@@ -130,12 +144,18 @@ void main() {
     fastStaging.markRealized(batch.batchId, isDrag: true);
     await fastStaging.onDragTransferFinished(batch.batchId, immediateIfUnused: true);
 
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await _waitUntil(
+      () async => inUseProbeCalls >= 2,
+      description: 'the staging pin to be checked by the drain poll',
+    );
     expect(await stagedFile.exists(), isTrue);
-    expect(inUseProbeCalls, greaterThanOrEqualTo(1));
+    expect(inUseProbeCalls, greaterThanOrEqualTo(2));
 
     svc.releaseImportPaths(pins);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await _waitUntil(
+      () async => !(await stagedFile.exists()),
+      description: 'staging cleanup after releasing the import pin',
+    );
     expect(await stagedFile.exists(), isFalse);
     await svc.dispose();
   });

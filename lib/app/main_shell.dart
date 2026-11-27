@@ -77,6 +77,12 @@ class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
   int _index = 0;
   late final ProviderContainer _container;
+
+  /// False from the moment this shell's element is removed from the tree until
+  /// (if ever) it is put back. [dispose] comes later, at the end of the frame,
+  /// so anything handed to FileManagerEnvironment must check this rather than
+  /// assume the widget state can still be used.
+  bool _isActive = true;
   bool _isEnforcingLock = false;
   late bool _hideDashboard = widget.hideDashboardUntilShareHandled;
   final ValueNotifier<List<MountedContainer>> _mountedNotifier = ValueNotifier(
@@ -97,6 +103,7 @@ class _MainShellState extends ConsumerState<MainShell>
   /// container, resolving a vault, opening the Add sheet), so it does not
   /// matter which one answers as long as the focused one is preferred.
   VaultDashboardState? get _dashboard {
+    if (!_isActive) return null;
     final active = _browserWorkspaceState?.activeTab;
     if (active != null && active.isDashboard) {
       final focused = _dashboardKeys[active.tabId]?.currentState;
@@ -139,7 +146,7 @@ class _MainShellState extends ConsumerState<MainShell>
       if (c.volId == volId) return c;
     }
     if (volId <= kExternalStorageBaseVolId) {
-      final external = ref
+      final external = _container
           .read(externalStorageLocationsProvider.notifier)
           .resolveContainer(volId);
       if (external != null) return external;
@@ -225,16 +232,23 @@ class _MainShellState extends ConsumerState<MainShell>
   /// is left to resume. See [BrowserSessionStore].
   BrowserTabsConfig? _restoredBrowserWorkspace;
 
+  // Read through the cached [_container], not `ref`: other windows reach these
+  // getters through FileManagerEnvironment, and in the frame where this
+  // shell's window is closed the element is already deactivated while those
+  // windows still lay out. `ref.read` asserts on a deactivated element;
+  // the container does not care.
   BrowserTabsState? get _browserWorkspaceState {
     final workspace = _browserWorkspace;
-    return workspace == null ? null : ref.read(browserTabsProvider(workspace));
+    return workspace == null
+        ? null
+        : _container.read(browserTabsProvider(workspace));
   }
 
   BrowserTabs? get _browserWorkspaceActions {
     final workspace = _browserWorkspace;
     return workspace == null
         ? null
-        : ref.read(browserTabsProvider(workspace).notifier);
+        : _container.read(browserTabsProvider(workspace).notifier);
   }
 
   /// Keyboard shortcuts for tabs, for a tablet with a keyboard or a desktop
@@ -321,19 +335,19 @@ class _MainShellState extends ConsumerState<MainShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleTabShortcutKey);
+    // Cached so asynchronous lock callbacks stay safe after this widget is
+    // unmounted. Assigned before attach(): the environment's closures use it.
+    _container = ProviderScope.containerOf(context, listen: false);
     FileManagerEnvironment.instance.attach(
       resolveContainer: _resolveContainer,
       mountedContainers: () =>
-          ref.read(vaultDashboardControllerProvider).mounted,
+          _container.read(vaultDashboardControllerProvider).mounted,
       primaryLocalContainer: () => _primaryLocalStorageContainer,
       openWindow: (container, initialPath) =>
           openFileManagerWindow(container: container, initialPath: initialPath),
       openVaultsWindow: (title) => openFileManagerWindow(title: title),
       openTabWindow: openFileManagerWindowForTab,
     );
-    // Cached so asynchronous lock callbacks stay safe after this widget is
-    // unmounted.
-    _container = ProviderScope.containerOf(context, listen: false);
     if (widget.returnToDecoyOnBackground) {
       _restoredBrowserWorkspace = _container
           .read(browserSessionStoreProvider)
@@ -613,6 +627,22 @@ class _MainShellState extends ConsumerState<MainShell>
           // cleanly finish and remove the isolated QuickCaptureActivity task window.
           SystemNavigator.pop();
         });
+  }
+
+  @override
+  void deactivate() {
+    // Remember the device-storage container while the dashboard can still
+    // answer: from here on _dashboard returns null and the cache is all that
+    // other windows will get, until dispose() hands over to the session keeper.
+    _cacheDashboardLocalStorageContainer();
+    _isActive = false;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _isActive = true;
   }
 
   @override

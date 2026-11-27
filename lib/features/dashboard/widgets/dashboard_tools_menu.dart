@@ -44,15 +44,11 @@ enum _DashboardTool {
   allTools,
 }
 
-/// The vault tools worth having one click away on the desktop Vaults toolbar,
-/// the same screens the Tools page lists. "All tools" opens that page.
-///
-/// The tools that work on an unlocked vault are handed the vaults unlocked
-/// when the menu item is chosen.
-class DashboardToolsMenuButton extends ConsumerWidget {
-  const DashboardToolsMenuButton({super.key});
-
-  void _open(BuildContext context, WidgetRef ref, _DashboardTool tool) {
+void _openDashboardTool(
+  BuildContext context,
+  WidgetRef ref,
+  _DashboardTool tool,
+) {
     if (tool == _DashboardTool.allTools) {
       openToolsWindow(context);
       return;
@@ -78,12 +74,78 @@ class DashboardToolsMenuButton extends ConsumerWidget {
       _DashboardTool.vaultSync => VaultSyncScreen(mountedContainers: mounted),
       _DashboardTool.allTools => const SizedBox.shrink(),
     };
-    Navigator.of(context).push(
+   Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SkinAreaScope(area: SkinArea.tools, child: screen),
       ),
     );
   }
+
+List<Widget> buildDashboardToolsMenuItems(
+  BuildContext context,
+  WidgetRef ref,
+) {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = context.l10n;
+  Widget entry(_DashboardTool tool, IconData icon, String label) =>
+      MenuItemButton(
+        leadingIcon: Icon(icon, size: 20, color: cs.onSurfaceVariant),
+        onPressed: () => _openDashboardTool(context, ref, tool),
+        child: Text(label),
+      );
+  return [
+    entry(
+      _DashboardTool.keyfileGenerator,
+      Icons.key_rounded,
+      l10n.keyfilePassphraseGeneratorTitle,
+    ),
+    entry(
+      _DashboardTool.encryptFiles,
+      Icons.enhanced_encryption_rounded,
+      l10n.toolSingleFileCryptoTitle,
+    ),
+    entry(
+      _DashboardTool.hashVerifier,
+      Icons.verified_rounded,
+      l10n.toolHashVerifierTitle,
+    ),
+    const Divider(height: 1),
+    entry(
+      _DashboardTool.headerBackup,
+      Icons.settings_backup_restore_rounded,
+      l10n.toolHeaderBackupTitle,
+    ),
+    entry(
+      _DashboardTool.repair,
+      Icons.build_rounded,
+      l10n.toolContainerRepairTitle,
+    ),
+    entry(
+      _DashboardTool.vaultSync,
+      Icons.sync_alt_rounded,
+      l10n.toolVaultSyncTitle,
+    ),
+    entry(
+      _DashboardTool.storageAnalyzer,
+      Icons.pie_chart_rounded,
+      l10n.toolStorageAnalyzerTitle,
+    ),
+    const Divider(height: 1),
+    entry(
+      _DashboardTool.allTools,
+      Icons.apps_rounded,
+      l10n.navBarToolsLabel,
+    ),
+  ];
+}
+
+/// The vault tools worth having one click away on the desktop Vaults toolbar,
+/// the same screens the Tools page lists. "All tools" opens that page.
+///
+/// The tools that work on an unlocked vault are handed the vaults unlocked
+/// when the menu item is chosen.
+class DashboardToolsMenuButton extends ConsumerWidget {
+  const DashboardToolsMenuButton({super.key});
 
   PopupMenuItem<_DashboardTool> _item(
     ColorScheme cs,
@@ -111,7 +173,7 @@ class DashboardToolsMenuButton extends ConsumerWidget {
       icon: const Icon(Icons.handyman_outlined),
       tooltip: l10n.toolsScreenTitle,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (tool) => _open(context, ref, tool),
+         onSelected: (tool) => _openDashboardTool(context, ref, tool),
       itemBuilder: (_) => [
         _item(
           cs,

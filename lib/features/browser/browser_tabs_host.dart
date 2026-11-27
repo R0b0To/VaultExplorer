@@ -29,7 +29,9 @@ import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_layout_button.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/lock_all_vaults.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_tools_menu.dart';
+import 'package:vaultexplorer/core/widgets/adaptive_action_strip.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
+import 'package:vaultexplorer/data/models/dashboard_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -553,14 +555,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     if (navigator.canPop()) navigator.pop();
   }
 
-  /// The chrome of a Vaults tab on desktop: two rows of 36 and 40 px, the same
-  /// heights as a storage's breadcrumb row and toolbar in the file manager, so
-  /// nothing shifts when going from one to the other.
-  ///
-  /// There is no location row, because the tab already says "Vaults". The
-  /// upper row holds what changes the list (order, refresh) and the search box,
-  /// which sits where the file manager's does; the lower row holds the actions
-  /// on the vaults themselves.
+ /// Single 40px desktop toolbar for a Vaults tab: navigation/refresh, primary
+  /// vault actions, tools, view/sort controls in an adaptive strip, followed by
+  /// authenticator/transfer status and the right-aligned search field.
   Widget _buildDesktopDashboardChrome(
     BuildContext context,
     TabId tabId, {
@@ -569,8 +566,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final scheme = Theme.of(context).colorScheme;
     final toolbar = ref.read(dashboardToolbarActionsProvider).forTab(tabId);
     final showSidebar = showSidebarButton ? context.showSidebarAction : null;
-    // `surfaceContainer`, like the breadcrumb row: the selected tab above
-    // flows into it.
+    final sortMode = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.containerSortMode,
+      ),
+    );
+    final layoutMode = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.dashboardLayoutMode,
+      ),
+    );
     return IconButtonTheme(
       data: const IconButtonThemeData(
         style: ButtonStyle(
@@ -579,92 +584,205 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           minimumSize: WidgetStatePropertyAll(Size(36, 36)),
         ),
       ),
-      child: Column(
-        children: [
-          Material(
-            color: scheme.surfaceContainer,
-            child: SizedBox(
-              height: 36,
-              child: Row(
+      child: Material(
+        color: scheme.surfaceContainer,
+        child: SizedBox(
+          height: 40,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final searchWidth = constraints.maxWidth >= 700
+                  ? 260.0
+                  : (constraints.maxWidth * 0.34).clamp(88.0, 260.0);
+              return Row(
                 children: [
-                  if (showSidebar != null) ...[
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.menu_rounded),
-                      tooltip: context.l10n.showSidebarTooltip,
-                      onPressed: showSidebar,
-                    ),
-                  ] else
-                    const SizedBox(width: 6),
-                  const _DashboardSortButton(),
-                  const DashboardLayoutButton(),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded),
-                    tooltip: context.l10n.refreshListButton,
-                    onPressed: () => unawaited(
-                      ref
-                          .read(vaultDashboardControllerProvider.notifier)
-                          .loadAll(),
-                    ),
-                  ),
-                  // Same search box, in the same place, as the file manager's
-                  // breadcrumb row. Each Vaults tab has its own text.
+                  const SizedBox(width: 4),
                   Expanded(
                     child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 14),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 260),
-                          child: _DashboardSearchBox(
-                            key: ValueKey<TabId>(tabId),
-                            query: toolbar.searchQuery,
+                      alignment: Alignment.centerLeft,
+                      child: AdaptiveActionStrip(
+                        itemExtent: 40,
+                        items: [
+                          if (showSidebar != null)
+                            AdaptiveActionItem(
+                              id: 'sidebar',
+                              builder: (_) => IconButton(
+                                icon: const Icon(Icons.menu_rounded),
+                                tooltip: context.l10n.showSidebarTooltip,
+                                onPressed: showSidebar,
+                              ),
+                            ),
+                          AdaptiveActionItem(
+                            id: 'refresh',
+                            priority: 3,
+                            builder: (_) => IconButton(
+                              icon: const Icon(Icons.refresh_rounded),
+                              tooltip: context.l10n.refreshListButton,
+                              onPressed: () => unawaited(
+                                ref
+                                    .read(
+                                      vaultDashboardControllerProvider.notifier,
+                                    )
+                                    .loadAll(),
+                              ),
+                            ),
+                            menuBuilder: (ctx) => MenuItemButton(
+                              leadingIcon: const Icon(Icons.refresh_rounded),
+                              onPressed: () => unawaited(
+                                ref
+                                    .read(
+                                      vaultDashboardControllerProvider.notifier,
+                                    )
+                                    .loadAll(),
+                              ),
+                              child: Text(ctx.l10n.refreshListButton),
+                            ),
                           ),
-                        ),
+                          const AdaptiveActionItem.separator(id: 'nav-sep'),
+                          AdaptiveActionItem(
+                            id: 'add-vault',
+                            builder: (_) => _DashboardToolbarButton(
+                              listenable: toolbar.addVault,
+                              icon: Icons.add_rounded,
+                              tooltip: context.l10n.addVaultFabLabel,
+                            ),
+                          ),
+                          AdaptiveActionItem(
+                            id: 'lock-all',
+                            priority: 2,
+                            builder: (_) => const _DashboardLockAllButton(),
+                            menuBuilder: (ctx) => Consumer(
+                              builder: (ctx, ref, _) {
+                                final mounted = ref.watch(
+                                  vaultDashboardControllerProvider.select(
+                                    (s) => s.mounted,
+                                  ),
+                                );
+                                return MenuItemButton(
+                                  leadingIcon: const Icon(
+                                    Icons.lock_outline_rounded,
+                                  ),
+                                  onPressed: mounted.isEmpty
+                                      ? null
+                                      : () => unawaited(
+                                          lockAllVaults(ctx, ref, mounted),
+                                        ),
+                                  child: Text(ctx.l10n.lockAllVaultsTitle),
+                                );
+                              },
+                            ),
+                          ),
+                          const AdaptiveActionItem.separator(id: 'vault-sep'),
+                          AdaptiveActionItem(
+                            id: 'password-gen',
+                            priority: 1,
+                            builder: (_) => IconButton(
+                              icon: const Icon(Icons.password_rounded),
+                              tooltip:
+                                  context.l10n.quickPasswordGeneratorSheetTitle,
+                              onPressed: () => unawaited(
+                                showQuickPasswordGenerator(context),
+                              ),
+                            ),
+                            menuBuilder: (ctx) => MenuItemButton(
+                              leadingIcon: const Icon(Icons.password_rounded),
+                              onPressed: () =>
+                                  unawaited(showQuickPasswordGenerator(ctx)),
+                              child: Text(
+                                ctx.l10n.quickPasswordGeneratorSheetTitle,
+                              ),
+                            ),
+                          ),
+                          AdaptiveActionItem(
+                            id: 'tools',
+                            priority: 1,
+                            builder: (_) => const DashboardToolsMenuButton(),
+                            menuBuilder: (ctx) => SubmenuButton(
+                              leadingIcon: const Icon(Icons.handyman_outlined),
+                              menuChildren: buildDashboardToolsMenuItems(
+                                ctx,
+                                ref,
+                              ),
+                              child: Text(ctx.l10n.toolsScreenTitle),
+                            ),
+                          ),
+                          const AdaptiveActionItem.separator(id: 'tools-sep'),
+                          AdaptiveActionItem(
+                            id: 'sort',
+                            priority: 2,
+                            builder: (_) => const _DashboardSortButton(),
+                            menuBuilder: (ctx) => SubmenuButton(
+                              leadingIcon: const Icon(Icons.sort_rounded),
+                              menuChildren: [
+                                for (final mode in ContainerSortMode.values)
+                                  MenuItemButton(
+                                    leadingIcon: Icon(
+                                      mode == sortMode
+                                          ? Icons.check_rounded
+                                          : null,
+                                      size: 18,
+                                      color: Theme.of(
+                                        ctx,
+                                      ).colorScheme.primary,
+                                    ),
+                                    onPressed: () => unawaited(
+                                      ref
+                                          .read(
+                                            appSettingsControllerProvider
+                                                .notifier,
+                                          )
+                                          .updateSettings(
+                                            (s) => s.copyWith(
+                                              containerSortMode: mode,
+                                            ),
+                                          ),
+                                    ),
+                                    child: Text(
+                                      mode.getLocalizedLabel(ctx.l10n),
+                                    ),
+                                  ),
+                              ],
+                              child: Text(ctx.l10n.sortContainersByLabel),
+                            ),
+                          ),
+                          AdaptiveActionItem(
+                            id: 'layout',
+                            priority: 2,
+                            builder: (_) => const DashboardLayoutButton(),
+                            menuBuilder: (ctx) => SubmenuButton(
+                              leadingIcon: Icon(layoutMode.icon),
+                              menuChildren: buildDashboardLayoutMenuItems(
+                                ctx,
+                                ref,
+                              ),
+                              child: Text(ctx.l10n.dashboardLayoutLabel),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          Material(
-            color: scheme.surfaceContainer,
-            child: SizedBox(
-              height: 40,
-              child: Row(
-                children: [
-                  const SizedBox(width: 6),
-                  // Opens the "Add a vault" prompt (mount existing, create
-                  // new, USB) instead of jumping straight into one flow.
-                  _DashboardToolbarButton(
-                    listenable: toolbar.addVault,
-                    icon: Icons.add_rounded,
-                    tooltip: context.l10n.addVaultFabLabel,
-                  ),
-                  const _DashboardLockAllButton(),
-                  const VerticalDivider(width: 1, indent: 8, endIndent: 8),
-                  // Vault helpers kept on hand: the password generator is one
-                  // click, the rest of the vault tools sit in the menu next to
-                  // it (the Tools page is its last entry).
-                  IconButton(
-                    icon: const Icon(Icons.password_rounded),
-                    tooltip: context.l10n.quickPasswordGeneratorSheetTitle,
-                    onPressed: () =>
-                        unawaited(showQuickPasswordGenerator(context)),
-                  ),
-                  const DashboardToolsMenuButton(),
-                  const Spacer(),
-                  // Activity on the right: what is open elsewhere, then what
-                  // is being copied or moved.
                   const AppBarAuthenticatorButton(),
-                  const AppBarTransferButton(),
+                  const AppBarTransferButton(
+                    collapseWhenIdle: true,
+                    size: 40,
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: searchWidth,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: _DashboardSearchBox(
+                        key: ValueKey<TabId>(tabId),
+                        query: toolbar.searchQuery,
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 8),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1784,8 +1902,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           hasTopSelectionOverlay && regularChromeHeight < kToolbarHeight
           ? kToolbarHeight
           : regularChromeHeight;
-      final totalTopChromeHeight =
-          topChromeHeight + (desktopFileManagerChrome ? 76.0 : 0.0);
+      final desktopSubChromeHeight = desktopDashboardChrome
+          ? 40.0
+          : (desktopFileManagerChrome ? 80.0 : 0.0);
+      final totalTopChromeHeight = topChromeHeight + desktopSubChromeHeight;
       return MediaQuery.paddingOf(context).top +
           (appBarAtBottom && !desktopFileManagerChrome
               ? visibleTabStripHeight
@@ -2494,7 +2614,6 @@ class _DashboardSearchBox extends StatelessWidget {
   Widget build(BuildContext context) => ValueListenableBuilder<String>(
     valueListenable: query,
     builder: (context, value, _) => AddressSearchField(
-      height: 28,
       query: value,
       hintText: context.l10n.search,
       onChanged: (text) => query.value = text,

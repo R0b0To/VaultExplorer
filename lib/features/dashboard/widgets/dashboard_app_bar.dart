@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
@@ -52,11 +53,12 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       context.l10n.appNameVaultExplorer,
       style: const TextStyle(fontWeight: FontWeight.bold),
     ),
-    actions: const [
-      DashboardLayoutButton(),
-      AppBarAuthenticatorButton(),
-      AppBarTransferButton(),
-      SizedBox(width: 4),
+   actions: [
+      if (defaultTargetPlatform != TargetPlatform.android)
+        const DashboardLayoutButton(),
+      const AppBarAuthenticatorButton(),
+      const AppBarTransferButton(),
+      const SizedBox(width: 4),
     ],
     );
   }

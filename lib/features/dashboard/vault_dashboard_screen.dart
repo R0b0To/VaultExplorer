@@ -1153,34 +1153,33 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       child: dashboardScrollContent,
     );
 
-    final dashboardFloatingAction = AnimatedSlide(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeInOut,
-      offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: _isFabVisible ? 1.0 : 0.0,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const ClipboardFab(heroTag: 'dashboard_clipboard_fab'),
-            // Desktop adds and creates vaults from the toolbar instead.
-            if (!PlatformFeatures.isDesktop) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: 64,
-                height: 64,
-                child: FloatingActionButton(
-                  onPressed: _isFabVisible ? _showAddOptionsSheet : null,
-                  child: const Icon(Icons.add_rounded, size: 28),
-                ),
+     final Widget? dashboardFloatingAction = PlatformFeatures.isDesktop
+        ? null
+        : AnimatedSlide(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _isFabVisible ? 1.0 : 0.0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const ClipboardFab(heroTag: 'dashboard_clipboard_fab'),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: 64,
+                    height: 64,
+                    child: FloatingActionButton(
+                      onPressed: _isFabVisible ? _showAddOptionsSheet : null,
+                      child: const Icon(Icons.add_rounded, size: 28),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ],
-        ),
-      ),
-    );
+            ),
+          );
     final dashboardBottomBar = AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,

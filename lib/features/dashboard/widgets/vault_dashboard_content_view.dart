@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -58,7 +59,9 @@ class VaultDashboardContentView extends ConsumerWidget {
       return EmptyState(onAdd: onAdd);
     }
 
-    final layout = settings.dashboardLayoutMode;
+    final layout = defaultTargetPlatform == TargetPlatform.android
+        ? DashboardLayoutMode.cards
+        : settings.dashboardLayoutMode;
     return LayoutBuilder(
       builder: (context, constraints) {
         final usable = constraints.maxWidth;

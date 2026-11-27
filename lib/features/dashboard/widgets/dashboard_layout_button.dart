@@ -18,6 +18,38 @@ extension DashboardLayoutModeIcon on DashboardLayoutMode {
       };
 }
 
+List<Widget> buildDashboardLayoutMenuItems(
+  BuildContext context,
+  WidgetRef ref,
+) {
+  final current = ref.read(appSettingsControllerProvider).settings.dashboardLayoutMode;
+  final cs = Theme.of(context).colorScheme;
+  return [
+    for (final mode in DashboardLayoutMode.values)
+      MenuItemButton(
+        leadingIcon: Icon(
+          mode.icon,
+          size: 20,
+          color: mode == current ? cs.primary : cs.onSurfaceVariant,
+        ),
+        trailingIcon: mode == current
+            ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+            : null,
+        onPressed: () => unawaited(
+          ref
+              .read(appSettingsControllerProvider.notifier)
+              .updateSettings((s) => s.copyWith(dashboardLayoutMode: mode)),
+        ),
+        child: Text(
+          mode.getLocalizedLabel(context.l10n),
+          style: mode == current
+              ? TextStyle(color: cs.primary, fontWeight: FontWeight.w600)
+              : null,
+        ),
+      ),
+  ];
+}
+
 /// The "View" button of the Vaults page: a menu to switch between cards, grid,
 /// list and details, like the View menu of a file manager's drives page. Its
 /// icon shows the layout in use. The choice is the app-wide

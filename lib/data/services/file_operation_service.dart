@@ -2025,8 +2025,6 @@ class FileOperationService extends ChangeNotifier {
         if (entity is Directory) existingDirs.add(name);
       }
 
-      op._setTotalBytes(op.items.fold(0, (sum, item) => sum + item.sizeBytes));
-
       final resolved =
           <
             ({
@@ -2118,6 +2116,24 @@ class FileOperationService extends ChangeNotifier {
       }
       notifyListeners();
 
+      // What each item will move, so the percentage has a denominator that
+      // includes the contents of folders (a folder item itself reports no
+      // size). Items that are skipped do not count.
+      final expectedBytes = List<int>.filled(resolved.length, 0);
+      var totalToCopy = 0;
+      for (int i = 0; i < resolved.length; i++) {
+        final r = resolved[i];
+        if (r.skip) continue;
+        if (op.cancelRequested) break;
+        expectedBytes[i] = await _localEntryBytes(
+          r.srcPath,
+          r.item.isDir,
+          r.item.sizeBytes,
+        );
+        totalToCopy += expectedBytes[i];
+      }
+      op._setTotalBytes(totalToCopy);
+
       for (int i = 0; i < resolved.length; i++) {
         if (op.cancelRequested) {
           op._recordItemResult(
@@ -2156,14 +2172,26 @@ class FileOperationService extends ChangeNotifier {
               ? op.l10n.fileOpMovingName(r.item.name)
               : op.l10n.fileOpCopyingName(r.item.name),
         );
+        final creditedBefore = op.transferredBytes;
         try {
           if (op.isCut) {
-            await _moveLocalEntry(r.srcPath, r.destPath, r.item.isDir);
+            await _moveLocalEntry(r.srcPath, r.destPath, r.item.isDir, op);
           } else {
-            await _copyLocalEntry(r.srcPath, r.destPath, r.item.isDir);
+            await _copyLocalEntry(r.srcPath, r.destPath, r.item.isDir, op);
           }
-          op._addTransferredBytes(r.item.sizeBytes);
+          // Copying reports its bytes as it goes. A move on one drive is a
+          // rename and moves none, so whatever was not reported is credited
+          // now: the item is done either way.
+          final shortfall =
+              expectedBytes[i] - (op.transferredBytes - creditedBefore);
+          if (shortfall > 0) op._addTransferredBytes(shortfall);
           op._recordItemResult(i, FileItemResult.success);
+        } on _CancelledException {
+          op._recordItemResult(
+            i,
+            FileItemResult.skipped,
+            errorMessage: op.l10n.statusCancelled,
+          );
         } catch (e) {
           op._recordItemResult(
             i,
@@ -2283,11 +2311,36 @@ class FileOperationService extends ChangeNotifier {
     return a.volId == b.volId && bPath.startsWith('$aPath/');
   }
 
+  /// How many bytes copying the local entry at [path] moves: the file's size,
+  /// or everything under the folder. [knownSize] is what the listing said.
+  Future<int> _localEntryBytes(String path, bool isDir, int knownSize) async {
+    try {
+      if (!isDir) return knownSize > 0 ? knownSize : await File(path).length();
+      var total = 0;
+      await for (final entity in Directory(
+        path,
+      ).list(recursive: true, followLinks: false)) {
+        if (entity is File) {
+          try {
+            total += await entity.length();
+          } on FileSystemException {
+            // Gone or unreadable: the copy reports it for that file.
+          }
+        }
+      }
+      return total;
+    } on FileSystemException {
+      return knownSize;
+    }
+  }
+
   Future<void> _copyLocalEntry(
     String sourcePath,
     String destPath,
     bool isDir,
+    FileOperation op,
   ) async {
+    if (op.cancelRequested) throw const _CancelledException();
     if (isDir) {
       await Directory(destPath).create(recursive: true);
       await for (final entity in Directory(
@@ -2295,14 +2348,71 @@ class FileOperationService extends ChangeNotifier {
       ).list(followLinks: false)) {
         final childDest = p.join(destPath, p.basename(entity.path));
         if (entity is Directory) {
-          await _copyLocalEntry(entity.path, childDest, true);
+          await _copyLocalEntry(entity.path, childDest, true, op);
         } else if (entity is File) {
-          await entity.copy(childDest);
+          await _copyLocalFile(entity.path, childDest, op);
         }
       }
     } else {
       await Directory(p.dirname(destPath)).create(recursive: true);
-      await File(sourcePath).copy(destPath);
+      await _copyLocalFile(sourcePath, destPath, op);
+    }
+  }
+
+  static const int _localCopyChunkBytes = 4 * 1024 * 1024;
+
+  /// Copies one file in pieces so the operation can report how much has been
+  /// written (the percentage and the speed) and stop between pieces. A single
+  /// `File.copy` call reports nothing until the whole file is done and cannot
+  /// be cancelled.
+  ///
+  /// The next piece is read while the last one is being written. A copy that
+  /// fails or is cancelled does not leave a partial file behind.
+  Future<void> _copyLocalFile(
+    String sourcePath,
+    String destPath,
+    FileOperation op,
+  ) async {
+    // Writing opens the destination empty: never let that be the source.
+    if (p.equals(sourcePath, destPath)) return;
+    final source = File(sourcePath);
+    RandomAccessFile? input;
+    RandomAccessFile? output;
+    var finished = false;
+    try {
+      input = await source.open();
+      output = await File(destPath).open(mode: FileMode.write);
+      var current = await input.read(_localCopyChunkBytes);
+      while (current.isNotEmpty) {
+        if (op.cancelRequested) throw const _CancelledException();
+        final next = input.read(_localCopyChunkBytes);
+        try {
+          await output.writeFrom(current);
+        } catch (_) {
+          // The read in flight must finish before the file is closed.
+          await next.then<void>((_) {}, onError: (_) {});
+          rethrow;
+        }
+        op._addTransferredBytes(current.length);
+        current = await next;
+      }
+      await output.flush();
+      finished = true;
+    } finally {
+      await input?.close();
+      await output?.close();
+      if (!finished) {
+        try {
+          await File(destPath).delete();
+        } on FileSystemException {
+          // Nothing was created.
+        }
+      }
+    }
+    try {
+      await File(destPath).setLastModified(await source.lastModified());
+    } on FileSystemException {
+      // The copy itself is fine; only its timestamp is not carried over.
     }
   }
 
@@ -2310,13 +2420,15 @@ class FileOperationService extends ChangeNotifier {
     String sourcePath,
     String destPath,
     bool isDir,
+    FileOperation op,
   ) async {
     try {
       await Directory(p.dirname(destPath)).create(recursive: true);
       final entity = isDir ? Directory(sourcePath) : File(sourcePath);
       await entity.rename(destPath);
     } on FileSystemException {
-      await _copyLocalEntry(sourcePath, destPath, isDir);
+      // Another drive: copy, then remove the original.
+      await _copyLocalEntry(sourcePath, destPath, isDir, op);
       await _deleteLocalRecursive(sourcePath);
     }
   }

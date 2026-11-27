@@ -119,18 +119,35 @@ class DesktopTransfers {
       case veEventImportProgress:
         {
           final s = _importProgress[e.opId];
-          if (s == null) return;
+          if (s == null) {
+            _emitSingleFileProgress(e);
+            return;
+          }
           s.transferred += e.n0;
           _emitProgress('onImportProgress', e.opId, s);
         }
       case veEventExportProgress:
         {
           final s = _exportProgress[e.opId];
-          if (s == null) return;
+          if (s == null) {
+            _emitSingleFileProgress(e);
+            return;
+          }
           s.transferred += e.n0;
           _emitProgress('onExportProgress', e.opId, s);
         }
     }
+  }
+
+  /// Bytes of a single host file being written into a vault, or a single vault
+  /// file extracted to a host path ([writeBackFile], [decryptFile]): the file
+  /// manager's copy between a storage and a vault. There is no import or export
+  /// state for it, so the bytes used to be dropped and the copy showed no
+  /// progress and no speed until it was done. They are the copy's bytes: the
+  /// same push a vault-to-vault copy sends.
+  void _emitSingleFileProgress(VeNativeEvent e) {
+    if (e.opId <= 0 || e.n0 <= 0) return;
+    emit('onCopyProgress', {'opId': e.opId, 'bytesDelta': e.n0});
   }
 
   void _emitProgress(String method, int opId, _Progress s) => emit(method, {

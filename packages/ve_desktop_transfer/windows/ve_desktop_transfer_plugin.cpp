@@ -398,7 +398,11 @@ std::string VeDesktopTransferPlugin::RunDrag(
   ReleaseCapture();
 
   DWORD effect = DROPEFFECT_NONE;
+  // Our own windows are drop targets for this drag too; they must know it is
+  // ours (see VeDropTarget::SetOwnOutboundDataObject).
+  ve_transfer::VeDropTarget::SetOwnOutboundDataObject(data_obj);
   const HRESULT hr = DoDragDrop(data_obj, drop_src, DROPEFFECT_COPY, &effect);
+  ve_transfer::VeDropTarget::SetOwnOutboundDataObject(nullptr);
   const bool async_started = data_obj->did_async_operation();
   data_obj->Release();
   drop_src->Release();

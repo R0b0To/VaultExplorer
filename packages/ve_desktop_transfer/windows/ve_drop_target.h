@@ -20,6 +20,13 @@ class VeDropTarget final : public IDropTarget {
   bool Register();
   void Revoke();
 
+  // The data object of this process's own outbound drag while one is running
+  // (null otherwise). The OLE drag is modal and our own windows are valid drop
+  // targets for it, so a drag that leaves the app and comes back over it must
+  // be recognised as ours without asking the data object anything (asking for
+  // the files makes it decrypt them).
+  static void SetOwnOutboundDataObject(IDataObject* object);
+
   // IUnknown
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override;
   ULONG STDMETHODCALLTYPE AddRef() override;
@@ -48,6 +55,9 @@ class VeDropTarget final : public IDropTarget {
   TransferCallbacksWin* callbacks_;
   bool registered_ = false;
   bool can_drop_ = false;
+  // The drag now over this window is this process's own (see
+  // SetOwnOutboundDataObject).
+  bool own_drag_ = false;
   std::atomic<ULONG> ref_count_{1};
 };
 

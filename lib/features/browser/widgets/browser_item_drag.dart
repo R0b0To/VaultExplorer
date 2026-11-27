@@ -30,6 +30,7 @@ import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drop_target.dart';
 import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 
 export 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart'
@@ -688,6 +689,12 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
     if (pointer != null) {
       scheduleMicrotask(() => GestureBinding.instance.cancelPointer(pointer));
     }
+    // What the in-app drag was, kept so it can carry on if the drag comes back
+    // over the window (see OwnDragResume). Read before the session ends.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final sessionState = container.read(browserDragSessionProvider);
+    final sourceTab = sessionState.sourceTabId;
+    final startPosition = sessionState.startPosition;
     session.end();
     drawerScope?.setDrawerDragBlocked(false);
 
@@ -696,10 +703,19 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
         _handedOffToOsDrag = false;
         return;
       }
+      if (sourceTab != null && startPosition != null) {
+        OwnDragResume.instance.begin(
+          data: data,
+          container: container,
+          sourceTab: sourceTab,
+          startPosition: startPosition,
+        );
+      }
       unawaited(
         DesktopTransferService.instance
             .startOutboundDrag(viewId: viewId, items: transferItems)
             .whenComplete(() {
+              OwnDragResume.instance.end();
               _handedOffToOsDrag = false;
               _isPrimaryMouseDown = false;
               _activePointerId = null;
@@ -803,7 +819,7 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
       final targetPath = currentDirectory.isEmpty
           ? entry.name
           : '$currentDirectory/${entry.name}';
-      dragChild = DragTarget<BrowserItemDragData>(
+      dragChild = BrowserItemDropTarget(
         onWillAcceptWithDetails: (details) =>
             details.data.canDropInto(source, targetPath),
         onAcceptWithDetails: (details) => unawaited(

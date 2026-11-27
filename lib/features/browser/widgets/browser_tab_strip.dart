@@ -28,6 +28,7 @@ import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drop_target.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/tab_drag_platform.dart';
 import 'package:vaultexplorer/features/browser/widgets/tab_drag_session.dart';
@@ -1227,7 +1228,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                       builder: (tabContext) => SizedBox(
                                         key: itemKey,
                                         width: kBrowserTabItemWidth,
-                                        child: DragTarget<BrowserItemDragData>(
+                                        child: BrowserItemDropTarget(
                                           onWillAcceptWithDetails: (details) {
                                             final destination = tab.container;
                                             if (destination == null ||

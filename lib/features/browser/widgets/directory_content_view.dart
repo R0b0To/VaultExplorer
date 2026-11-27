@@ -102,6 +102,7 @@ import 'package:vaultexplorer/features/browser/widgets/folder_background_context
 import 'package:vaultexplorer/features/browser/widgets/vault_listing_notices.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drop_target.dart';
 import 'package:vaultexplorer/features/browser/widgets/external_file_drop_zone.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
@@ -5230,7 +5231,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                           children: [
                                             KeyedSubtree(
                                               key: ValueKey(_currentDirPath),
-                                              child: DragTarget<BrowserItemDragData>(
+                                              child: BrowserItemDropTarget(
                                                 onWillAcceptWithDetails:
                                                     (details) =>
                                                         _archiveContext ==

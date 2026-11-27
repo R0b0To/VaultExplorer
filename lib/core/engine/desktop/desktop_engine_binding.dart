@@ -42,7 +42,9 @@ class DesktopEngineRuntime {
 
   /// Created on first use, so an app that never touches the engine never spawns its workers.
   DesktopEngineHost get host => _host ??= DesktopEngineHost(
-        pool: EngineWorkerPool(),
+        // Quick calls get workers of their own and long ones may grow past four,
+        // so a copy that is running never holds up the next paste or a listing.
+        pool: EngineWorkerPool(quickWorkers: 2, maxWorkers: 12),
         emit: _emitToDart,
       );
 

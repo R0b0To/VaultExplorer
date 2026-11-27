@@ -6,18 +6,79 @@
 // A call goes to the least-loaded worker, so one long unlock never queues small calls behind it.
 import 'dart:async';
 import 'dart:isolate';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:vaultexplorer/core/diagnostics/stall_diagnostics.dart';
 
 import 've_native.dart';
 
+/// Engine calls that return in moments and that a person is waiting on: a
+/// listing, a stat, a rename, cancelling something. See
+/// [EngineWorkerPool.quickWorkers].
+///
+/// Everything else, including any op added later, is treated as long-running.
+const Set<String> quickEngineOps = {
+  'init',
+  'probe',
+  'lock',
+  'unmount',
+  'cancelUnlock',
+  'opCancel',
+  'list',
+  'listMounts',
+  'mountSupported',
+  'fvSupported',
+  'fvProbe',
+  'fvProbeCryptomator',
+  'fvCheck',
+  'fvConfigFileName',
+  'fvValidateConfig',
+  'listSymlinks',
+  'readSymlink',
+  'createSymlink',
+  'vaultInfo',
+  'containerFormat',
+  'fileSize',
+  'read',
+  'write',
+  'mkdir',
+  'rename',
+  'setMtime',
+  'space',
+  'hashBegin',
+  'hashUpdate',
+  'hashFinish',
+  'hashFree',
+};
+
 class EngineWorkerPool {
-  EngineWorkerPool({this.size = 4, this.libraryPath});
+  /// [size] workers run the long calls (copy, import, export, delete, unlock,
+  /// archives, thumbnails ...); the pool starts with that many.
+  ///
+  /// With [quickWorkers] above zero that many more are kept for the calls in
+  /// [quickEngineOps] and nothing else runs on them. Without it, a copy of
+  /// several files (each file is a call that can run for minutes) takes every
+  /// worker, and the next folder listing, the next paste's checks, even
+  /// cancelling the copy, wait in line behind it until a file finishes.
+  ///
+  /// [maxWorkers] (at least [size]) lets the long-call group grow while all of
+  /// its workers are busy, so a second operation started while the first is
+  /// still copying gets going at once instead of waiting for it.
+  EngineWorkerPool({
+    this.size = 4,
+    this.quickWorkers = 0,
+    int? maxWorkers,
+    this.libraryPath,
+  }) : maxWorkers = math.max(maxWorkers ?? size, size);
 
   final int size;
+  final int quickWorkers;
+  final int maxWorkers;
   final String? libraryPath;
   final List<_Worker> _workers = [];
+  final List<_Worker> _quick = [];
+  int _spawning = 0;
   Future<void>? _starting;
 
   Future<void> _ensureStarted() => _starting ??= _start();
@@ -26,14 +87,46 @@ class EngineWorkerPool {
     for (var i = 0; i < size; i++) {
       _workers.add(await _Worker.spawn(libraryPath));
     }
+    for (var i = 0; i < quickWorkers; i++) {
+      _quick.add(await _Worker.spawn(libraryPath));
+    }
   }
 
-  /// Runs [op] (see [veExecute]) on the least-loaded worker.
+  static _Worker _leastLoaded(List<_Worker> workers) {
+    var best = workers.first;
+    for (final w in workers) {
+      if (w.load < best.load) best = w;
+    }
+    return best;
+  }
+
+  /// Starts one more worker for the long calls.
+  Future<_Worker> _growLongWorkers() async {
+    _spawning++;
+    try {
+      final extra = await _Worker.spawn(libraryPath);
+      _workers.add(extra);
+      return extra;
+    } finally {
+      _spawning--;
+    }
+  }
+
+  /// Runs [op] (see [veExecute]) on the least-loaded worker of its group.
   Future<Object?> call(String op, [List<Object?> args = const []]) async {
     await _ensureStarted();
-    var best = _workers.first;
-    for (final w in _workers) {
-      if (w.load < best.load) best = w;
+    // Choosing a worker and handing it the call must happen with nothing
+    // awaited in between: a call counts as load the moment it is handed over,
+    // which is what spreads calls that arrive together over different workers.
+    // Only growing the group has to wait.
+    final _Worker best;
+    if (_quick.isNotEmpty && quickEngineOps.contains(op)) {
+      best = _leastLoaded(_quick);
+    } else {
+      final candidate = _leastLoaded(_workers);
+      best = (candidate.load == 0 || _workers.length + _spawning >= maxWorkers)
+          ? candidate
+          : await _growLongWorkers();
     }
     final diag = StallDiagnostics.poolBegin(op, best.load);
     var execMicros = -1;
@@ -48,7 +141,11 @@ class EngineWorkerPool {
     for (final w in _workers) {
       w.kill();
     }
+    for (final w in _quick) {
+      w.kill();
+    }
     _workers.clear();
+    _quick.clear();
     _starting = null;
   }
 }

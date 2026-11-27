@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drop_target.dart';
 
 /// Lets a sidebar entry (a storage, a vault, a bookmarked folder) take files
 /// and folders dragged out of a file-manager pane.
@@ -42,7 +43,7 @@ class SidebarDropTarget extends StatelessWidget {
   Widget build(BuildContext context) {
     final target = container;
     final primary = Theme.of(context).colorScheme.primary;
-    return DragTarget<BrowserItemDragData>(
+    return BrowserItemDropTarget(
       onWillAcceptWithDetails: (details) =>
           target != null && details.data.canDropInto(target, path),
       onAcceptWithDetails: (details) {

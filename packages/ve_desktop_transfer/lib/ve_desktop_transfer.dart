@@ -11,6 +11,10 @@ export 'src/transfer_models.dart';
 
 typedef DesktopDropListener = void Function(DesktopDropEvent event);
 
+/// Receives what happens to this app's own outbound drag while it is over the
+/// app's own windows (see [VeDesktopTransfer.addOwnDragListener]).
+typedef OwnDragListener = void Function(DesktopDropEvent event);
+
 /// Flutter interface to the native Windows (Win32 OLE) and Linux (GTK3 X11 /
 /// Wayland) drag-and-drop & clipboard plugin.
 class VeDesktopTransfer {
@@ -29,6 +33,7 @@ class VeDesktopTransfer {
   Future<bool>? _initFuture;
 
   final Set<DesktopDropListener> _dropListeners = <DesktopDropListener>{};
+  final Set<OwnDragListener> _ownDragListeners = <OwnDragListener>{};
   final Map<int, int> _viewRefCounts = <int, int>{};
 
   /// Fired when native lazy decryption materializes files into a staging
@@ -100,6 +105,24 @@ class VeDesktopTransfer {
 
   void removeDropListener(DesktopDropListener listener) {
     _dropListeners.remove(listener);
+  }
+
+  /// Listens to this app's own outbound drag (`startOutboundDrag`) while it
+  /// is over one of the app's own windows, which happens when a drag that left
+  /// the window comes back with the button still held.
+  ///
+  /// The platform tells these apart from drops of files from other programs:
+  /// they do not reach [addDropListener], and their files are never read (the
+  /// owner of the drag still has the entries, so it finishes the drop itself
+  /// without writing anything to disk). The events carry the pointer position
+  /// in the window's physical pixels. Only the Windows runner reports them.
+  void addOwnDragListener(OwnDragListener listener) {
+    _ensureChannelHandler();
+    _ownDragListeners.add(listener);
+  }
+
+  void removeOwnDragListener(OwnDragListener listener) {
+    _ownDragListeners.remove(listener);
   }
 
   /// Increments the registration refcount for [viewId] and attaches native drop
@@ -404,6 +427,29 @@ class VeDesktopTransfer {
         );
         for (final listener in List<DesktopDropListener>.of(_dropListeners)) {
           listener(event);
+        }
+        return null;
+
+      case 'onOwnDragEntered':
+      case 'onOwnDragUpdated':
+      case 'onOwnDragExited':
+      case 'onOwnDragDropped':
+        final ownKind = switch (call.method) {
+          'onOwnDragEntered' => DesktopDropEventKind.entered,
+          'onOwnDragUpdated' => DesktopDropEventKind.updated,
+          'onOwnDragExited' => DesktopDropEventKind.exited,
+          _ => DesktopDropEventKind.dropped,
+        };
+        final ownEvent = DesktopDropEvent(
+          kind: ownKind,
+          viewId: (args['viewId'] as num?)?.toInt() ?? 0,
+          location: ui.Offset(
+            (args['x'] as num?)?.toDouble() ?? 0.0,
+            (args['y'] as num?)?.toDouble() ?? 0.0,
+          ),
+        );
+        for (final listener in List<OwnDragListener>.of(_ownDragListeners)) {
+          listener(ownEvent);
         }
         return null;
 

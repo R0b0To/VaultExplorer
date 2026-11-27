@@ -15,6 +15,31 @@ import 'dart:typed_data';
 import 'engine_worker_pool.dart';
 import 've_native.dart';
 
+/// Opt-in tracing of every thumbnail: set the environment variable VE_THUMB_TRACE to `1` (lines go to stdout, and the
+/// engine's own to stderr) or to a file path (every line, Dart's and the engine's, is appended to it). A line says
+/// which route made the thumbnail, the outcome and the milliseconds, and for a video the container and codec -- never
+/// a file name or a path. It exists to answer "why is this slow / why is there no thumbnail" on a real machine.
+final String? _traceTarget = () {
+  final v = Platform.environment['VE_THUMB_TRACE'];
+  return (v == null || v.isEmpty || v == '0') ? null : v;
+}();
+
+bool get thumbnailTraceEnabled => _traceTarget != null;
+
+void traceThumbnail(String line) {
+  final target = _traceTarget;
+  if (target == null) return;
+  if (target == '1') {
+    stdout.writeln(line);
+    return;
+  }
+  try {
+    File(target).writeAsStringSync('$line\n', mode: FileMode.append);
+  } on FileSystemException catch (e) {
+    stderr.writeln('VE_THUMB_TRACE: cannot write $target: ${e.message}');
+  }
+}
+
 /// What a native thumbnail attempt came to.
 sealed class NativeImageOutcome {
   const NativeImageOutcome();
@@ -145,14 +170,28 @@ class DesktopNativeThumbnails {
       _run('videoThumbnailFile',
           [path, targetSize, quality, strategy, framePosition, explicitTimeUs ?? -1, timeout.inMilliseconds]);
 
+  /// What has already been reported as broken (printed once each, so a broken route does not flood the console).
+  static final Set<String> _reportedBroken = {};
+
   Future<NativeImageOutcome> _run(String op, List<Object?> args) async {
+    final timer = Stopwatch()..start();
     final List<Object?> r;
     try {
       r = await call(op, args) as List<Object?>;
-    } on Object {
-      return const NativeImageUnsupported(); // the pool / library is not usable: let the caller use Flutter's codecs
+    } on Object catch (e) {
+      // The pool / library is not usable: the caller falls back to the slower route. That must not be silent: a
+      // route that is quietly broken looks exactly like a route that is merely slow.
+      if (_reportedBroken.add('$op: $e')) {
+        stderr.writeln("[thumbnails] the engine's native thumbnailer is not working ($op: $e); using the slower route");
+      }
+      traceThumbnail('[dart-thumb] $op threw after ${timer.elapsedMilliseconds}ms: $e');
+      return const NativeImageUnsupported();
     }
-    return interpretNativeThumbnailReply(r);
+    final outcome = interpretNativeThumbnailReply(r);
+    if (thumbnailTraceEnabled) {
+      traceThumbnail('[dart-thumb] $op rc=${r[0]} ${outcome.runtimeType} ${timer.elapsedMilliseconds}ms');
+    }
+    return outcome;
   }
 }
 

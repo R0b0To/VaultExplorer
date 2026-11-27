@@ -8,11 +8,14 @@
 #include "ve_engine.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <new>
 #include <string>
 
@@ -85,6 +88,35 @@ private:
     int64_t size_ = -1;
 };
 
+
+// VE_THUMB_TRACE=1 prints one line per thumbnail to stderr; any other non-empty value (except 0) is a file the lines
+// are appended to (run the app with it set and read the file). The lines say what happened -- the route, the result
+// code, the sizes, the milliseconds, for a video the container and codec -- and never a file name or a path.
+const std::string& traceTarget() {
+    static const std::string target = [] {
+        const char* e = std::getenv("VE_THUMB_TRACE");
+        return (e && *e && std::string(e) != "0") ? std::string(e) : std::string();
+    }();
+    return target;
+}
+
+void traceLine(const std::string& line) {
+    const std::string& target = traceTarget();
+    if (target.empty()) return;
+    static std::mutex mu;
+    std::lock_guard<std::mutex> lock(mu);
+    if (target == "1") {
+        std::fprintf(stderr, "%s\n", line.c_str());
+    } else {
+        std::ofstream f(std::filesystem::path(std::u8string(target.begin(), target.end())), std::ios::app);
+        f << line << "\n";
+    }
+}
+
+long long msSince(std::chrono::steady_clock::time_point t) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t).count();
+}
+
 int32_t toCode(veimg::Status st) {
     switch (st) {
         case veimg::Status::kOk: return VE_OK;
@@ -113,8 +145,12 @@ int32_t run(veimg::ByteSource& src, int32_t targetSize, int32_t quality, int32_t
     opt.maxSourceBytes = static_cast<uint64_t>(maxSourceBytes > 0 ? maxSourceBytes : kDefaultMaxSourceBytes);
 
     veimg::Thumbnail t;
+    const auto started = std::chrono::steady_clock::now();
     const int32_t rc = toCode(veimg::makeThumbnail(src, opt, t));
-    if (rc != VE_OK) return rc;
+    if (rc != VE_OK) {
+        traceLine("[ve-thumb] image rc=" + std::to_string(rc) + " " + std::to_string(msSince(started)) + "ms");
+        return rc;
+    }
     auto* mem = static_cast<uint8_t*>(std::malloc(t.bytes.size()));
     if (!mem) return VE_ERR_NO_MEMORY;
     std::memcpy(mem, t.bytes.data(), t.bytes.size());
@@ -129,6 +165,9 @@ int32_t run(veimg::ByteSource& src, int32_t targetSize, int32_t quality, int32_t
         info[5] = t.hasAlpha ? 1 : 0;
         info[6] = t.isBlank ? 1 : 0;
     }
+    traceLine("[ve-thumb] image ok " + std::to_string(msSince(started)) + "ms " + std::to_string(t.sourceWidth) + "x" +
+              std::to_string(t.sourceHeight) + "->" + std::to_string(t.width) + "x" + std::to_string(t.height) +
+              (t.isPng ? " png " : " jpeg ") + std::to_string(t.bytes.size()) + "B");
     return VE_OK;
 }
 
@@ -146,8 +185,12 @@ int32_t runVideo(veimg::ByteSource& src, int32_t targetSize, int32_t quality, in
     opt.timeoutMs = timeoutMs > 0 ? timeoutMs : 20000;
 
     veimg::VideoThumbnail v;
+    const auto started = std::chrono::steady_clock::now();
     const int32_t rc = toCode(veimg::makeVideoThumbnail(src, opt, v));
-    if (rc != VE_OK) return rc;
+    if (rc != VE_OK) {
+        traceLine("[ve-thumb] video rc=" + std::to_string(rc) + " " + std::to_string(msSince(started)) + "ms | " + v.diag);
+        return rc;
+    }
     const veimg::Thumbnail& t = v.thumb;
     auto* mem = static_cast<uint8_t*>(std::malloc(t.bytes.size()));
     if (!mem) return VE_ERR_NO_MEMORY;
@@ -164,6 +207,9 @@ int32_t runVideo(veimg::ByteSource& src, int32_t targetSize, int32_t quality, in
         info[6] = t.isBlank ? 1 : 0;
         info[7] = static_cast<int32_t>(std::min<int64_t>(v.durationUs / 1000, INT32_MAX));
     }
+    traceLine("[ve-thumb] video ok " + std::to_string(msSince(started)) + "ms " + std::to_string(t.sourceWidth) + "x" +
+              std::to_string(t.sourceHeight) + "->" + std::to_string(t.width) + "x" + std::to_string(t.height) +
+              (t.isBlank ? " BLANK " : " ") + std::to_string(t.bytes.size()) + "B | " + v.diag);
     return VE_OK;
 }
 
@@ -242,7 +288,10 @@ extern "C" VE_API int32_t ve_video_thumbnail(int32_t vol_id, const char* path, i
     if (!out) return VE_ERR_INVALID_ARG;
     clearOut(out, info);
     if (!path) return VE_ERR_INVALID_ARG;
-    if (!veimg::videoThumbnailsAvailable()) return VE_ERR_UNSUPPORTED;
+    if (!veimg::videoThumbnailsAvailable()) {
+        traceLine("[ve-thumb] video rc=" + std::to_string(VE_ERR_UNSUPPORTED) + " | this engine was built without FFmpeg");
+        return VE_ERR_UNSUPPORTED;
+    }
     try {
         // No size cap: a video is read as far as its header and one keyframe need, however large the file is.
         return withVaultSource(vol_id, path, 0, [&](veimg::ByteSource& src) {
@@ -261,7 +310,10 @@ extern "C" VE_API int32_t ve_video_thumbnail_file(const char* host_path_utf8, in
     if (!out) return VE_ERR_INVALID_ARG;
     clearOut(out, info);
     if (!host_path_utf8) return VE_ERR_INVALID_ARG;
-    if (!veimg::videoThumbnailsAvailable()) return VE_ERR_UNSUPPORTED;
+    if (!veimg::videoThumbnailsAvailable()) {
+        traceLine("[ve-thumb] video rc=" + std::to_string(VE_ERR_UNSUPPORTED) + " | this engine was built without FFmpeg");
+        return VE_ERR_UNSUPPORTED;
+    }
     try {
         HostSource src{std::string(host_path_utf8)};
         if (!src.ok() || src.size() <= 0) return VE_ERR_FAILED;

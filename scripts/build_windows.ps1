@@ -62,6 +62,7 @@ if (-not [string]::IsNullOrWhiteSpace($Msys2Root)) {
 $msysRoots += @('C:\Tools\msys64', 'C:\msys64', 'C:\msys2')
 
 $ucrtBin = $null
+$msysRoot = $null
 foreach ($root in $msysRoots) {
     $candidateUcrtBin = Join-Path $root 'ucrt64\bin'
     if ((Test-Path (Join-Path $candidateUcrtBin 'cmake.exe')) -and
@@ -69,6 +70,7 @@ foreach ($root in $msysRoots) {
         (Test-Path (Join-Path $candidateUcrtBin 'gcc.exe')) -and
         (Test-Path (Join-Path $candidateUcrtBin 'g++.exe'))) {
         $ucrtBin = $candidateUcrtBin
+        $msysRoot = $root
         break
     }
 }
@@ -76,8 +78,21 @@ foreach ($root in $msysRoots) {
 if (-not $ucrtBin) {
     throw @"
 MSYS2 UCRT64 tools were not found. Install MSYS2 UCRT64 with:
-  pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc git
+  pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc git make diffutils
 Then rerun this script, or pass -Msys2Root with your MSYS2 install folder.
+"@
+}
+
+$msysUsrBin = Join-Path $msysRoot 'usr\bin'
+$missingFfmpegTools = @('bash.exe', 'make.exe', 'diff.exe') |
+    Where-Object { -not (Test-Path -LiteralPath (Join-Path $msysUsrBin $_)) }
+if ($missingFfmpegTools.Count -gt 0) {
+    $missingList = $missingFfmpegTools -join ', '
+    throw @"
+FFmpeg's configure/build tools are missing from ${msysUsrBin}: $missingList.
+Install them with:
+  & '$msysUsrBin\bash.exe' -lc 'pacman -S --needed bash make diffutils'
+Then rerun this script.
 "@
 }
 
@@ -106,7 +121,7 @@ $previousLocation = Get-Location
 try {
     # CMake and Ninja run as Windows programs; adding UCRT64 first lets CMake find the MinGW compilers.
     # Use Git for Windows explicitly for FetchContent (MSYS2 git can fail outside an MSYS2 shell).
-    $env:PATH = "$ucrtBin;$originalPath"
+    $env:PATH = "$ucrtBin;$msysUsrBin;$originalPath"
     Set-Location $repoRoot
 
     $packageConfig = Join-Path $repoRoot '.dart_tool\package_config.json'

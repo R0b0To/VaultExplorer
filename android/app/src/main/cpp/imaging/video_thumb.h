@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "thumb.h"
@@ -39,6 +40,9 @@ struct VideoOptions {
 struct VideoThumbnail {
     Thumbnail thumb;  // sourceWidth/Height: the picture as it is shown (rotation and pixel aspect applied)
     int64_t durationUs = 0;  // 0 when the container does not say
+    // What happened, for logs: the container and codec, the picture size, the timings -- or why it stopped. Never
+    // contains a file name or path. Filled on success and on failure alike.
+    std::string diag;
 };
 
 // kUnsupported: not something this build can open or decode (an unknown container, a codec that is not compiled in,

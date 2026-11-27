@@ -13,23 +13,32 @@
 # FFmpeg builds with its own ./configure + make, so it goes through ExternalProject (at build time, the compiler and
 # cross-compilation settings forwarded). Needs a POSIX `make` (MSYS2: `make` and `diffutils`) -- and `nasm` for the
 # x86 assembly, without which FFmpeg's configure stops, so it is passed --disable-x86asm when NASM is missing (slower
-# decoding). When `make` itself is missing this file turns video thumbnails off with a warning and the engine builds
-# and runs without them (ve_video_thumbnail then answers VE_ERR_UNSUPPORTED).
+# decoding). Without `make` the configure FAILS with instructions (a silent fallback would only look like a slow
+# engine); -DVE_WITH_FFMPEG=OFF opts out on purpose, and the engine then answers VE_ERR_UNSUPPORTED for every video.
 #
 # Defines: VE_HAVE_FFMPEG (ON/OFF) and, when ON, VE_FFMPEG_LIBS (link these).
 # ─────────────────────────────────────────────────────────────────────────
 include(ExternalProject)
 
 set(VE_HAVE_FFMPEG OFF)
-find_program(VE_MAKE_PROGRAM NAMES gmake make)
-if(NOT VE_MAKE_PROGRAM)
-    message(WARNING "No `make` found: building WITHOUT native video thumbnails (the desktop app falls back to libmpv "
-                    "for them, which is much slower). Install make (MSYS2: `pacman -S make diffutils`).")
+option(VE_WITH_FFMPEG "Build FFmpeg for native video thumbnails. OFF: the engine has none and every video thumbnail goes through libmpv, which is MUCH slower" ON)
+if(NOT VE_WITH_FFMPEG)
+    message(WARNING "VE_WITH_FFMPEG=OFF: building WITHOUT native video thumbnails; the desktop app makes every video "
+                    "thumbnail through libmpv, which is much slower (seconds per video instead of milliseconds).")
     return()
 endif()
+# A missing prerequisite is an ERROR, not a warning: a warning scrolls by, and an engine without FFmpeg looks exactly like
+# a slow engine at run time (every video quietly takes the libmpv route).
+find_program(VE_MAKE_PROGRAM NAMES gmake make)
+if(NOT VE_MAKE_PROGRAM)
+    message(FATAL_ERROR "No `make` found, which FFmpeg's build needs (native video thumbnails). Install it "
+                        "(Debian/Ubuntu: sudo apt install make; MSYS2: pacman -S make diffutils) -- or configure with "
+                        "-DVE_WITH_FFMPEG=OFF to build without native video thumbnails (video thumbnails then use libmpv "
+                        "only and are much slower).")
+endif()
 if(CMAKE_CROSSCOMPILING AND NOT WIN32)
-    message(WARNING "Cross-compiling for a non-Windows target: building WITHOUT native video thumbnails.")
-    return()
+    message(FATAL_ERROR "ffmpeg_deps.cmake only knows how to cross-compile FFmpeg for Windows (MinGW). Configure with "
+                        "-DVE_WITH_FFMPEG=OFF to build this target without native video thumbnails.")
 endif()
 
 set(VE_FFMPEG_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/ffmpeg-install)
@@ -72,6 +81,20 @@ if(NOT VE_FFMPEG_JOBS OR VE_FFMPEG_JOBS LESS 1)
     set(VE_FFMPEG_JOBS 2)
 endif()
 
+# FFmpeg's configure is a POSIX shell script. On a Windows host CMake/Ninja
+# otherwise tries to execute it as a native program, which fails before make
+# can build anything. Use the MSYS2 Bash supplied alongside make/diffutils.
+if(CMAKE_HOST_WIN32)
+    find_program(VE_BASH_PROGRAM NAMES bash.exe bash)
+    if(NOT VE_BASH_PROGRAM)
+        message(FATAL_ERROR "FFmpeg's configure script needs bash on Windows. Install MSYS2 bash and ensure its usr/bin "
+                            "directory is on PATH.")
+    endif()
+    set(VE_FFMPEG_CONFIGURE_COMMAND ${VE_BASH_PROGRAM} <SOURCE_DIR>/configure)
+else()
+    set(VE_FFMPEG_CONFIGURE_COMMAND <SOURCE_DIR>/configure)
+endif()
+
 set(VE_FFMPEG_LIB_FILES "")
 foreach(VE_FF_LIB avformat avcodec swscale avutil)
     list(APPEND VE_FFMPEG_LIB_FILES ${VE_FFMPEG_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${VE_FF_LIB}${CMAKE_STATIC_LIBRARY_SUFFIX})
@@ -81,7 +104,7 @@ ExternalProject_Add(ffmpeg_ep
     GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
     GIT_TAG        1041abdc962f4cc4f394aa8de9dc5236c0c3b9e7 # n8.1.3
     UPDATE_COMMAND ""
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure ${VE_FFMPEG_CONFIGURE_ARGS}
+    CONFIGURE_COMMAND ${VE_FFMPEG_CONFIGURE_COMMAND} ${VE_FFMPEG_CONFIGURE_ARGS}
     BUILD_COMMAND  ${VE_MAKE_PROGRAM} -j${VE_FFMPEG_JOBS}
     INSTALL_COMMAND ${VE_MAKE_PROGRAM} install
     BUILD_BYPRODUCTS ${VE_FFMPEG_LIB_FILES}

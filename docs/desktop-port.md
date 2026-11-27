@@ -153,8 +153,9 @@ Android is untouched: the JNI bridges and Kotlin are not involved on desktop, an
 Install `nasm` and `make` too (`sudo apt install nasm make`; MSYS2: `nasm`, `make`, `diffutils`): libjpeg-turbo (image
 thumbnails, see "Image thumbnails") and FFmpeg (video thumbnails, see "Video thumbnails") build their SIMD / assembly
 code with NASM, and FFmpeg has its own `./configure` + `make`. Without NASM the build still works, with a CMake
-warning, and decoding is slower; without `make` the engine is built without native video thumbnails (CMake warns, the
-desktop code uses libmpv for them). The native thumbnailers have host tests:
+warning, and decoding is slower; without `make` the CMake configure **fails** (a silent fallback would only look like a
+slow engine); `-DVE_WITH_FFMPEG=OFF` builds without native video thumbnails on purpose, and every video thumbnail then goes
+through libmpv. The native thumbnailers have host tests:
 
     cmake --build build/desktop-engine --target thumb_test video_thumb_test
     build/desktop-engine/thumb_test                                                              # images
@@ -322,6 +323,12 @@ app ends when the last one is gone.
 
 ## Folder vaults (gocryptfs / Cryptomator / CryFS) -- Linux and Windows
 
+The bulk AEAD (AES-GCM, XChaCha20-Poly1305) runs through BoringSSL's EVP (`FV_AEAD_EVP`, as on Android), not mbedTLS:
+measured on an Intel Xeon with AES-NI / PCLMUL / AVX2, one thread, 4 and 32 KiB chunks, AES-256-GCM went from ~0.3 GB/s to
+7-13 GB/s and XChaCha20-Poly1305 from ~0.4 GB/s to 1.5-2.1 GB/s. Both backends produce byte-identical ciphertext and
+tags (checked for AES-128/256-GCM with 12- and 16-byte nonces and XChaCha20-Poly1305, sizes 0 to 32 KiB, including
+rejection of a flipped bit and of a wrong AAD), so a vault opens with either.
+
 Main (v1.50) moved the three formats into a platform-neutral C++ core (`foldervault/`, linked as
 `foldervault_core`); the desktop engine reaches it through `ffi/ve_foldervault.cpp`, the desktop twin of
 `jni/foldervault_bridge.cpp` (same open/create semantics; `fv::PosixStorage` over an ordinary directory).
@@ -480,7 +487,7 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
   ASF, Ogg, IVF with H.264, HEVC, VP8, VP9, MPEG-4 part 2, MPEG-1/2, H.263, WMV/VC-1, MJPEG, Theora, ProRes. **AV1 is
   not in the list** (FFmpeg's own AV1 decoder is hardware-only; software needs dav1d): the engine answers
   "unsupported" and the libmpv route makes that thumbnail, as it does for any other container or codec outside the
-  list. An engine built without `make` has no FFmpeg at all and answers "unsupported" for everything.
+  list. An engine configured with `-DVE_WITH_FFMPEG=OFF` has no FFmpeg and answers "unsupported" for every video.
 - Rotation recorded in the container (phones), the pixel aspect ratio and the colour matrix / range (BT.601, BT.709,
   BT.2020) are applied, so a portrait phone video is upright and HD video has the right colours; the reported source
   size is the picture as shown. HDR is not tone-mapped (it looks flatter than in a player). It decodes the nearest
@@ -505,6 +512,29 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
   have **not been run inside Flutter**: they follow `desktop_video_backend.dart` and `desktop_images.dart` closely, but
   `Player.screenshot` and the first-frame signal of an off-screen `VideoController` are the first things to check on
   a real Linux / Windows build -- and they matter much less now that they are only the fallback.
+
+### Diagnosing thumbnails
+
+Set `VE_THUMB_TRACE` before starting the app and every thumbnail says how it was made: `VE_THUMB_TRACE=1` prints the
+lines (Dart's to stdout, the engine's to stderr), and any other value is a file the lines are appended to (Windows:
+`set VE_THUMB_TRACE=C:\temp\thumbs.log`, then start the app from that same prompt). No file name or path is ever
+written. Examples:
+
+```
+[ve-thumb] video ok 34ms 1920x1080->180x101 2328B | mov,mp4,m4a,3gp,3g2,mj2/h264 1920x1080 open=0ms probe=10ms blank_retries=0 | 34ms
+[ve-thumb] video rc=9 0ms | mov,mp4,m4a,3gp,3g2,mj2: no decoder built in for video codec av1 | 0ms
+[ve-thumb] video rc=9 | this engine was built without FFmpeg
+[dart-thumb] video native: NativeImageUnsupported 3ms
+[dart-thumb] video libmpv: ok 6120ms
+[ve-thumb] image ok 41ms 6000x4000->180x120 jpeg 5812B
+```
+
+`ve-thumb` lines are the engine (rc 0 = ok, 9 = unsupported, 1 = failed, 15 = too large, 16 = out of memory);
+`dart-thumb` lines are the Dart side: whether the native route answered or the request went on to libmpv, and how long
+each took. If the native route cannot run at all (the pool or the library), a one-time message is printed to stderr
+whatever `VE_THUMB_TRACE` says. A video that takes seconds and has a `libmpv` line was NOT made by the engine: the
+`video native:` line before it says why (unsupported codec or container, an engine built without FFmpeg, or a decode
+failure).
 
 ## Not yet
 

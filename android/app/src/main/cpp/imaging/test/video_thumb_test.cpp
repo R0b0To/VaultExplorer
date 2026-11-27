@@ -306,9 +306,10 @@ void bench(const std::string& path) {
         Status st = Status::kOk;
         for (int i = 0; i < reps; ++i) st = makeVideoThumbnail(src, opt, v);
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / reps;
-        std::printf("  strategy %d: status %d, %.1f ms per thumbnail, %dx%d from %dx%d, %zu bytes\n", static_cast<int>(s),
-                    static_cast<int>(st), ms, v.thumb.width, v.thumb.height, v.thumb.sourceWidth, v.thumb.sourceHeight,
-                    v.thumb.bytes.size());
+        static const char* names[] = {"ok", "unsupported", "failed", "too large", "I/O error", "out of memory"};
+        std::printf("  strategy %d: %s, %.1f ms per thumbnail, %dx%d from %dx%d, %zu bytes\n    %s\n", static_cast<int>(s),
+                    names[static_cast<int>(st)], ms, v.thumb.width, v.thumb.height, v.thumb.sourceWidth,
+                    v.thumb.sourceHeight, v.thumb.bytes.size(), v.diag.c_str());
     }
 }
 

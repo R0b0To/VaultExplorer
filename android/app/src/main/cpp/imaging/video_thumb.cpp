@@ -30,7 +30,10 @@ int64_t timeAtFraction(int64_t durationUs, double fraction) {
 
 namespace veimg {
 bool videoThumbnailsAvailable() { return false; }
-Status makeVideoThumbnail(ByteSource&, const VideoOptions&, VideoThumbnail&) { return Status::kUnsupported; }
+Status makeVideoThumbnail(ByteSource&, const VideoOptions&, VideoThumbnail& out) {
+    out.diag = "this engine was built without FFmpeg";
+    return Status::kUnsupported;
+}
 }  // namespace veimg
 
 #else  // VE_HAVE_FFMPEG
@@ -58,6 +61,16 @@ bool videoThumbnailsAvailable() { return true; }
 namespace {
 
 using Clock = std::chrono::steady_clock;
+
+std::string avErr(int e) {
+    char buf[AV_ERROR_MAX_STRING_SIZE] = {0};
+    av_strerror(e, buf, sizeof buf);
+    return buf;
+}
+
+long long msSince(Clock::time_point t) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t).count();
+}
 
 // ───────────────────────── I/O over a ByteSource ─────────────────────────
 
@@ -254,19 +267,26 @@ Status makeVideoThumbnail(ByteSource& src, const VideoOptions& optIn, VideoThumb
         opt.targetSize = std::max(opt.targetSize, 1);
         const auto deadline = Clock::now() + std::chrono::milliseconds(std::max(opt.timeoutMs, 1000));
 
+        const auto started = Clock::now();
+        // Every early exit says why, in `out.diag`.
+        auto bail = [&](Status st, std::string why) {
+            out.diag = std::move(why) + " | " + std::to_string(msSince(started)) + "ms";
+            return st;
+        };
+
         Source s;
         s.io.src = &src;
         s.io.size = src.size();
         s.io.deadline = deadline;
         auto* buffer = static_cast<uint8_t*>(av_malloc(kIoBufferSize));
-        if (!buffer) return Status::kNoMemory;
+        if (!buffer) return bail(Status::kNoMemory, "out of memory (io buffer)");
         s.pb = avio_alloc_context(buffer, kIoBufferSize, 0, &s.io, readPacket, nullptr, seekPacket);
         if (!s.pb) {
             av_free(buffer);
-            return Status::kNoMemory;
+            return bail(Status::kNoMemory, "out of memory (avio)");
         }
         s.fmt = avformat_alloc_context();
-        if (!s.fmt) return Status::kNoMemory;
+        if (!s.fmt) return bail(Status::kNoMemory, "out of memory (format context)");
         s.fmt->pb = s.pb;
         s.fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
         s.fmt->interrupt_callback.callback = interruptCallback;
@@ -275,27 +295,47 @@ Status makeVideoThumbnail(ByteSource& src, const VideoOptions& optIn, VideoThumb
         s.fmt->max_analyze_duration = 2 * AV_TIME_BASE;
 
         int r = avformat_open_input(&s.fmt, "", nullptr, nullptr);  // on failure frees and nulls s.fmt
-        if (r < 0) return s.io.ioError ? Status::kIoError : Status::kUnsupported;  // not a container this build knows
-        if (avformat_find_stream_info(s.fmt, nullptr) < 0) return s.io.ioError ? Status::kIoError : Status::kFailed;
+        if (r < 0)  // not a container this build knows (or the source failed)
+            return bail(s.io.ioError ? Status::kIoError : Status::kUnsupported, "open_input: " + avErr(r));
+        const std::string container = s.fmt->iformat && s.fmt->iformat->name ? s.fmt->iformat->name : "?";
+        const auto opened = Clock::now();
+        r = avformat_find_stream_info(s.fmt, nullptr);
+        if (r < 0)
+            return bail(s.io.ioError ? Status::kIoError : Status::kFailed, container + ": find_stream_info: " + avErr(r));
 
         const AVCodec* codec = nullptr;
         const int vi = av_find_best_stream(s.fmt, AVMEDIA_TYPE_VIDEO, -1, -1, &codec, 0);
-        if (vi == AVERROR_DECODER_NOT_FOUND) return Status::kUnsupported;  // a video, but its codec is not compiled in
-        if (vi < 0) return Status::kFailed;                                // no video stream
+        if (vi == AVERROR_DECODER_NOT_FOUND) {  // a video, but its codec is not compiled in
+            std::string name = "?";
+            for (unsigned i = 0; i < s.fmt->nb_streams; ++i)
+                if (s.fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+                    name = avcodec_get_name(s.fmt->streams[i]->codecpar->codec_id);
+                    break;
+                }
+            return bail(Status::kUnsupported, container + ": no decoder built in for video codec " + name);
+        }
+        if (vi < 0) return bail(Status::kFailed, container + ": no video stream");
         AVStream* st = s.fmt->streams[vi];
-        if (!codec) return Status::kUnsupported;
+        if (!codec) return bail(Status::kUnsupported, container + ": no decoder");
+        const std::string codecName = codec->name ? codec->name : "?";
         for (unsigned i = 0; i < s.fmt->nb_streams; ++i)
             if (static_cast<int>(i) != vi) s.fmt->streams[i]->discard = AVDISCARD_ALL;  // audio, subtitles, covers
 
         s.dec = avcodec_alloc_context3(codec);
-        if (!s.dec) return Status::kNoMemory;
-        if (avcodec_parameters_to_context(s.dec, st->codecpar) < 0) return Status::kFailed;
+        if (!s.dec) return bail(Status::kNoMemory, "out of memory (decoder)");
+        r = avcodec_parameters_to_context(s.dec, st->codecpar);
+        if (r < 0) return bail(Status::kFailed, container + "/" + codecName + ": parameters: " + avErr(r));
         s.dec->thread_count = 1;  // parallelism comes from decoding several videos at once, not from one decode
         s.dec->skip_loop_filter = AVDISCARD_ALL;  // invisible at thumbnail size, and a real saving
-        if (avcodec_open2(s.dec, codec, nullptr) < 0) return Status::kUnsupported;  // a profile it cannot decode
+        r = avcodec_open2(s.dec, codec, nullptr);
+        if (r < 0)  // a profile it cannot decode
+            return bail(Status::kUnsupported, container + "/" + codecName + ": avcodec_open2: " + avErr(r));
         s.pkt = av_packet_alloc();
         s.frame = av_frame_alloc();
-        if (!s.pkt || !s.frame) return Status::kNoMemory;
+        if (!s.pkt || !s.frame) return bail(Status::kNoMemory, "out of memory (packet/frame)");
+        const std::string what = container + "/" + codecName + " " + std::to_string(st->codecpar->width) + "x" +
+                                 std::to_string(st->codecpar->height) + " open=" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(opened - started).count()) +
+                                 "ms probe=" + std::to_string(msSince(opened)) + "ms";
 
         Grab g;
         g.s = &s;
@@ -312,12 +352,17 @@ Status makeVideoThumbnail(ByteSource& src, const VideoOptions& optIn, VideoThumb
             return frameToThumbnail(s, st, s.frame, opt, into);
         };
 
-        if (opt.explicitTimeUs >= 0) return candidate(opt.explicitTimeUs, out);
+        if (opt.explicitTimeUs >= 0) {
+            const Status ex = candidate(opt.explicitTimeUs, out);
+            out.diag = what + " explicit " + (ex == Status::kOk ? "ok" : "failed") + " | " + std::to_string(msSince(started)) + "ms";
+            return ex;
+        }
 
         // The start always comes first: it needs no seek, and it is what 'firstFrame' and 'hybrid' want.
         Status st0 = candidate(0, out);
-        if (st0 != Status::kOk) return st0;
+        if (st0 != Status::kOk) return bail(st0, what + ": no picture at the start");
         out.durationUs = durationUs;
+        int retries = 0;
 
         switch (opt.strategy) {
             case VideoStrategy::kFirstFrame: break;
@@ -334,6 +379,7 @@ Status makeVideoThumbnail(ByteSource& src, const VideoOptions& optIn, VideoThumb
                 if (out.thumb.isBlank && durationUs > 0) {
                     for (double fraction : blankFrameRetryFractions(opt.framePosition)) {
                         VideoThumbnail c;
+                        ++retries;
                         if (candidate(timeAtFraction(durationUs, fraction), c) != Status::kOk) continue;
                         if (!c.thumb.isBlank) {
                             out = std::move(c);
@@ -344,10 +390,13 @@ Status makeVideoThumbnail(ByteSource& src, const VideoOptions& optIn, VideoThumb
                 }
                 break;
         }
+        out.diag = what + " blank_retries=" + std::to_string(retries) + " | " + std::to_string(msSince(started)) + "ms";
         return Status::kOk;
     } catch (const std::bad_alloc&) {
+        out.diag = "out of memory";
         return Status::kNoMemory;
     } catch (...) {
+        out.diag = "unexpected exception";
         return Status::kFailed;
     }
 }

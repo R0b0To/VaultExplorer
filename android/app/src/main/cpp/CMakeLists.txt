@@ -570,6 +570,15 @@ endif()
 if(VAULTEXPLORER_DESKTOP)
     # Same key-generation entropy mixing as Android (crypto/user_entropy.cpp is part of the engine).
     target_compile_definitions(foldervault_core PRIVATE FV_USE_USERENTROPY=1)
+    # Bulk AEAD through BoringSSL's EVP, as on Android. The engine already links BoringSSL, and its AES-NI/PCLMUL
+    # AES-GCM and vectorised XChaCha20-Poly1305 are far faster than mbedTLS' GCM and the portable XChaCha code the
+    # desktop build used until now. Measured on an Intel Xeon (AES-NI, PCLMUL, AVX2), single thread, seal/open of
+    # 4 KiB and 32 KiB chunks: AES-256-GCM ~300-360 MB/s with mbedTLS vs 7-13 GB/s with EVP (25-40x), XChaCha20-
+    # Poly1305 ~390-430 MB/s vs 1.5-2.1 GB/s (4-5x). Both backends give byte-identical ciphertext and tags and
+    # reject tampered data and a wrong AAD alike (checked for AES-128/256-GCM with 12- and 16-byte nonces and
+    # XChaCha20-Poly1305, sizes 0 to 32 KiB), so vaults are interchangeable between them.
+    target_compile_definitions(foldervault_core PRIVATE FV_AEAD_EVP=1)
+    target_link_libraries(foldervault_core PUBLIC crypto)
 endif()
 set(VE_FV_LIB foldervault_core)
 

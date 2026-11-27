@@ -19,12 +19,7 @@ import 'dart:typed_data';
 
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 
-import 'desktop_native_thumbnails.dart' show
-    NativeImageFailed,
-    NativeImageOutcome,
-    NativeImageRefused,
-    NativeImageThumb,
-    NativeImageUnsupported;
+import 'desktop_native_thumbnails.dart' show NativeImageFailed, NativeImageOutcome, NativeImageRefused, NativeImageThumb, NativeImageUnsupported, thumbnailTraceEnabled, traceThumbnail;
 import 'video_thumbnail_logic.dart';
 
 /// One frame out of a video: encoded (JPEG or PNG) at the video's own resolution, plus the video's length
@@ -180,29 +175,42 @@ class DesktopVideoThumbnails {
     if (_disposed) return null;
     final nativeGrab = native;
     if (nativeGrab != null) {
+      final timer = Stopwatch()..start();
       final outcome = await _runNative(nativeGrab, request);
+      if (thumbnailTraceEnabled) {
+        traceThumbnail('[dart-thumb] video native: ${outcome?.runtimeType} ${timer.elapsedMilliseconds}ms');
+      }
       switch (outcome) {
         case null:
-        case NativeImageFailed():
         case NativeImageRefused():
-          return null; // cancelled, or a video this engine understands but cannot make a picture of
+          return null; // cancelled, or refused by a guard
         case NativeImageThumb():
           return VideoThumbnail(bytes: outcome.bytes, width: outcome.sourceWidth, height: outcome.sourceHeight);
         case NativeImageUnsupported():
-          break; // not something the engine can open or decode: libmpv below
+        case NativeImageFailed():
+          // Not something the engine can open or decode -- or a picture it could not make, which may be this build's
+          // doing rather than the file's, so libmpv gets its chance before the tile gives up. (A truly broken file
+          // costs libmpv's timeout, as it always did.)
+          break;
       }
     }
+    final mpvTimer = Stopwatch()..start();
     final run = _Run(request.volId);
     if (!await _acquire(run)) return null;
     _active.add(run);
+    VideoThumbnail? made;
     try {
-      return await _extract(request, run);
+      made = await _extract(request, run);
+      return made;
     } on Object catch (e) {
       _log('video thumbnail for ${request.path} failed: $e');
       return null;
     } finally {
       _active.remove(run);
       _release();
+      if (thumbnailTraceEnabled) {
+        traceThumbnail('[dart-thumb] video libmpv: ${made == null ? 'no thumbnail' : 'ok'} ${mpvTimer.elapsedMilliseconds}ms');
+      }
     }
   }
 

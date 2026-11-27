@@ -240,8 +240,15 @@ void main() {
       expect((mpvGrabs, opens), (0, 0));
     });
 
-    test('a video the engine understands but cannot picture is no thumbnail, and libmpv is not asked either', () async {
+    test("a picture the engine could not make still gets libmpv's chance before the tile gives up", () async {
       final service = make((r) async => const NativeImageFailed());
+      final t = await service.thumbnail(request());
+      expect(t?.bytes, [7]);
+      expect(mpvGrabs, greaterThan(0));
+    });
+
+    test('a guard refusal is final: libmpv is not asked', () async {
+      final service = make((r) async => const NativeImageRefused(outOfMemory: false));
       expect(await service.thumbnail(request()), isNull);
       expect(mpvGrabs, 0);
     });

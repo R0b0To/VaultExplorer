@@ -1,4 +1,4 @@
-import 'dart:ui' show Size;
+import 'dart:ui' show Size, VoidCallback;
 
 import 'package:vaultexplorer/core/windowing/desktop_windowing.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -20,6 +20,55 @@ import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider
 /// in a new window ([canOpenWindow], [openWindow]), and how the tab strip hands
 /// a tab that was dragged out of its window to a window of its own
 /// ([canOpenTabWindow], [openTabWindow]), without importing the window itself.
+/// A request for a window of its own for a tab that was dragged out of its
+/// window (see [FileManagerEnvironment.openTabWindow]).
+class TabWindowRequest {
+  const TabWindowRequest({
+    required this.tab,
+    this.initialPath,
+    this.windowSize,
+    this.placeAtCursor = false,
+    this.onFirstFrame,
+  });
+
+  final BrowserTabState tab;
+
+  /// Where in its container the tab is (null for the root, and for tabs that
+  /// are not folders).
+  final String? initialPath;
+
+  /// The size of the window the tab came from, which the new one takes so that
+  /// it reads as the same window.
+  final Size? windowSize;
+
+  /// Put the window under the mouse cursor when it opens, where the platform
+  /// lets the app do that. Not wanted by a drag that moves the window itself.
+  final bool placeAtCursor;
+
+  /// Called once the window has drawn its first frame: it is on screen from
+  /// then on, and [OpenedTabWindow.tabLeft] is exact.
+  final VoidCallback? onFirstFrame;
+}
+
+/// A window opened for a tab that was dragged out of its own.
+class OpenedTabWindow {
+  OpenedTabWindow({
+    required this.viewId,
+    required this.close,
+    required this.tabLeft,
+  });
+
+  /// The window's view, which is how the platform runner knows it.
+  final int viewId;
+
+  /// Closes the window.
+  final void Function() close;
+
+  /// Where the window's first tab starts, in logical pixels from the left edge
+  /// of its content: a guess until the window has been drawn, exact after.
+  double tabLeft;
+}
+
 class FileManagerEnvironment {
   FileManagerEnvironment._();
 
@@ -30,8 +79,7 @@ class FileManagerEnvironment {
   MountedContainer? Function()? _primaryLocalContainer;
   bool Function(MountedContainer container, String? initialPath)? _openWindow;
   bool Function(String? title)? _openVaultsWindow;
-  bool Function(BrowserTabState tab, String? initialPath, Size? windowSize)?
-  _openTabWindow;
+  OpenedTabWindow? Function(TabWindowRequest request)? _openTabWindow;
 
   void attach({
     required MountedContainer? Function(int volId) resolveContainer,
@@ -40,8 +88,7 @@ class FileManagerEnvironment {
     required bool Function(MountedContainer container, String? initialPath)
     openWindow,
     required bool Function(String? title) openVaultsWindow,
-    bool Function(BrowserTabState tab, String? initialPath, Size? windowSize)?
-    openTabWindow,
+    OpenedTabWindow? Function(TabWindowRequest request)? openTabWindow,
   }) {
     _resolveContainer = resolveContainer;
     _mountedContainers = mountedContainers;
@@ -81,20 +128,12 @@ class FileManagerEnvironment {
   bool get canOpenTabWindow =>
       _openTabWindow != null && DesktopWindowing.isSupportedPlatform;
 
-  /// Opens [tab]'s location in a new window, for a tab that was dragged out of
-  /// its window. [initialPath] is where in its container the tab is (null for
-  /// the root, and for tabs that are not folders), and [windowSize] the size
-  /// of the window it came from, which the new one takes so that it looks like
-  /// the same window. The window appears under the mouse cursor where the
-  /// platform lets the app place it.
-  ///
-  /// Moving the tab is up to the caller: this only opens the window. Returns
-  /// false when that is not possible, and then the tab should stay where it is.
-  bool openTabWindow(
-    BrowserTabState tab, {
-    String? initialPath,
-    Size? windowSize,
-  }) => canOpenTabWindow && _openTabWindow!(tab, initialPath, windowSize);
+  /// Opens a window for a tab that was dragged out of its own window, on the
+  /// tab's location. Moving the tab is up to the caller: this only opens the
+  /// window. Null when that is not possible, and then the tab should stay where
+  /// it is.
+  OpenedTabWindow? openTabWindow(TabWindowRequest request) =>
+      canOpenTabWindow ? _openTabWindow!(request) : null;
 
   MountedContainer? resolveContainer(int volId) =>
       _resolveContainer?.call(volId);

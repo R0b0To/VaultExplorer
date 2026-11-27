@@ -75,12 +75,7 @@ class DesktopSessionKeeper with WidgetsBindingObserver {
       openWindow: (target, initialPath) =>
           openFileManagerWindow(container: target, initialPath: initialPath),
       openVaultsWindow: (title) => openFileManagerWindow(title: title),
-      openTabWindow: (tab, initialPath, windowSize) =>
-          openFileManagerWindowForTab(
-            tab,
-            initialPath: initialPath,
-            windowSize: windowSize,
-          ),
+      openTabWindow: openFileManagerWindowForTab,
     );
     WidgetsBinding.instance.addObserver(this);
     configureSessionLock(container, enforceAppLock: _enforceAppLock);

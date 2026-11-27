@@ -62,6 +62,15 @@ class FlutterWindow : public Win32Window {
 
   // The top-level window that shows the view [view_id], or null.
   HWND WindowForView(int64_t view_id);
+
+  // The window of the Flutter view [view_id] (the view itself, not the
+  // top-level window around it). Null when there is no such view.
+  HWND ContentForView(int64_t view_id);
+
+  // One step of a tab being dragged between windows ("tabDragPoll"): moves the
+  // window that carries the tab, then reports the cursor, the mouse button and
+  // which of the asked-about windows is topmost under the cursor.
+  flutter::EncodableValue PollTabDrag(const flutter::EncodableValue* arguments);
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

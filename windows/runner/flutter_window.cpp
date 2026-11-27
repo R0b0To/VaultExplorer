@@ -1,12 +1,16 @@
 #include "flutter_window.h"
 
 #include <commctrl.h>
+#include <dwmapi.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <map>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -100,6 +104,159 @@ int64_t IntArgument(const flutter::EncodableMap& map, const char* key) {
     if (const auto* wide = std::get_if<int64_t>(value)) return *wide;
   }
   return 0;
+}
+
+
+// Reads a number that the Dart side put under [key] in the map [arguments]
+// (a double, or an int when it happened to be whole).
+double ReadNumber(const flutter::EncodableValue* arguments,
+                  const char* key,
+                  double fallback) {
+  if (arguments == nullptr) return fallback;
+  const auto* map = std::get_if<flutter::EncodableMap>(arguments);
+  if (map == nullptr) return fallback;
+  const auto it = map->find(flutter::EncodableValue(key));
+  if (it == map->end()) return fallback;
+  if (const auto* value = std::get_if<double>(&it->second)) return *value;
+  if (const auto* value = std::get_if<int32_t>(&it->second)) return *value;
+  if (const auto* value = std::get_if<int64_t>(&it->second)) {
+    return static_cast<double>(*value);
+  }
+  return fallback;
+}
+
+// Reads a whole number that the Dart side put under [key] in the map
+// [arguments]; [fallback] when there is none.
+int64_t ReadInt(const flutter::EncodableValue* arguments,
+                const char* key,
+                int64_t fallback) {
+  if (arguments == nullptr) return fallback;
+  const auto* map = std::get_if<flutter::EncodableMap>(arguments);
+  if (map == nullptr) return fallback;
+  const auto it = map->find(flutter::EncodableValue(key));
+  if (it == map->end()) return fallback;
+  if (const auto* value = std::get_if<int32_t>(&it->second)) return *value;
+  if (const auto* value = std::get_if<int64_t>(&it->second)) return *value;
+  return fallback;
+}
+
+bool ReadBool(const flutter::EncodableValue* arguments,
+              const char* key,
+              bool fallback) {
+  if (arguments == nullptr) return fallback;
+  const auto* map = std::get_if<flutter::EncodableMap>(arguments);
+  if (map == nullptr) return fallback;
+  const auto it = map->find(flutter::EncodableValue(key));
+  if (it == map->end()) return fallback;
+  if (const auto* value = std::get_if<bool>(&it->second)) return *value;
+  return fallback;
+}
+
+// The whole numbers of a list that the Dart side put under [key].
+std::vector<int64_t> ReadIntList(const flutter::EncodableValue* arguments,
+                                 const char* key) {
+  std::vector<int64_t> numbers;
+  if (arguments == nullptr) return numbers;
+  const auto* map = std::get_if<flutter::EncodableMap>(arguments);
+  if (map == nullptr) return numbers;
+  const auto it = map->find(flutter::EncodableValue(key));
+  if (it == map->end()) return numbers;
+  const auto* list = std::get_if<flutter::EncodableList>(&it->second);
+  if (list == nullptr) return numbers;
+  for (const auto& item : *list) {
+    if (const auto* value32 = std::get_if<int32_t>(&item)) {
+      numbers.push_back(*value32);
+    } else if (const auto* value64 = std::get_if<int64_t>(&item)) {
+      numbers.push_back(*value64);
+    }
+  }
+  return numbers;
+}
+
+// Where a window is parked to get it out of the way: where Windows itself puts
+// the windows it minimizes.
+constexpr int kParkedPosition = -32000;
+
+// Moves the top-level window [root] so that the cursor is [grab_x], [grab_y]
+// (logical pixels) inside the client area of its Flutter view [content].
+void MoveByGrip(HWND root,
+                HWND content,
+                POINT cursor,
+                double grab_x,
+                double grab_y) {
+  RECT rect;
+  POINT origin = {0, 0};
+  if (!GetWindowRect(root, &rect) || !ClientToScreen(content, &origin)) return;
+  const double scale = GetDpiForWindow(content) / 96.0;
+  // The window frame starts a little before its client area; the cursor is
+  // placed against the client area.
+  const int x = cursor.x - static_cast<int>(std::lround(grab_x * scale)) -
+                (origin.x - rect.left);
+  const int y = cursor.y - static_cast<int>(std::lround(grab_y * scale)) -
+                (origin.y - rect.top);
+  SetWindowPos(root, nullptr, x, y, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+// What is topmost at [cursor] among the windows of [candidates], looking from
+// the front of the screen backwards and leaving out [skip] (the window that is
+// following the cursor). The first window found there decides: if it is one of
+// the candidates, that is the answer; if it is anything else, something covers
+// the candidates at that spot and the answer is none.
+HWND TopmostAt(POINT cursor, HWND skip, const std::vector<HWND>& candidates) {
+  for (HWND window = GetTopWindow(nullptr); window != nullptr;
+       window = GetWindow(window, GW_HWNDNEXT)) {
+    if (window == skip || !IsWindowVisible(window) || IsIconic(window)) {
+      continue;
+    }
+    // Windows that are not there as far as the person can see: on another
+    // virtual desktop, suspended, or letting the mouse through.
+    DWORD cloaked = 0;
+    if (SUCCEEDED(DwmGetWindowAttribute(window, DWMWA_CLOAKED, &cloaked,
+                                        sizeof(cloaked))) &&
+        cloaked != 0) {
+      continue;
+    }
+    if (GetWindowLongPtr(window, GWL_EXSTYLE) & WS_EX_TRANSPARENT) continue;
+    RECT rect;
+    if (!GetWindowRect(window, &rect)) continue;
+    if (cursor.x < rect.left || cursor.x >= rect.right || cursor.y < rect.top ||
+        cursor.y >= rect.bottom) {
+      continue;
+    }
+    return std::find(candidates.begin(), candidates.end(), window) !=
+                   candidates.end()
+               ? window
+               : nullptr;
+  }
+  return nullptr;
+}
+
+// Moves [hwnd] so that the mouse cursor is [anchor_x], [anchor_y] (logical
+// pixels) inside its top-left corner, keeping the window on the monitor the
+// cursor is on. For a window opened by dragging a tab out of another one: it
+// appears where the tab was let go. The engine shows a new window only after
+// its first frame, so moving it right after it was created is not seen.
+void PlaceAtCursor(HWND hwnd, double anchor_x, double anchor_y) {
+  POINT cursor;
+  RECT rect;
+  if (!GetCursorPos(&cursor) || !GetWindowRect(hwnd, &rect)) return;
+  const double scale = GetDpiForWindow(hwnd) / 96.0;
+  const int width = rect.right - rect.left;
+  const int height = rect.bottom - rect.top;
+  int x = cursor.x - static_cast<int>(std::lround(anchor_x * scale));
+  int y = cursor.y - static_cast<int>(std::lround(anchor_y * scale));
+  MONITORINFO monitor = {sizeof(monitor)};
+  if (GetMonitorInfo(MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST),
+                     &monitor)) {
+    const RECT& work = monitor.rcWork;
+    x = (std::max)(static_cast<int>(work.left),
+                   (std::min)(x, static_cast<int>(work.right) - width));
+    y = (std::max)(static_cast<int>(work.top),
+                   (std::min)(y, static_cast<int>(work.bottom) - height));
+  }
+  SetWindowPos(hwnd, nullptr, x, y, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 }  // namespace
@@ -254,6 +411,31 @@ bool FlutterWindow::OnCreate() {
           SetWindowPos(hwnd, nullptr, x, y, 0, 0,
                        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
           result->Success(flutter::EncodableValue());
+        } else if (method == "tabDragPoll") {
+          result->Success(PollTabDrag(call.arguments()));
+        } else if (method == "tabDragPrepare") {
+          // A maximized window cannot be carried along by a tab: it goes back
+          // to its normal size first. Answers by what factor its width
+          // changed, which is how far the grip has to move with it.
+          double ratio = 1.0;
+          if (IsZoomed(hwnd)) {
+            RECT before;
+            RECT after;
+            GetWindowRect(hwnd, &before);
+            ShowWindow(hwnd, SW_RESTORE);
+            GetWindowRect(hwnd, &after);
+            const double width = before.right - before.left;
+            if (width > 0) ratio = (after.right - after.left) / width;
+          }
+          result->Success(flutter::EncodableValue(ratio));
+        } else if (method == "activateWindow") {
+          if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+          SetForegroundWindow(hwnd);
+          result->Success(flutter::EncodableValue());
+        } else if (method == "placeAtCursor") {
+          PlaceAtCursor(hwnd, ReadNumber(call.arguments(), "anchorX", 0),
+                        ReadNumber(call.arguments(), "anchorY", 0));
+          result->Success(flutter::EncodableValue());
         } else if (method == "implicitWindowUnused") {
           // The app draws its windows (the main one included) as views of
           // their own, so this window shows nothing and must stay hidden. If
@@ -333,6 +515,78 @@ bool FlutterWindow::OnCreate() {
   flutter_controller_->ForceRedraw();
 
   return true;
+}
+
+HWND FlutterWindow::ContentForView(int64_t view_id) {
+  if (window_registrar_ == nullptr) return nullptr;
+  FlutterDesktopViewRef view =
+      FlutterDesktopPluginRegistrarGetViewById(window_registrar_, view_id);
+  return view != nullptr ? FlutterDesktopViewGetHWND(view) : nullptr;
+}
+
+flutter::EncodableValue FlutterWindow::PollTabDrag(
+    const flutter::EncodableValue* arguments) {
+  POINT cursor = {0, 0};
+  GetCursorPos(&cursor);
+
+  // The window that carries the tab goes first, so that what is reported
+  // below is what the person sees now.
+  HWND carrier = nullptr;
+  const int64_t carrier_id = ReadInt(arguments, "carrierViewId", -1);
+  if (carrier_id >= 0) {
+    const HWND content = ContentForView(carrier_id);
+    if (content != nullptr) {
+      carrier = GetAncestor(content, GA_ROOT);
+      if (ReadBool(arguments, "park", false)) {
+        SetWindowPos(carrier, nullptr, kParkedPosition, kParkedPosition, 0, 0,
+                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+      } else {
+        MoveByGrip(carrier, content, cursor, ReadNumber(arguments, "grabX", 0),
+                   ReadNumber(arguments, "grabY", 0));
+      }
+    }
+  }
+
+  std::vector<int64_t> ids;
+  std::vector<HWND> contents;
+  std::vector<HWND> roots;
+  for (const int64_t id : ReadIntList(arguments, "candidates")) {
+    const HWND content = ContentForView(id);
+    if (content == nullptr) continue;
+    ids.push_back(id);
+    contents.push_back(content);
+    roots.push_back(GetAncestor(content, GA_ROOT));
+  }
+  const HWND hit = TopmostAt(cursor, carrier, roots);
+
+  // The physical buttons are read, not the logical ones, so a mouse set up
+  // for the left hand is followed too.
+  const int button = GetSystemMetrics(SM_SWAPBUTTON) ? VK_RBUTTON : VK_LBUTTON;
+
+  flutter::EncodableMap report;
+  report[flutter::EncodableValue("cursorX")] =
+      flutter::EncodableValue(static_cast<double>(cursor.x));
+  report[flutter::EncodableValue("cursorY")] =
+      flutter::EncodableValue(static_cast<double>(cursor.y));
+  report[flutter::EncodableValue("buttonDown")] =
+      flutter::EncodableValue((GetAsyncKeyState(button) & 0x8000) != 0);
+  if (hit != nullptr) {
+    for (size_t i = 0; i < roots.size(); i++) {
+      if (roots[i] != hit) continue;
+      POINT origin = {0, 0};
+      ClientToScreen(contents[i], &origin);
+      report[flutter::EncodableValue("windowViewId")] =
+          flutter::EncodableValue(ids[i]);
+      report[flutter::EncodableValue("originX")] =
+          flutter::EncodableValue(static_cast<double>(origin.x));
+      report[flutter::EncodableValue("originY")] =
+          flutter::EncodableValue(static_cast<double>(origin.y));
+      report[flutter::EncodableValue("scale")] =
+          flutter::EncodableValue(GetDpiForWindow(contents[i]) / 96.0);
+      break;
+    }
+  }
+  return flutter::EncodableValue(report);
 }
 
 HWND FlutterWindow::WindowForView(int64_t view_id) {

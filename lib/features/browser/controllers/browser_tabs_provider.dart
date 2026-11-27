@@ -717,9 +717,9 @@ class BrowserTabs extends _$BrowserTabs {
 
   /// Opens one more Vaults tab, even when others are open, next to the active
   /// tab like any new tab. Null at the tab limit.
-  TabId? openNewDashboardTab() {
+  TabId? openNewDashboardTab({TabPane? pane}) {
     if (state.atLimit) return null;
-    final target = _paneForNewTab();
+    final target = pane ?? _paneForNewTab();
     final tab = BrowserTabState.home(tabId: TabId.allocate(), pane: target);
     final tabs = [...state.tabs];
     tabs.insert(
@@ -742,6 +742,51 @@ class BrowserTabs extends _$BrowserTabs {
       ),
     );
     return tab.tabId;
+  }
+
+  /// Takes in a tab that was dragged here from another window: the same
+  /// location, as a new tab in [pane] (the one new tabs go to by default) at
+  /// [slot], which counts inside that pane's strip (0 puts it before its first
+  /// tab). The new tab becomes the active one. It starts afresh: of the tab it
+  /// comes from only the place carries over ([initialPath] is where in its
+  /// container a folder tab was).
+  ///
+  /// Null at the tab limit. A category that is already open here is shown
+  /// instead of opening it twice, and is where it was.
+  TabId? adoptTab(
+    BrowserTabState from, {
+    String? initialPath,
+    TabPane? pane,
+    required int slot,
+  }) {
+    final target = pane ?? _paneForNewTab();
+    final before = state.tabs.length;
+    final TabId? id = switch (from.kind) {
+      FolderTab(:final container) => openTab(
+        container,
+        initialPath: initialPath,
+        pane: target,
+      ),
+      CategoryTab(
+        :final category,
+        :final primaryLocalContainer,
+        :final includeVaults,
+      ) =>
+        openCategoryTab(
+          category,
+          primaryLocalContainer: primaryLocalContainer,
+          includeVaults: includeVaults,
+          pane: target,
+        ),
+      HomeTab() => openNewDashboardTab(pane: target),
+    };
+    if (id == null || state.tabs.length == before) return id;
+    final group = state.tabsInPane(target);
+    final index = group.indexWhere((tab) => tab.tabId == id);
+    if (index >= 0) {
+      reorderTabsInPane(target, index, slot.clamp(0, group.length - 1));
+    }
+    return id;
   }
 
   /// The Vaults tab closest to the active tab, preferring the active tab's own

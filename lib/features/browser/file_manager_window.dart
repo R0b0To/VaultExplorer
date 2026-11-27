@@ -65,47 +65,73 @@ bool openFileManagerWindow({
   );
 }
 
-/// Opens the location of [tab] in a new window of its own, for a tab that was
-/// dragged out of its window: a folder at [initialPath], a category, or the
-/// Vaults page. The window takes [windowSize] (the size of the window the tab
-/// came from) and, where the platform allows, appears under the mouse cursor.
+/// Opens the location of a tab in a new window of its own, for a tab that was
+/// dragged out of its window: a folder at the request's path, a category, or
+/// the Vaults page.
 ///
 /// Like [openFileManagerWindow], the window starts with a workspace of its own
 /// and nothing of the tab's state besides where it was. Moving the tab, that
-/// is closing it in the window it came from, is up to the caller. Returns false
-/// when native windows are not available, and then the tab should stay put.
-bool openFileManagerWindowForTab(
-  BrowserTabState tab, {
-  String? initialPath,
-  Size? windowSize,
-}) {
+/// is closing it in the window it came from, is up to the caller. Null when
+/// native windows are not available, and then the tab should stay put.
+OpenedTabWindow? openFileManagerWindowForTab(TabWindowRequest request) {
+  final tab = request.tab;
   final container = tab.isDashboard || tab.isCategory ? null : tab.container;
-  if (!tab.isDashboard && !tab.isCategory && container == null) return false;
-  return _openFileManagerWindow(
+  if (!tab.isDashboard && !tab.isCategory && container == null) return null;
+
+  OpenedTabWindow? opened;
+  final size = request.windowSize;
+  final ok = _openFileManagerWindow(
     // A category (or the Vaults page) has no name before the window can
     // localize it; the window titles itself from its tab once it is built.
     title: container?.displayName ?? '',
-    size: windowSize,
-    atCursor: true,
+    size: size,
     content: () => FileManagerWindow(
       container: container,
-      initialPath: initialPath,
+      initialPath: request.initialPath,
       category: tab.category,
       categoryContainer: tab.primaryLocalContainer,
       categoryIncludesVaults: tab.includeVaults,
+      onFirstFrame: (tabLeft) {
+        opened?.tabLeft = tabLeft;
+        request.onFirstFrame?.call();
+      },
     ),
+    onCreated: (entry) {
+      opened = OpenedTabWindow(
+        viewId: entry.viewId,
+        close: entry.close,
+        tabLeft: _guessTabLeft(size),
+      );
+      if (request.placeAtCursor) {
+        // Over the caption row, on the first tab.
+        unawaited(
+          placeWindowAtCursor(
+            entry.viewId,
+            anchor: Offset(opened!.tabLeft + 70, 20),
+          ),
+        );
+      }
+    },
   );
+  return ok ? opened : null;
 }
 
-/// How far inside a new window's top-left corner the mouse cursor lands when
-/// the window is placed under it: over the caption row, near the first tab.
-const Offset _kTornOutWindowAnchor = Offset(80, 16);
+/// Where a new window's first tab will start, before the window has been
+/// built: after the sidebar when the window is wide enough to dock one (it may
+/// have been collapsed, which only the window knows), else after the menu
+/// button. The tab strip starts with the flare that tabs lean into.
+double _guessTabLeft(Size? size) {
+  final docked = AppBreakpoints.useDockedSidebarFor(
+    size ?? const Size(1100, 760),
+  );
+  return (docked ? AppBreakpoints.dockedSidebarWidth + 8 : 48.0) + 8;
+}
 
 bool _openFileManagerWindow({
   required String title,
   required Widget Function() content,
   Size? size,
-  bool atCursor = false,
+  void Function(SecondaryWindowEntry entry)? onCreated,
 }) {
   const constraints = BoxConstraints(minWidth: 560, minHeight: 400);
   return SecondaryWindows.instance.open(
@@ -117,11 +143,7 @@ bool _openFileManagerWindow({
         : constraints.constrain(size),
     constraints: constraints,
     builder: (_) => content(),
-    onCreated: atCursor
-        ? (entry) => unawaited(
-            placeWindowAtCursor(entry.viewId, anchor: _kTornOutWindowAnchor),
-          )
-        : null,
+    onCreated: onCreated,
   );
 }
 
@@ -145,6 +167,7 @@ class FileManagerWindow extends ConsumerStatefulWidget {
     this.category,
     this.categoryContainer,
     this.categoryIncludesVaults = true,
+    this.onFirstFrame,
   });
 
   /// What the window opens on; null (with no [category]) opens the Vaults page.
@@ -156,6 +179,11 @@ class FileManagerWindow extends ConsumerStatefulWidget {
   final FileCategory? category;
   final MountedContainer? categoryContainer;
   final bool categoryIncludesVaults;
+
+  /// Called once the window has been built, with where its first tab starts
+  /// (logical pixels from the left edge). A tab that was dragged out of another
+  /// window uses it to put the mouse cursor on that tab.
+  final void Function(double tabLeft)? onFirstFrame;
 
   @override
   ConsumerState<FileManagerWindow> createState() => _FileManagerWindowState();
@@ -184,6 +212,9 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   final GlobalKey _browserKey = GlobalKey(debugLabel: 'fileManagerBrowser');
 
   double _sidebarWidth = AppBreakpoints.dockedSidebarWidth;
+
+  /// Where the first tab starts, as worked out by the latest build.
+  double _tabLeft = 0;
   final ValueNotifier<double> _dualPaneSplitFraction = ValueNotifier(0.5);
 
   BrowserTabs get _actions =>
@@ -196,6 +227,11 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleShortcutKey);
+    if (widget.onFirstFrame != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onFirstFrame!(_tabLeft);
+      });
+    }
   }
 
   @override
@@ -520,6 +556,10 @@ Widget _buildSidebar({
     // with the tabs in it, across the whole width (sidebar included).
     final customCaption =
         PlatformFeatures.isWindows && !NativeWindowChrome.of(context);
+    // Where the first tab starts: in the caption row after the sidebar (or the
+    // menu button), or at the edge of the strip below a native title bar. The
+    // strip begins with the flare that tabs lean into.
+    _tabLeft = (customCaption ? (sidebarShown ? _sidebarWidth + 8 : 48.0) : 0) + 8;
     final tabsEnabled = ref.watch(
       appSettingsControllerProvider.select(
         (state) => state.settings.useBrowserTabs,

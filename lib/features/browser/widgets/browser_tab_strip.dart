@@ -18,6 +18,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_title_bar.dart';
 import 'package:vaultexplorer/core/windowing/app_windows.dart';
+import 'package:vaultexplorer/core/windowing/window_caption.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_tab_paths.dart';
@@ -28,7 +29,10 @@ import 'package:vaultexplorer/features/browser/models/file_category_presentation
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_drag.dart';
+import 'package:vaultexplorer/features/browser/widgets/tab_drag_platform.dart';
+import 'package:vaultexplorer/features/browser/widgets/tab_drag_session.dart';
 import 'package:vaultexplorer/features/browser/widgets/tab_tear_off_zone.dart';
+import 'package:vaultexplorer/features/browser/widgets/tab_transfer.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 /// Leading icon for a location row in the new-tab picker.
@@ -88,6 +92,12 @@ const double kBrowserTabItemWidth = 148;
 /// hold), and a tab pulled out of the strip, down into the window or out of its
 /// side, floats under the pointer and opens in a window of its own when let
 /// go. A window's last tab can be closed too, which closes the window.
+///
+/// Where the platform allows it (Windows), the drag is live like in a browser:
+/// the window made for a tab pulled out follows the pointer, a tab can be
+/// dropped into the strip of another window (the strips of every window take
+/// part, see [tabDropTargets]), and a window's only tab moves the whole window.
+/// See [TabDragSession].
 ///
 /// With a [pane] the strip belongs to that pane in the dual-pane layout: it
 /// lists only the pane's own tabs, switching a tab changes only that pane, the
@@ -165,6 +175,24 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   /// out. After a release it stays hidden until the tab has left, so the list's
   /// drop animation is not seen.
   final ValueNotifier<bool> _dragProxyHidden = ValueNotifier<bool>(false);
+
+  /// The live drag of the tab being dragged, once it left the strip (or at
+  /// once, for a window's only tab). See [TabDragSession].
+  TabDragSession<TabTransfer>? _session;
+
+  /// Whether the window made for the dragged tab has been drawn, so that the
+  /// floating copy is not needed any more; and whether the tab is back over
+  /// its own strip.
+  bool _carrierShown = false;
+  bool _returned = false;
+  bool _ghostShown = false;
+
+  /// This strip as a place for another window's tab to be dropped, and the tab
+  /// that is held over it right now (shown at its slot).
+  late final _StripDropTarget _dropTarget = _StripDropTarget(this);
+  bool _dropTargetAdded = false;
+  int? _viewId;
+  ({BrowserTabState tab, int slot})? _incoming;
   Timer? _fileDropHoverTimer;
   TabId? _fileDropHoverTabId;
 
@@ -184,6 +212,16 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _viewId = View.maybeOf(context)?.viewId;
+    if (!_dropTargetAdded && _viewId != null && PlatformFeatures.isDesktop) {
+      _dropTargetAdded = true;
+      tabDropTargets.register(_dropTarget);
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant BrowserTabStrip oldWidget) {
     super.didUpdateWidget(oldWidget);
     _scrollActiveIntoView();
@@ -195,6 +233,11 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     _scrollController.removeListener(_rememberScrollOffset);
     _scrollController.dispose();
     _stripHovered.dispose();
+    tabDropTargets.unregister(_dropTarget);
+    // A drag in progress is given up. Its end is not reported back here.
+    final session = _session;
+    _session = null;
+    session?.abort();
     _tornOutGhost.dispose();
     _dragProxyHidden.dispose();
     super.dispose();
@@ -257,6 +300,10 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   /// strip, which is what tearing the tab off into a window is decided by.
   void _trackDrag(PointerEvent event) {
     if (_draggingTabId == null) return;
+    if (_session != null) {
+      _updateTearOff(event.position, overOtherPane: false);
+      return;
+    }
     final pane = widget.pane;
     TabPane? over;
     if (pane != null) {
@@ -277,15 +324,16 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     _trackDrag(event);
     // The list reports the end of its drag right after this (_finishDrag). If
     // it never does, because it cancelled the drag (a tab was closed meanwhile,
-    // say), nothing may be left floating.
+    // say), nothing may be left floating. A live drag ends by itself: it reads
+    // the mouse button from the system.
     scheduleMicrotask(() {
-      if (mounted && _draggingTabId != null) _resetDrag();
+      if (mounted && _session == null && _draggingTabId != null) _resetDrag();
     });
   }
 
   /// The tab [id] if it can be torn off into a window of its own: there has to
-  /// be somewhere to open one, and another tab to stay behind (pulling out a
-  /// window's only tab would just swap the window for an identical one).
+  /// be somewhere to open one, and another tab to stay behind (a window's only
+  /// tab moves the window instead, see [_beginLiveDrag]).
   BrowserTabState? _tearOffCandidate(TabId id) {
     if (!PlatformFeatures.isDesktop ||
         !FileManagerEnvironment.instance.canOpenTabWindow) {
@@ -299,7 +347,19 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     return null;
   }
 
+  /// Whether the platform can follow a drag live: where the cursor is, which
+  /// window is under it, moving a window along. Only a window that the runner
+  /// knows by its view id qualifies.
+  bool get _liveDragAvailable =>
+      WindowsTabDragPlatform.isSupported && windowChannelArgsFor(context) != null;
+
   void _updateTearOff(Offset pointer, {required bool overOtherPane}) {
+    if (_session != null) {
+      // The live drag decides from here on (see TabDragSession). The floating
+      // copy only stands in until the new window has been drawn.
+      if (_ghostShown) _tornOutGhost.value = pointer - _grabOffset;
+      return;
+    }
     final id = _draggingTabId;
     final candidate = id == null || overOtherPane ? null : _tearOffCandidate(id);
     final strip = context.findRenderObject();
@@ -327,13 +387,28 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       if (!_tornOut) {
         _tornOut = true;
         _dragProxyHidden.value = true;
-        _tornOutPortal.show();
+        if (_liveDragAvailable) _beginLiveDrag(candidate!, movesWindow: false);
+        _syncGhost();
       }
     } else if (_tornOut) {
       _tornOut = false;
       _dragProxyHidden.value = false;
-      _tornOutGhost.value = null;
+      _syncGhost();
+    }
+  }
+
+  /// Whether the floating copy of the tab shows: while the tab is held out and
+  /// no window of its own shows it yet (or never will, where there is no live
+  /// drag and the window only opens when the tab is let go).
+  void _syncGhost() {
+    final want = _tornOut && !_carrierShown && !_returned;
+    if (want == _ghostShown) return;
+    _ghostShown = want;
+    if (want) {
+      _tornOutPortal.show();
+    } else {
       _tornOutPortal.hide();
+      _tornOutGhost.value = null;
     }
   }
 
@@ -363,15 +438,20 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       _hoverPane = null;
       widget.onDragOverPane?.call(null);
     }
-    if (_tornOut) {
-      _tornOut = false;
-      _tornOutGhost.value = null;
-      _tornOutPortal.hide();
-    }
+    _tornOut = false;
+    _syncGhost();
     if (!keepProxyHidden) _dragProxyHidden.value = false;
   }
 
   void _finishDrag(BrowserTabs actions) {
+    final session = _session;
+    if (session != null) {
+      // A live drag settles itself on where the cursor is now (and has
+      // usually noticed the release already).
+      _draggingTabId = null;
+      unawaited(session.finishNow());
+      return;
+    }
     final id = _draggingTabId;
     final target = _hoverPane;
     final tearOff = _tornOut;
@@ -394,27 +474,233 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     });
   }
 
-  /// Moves the tab [id] into a window of its own: the window opens on the tab's
-  /// location (see [FileManagerEnvironment.openTabWindow]) and the tab closes
-  /// here. If the window cannot be opened the tab stays where it is.
+  /// Where in its container a folder tab is (null for the root, and for tabs
+  /// that are not folders).
+  String? _pathOf(BrowserTabState tab) {
+    if (tab.isDashboard || tab.isCategory) return null;
+    final current = browserTabDuplicatePath(
+      ref.read(fileBrowserNavigationProvider(tab.tabId)),
+    );
+    return current.isEmpty ? null : current;
+  }
+
+  /// The size for a window made for a tab of this one: the same, so that it
+  /// reads as the same window, but never larger than most of the screen (a
+  /// maximized window is not one that size when it is restored).
+  Size _newWindowSize() {
+    final view = View.of(context);
+    final size = view.physicalSize / view.devicePixelRatio;
+    final display = view.display;
+    final screen = display.size / display.devicePixelRatio;
+    return Size(
+      size.width < screen.width * 0.9 ? size.width : screen.width * 0.9,
+      size.height < screen.height * 0.9 ? size.height : screen.height * 0.9,
+    );
+  }
+
+  /// Moves the tab [id] into a window of its own once it is let go, for where
+  /// there is no live drag: the window opens on the tab's location (see
+  /// [FileManagerEnvironment.openTabWindow]), under the cursor where the
+  /// platform allows, and the tab closes here. If the window cannot be opened
+  /// the tab stays where it is.
   void _tearOffTab(TabId id) {
     final tab = _tearOffCandidate(id);
     if (tab == null) return;
-    String? path;
-    if (!tab.isDashboard && !tab.isCategory) {
-      final nav = ref.read(fileBrowserNavigationProvider(tab.tabId));
-      final current = browserTabDuplicatePath(nav);
-      path = current.isEmpty ? null : current;
-    }
-    // The new window is as large as this one, so it reads as the same window.
-    final view = View.of(context);
     final opened = FileManagerEnvironment.instance.openTabWindow(
-      tab,
-      initialPath: path,
-      windowSize: view.physicalSize / view.devicePixelRatio,
+      TabWindowRequest(
+        tab: tab,
+        initialPath: _pathOf(tab),
+        windowSize: _newWindowSize(),
+        placeAtCursor: true,
+      ),
     );
-    if (!opened) return;
+    if (opened == null) return;
     ref.read(browserTabsProvider(widget.workspaceConfig).notifier).closeTab(id);
+  }
+
+  // ---- the live drag: this strip as where a drag starts
+
+  /// Starts the live drag of [tab]: from the moment it is pulled out of the
+  /// strip, or, for a window's only tab, from the moment it is picked up
+  /// (then it is the window that follows the cursor).
+  void _beginLiveDrag(BrowserTabState tab, {required bool movesWindow}) {
+    final viewId = _viewId;
+    if (viewId == null || _session != null) return;
+    final press = _lastPressPosition ?? Offset.zero;
+    _carrierShown = false;
+    _returned = false;
+    // A tab pulled out gives way to the window that carries it. A window's only
+    // tab stays in sight instead: the window moves with the cursor, so the
+    // lifted tab simply stays where it is under it.
+    if (!movesWindow) _dragProxyHidden.value = true;
+    final session = TabDragSession<TabTransfer>(
+      payload: TabTransfer(tab: tab, sourceViewId: viewId, path: _pathOf(tab)),
+      sourceViewId: viewId,
+      platform: const WindowsTabDragPlatform(),
+      targets: tabDropTargets,
+      host: _LiveDragHost(this),
+      movesSourceWindow: movesWindow,
+      // Where in this window the cursor stays when the window itself moves:
+      // where it took hold of the tab.
+      grabX: press.dx,
+      grabY: press.dy,
+    );
+    _session = session;
+    unawaited(session.start());
+  }
+
+  bool _inSourceStrip(double x, double y, {required bool wasInside}) {
+    final strip = context.findRenderObject();
+    if (strip is! RenderBox || !strip.attached || !strip.hasSize) return false;
+    final top = strip.localToGlobal(Offset.zero).dy;
+    final view = View.of(context);
+    return !TabTearOffZone.isTornOut(
+      pointerX: x,
+      pointerY: y,
+      stripTop: top,
+      stripBottom: top + strip.size.height,
+      windowWidth: view.physicalSize.width / view.devicePixelRatio,
+      wasTornOut: !wasInside,
+    );
+  }
+
+  TabDragCarrierWindow? _openCarrier(void Function() onShown) {
+    final tab = _session?.payload.tab;
+    if (tab == null) return null;
+    final opened = FileManagerEnvironment.instance.openTabWindow(
+      TabWindowRequest(
+        tab: tab,
+        initialPath: _pathOf(tab),
+        windowSize: _newWindowSize(),
+        onFirstFrame: onShown,
+      ),
+    );
+    if (opened == null) return null;
+    // The cursor stays on the new window's tab where it was on this one.
+    final grab = _grabOffset;
+    return TabDragCarrierWindow(
+      viewId: opened.viewId,
+      close: opened.close,
+      grip: () => (x: opened.tabLeft + grab.dx, y: 4 + grab.dy),
+    );
+  }
+
+  void _liveReturned(bool returned) {
+    if (_session == null) return;
+    _returned = returned;
+    _dragProxyHidden.value = !returned;
+    _syncGhost();
+  }
+
+  void _liveCarrierShown() {
+    if (_session == null) return;
+    _carrierShown = true;
+    _syncGhost();
+  }
+
+  void _onLiveDragFinished(TabDragResult result) {
+    final session = _session;
+    if (session == null || !mounted) return;
+    _session = null;
+    final tab = session.payload.tab;
+    _carrierShown = false;
+    _returned = false;
+    switch (result.outcome) {
+      case TabDragOutcome.returned:
+      case TabDragOutcome.cancelled:
+        // Nothing left: the list settles its own drag, as if the tab had never
+        // been pulled out.
+        _tornOut = false;
+        _syncGhost();
+        _dragProxyHidden.value = false;
+      case TabDragOutcome.movedWindow:
+        _resetDrag();
+      case TabDragOutcome.detached:
+        // The tab lives in its own window now.
+        _resetDrag(keepProxyHidden: true);
+        ref
+            .read(browserTabsProvider(widget.workspaceConfig).notifier)
+            .closeTab(tab.tabId);
+        _dragProxyHidden.value = false;
+      case TabDragOutcome.dropped:
+        _resetDrag(keepProxyHidden: true);
+        if (session.movesSourceWindow) {
+          // Its only tab went to another window, and this window with it.
+          closeWindowOf(context);
+        } else {
+          ref
+              .read(browserTabsProvider(widget.workspaceConfig).notifier)
+              .closeTab(tab.tabId);
+          _dragProxyHidden.value = false;
+        }
+    }
+  }
+
+  // ---- the live drag: this strip as where another window's tab is dropped
+
+  /// Where the strip is on the screen of its own window, a little taller than
+  /// it is so that a tab need not be aimed precisely. Null while it cannot take
+  /// a drop: not drawn, or covered by another page of the window.
+  DragRect? _dropZone() {
+    if (!mounted) return null;
+    if (ModalRoute.of(context)?.isCurrent == false) return null;
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize || box.size.isEmpty) {
+      return null;
+    }
+    final origin = box.localToGlobal(Offset.zero);
+    return (
+      left: origin.dx,
+      top: origin.dy - 6,
+      right: origin.dx + box.size.width,
+      bottom: origin.dy + box.size.height + 6,
+    );
+  }
+
+  bool _accepts(TabTransfer payload) {
+    if (!mounted || payload.sourceViewId == _viewId) return false;
+    return !ref.read(browserTabsProvider(widget.workspaceConfig)).atLimit;
+  }
+
+  /// The slot (0 = before the first tab) that a tab held at window x [x] would
+  /// take: after the tabs whose middle is to its left.
+  int _slotAt(double x) {
+    final box = context.findRenderObject();
+    final left = box is RenderBox && box.attached
+        ? box.localToGlobal(Offset.zero).dx
+        : 0.0;
+    final scrolled = _scrollController.hasClients
+        ? _scrollController.offset
+        : 0.0;
+    final count = _stripTabs(
+      ref.read(browserTabsProvider(widget.workspaceConfig)),
+    ).length;
+    final slot = ((x - left - _stripPadding + scrolled) / kBrowserTabItemWidth)
+        .round();
+    return slot.clamp(0, count);
+  }
+
+  void _showIncoming(TabTransfer payload, int slot) {
+    if (!mounted) return;
+    setState(() => _incoming = (tab: payload.tab, slot: slot));
+  }
+
+  void _clearIncoming() {
+    if (!mounted || _incoming == null) return;
+    setState(() => _incoming = null);
+  }
+
+  bool _takeIn(TabTransfer payload, int slot) {
+    if (!mounted) return false;
+    final id = ref
+        .read(browserTabsProvider(widget.workspaceConfig).notifier)
+        .adoptTab(
+          payload.tab,
+          initialPath: payload.path,
+          pane: widget.pane,
+          slot: slot,
+        );
+    return id != null;
   }
 
   /// Closes the tab [id]. On desktop a window's last tab goes with the window,
@@ -427,6 +713,32 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       return;
     }
     ref.read(browserTabsProvider(widget.workspaceConfig).notifier).closeTab(id);
+  }
+
+  /// The tab of another window that is held over this strip: where it would
+  /// land, in the strip's own colour, so it is plain that it is not here yet.
+  Widget _buildIncomingTab(
+    BrowserTabState tab, {
+    required bool connected,
+    required Color color,
+  }) {
+    return SizedBox(
+      key: const ValueKey<String>('incoming-tab'),
+      width: kBrowserTabItemWidth,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: 0.7,
+          child: _TabItem(
+            tab: tab,
+            active: true,
+            connected: connected,
+            activeBackground: color,
+            closeVisible: false,
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
   }
 
   /// The tab pulled out of the strip, floating where the pointer is. It is
@@ -682,6 +994,16 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     final state = ref.watch(browserTabsProvider(widget.workspaceConfig));
     final pane = widget.pane;
     final tabs = _stripTabs(state);
+    // A tab held over this strip by a drag from another window shows at the
+    // slot it would take, and the tabs after it make room.
+    final incoming = _incoming;
+    final slotted = incoming == null
+        ? tabs
+        : <BrowserTabState>[
+            ...tabs.take(incoming.slot),
+            incoming.tab,
+            ...tabs.skip(incoming.slot),
+          ];
     final shownTabId = _shownTabId(state);
     // Side by side, only one pane is the active one (the pane of the active
     // tab). The single strip always is.
@@ -745,7 +1067,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                 // fit; once they overflow the list stops short of it and the +
                 // stays fixed at the right edge, always visible.
                 final tabsWidth =
-                    _stripPadding * 2 + tabs.length * kBrowserTabItemWidth;
+                    _stripPadding * 2 + slotted.length * kBrowserTabItemWidth;
                 final listWidth = PlatformFeatures.isDesktop
                     ? tabsWidth
                           .clamp(
@@ -775,7 +1097,9 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                               _lastPressPosition = event.position,
                           onPointerMove: _trackDrag,
                           onPointerUp: _onPointerUp,
-                          onPointerCancel: (_) => _resetDrag(),
+                          onPointerCancel: (_) {
+                            if (_session == null) _resetDrag();
+                          },
                           onPointerSignal: _onPointerSignal,
                           // A slim scrollbar along the top edge, shown while
                           // the pointer is over the strip (only when the tabs
@@ -820,7 +1144,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                         vertical: 3,
                                       ),
                                 // The + button is not a list item: see below.
-                                itemCount: tabs.length,
+                                itemCount: slotted.length,
                                 onReorderStart: (index) {
                                   HapticFeedback.mediumImpact();
                                   _draggingTabId =
@@ -828,6 +1152,14 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                       ? tabs[index].tabId
                                       : null;
                                   _noteGrab(_draggingTabId);
+                                  // A window's only tab has nowhere to be
+                                  // pulled out to: it moves the window.
+                                  if (_draggingTabId != null &&
+                                      tabs.length == 1 &&
+                                      state.tabs.length == 1 &&
+                                      _liveDragAvailable) {
+                                    _beginLiveDrag(tabs[0], movesWindow: true);
+                                  }
                                 },
                                 onReorderEnd: (_) => _finishDrag(actions),
                                 onReorderItem: pane == null
@@ -871,7 +1203,15 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                   );
                                 },
                                 itemBuilder: (context, index) {
-                                  final tab = tabs[index];
+                                  final tab = slotted[index];
+                                  if (incoming != null &&
+                                      tab.tabId == incoming.tab.tabId) {
+                                    return _buildIncomingTab(
+                                      tab,
+                                      connected: connected,
+                                      color: activeBackground,
+                                    );
+                                  }
                                   final itemKey = _tabItemKeys.putIfAbsent(
                                     tab.tabId,
                                     GlobalKey.new,
@@ -1105,6 +1445,61 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       ),
     );
   }
+}
+
+/// What a live drag (see [TabDragSession]) needs from the strip it started in.
+class _LiveDragHost implements TabDragHost {
+  _LiveDragHost(this._strip);
+
+  final _BrowserTabStripState _strip;
+
+  @override
+  bool isInSourceStrip(double x, double y, {required bool wasInside}) =>
+      _strip._inSourceStrip(x, y, wasInside: wasInside);
+
+  @override
+  TabDragCarrierWindow? openCarrier({required void Function() onShown}) =>
+      _strip._openCarrier(onShown);
+
+  @override
+  void returned(bool returned) => _strip._liveReturned(returned);
+
+  @override
+  void carrierShown() => _strip._liveCarrierShown();
+
+  @override
+  void finished(TabDragResult result) => _strip._onLiveDragFinished(result);
+}
+
+/// A strip as a place that another window's tab can be dropped.
+class _StripDropTarget implements TabDropTarget<TabTransfer> {
+  _StripDropTarget(this._strip);
+
+  final _BrowserTabStripState _strip;
+
+  // No window has this id, so a strip that has not been given its window yet
+  // is never found under a cursor.
+  @override
+  int get viewId => _strip._viewId ?? -1;
+
+  @override
+  DragRect? get dropZone => _strip._dropZone();
+
+  @override
+  bool accepts(TabTransfer payload) => _strip._accepts(payload);
+
+  @override
+  int slotAt(double x) => _strip._slotAt(x);
+
+  @override
+  void showDrop(TabTransfer payload, int slot) =>
+      _strip._showIncoming(payload, slot);
+
+  @override
+  void clearDrop() => _strip._clearIncoming();
+
+  @override
+  bool drop(TabTransfer payload, int slot) => _strip._takeIn(payload, slot);
 }
 
 class _TabItem extends ConsumerStatefulWidget {

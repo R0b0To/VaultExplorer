@@ -1176,4 +1176,120 @@ void main() {
       expect(state.previousTabId, state.tabs.first.tabId);
     });
   });
+
+  group('BrowserTabs.adoptTab (a tab dragged in from another window)', () {
+    // The tab as it was in the window it came from: a tab of that window's
+    // own, with an id of its own.
+    BrowserTabState foreignFolder(int volId, [String? path]) =>
+        BrowserTabState.folder(
+          tabId: TabId.allocate(),
+          container: _container(volId),
+          initialPath: path,
+        );
+
+    /// A workspace of three tabs on vaults 1, 2 and 3, the second active.
+    _Workspace three() {
+      final w = workspace(1);
+      w.tabs.openTab(_container(2));
+      w.tabs.openTab(_container(3));
+      w.tabs.activate(w.ids[1]);
+      return w;
+    }
+
+    List<int?> vols(_Workspace w) => w.state.tabs.map((t) => t.volId).toList();
+
+    test('opens the same place as a new active tab at the slot', () {
+      final w = three();
+      final from = foreignFolder(7, '/photos');
+      final id = w.tabs.adoptTab(from, initialPath: '/photos', slot: 1)!;
+      expect(vols(w), [1, 7, 2, 3]);
+      expect(w.active, id);
+      final adopted = w.tabs.tabForKey(id)!;
+      expect(adopted.volId, 7);
+      expect((adopted.kind as FolderTab).initialPath, '/photos');
+    });
+
+    test('is a tab of its own: only the place carries over', () {
+      final w = three();
+      final from = foreignFolder(7);
+      final id = w.tabs.adoptTab(from, slot: 0)!;
+      expect(id, isNot(from.tabId));
+      expect(w.tabs.tabForKey(from.tabId), isNull);
+    });
+
+    test('a slot of 0 is the front, one past the end is the back', () {
+      final w = three();
+      w.tabs.adoptTab(foreignFolder(7), slot: 0);
+      expect(vols(w), [7, 1, 2, 3]);
+      final x = three();
+      x.tabs.adoptTab(foreignFolder(8), slot: 3);
+      expect(vols(x), [1, 2, 3, 8]);
+    });
+
+    test('a slot out of range goes to the nearest end', () {
+      final w = three();
+      w.tabs.adoptTab(foreignFolder(7), slot: 99);
+      expect(vols(w), [1, 2, 3, 7]);
+      final x = three();
+      x.tabs.adoptTab(foreignFolder(8), slot: -4);
+      expect(vols(x), [8, 1, 2, 3]);
+    });
+
+    test('keeps the order of the tabs that were there', () {
+      final w = three();
+      w.tabs.adoptTab(foreignFolder(7), slot: 2);
+      expect(vols(w), [1, 2, 7, 3]);
+    });
+
+    test('is turned away at the tab limit, and nothing changes', () {
+      final w = workspace(1);
+      while (!w.state.atLimit) {
+        w.tabs.openTab(_container(w.state.tabs.length + 10));
+      }
+      final before = vols(w);
+      expect(w.tabs.adoptTab(foreignFolder(7), slot: 0), isNull);
+      expect(vols(w), before);
+    });
+
+    test('takes in a category with its settings', () {
+      final w = three();
+      final local = _container(5, 'device');
+      final from = BrowserTabState.category(
+        tabId: TabId.allocate(),
+        category: FileCategory.videos,
+        primaryLocalContainer: local,
+        includeVaults: false,
+      );
+      final id = w.tabs.adoptTab(from, slot: 0)!;
+      final adopted = w.tabs.tabForKey(id)!;
+      expect(w.state.tabs.first.tabId, id);
+      expect(adopted.category, FileCategory.videos);
+      expect(adopted.primaryLocalContainer, same(local));
+      expect(adopted.includeVaults, isFalse);
+    });
+
+    test('a category that is already open is shown, not opened twice', () {
+      final w = workspace(1);
+      final open = w.tabs.openCategoryTab(FileCategory.audio)!;
+      w.tabs.openTab(_container(2));
+      final before = w.state.tabs.length;
+      final from = BrowserTabState.category(
+        tabId: TabId.allocate(),
+        category: FileCategory.audio,
+      );
+      final id = w.tabs.adoptTab(from, slot: 0);
+      expect(id, open);
+      expect(w.state.tabs, hasLength(before));
+      expect(w.active, open);
+    });
+
+    test('takes in a Vaults tab', () {
+      final w = three();
+      final from = BrowserTabState.home(tabId: TabId.allocate());
+      final id = w.tabs.adoptTab(from, slot: 1)!;
+      expect(w.state.tabs[1].tabId, id);
+      expect(w.state.tabs[1].isDashboard, isTrue);
+      expect(w.active, id);
+    });
+  });
 }

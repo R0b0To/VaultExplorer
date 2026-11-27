@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/veracrypt_tools_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -627,12 +628,10 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     final host = _host;
     final hiddenReady = host != null && host.maxHiddenBytes > 0;
 
-    return Scaffold(
-      appBar: AppBar(
+    return CaptionScaffold(
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
-        backgroundColor: cs.surfaceContainerHigh,
-      ),
+        appBarBackgroundColor: cs.surfaceContainerHigh,
       body: Column(
         children: [
           if (_busy) const LinearProgressIndicator(minHeight: 3),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -90,8 +91,7 @@ class PasswordInterchangeScreen extends ConsumerWidget {
     final state = ref.watch(passwordInterchangeProvider);
     final isLandscape = context.screen.useWideLayout;
 
-    return Scaffold(
-      appBar: AppBar(
+    return CaptionScaffold(
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
@@ -116,7 +116,6 @@ class PasswordInterchangeScreen extends ConsumerWidget {
               ? const LinearProgressIndicator(minHeight: 2)
               : const SizedBox(height: 2),
         ),
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: isLandscape

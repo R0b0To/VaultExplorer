@@ -317,7 +317,11 @@ extension _MediaViewerHandoff on _MediaViewerScreenState {
   /// window's flight from happening over a black screen that lingers.
   void _beginFloatingFlight({bool fadeChrome = true}) {
     if (_backgroundPlaybackHandoff?.floatingPlayer != true) return;
-    final from = _videoProbe.measure();
+    // The floating player is a native window of its own on desktop: there is
+    // no in-app panel to fly the video into.
+    final flies =
+        !DesktopPipWindowController.isAvailable && _videoProbe.measure() != null;
+    final from = flies ? _videoProbe.measure() : null;
     if (from != null) {
       BackgroundPlaybackHost.instance.beginFloatingEntry(
         FloatingPlayerEntry(playbackManager: _playbackManager, from: from),

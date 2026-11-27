@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -286,8 +287,7 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
           ref.read(hashVerifierProvider.notifier).setVaultAction(null);
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
+      child: CaptionScaffold(
           elevation: 0,
           leading: inVaultSubAction
               ? IconButton(
@@ -314,7 +314,6 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
               const SizedBox(width: 12),
             ],
           ],
-        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: isLandscape

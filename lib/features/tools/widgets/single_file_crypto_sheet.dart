@@ -1,7 +1,8 @@
-import 'package:flutter/services.dart' show AutofillContextAction;
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
@@ -184,8 +185,7 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
     final directionLocked = widget.initialDirection != null;
     final isLandscape = context.screen.useWideLayout;
 
-    return Scaffold(
-      appBar: AppBar(
+    return CaptionScaffold(
         elevation: 0,
         title: Text(
           maxLines: 2,
@@ -202,7 +202,6 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
             const SizedBox(width: 16),
           ],
         ],
-      ),
       body: SafeArea(
         child: isLandscape
             ? _buildLandscapeLayout(context, state, isEncrypt)

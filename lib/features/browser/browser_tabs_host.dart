@@ -31,7 +31,6 @@ import 'package:vaultexplorer/features/dashboard/widgets/lock_all_vaults.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_tools_menu.dart';
 import 'package:vaultexplorer/core/widgets/adaptive_action_strip.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
-import 'package:vaultexplorer/data/models/dashboard_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';

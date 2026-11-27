@@ -54,6 +54,23 @@ class AppWindows extends ChangeNotifier {
   /// Whether a main window is open.
   bool get isMainWindowOpen => _policy.isMainOpen;
 
+  /// The id of the main window's view, or null when there is none (it was
+  /// closed). It is how the runner knows the window (see
+  /// `windowChannelArgsFor`).
+  int? get mainViewId {
+    final main = _main;
+    if (main != null) {
+      try {
+        return main.rootView.viewId;
+      } catch (_) {
+        return null;
+      }
+    }
+    return _mainInRunnerWindow
+        ? PlatformDispatcher.instance.implicitView?.viewId
+        : null;
+  }
+
   /// Opens the main window at startup. Called once, by `DesktopAppHost`.
   void openStartupWindow() {
     if (_policy.isMainOpen) return;

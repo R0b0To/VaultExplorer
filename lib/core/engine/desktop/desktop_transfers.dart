@@ -23,7 +23,6 @@
 // is only offered for "delete after import" when every picked item was written, the read-back
 // matched, and the import ran to the end.
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';

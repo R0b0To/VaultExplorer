@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart' show KeyfileRef;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -118,8 +119,7 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
           ref.read(headerBackupProvider.notifier).changeTarget();
         }
       },
-      child: Scaffold(
-      appBar: AppBar(
+      child: CaptionScaffold(
           elevation: 0,
           leading: hasTarget
               ? IconButton(
@@ -132,7 +132,6 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
             l10n.toolHeaderBackupTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: isLandscape

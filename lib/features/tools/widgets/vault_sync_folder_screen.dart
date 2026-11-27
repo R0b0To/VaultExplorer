@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -286,7 +287,7 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
             _goTo(_parentOf(_path));
           }
         },
-        child: Scaffold(
+        child: CaptionScaffold(
           appBar: _selecting ? _selectionAppBar(context) : _appBar(context),
           body: (left == null || right == null)
               ? const SizedBox.shrink()
@@ -307,7 +308,7 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
     );
   }
 
-  PreferredSizeWidget _appBar(BuildContext context) => AppBar(
+  AppBar _appBar(BuildContext context) => AppBar(
     elevation: 0,
     title: Text(
       context.l10n.vaultSyncExplorerTitle,
@@ -324,7 +325,7 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
     ],
   );
 
-  PreferredSizeWidget _selectionAppBar(BuildContext context) => AppBar(
+  AppBar _selectionAppBar(BuildContext context) => AppBar(
     elevation: 0,
     leading: IconButton(
       icon: const Icon(Icons.close_rounded),

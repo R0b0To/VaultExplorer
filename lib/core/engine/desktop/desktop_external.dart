@@ -12,7 +12,6 @@
 //   * nothing else in the app uses it.
 // A viewer the user keeps open after locking loses its file, which is the intent.
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

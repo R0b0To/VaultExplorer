@@ -7,6 +7,7 @@ import 'package:vaultexplorer/features/browser/viewer/desktop_media/desktop_medi
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/desktop_pip_window.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/floating_video_player.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
@@ -28,6 +29,9 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coo
 ///    the navigator, while [BackgroundPlaybackHost] has a floating session.
 ///    Leaving the app then turns the app into the PiP window above, with the
 ///    same video.
+///  * On Linux and Windows the floating player is not drawn here at all: it is
+///    a native window of its own (see [DesktopPipWindowController]) that can be
+///    moved anywhere on screen and resized by its edges.
 class PictureInPictureLayer extends StatefulWidget {
   final Widget child;
 
@@ -40,9 +44,16 @@ class PictureInPictureLayer extends StatefulWidget {
 class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
   StreamSubscription<void>? _openPlayerSubscription;
 
+  /// The floating player's own window, where there are native windows (Linux
+  /// and Windows). Null elsewhere, where the panel is drawn in the app.
+  DesktopPipWindowController? _desktopPip;
+
   @override
   void initState() {
     super.initState();
+    if (DesktopPipWindowController.isAvailable) {
+      _desktopPip = DesktopPipWindowController();
+    }
     BackgroundPlaybackHost.instance.expandHandler = _reopenViewer;
     _openPlayerSubscription = MediaSessionBridge.openPlayerRequests.listen(
       (_) => _onOpenPlayerRequest(),
@@ -75,6 +86,7 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
     final host = BackgroundPlaybackHost.instance;
     if (host.expandHandler == _reopenViewer) host.expandHandler = null;
     DesktopMediaControls.instance.stop();
+    _desktopPip?.dispose();
     super.dispose();
   }
 
@@ -158,7 +170,9 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
                 // viewer has drawn the video where it was (an exit). The
                 // constant key keeps it the same window throughout, so none of
                 // the hand-overs is seen.
-                child: ListenableBuilder(
+                child: _desktopPip != null
+                    ? const SizedBox.shrink()
+                    : ListenableBuilder(
                   listenable: Listenable.merge(<Listenable>[
                     BackgroundPlaybackHost.instance.floatingSession,
                     BackgroundPlaybackHost.instance.floatingEntry,

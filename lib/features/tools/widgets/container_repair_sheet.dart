@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
@@ -124,8 +125,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
           ref.read(containerRepairProvider.notifier).changeTarget();
         }
       },
-      child: Scaffold(
-      appBar: AppBar(
+      child: CaptionScaffold(
           elevation: 0,
           leading: hasTarget
               ? IconButton(
@@ -140,7 +140,6 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
             context.l10n.toolContainerRepairTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: isLandscape

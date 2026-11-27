@@ -13,7 +13,6 @@
 //     WidgetsFlutterBinding.ensureInitialized();
 //   }
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' show PlatformMessageResponseCallback, AppExitResponse;
 
 import 'package:flutter/foundation.dart';

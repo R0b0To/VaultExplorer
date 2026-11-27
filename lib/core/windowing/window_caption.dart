@@ -163,6 +163,60 @@ Future<void> setWindowContentHeight(int viewId, double height) async {
   }
 }
 
+/// Keeps the window that shows [viewId] above every other window (or lets it
+/// sink back among them), like a picture-in-picture player.
+///
+/// Windows only. Never throws.
+Future<void> setWindowAlwaysOnTop(int viewId, bool enabled) async {
+  if (!PlatformFeatures.isWindows) return;
+  try {
+    await kWindowChannel.invokeMethod<void>('setAlwaysOnTop', <String, Object?>{
+      'viewId': viewId,
+      'enabled': enabled,
+    });
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not change always-on-top', error);
+  }
+}
+
+/// Holds the window that shows [viewId] to [ratio] (width / height of its
+/// content) while the person resizes it by its edges. With [reshape] it takes
+/// that shape right now too: the width stays, the height follows and the
+/// bottom edge stays put. A null or non-positive [ratio] lifts the hold.
+///
+/// Windows only; elsewhere the window can be resized freely. Never throws.
+Future<void> setWindowAspectRatio(
+  int viewId,
+  double? ratio, {
+  bool reshape = false,
+}) async {
+  if (!PlatformFeatures.isWindows) return;
+  try {
+    await kWindowChannel.invokeMethod<void>('setAspectRatio', <String, Object?>{
+      'viewId': viewId,
+      // Sent as a pair so the runner reads plain numbers.
+      'width': ratio != null && ratio > 0 ? ratio * 1000 : 0.0,
+      'height': ratio != null && ratio > 0 ? 1000.0 : 0.0,
+      'resize': reshape,
+    });
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not set the aspect ratio', error);
+  }
+}
+
+/// Brings the window that shows [viewId] to the front and gives it focus
+/// (restoring it first when it is minimized). Windows only. Never throws.
+Future<void> bringWindowForward(int viewId) async {
+  if (!PlatformFeatures.isWindows) return;
+  try {
+    await kWindowChannel.invokeMethod<void>('activateWindow', <String, Object?>{
+      'viewId': viewId,
+    });
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not bring the window forward', error);
+  }
+}
+
 /// Puts a window into real fullscreen (no frame, covering its whole monitor,
 /// taskbar included) or back, and returns whether the runner did it.
 ///

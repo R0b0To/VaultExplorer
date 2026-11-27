@@ -7,7 +7,6 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations_en.dart';
 
 void main() {

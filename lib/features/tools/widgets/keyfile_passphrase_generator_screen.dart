@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -162,22 +163,20 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
     final cs = context.colors;
     final isLandscape = context.screen.useWideLayout;
 
-    return Scaffold(
-      appBar: AppBar(
+    return CaptionScaffold(
         title: Text(
           context.l10n.keyfilePassphraseGeneratorTitle,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         elevation: 0,
-        backgroundColor: cs.surfaceContainerHigh,
+        appBarBackgroundColor: cs.surfaceContainerHigh,
         actions: [
           if (isLandscape) ...[
             _buildTabSegment(context, ref, state, isCompact: true),
             const SizedBox(width: 12),
           ],
         ],
-      ),
       body: SafeArea(
         child: Column(
           children: [

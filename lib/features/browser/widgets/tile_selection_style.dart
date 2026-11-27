@@ -9,7 +9,6 @@ import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_details_table.dart';
-import 'package:vaultexplorer/features/browser/widgets/file_details_table.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 
 abstract final class TileSelectionStyle {

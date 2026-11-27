@@ -2,6 +2,7 @@
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
@@ -132,8 +133,7 @@ class _ContainerSplitterSheetState extends ConsumerState<ContainerSplitterSheet>
     final textTheme = context.typography;
     final isLandscape = context.screen.useWideLayout;
 
-    return Scaffold(
-      appBar: AppBar(
+    return CaptionScaffold(
         elevation: 0,
         title: Text(
           context.l10n.toolContainerSplitterTitle,
@@ -145,7 +145,6 @@ class _ContainerSplitterSheetState extends ConsumerState<ContainerSplitterSheet>
             const SizedBox(width: 16),
           ],
         ],
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: isLandscape

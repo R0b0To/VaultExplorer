@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
@@ -251,7 +252,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) notifier.clearSelection();
       },
-      child: Scaffold(
+      child: CaptionScaffold(
         appBar: selecting
             ? AppBar(
                 elevation: 0,

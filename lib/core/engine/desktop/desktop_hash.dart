@@ -6,7 +6,6 @@
 // in a single pass, exactly like the Android handler's per-algorithm MessageDigests. Wire names and
 // result shape match: {"MD5": "<lowercase hex>", "SHA-1": ..., "SHA-256": ..., "SHA-512": ...}.
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 

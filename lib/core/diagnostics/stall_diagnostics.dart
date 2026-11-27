@@ -1,13 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:ui' show FrameTiming;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/semantics.dart';
+
 
 /// Temporary diagnostics for "the app stops answering inputs while music plays".
 ///

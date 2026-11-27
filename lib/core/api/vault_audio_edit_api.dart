@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 

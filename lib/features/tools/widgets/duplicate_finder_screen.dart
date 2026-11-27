@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -202,14 +203,12 @@ class _DuplicateFinderScreenState extends ConsumerState<DuplicateFinderScreen> {
     final state = ref.watch(duplicateFinderProvider);
     final isLandscape = context.screen.useWideLayout;
 
-    return Scaffold(
-      appBar: AppBar(
+    return CaptionScaffold(
         elevation: 0,
         title: Text(
           context.l10n.toolDuplicateFinderTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-      ),
       body: ValueListenableBuilder<List<MountedContainer>>(
         valueListenable: widget.mountedContainers,
         builder: (context, mountedList, _) {

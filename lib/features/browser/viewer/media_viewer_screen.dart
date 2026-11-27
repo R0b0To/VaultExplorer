@@ -49,6 +49,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/desktop_pip_window.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';

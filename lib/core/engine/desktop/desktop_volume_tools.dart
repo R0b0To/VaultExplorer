@@ -10,7 +10,6 @@
 // A container file is addressed by its filesystem path (what `uri` means on desktop). A container file that is
 // currently unlocked in this process is refused by the engine itself (CONTAINER_IN_USE).
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 

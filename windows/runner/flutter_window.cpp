@@ -28,6 +28,13 @@ std::map<HWND, FullscreenState>& FullscreenWindows() {
   return windows;
 }
 
+// Windows whose shape is held to an aspect ratio while the person resizes them
+// (the picture-in-picture window): width / height of the window's content.
+std::map<HWND, double>& AspectRatios() {
+  static std::map<HWND, double> ratios;
+  return ratios;
+}
+
 // A fullscreen window has no OS frame at all, so there is no caption for the
 // WM_NCCALCSIZE hook to hide.
 bool HasOsFrame(HWND hwnd) {
@@ -66,7 +73,50 @@ LRESULT CALLBACK CustomCaptionProc(HWND hwnd,
       }
       return 0;
     }
+    case WM_SIZING: {
+      // Keeps a window with an aspect ratio (see AspectRatios) in shape while
+      // an edge or a corner is dragged: the dragged edge decides, the other
+      // dimension follows. Corners follow the width.
+      const auto found = AspectRatios().find(hwnd);
+      if (found == AspectRatios().end() || found->second <= 0) break;
+      RECT win;
+      RECT client;
+      GetWindowRect(hwnd, &win);
+      GetClientRect(hwnd, &client);
+      const int extra_w = (win.right - win.left) - (client.right - client.left);
+      const int extra_h = (win.bottom - win.top) - (client.bottom - client.top);
+      RECT* rect = reinterpret_cast<RECT*>(lparam);
+      const double ratio = found->second;
+      const int width = (rect->right - rect->left) - extra_w;
+      const int height = (rect->bottom - rect->top) - extra_h;
+      switch (wparam) {
+        case WMSZ_LEFT:
+        case WMSZ_RIGHT:
+          rect->bottom = rect->top + extra_h +
+                         static_cast<int>(std::lround(width / ratio));
+          break;
+        case WMSZ_TOP:
+        case WMSZ_BOTTOM:
+          rect->right = rect->left + extra_w +
+                        static_cast<int>(std::lround(height * ratio));
+          break;
+        case WMSZ_TOPLEFT:
+        case WMSZ_TOPRIGHT:
+          rect->top = rect->bottom - extra_h -
+                      static_cast<int>(std::lround(width / ratio));
+          break;
+        case WMSZ_BOTTOMLEFT:
+        case WMSZ_BOTTOMRIGHT:
+          rect->bottom = rect->top + extra_h +
+                         static_cast<int>(std::lround(width / ratio));
+          break;
+        default:
+          break;
+      }
+      return TRUE;
+    }
     case WM_NCDESTROY:
+      AspectRatios().erase(hwnd);
       FullscreenWindows().erase(hwnd);
       RemoveWindowSubclass(hwnd, CustomCaptionProc, subclass_id);
       break;
@@ -334,6 +384,47 @@ bool FlutterWindow::OnCreate() {
           SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                        SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE |
                            SWP_NOZORDER | SWP_NOACTIVATE);
+          result->Success(flutter::EncodableValue());
+        } else if (method == "setAlwaysOnTop") {
+          // Keeps the window above every other window (the picture-in-picture
+          // window), or lets it sink back among them.
+          const bool on = ReadBool(call.arguments(), "enabled", false);
+          SetWindowPos(hwnd, on ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+          result->Success(flutter::EncodableValue());
+        } else if (method == "setAspectRatio") {
+          // Holds the window to width : height while it is resized by its
+          // edges (see WM_SIZING). With `resize`, also reshapes it now: the
+          // width stays, the height follows, and the bottom edge stays where it
+          // is (so a window parked in a corner grows upward).
+          const double w = ReadNumber(call.arguments(), "width", 0);
+          const double h = ReadNumber(call.arguments(), "height", 0);
+          if (w <= 0 || h <= 0) {
+            AspectRatios().erase(hwnd);
+            result->Success(flutter::EncodableValue());
+            return;
+          }
+          const double ratio = w / h;
+          AspectRatios()[hwnd] = ratio;
+          if (ReadBool(call.arguments(), "resize", false) && !IsZoomed(hwnd)) {
+            RECT win;
+            RECT client;
+            GetWindowRect(hwnd, &win);
+            GetClientRect(hwnd, &client);
+            const int extra_h =
+                (win.bottom - win.top) - (client.bottom - client.top);
+            const int client_w = client.right - client.left;
+            const int height =
+                static_cast<int>(std::lround(client_w / ratio)) + extra_h;
+            MONITORINFO monitor = {sizeof(MONITORINFO)};
+            GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                           &monitor);
+            const RECT work = monitor.rcWork;
+            int top = win.bottom - height;
+            if (top < work.top) top = work.top;
+            SetWindowPos(hwnd, nullptr, win.left, top, win.right - win.left,
+                         height, SWP_NOZORDER | SWP_NOACTIVATE);
+          }
           result->Success(flutter::EncodableValue());
         } else if (method == "dockBottomRight") {
           // Bottom-right corner of the work area of the screen the window is

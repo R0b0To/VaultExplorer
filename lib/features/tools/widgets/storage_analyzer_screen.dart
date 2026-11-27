@@ -19,6 +19,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
@@ -633,8 +634,7 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) notifier.clearSelection();
       },
-      child: Scaffold(
-        appBar: AppBar(
+      child: CaptionScaffold(
           title: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.sm),
             onTap: (!st.busy && mountedTargets.length > 1)
@@ -713,6 +713,51 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
               ),
             ),
           ),
+          // In a window's title bar there is one line: the title, then the
+          // storage being analysed (tap to pick another, as in the app bar).
+          captionTitleInteractive: true,
+          captionTitle: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            onTap: (!st.busy && mountedTargets.length > 1)
+                ? () => _showTargetPickerSheet(
+                    context,
+                    mountedTargets,
+                    st,
+                    notifier,
+                  )
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.toolStorageAnalyzerTitle,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (st.selected != null) ...[
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        st.selected!.displayName,
+                        style: context.typography.bodySmall?.copyWith(
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (mountedTargets.length > 1)
+                      Icon(
+                        Icons.arrow_drop_down_rounded,
+                        size: 18,
+                        color: context.colors.onSurfaceVariant,
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ),
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
@@ -722,7 +767,6 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
                   : () => unawaited(notifier.rescan()),
             ),
           ],
-        ),
         bottomNavigationBar: showBar
             ? _SelectionBar(
                 selection: selection,

@@ -38,6 +38,10 @@ Future<bool> pushWindowedPage(
   final windows = SecondaryWindows.instance;
   // The window this page was opened from: the new one is centered over it.
   final openedFrom = View.maybeOf(context)?.viewId;
+  // Callers such as the sidebar start this from a post-frame callback, and a
+  // native window must not be created inside a frame (see
+  // SecondaryWindows.untilBetweenFrames). Completes at once when between frames.
+  await SecondaryWindows.untilBetweenFrames();
   final opened = windows.open(
     key: key,
     title: title,
@@ -51,6 +55,7 @@ Future<bool> pushWindowedPage(
     await windows.entryFor(key)?.closed;
     return true;
   }
+  if (!context.mounted) return false;
   await Navigator.push<void>(
     context,
     adaptivePageRoute<void>(context, builder: builder),

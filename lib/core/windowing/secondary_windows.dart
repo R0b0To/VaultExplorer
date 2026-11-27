@@ -2,6 +2,8 @@
 // ignore_for_file: invalid_use_of_internal_member, implementation_imports
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/src/widgets/_window.dart' as flutter_window;
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -118,8 +120,33 @@ class SecondaryWindows extends ChangeNotifier {
   /// The window open under [key], if any.
   SecondaryWindowEntry? entryFor(String key) => _entries[key];
 
+  /// Completes once the scheduler is between frames (immediately when it
+  /// already is).
+  ///
+  /// Creating a native window must not happen while a frame is being built or
+  /// while its post-frame callbacks run (an `addPostFrameCallback` is exactly
+  /// that). On Windows the native create call pumps the message loop before it
+  /// returns, which lets the engine start a new frame inside the frame that is
+  /// still running; the scheduler then fails its `schedulerPhase == idle` and
+  /// `midFrameMicrotasks` assertions, and the new window never gets a valid
+  /// first frame (it ends up blank or behind the main window).
+  ///
+  /// A caller that may run inside a frame awaits this before [open].
+  static Future<void> untilBetweenFrames() {
+    if (WidgetsBinding.instance.schedulerPhase == SchedulerPhase.idle) {
+      return SynchronousFuture<void>(null);
+    }
+    final done = Completer<void>();
+    // A timer fires on a later turn of the event loop, after the frame that
+    // is running now has returned.
+    Timer.run(done.complete);
+    return done.future;
+  }
+
   /// Opens a window showing [builder], or brings the one already open under
   /// [key] to the front.
+  ///
+  /// Must not be called from inside a frame; see [untilBetweenFrames].
   ///
   /// With [survivesMainClose] the window outlives the main window: closing the
   /// main window leaves it open, and the app ends when the last window opened

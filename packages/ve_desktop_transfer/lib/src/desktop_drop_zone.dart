@@ -140,7 +140,6 @@ class _DesktopDropTargetState extends State<DesktopDropTarget> {
           );
         }
       case DesktopDropEventKind.dropped:
-        final wasActive = _status != _DropTargetStatus.idle || Platform.isLinux;
         if (_status != _DropTargetStatus.idle) {
           _setStatus(
             _DropTargetStatus.idle,
@@ -148,7 +147,11 @@ class _DesktopDropTargetState extends State<DesktopDropTarget> {
             globalPosition: globalPos,
           );
         }
-        if (wasActive && inBounds && event.paths.isNotEmpty) {
+        // The drop event is authoritative. Enter/update notifications can be
+        // missed while a window is busy; the native target only sends usable
+        // paths for an accepted format, and the bounds check keeps this zone
+        // from taking drops elsewhere in the view.
+        if (inBounds && event.paths.isNotEmpty) {
           widget.onDragDone?.call(
             DesktopDropDetails(
               localPosition: localPos,

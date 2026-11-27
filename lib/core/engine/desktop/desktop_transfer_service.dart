@@ -266,16 +266,24 @@ class DesktopTransferService {
 
     final batch = built.batch;
     if (batch != null) {
-      _recentOutboundDrag = (
-        volId: items.first.container.volId,
-        sourceDir: sourceDir,
-        stagingDir: batch.dirPath,
-        at: DateTime.now(),
-      );
-      if (!batch.disposed &&
-          (result == 'cancelled' ||
-              result == 'error' ||
-              result == 'unsupported')) {
+      final wasCancelled =
+          result == 'cancelled' || result == 'error' || result == 'unsupported';
+      if (wasCancelled) {
+        final recent = _recentOutboundDrag;
+        if (recent != null && p.equals(recent.stagingDir, batch.dirPath)) {
+          // A canceled export must not suppress a later external drop from
+          // this staging path as though it were a successful return-to-source.
+          _recentOutboundDrag = null;
+        }
+      } else {
+        _recentOutboundDrag = (
+          volId: items.first.container.volId,
+          sourceDir: sourceDir,
+          stagingDir: batch.dirPath,
+          at: DateTime.now(),
+        );
+      }
+      if (!batch.disposed && wasCancelled) {
         await staging.onDragTransferFinished(
           batch.batchId,
           immediateIfUnused: true,

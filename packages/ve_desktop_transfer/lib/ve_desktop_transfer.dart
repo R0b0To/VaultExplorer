@@ -426,7 +426,20 @@ class VeDesktopTransfer {
           paths: paths,
         );
         for (final listener in List<DesktopDropListener>.of(_dropListeners)) {
-          listener(event);
+          try {
+            listener(event);
+          } on Object catch (error, stackTrace) {
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stackTrace,
+                library: 've_desktop_transfer',
+                context: ErrorDescription(
+                  'while dispatching external drop event ${event.kind}',
+                ),
+              ),
+            );
+          }
         }
         return null;
 
@@ -449,7 +462,20 @@ class VeDesktopTransfer {
           ),
         );
         for (final listener in List<OwnDragListener>.of(_ownDragListeners)) {
-          listener(ownEvent);
+          try {
+            listener(ownEvent);
+          } on Object catch (error, stackTrace) {
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stackTrace,
+                library: 've_desktop_transfer',
+                context: ErrorDescription(
+                  'while dispatching own drag event ${ownEvent.kind}',
+                ),
+              ),
+            );
+          }
         }
         return null;
 

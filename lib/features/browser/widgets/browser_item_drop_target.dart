@@ -50,6 +50,7 @@ class _BrowserItemDropTargetState extends State<BrowserItemDropTarget>
   /// The resumed drag that is over this target and was accepted, if any.
   BrowserItemDragData? _ownDrag;
   int? _viewId;
+  RenderObject? _indexedRenderObject;
 
   @override
   void initState() {
@@ -60,7 +61,27 @@ class _BrowserItemDropTargetState extends State<BrowserItemDropTarget>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _viewId = View.maybeOf(context)?.viewId;
+    final nextViewId = View.maybeOf(context)?.viewId;
+    if (_viewId != nextViewId) {
+      _viewId = nextViewId;
+      OwnDragResume.instance.refreshTargets();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant BrowserItemDropTarget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _refreshTargetIndexAfterFrame();
+  }
+
+  void _refreshTargetIndexAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final renderObject = context.findRenderObject();
+      if (identical(_indexedRenderObject, renderObject)) return;
+      _indexedRenderObject = renderObject;
+      OwnDragResume.instance.refreshTargets();
+    });
   }
 
   @override
@@ -103,6 +124,9 @@ class _BrowserItemDropTargetState extends State<BrowserItemDropTarget>
 
   @override
   Widget build(BuildContext context) {
+    // Check after layout so ordinary tile rebuilds do not discard the index
+    // when the hit-test render object stayed the same.
+    _refreshTargetIndexAfterFrame();
     return DragTarget<BrowserItemDragData>(
       onWillAcceptWithDetails: widget.onWillAcceptWithDetails,
       onAcceptWithDetails: widget.onAcceptWithDetails,
@@ -156,15 +180,24 @@ class OwnDragResume {
   static final OwnDragResume instance = OwnDragResume._();
 
   final Set<OwnDragDropTarget> _targets = <OwnDragDropTarget>{};
+  final Map<int, Map<RenderObject, OwnDragDropTarget>> _targetsByView =
+      <int, Map<RenderObject, OwnDragDropTarget>>{};
 
   _HandedOffDrag? _active;
   OwnDragDropTarget? _hover;
   bool _sessionBegun = false;
 
-  void register(OwnDragDropTarget target) => _targets.add(target);
+  void register(OwnDragDropTarget target) {
+    if (_targets.add(target)) refreshTargets();
+  }
+
+  /// Invalidates the render-object index after targets attach, detach or
+  /// rebuild. The next pointer update rebuilds it once for that view.
+  void refreshTargets() => _targetsByView.clear();
 
   void unregister(OwnDragDropTarget target) {
     _targets.remove(target);
+    refreshTargets();
     if (identical(_hover, target)) _hover = null;
   }
 
@@ -273,14 +306,10 @@ class OwnDragResume {
 
   /// The registered targets under [position] in [viewId], innermost first.
   List<OwnDragDropTarget> _targetsAt(Offset position, int viewId) {
-    final byRenderObject = <RenderObject, OwnDragDropTarget>{};
-    for (final target in _targets) {
-      if (target.dropViewId != viewId) continue;
-      final renderObject = target.dropRenderObject;
-      if (renderObject != null && renderObject.attached) {
-        byRenderObject[renderObject] = target;
-      }
-    }
+    final byRenderObject = _targetsByView.putIfAbsent(
+      viewId,
+      () => _buildTargetIndex(viewId),
+    );
     if (byRenderObject.isEmpty) return const <OwnDragDropTarget>[];
     final result = HitTestResult();
     WidgetsBinding.instance.hitTestInView(result, position, viewId);
@@ -292,6 +321,18 @@ class OwnDragResume {
       if (match != null) found.add(match);
     }
     return found;
+  }
+
+  Map<RenderObject, OwnDragDropTarget> _buildTargetIndex(int viewId) {
+    final byRenderObject = <RenderObject, OwnDragDropTarget>{};
+    for (final target in _targets) {
+      if (target.dropViewId != viewId) continue;
+      final renderObject = target.dropRenderObject;
+      if (renderObject != null && renderObject.attached) {
+        byRenderObject[renderObject] = target;
+      }
+    }
+    return byRenderObject;
   }
 
   void _leaveHover() {

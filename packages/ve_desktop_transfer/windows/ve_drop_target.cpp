@@ -12,6 +12,7 @@ namespace ve_transfer {
 namespace {
 
 std::atomic<IDataObject*> g_own_outbound_data_object{nullptr};
+constexpr auto kDragUpdateInterval = std::chrono::milliseconds(33);
 
 // Tells Dart where an own drag is over [hwnd], in client pixels. These events
 // are separate from the external drop ones: the files of an own drag are never
@@ -29,7 +30,7 @@ void PostOwnDragEvent(HWND hwnd, int64_t view_id, TransferCallbacksWin* callback
 
 // static
 void VeDropTarget::SetOwnOutboundDataObject(IDataObject* object) {
-  g_own_outbound_data_object.store(object);
+  g_own_outbound_data_object.store(object, std::memory_order_release);
 }
 
 VeDropTarget::VeDropTarget(HWND hwnd, int64_t view_id, TransferCallbacksWin* callbacks)
@@ -89,18 +90,29 @@ bool VeDropTarget::AcceptsDataObject(IDataObject* pDataObj) const {
 // static
 bool VeDropTarget::IsOwnDataObject(IDataObject* pDataObj) {
   if (!pDataObj) return false;
-  // Our own outbound drag, known by identity: nothing is asked of the object.
-  if (pDataObj == g_own_outbound_data_object.load()) return true;
-  // VeDataObject always advertises the vault-specific
-  // ExcludeClipboardContentFromMonitorProcessing clipboard format.
-  // No other application uses this format, so its presence is a reliable
-  // signal that the data object was created by this process's outbound drag.
-  static const UINT cf_exclude = RegisterClipboardFormatW(
-      L"ExcludeClipboardContentFromMonitorProcessing");
-  if (cf_exclude == 0) return false;
-  FORMATETC probe{static_cast<CLIPFORMAT>(cf_exclude), nullptr,
-                  DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
-  return pDataObj->QueryGetData(&probe) == S_OK;
+  // Only the active object from our DoDragDrop call is ours. Clipboard
+  // privacy formats are public and may also be advertised by external apps.
+  IDataObject* active = g_own_outbound_data_object.load(std::memory_order_acquire);
+  if (!active) return false;
+  if (pDataObj == active) return true;
+
+  // Compare canonical COM identities in case OLE handed us another interface
+  // pointer for the same object.
+  IUnknown* incoming_identity = nullptr;
+  IUnknown* active_identity = nullptr;
+  const HRESULT incoming_hr = pDataObj->QueryInterface(
+      IID_IUnknown, reinterpret_cast<void**>(&incoming_identity));
+  if (FAILED(incoming_hr)) return false;
+  const HRESULT active_hr = active->QueryInterface(
+      IID_IUnknown, reinterpret_cast<void**>(&active_identity));
+  if (FAILED(active_hr)) {
+    incoming_identity->Release();
+    return false;
+  }
+  const bool is_own = incoming_identity == active_identity;
+  incoming_identity->Release();
+  active_identity->Release();
+  return is_own;
 }
 
 HRESULT STDMETHODCALLTYPE VeDropTarget::DragEnter(
@@ -111,11 +123,15 @@ HRESULT STDMETHODCALLTYPE VeDropTarget::DragEnter(
     // to Dart, which lets it carry on as an in-app drag. COPY keeps the drag
     // droppable here (with NONE, letting go would not reach Drop).
     can_drop_ = false;
+    last_own_drag_update_ = std::chrono::steady_clock::now();
+    last_drop_update_ = {};
     if (pdwEffect) *pdwEffect = DROPEFFECT_COPY;
     PostOwnDragEvent(hwnd_, view_id_, callbacks_, "onOwnDragEntered", pt);
     return S_OK;
   }
   can_drop_ = AcceptsDataObject(pDataObj);
+  last_own_drag_update_ = {};
+  last_drop_update_ = std::chrono::steady_clock::now();
   if (pdwEffect) {
     *pdwEffect = can_drop_ ? (*pdwEffect & (DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK))
                            : DROPEFFECT_NONE;
@@ -133,7 +149,11 @@ HRESULT STDMETHODCALLTYPE VeDropTarget::DragEnter(
 HRESULT STDMETHODCALLTYPE VeDropTarget::DragOver(DWORD, POINTL pt, DWORD* pdwEffect) {
   if (own_drag_) {
     if (pdwEffect) *pdwEffect = DROPEFFECT_COPY;
-    PostOwnDragEvent(hwnd_, view_id_, callbacks_, "onOwnDragUpdated", pt);
+    const auto now = std::chrono::steady_clock::now();
+    if (now - last_own_drag_update_ >= kDragUpdateInterval) {
+      last_own_drag_update_ = now;
+      PostOwnDragEvent(hwnd_, view_id_, callbacks_, "onOwnDragUpdated", pt);
+    }
     return S_OK;
   }
   if (pdwEffect) {
@@ -141,7 +161,10 @@ HRESULT STDMETHODCALLTYPE VeDropTarget::DragOver(DWORD, POINTL pt, DWORD* pdwEff
                            : DROPEFFECT_NONE;
     if (can_drop_ && *pdwEffect == DROPEFFECT_NONE) *pdwEffect = DROPEFFECT_COPY;
   }
-  if (can_drop_ && callbacks_) {
+  const auto now = std::chrono::steady_clock::now();
+  if (can_drop_ && callbacks_ &&
+      now - last_drop_update_ >= kDragUpdateInterval) {
+    last_drop_update_ = now;
     POINT client{pt.x, pt.y};
     ScreenToClient(hwnd_, &client);
     callbacks_->PostDropEvent(
@@ -153,11 +176,13 @@ HRESULT STDMETHODCALLTYPE VeDropTarget::DragOver(DWORD, POINTL pt, DWORD* pdwEff
 HRESULT STDMETHODCALLTYPE VeDropTarget::DragLeave() {
   if (own_drag_) {
     own_drag_ = false;
+    last_own_drag_update_ = {};
     PostOwnDragEvent(hwnd_, view_id_, callbacks_, "onOwnDragExited", POINTL{0, 0});
     return S_OK;
   }
   const bool was = can_drop_;
   can_drop_ = false;
+  last_drop_update_ = {};
   if (was && callbacks_) {
     callbacks_->PostDropEvent(view_id_, "onDropExited", 0.0, 0.0, {});
   }
@@ -173,10 +198,12 @@ HRESULT STDMETHODCALLTYPE VeDropTarget::Drop(
     // decrypt the files to a temporary folder only to import them back), and
     // the OS drag ends as cancelled, which cleans up whatever it prepared.
     own_drag_ = false;
+    last_own_drag_update_ = {};
     if (pdwEffect) *pdwEffect = DROPEFFECT_NONE;
     PostOwnDragEvent(hwnd_, view_id_, callbacks_, "onOwnDragDropped", pt);
     return S_OK;
   }
+  last_drop_update_ = {};
   std::vector<std::string> paths;
   FORMATETC fmt{CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
   STGMEDIUM stg{};

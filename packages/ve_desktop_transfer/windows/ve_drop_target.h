@@ -5,6 +5,7 @@
 #include <windows.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 
 #include "ve_transfer_callbacks_win.h"
@@ -58,6 +59,8 @@ class VeDropTarget final : public IDropTarget {
   // The drag now over this window is this process's own (see
   // SetOwnOutboundDataObject).
   bool own_drag_ = false;
+  std::chrono::steady_clock::time_point last_own_drag_update_{};
+  std::chrono::steady_clock::time_point last_drop_update_{};
   std::atomic<ULONG> ref_count_{1};
 };
 

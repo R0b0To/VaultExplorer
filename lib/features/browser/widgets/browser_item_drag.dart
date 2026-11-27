@@ -44,6 +44,22 @@ typedef BrowserItemDropHandler =
       BrowserDropMode mode,
     );
 
+const int _kVirtualStreamThresholdBytes = 64 * 1024 * 1024;
+
+bool _shouldPreferVirtualStream(Iterable<DesktopTransferEntry> items) {
+  var totalBytes = 0;
+  for (final item in items) {
+    // A directory's total size is not available in the listing entry. Use
+    // virtual files so dropping it does not stage the whole tree up front.
+    if (item.isDir) return true;
+    final size = item.sizeBytes;
+    if (size <= 0) continue;
+    if (size >= _kVirtualStreamThresholdBytes - totalBytes) return true;
+    totalBytes += size;
+  }
+  return false;
+}
+
 /// The tile being dragged plus the part of the selection that is in this list.
 ///
 /// One set lookup per selected item. This used to be `List.contains`, which made
@@ -713,7 +729,13 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
       }
       unawaited(
         DesktopTransferService.instance
-            .startOutboundDrag(viewId: viewId, items: transferItems)
+            .startOutboundDrag(
+              viewId: viewId,
+              items: transferItems,
+              preferVirtualStream:
+                  PlatformFeatures.isWindows &&
+                  _shouldPreferVirtualStream(transferItems),
+            )
             .whenComplete(() {
               OwnDragResume.instance.end();
               _handedOffToOsDrag = false;

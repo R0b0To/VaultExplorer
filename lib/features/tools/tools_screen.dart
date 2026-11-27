@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
@@ -87,8 +89,12 @@ class _ToolsScreenState extends State<ToolsScreen> {
         !docked && !titleBarMenu && (Scaffold.maybeOf(context)?.hasDrawer ?? false);
     final wide = context.screen.useWideLayout;
 
-    return Scaffold(
-      appBar: AppBar(
+    // A page in a Windows window of its own puts its title in the window's
+    // title bar and has no app bar; a page pushed over another one keeps a back
+    // arrow there, a window of its own is closed with the window.
+    final titleInCaption = pageTitleBelongsInCaption(context);
+    final scaffold = Scaffold(
+      appBar: titleInCaption ? null : AppBar(
         automaticallyImplyLeading: false,
         leading: docked || titleBarMenu
             ? null
@@ -169,6 +175,26 @@ class _ToolsScreenState extends State<ToolsScreen> {
         ),
       ),
     );
+    if (!titleInCaption) return scaffold;
+    return Column(
+      children: [
+        DesktopPageTitleBar(
+          title: context.l10n.toolsScreenTitle,
+          trailing: wide
+              ? SizedBox(
+                  width: 280,
+                  height: 30,
+                  child: _buildSearchField(context, compact: true),
+                )
+              : null,
+          onBack: SecondaryWindowScope.maybeOf(context) == null
+              ? () => Navigator.of(context).pop()
+              : null,
+          backTooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        ),
+        Expanded(child: scaffold),
+      ],
+    );
   }
 
   // ── SEARCH ─────────────────────────────────────────────────────────────────
@@ -180,9 +206,9 @@ class _ToolsScreenState extends State<ToolsScreen> {
     );
   }
 
-  Widget _buildSearchField(BuildContext context) {
+  Widget _buildSearchField(BuildContext context, {bool compact = false}) {
     final cs = context.colors;
-    final radius = BorderRadius.circular(28);
+    final radius = BorderRadius.circular(compact ? 18 : 28);
     const noBorder = BorderSide.none;
 
     return TextField(
@@ -190,10 +216,16 @@ class _ToolsScreenState extends State<ToolsScreen> {
       focusNode: _searchFocus,
       textInputAction: TextInputAction.search,
       onChanged: _onQueryChanged,
+      textAlignVertical: TextAlignVertical.center,
+      style: compact ? context.typography.bodyMedium : null,
       decoration: InputDecoration(
         isDense: true,
         hintText: context.l10n.toolsSearchHint,
-        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        prefixIcon: Icon(Icons.search_rounded, size: compact ? 18 : 20),
+        prefixIconConstraints:
+            compact ? const BoxConstraints(minWidth: 34, minHeight: 30) : null,
+        suffixIconConstraints:
+            compact ? const BoxConstraints(minWidth: 30, minHeight: 30) : null,
         suffixIcon: ValueListenableBuilder<TextEditingValue>(
           valueListenable: _searchController,
           builder: (context, value, _) {
@@ -211,7 +243,9 @@ class _ToolsScreenState extends State<ToolsScreen> {
         ),
         filled: true,
         fillColor: cs.surfaceContainerHigh,
-        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        contentPadding: compact
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         border: OutlineInputBorder(borderRadius: radius, borderSide: noBorder),
         enabledBorder:
             OutlineInputBorder(borderRadius: radius, borderSide: noBorder),

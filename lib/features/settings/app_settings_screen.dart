@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/desktop_page_title_bar.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/category_shortcuts_editor.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
@@ -481,8 +483,12 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     final hasShellDrawer =
         !docked && !titleBarMenu && (Scaffold.maybeOf(context)?.hasDrawer ?? false);
 
-    return Scaffold(
-      appBar: AppBar(
+    // A page in a Windows window of its own puts its title in the window's
+    // title bar and has no app bar; a page pushed over another one keeps a back
+    // arrow there, a window of its own is closed with the window.
+    final titleInCaption = pageTitleBelongsInCaption(context);
+    final scaffold = Scaffold(
+      appBar: titleInCaption ? null : AppBar(
         automaticallyImplyLeading: false,
         leading: docked || titleBarMenu
             ? null
@@ -536,6 +542,19 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                     )
                   : _buildNarrowHubList(cs, textTheme),
             ),
+    );
+    if (!titleInCaption) return scaffold;
+    return Column(
+      children: [
+        DesktopPageTitleBar(
+          title: context.l10n.appSettingsTitle,
+          onBack: SecondaryWindowScope.maybeOf(context) == null
+              ? () => Navigator.of(context).pop()
+              : null,
+          backTooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        ),
+        Expanded(child: scaffold),
+      ],
     );
   }
 

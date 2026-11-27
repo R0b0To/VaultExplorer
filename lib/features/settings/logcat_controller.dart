@@ -171,6 +171,12 @@ const List<String> _appKeywords = [
   'UnlockSheet',
   'SplitFuseCallback',
   'SafSplitResolver',
+  // Open/write diagnostics: without these the "App only" filter dropped every
+  // warning/info line from the raw-vs-SAF decision and the write boundary.
+  'SafContainerProbe',
+  'RawFileResolver',
+  'ContainerFileSystem',
+  'NativeOpSupport',
   'ContainerEngine',
   'Cryptomator',
   'Gocryptfs',

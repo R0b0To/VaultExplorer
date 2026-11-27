@@ -28,6 +28,9 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_seek_clai
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_seek_hud.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_dismiss_layer.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/audio_ambient_backdrop.dart';
+import 'package:vaultexplorer/features/library/tags/audio_tag_reader.dart';
+import 'package:vaultexplorer/features/library/tags/byte_source.dart';
 
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
@@ -260,6 +263,12 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   Size _lastKnownVideoSize = Size.zero;
   double? _knownAspectRatio;
   Uint8List? _localPosterBytes;
+  // Cover picture embedded in the audio file's tags (ID3 APIC, FLAC picture,
+  // MP4 covr, Ogg METADATA_BLOCK_PICTURE). Held in memory only.
+  Uint8List? _audioCover;
+  // Colours picked from [_audioCover] for the ambient backdrop.
+  List<Color>? _ambientColors;
+  int _audioCoverToken = 0;
   late final ThumbnailCacheService _thumbnailCache;
 
   AnimationController? _zoomAnimationController;
@@ -269,6 +278,13 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   final Map<int, Offset> _edgeTapStartPositions = {};
   final Map<int, bool> _edgeTapDirections = {};
   double _tapViewportWidth = 0;
+
+  /// The box this player is laid out in. The viewer may leave room for its
+  /// controls around the media, so this is smaller than the window; zoom and
+  /// pan limits are worked out against it, not against the window.
+  Size _boxSize = Size.zero;
+  Size get _viewportSize =>
+      _boxSize.isEmpty ? MediaQuery.sizeOf(context) : _boxSize;
   double? _brightnessDragStartLevel;
   double _brightnessLevel = 0.5;
   bool _showBrightnessHud = false;
@@ -384,6 +400,56 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     _videoTransformationController.addListener(_onVideoTransformationChanged);
     _syncBoundController();
     _ensurePosterLoaded();
+    _loadAudioCover();
+  }
+
+  Future<void> _loadAudioCover() async {
+    final token = ++_audioCoverToken;
+    if (!widget.isAudio) return;
+    final container = widget.container;
+    final fileName = widget.fileName;
+    try {
+      final size = await _fileIoApi.getFileSize(container, fileName);
+      if (size <= 0) return;
+      final art = await AudioTagReader.readCover(
+        _PlayerByteSource(_fileIoApi, container, fileName, size),
+        fileName: fileName,
+      );
+      if (!mounted || token != _audioCoverToken) return;
+      final bytes = art?.bytes;
+      if (bytes != null && bytes.isNotEmpty) {
+        setState(() => _audioCover = bytes);
+        unawaited(_loadAmbientColors(bytes, token));
+      }
+    } catch (_) {
+      // No readable cover: keep the plain music-note visual.
+    }
+  }
+
+  Future<void> _loadAmbientColors(Uint8List cover, int token) async {
+    try {
+      final colors = await CoverPalette.extract(cover);
+      if (!mounted || token != _audioCoverToken || colors.isEmpty) return;
+      setState(() => _ambientColors = colors);
+    } catch (_) {
+      // Undecodable picture: no backdrop, the cover itself still shows.
+    }
+  }
+
+  Widget _buildAmbientBackdrop(List<Color> colors) {
+    final controller = _boundController;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 700),
+      builder: (context, t, child) => Opacity(opacity: t, child: child),
+      child: controller == null
+          ? AudioAmbientBackdrop(colors: colors, isPlaying: false)
+          : ValueListenableBuilder<NativeVideoValue>(
+              valueListenable: controller,
+              builder: (context, val, _) =>
+                  AudioAmbientBackdrop(colors: colors, isPlaying: val.isPlaying),
+            ),
+    );
   }
 
   Future<void> _ensurePosterLoaded() async {
@@ -426,11 +492,14 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             widget.thumbnailQuality,
           );
       _localPosterBytes = newPoster;
+      _audioCover = null;
+      _ambientColors = null;
       _knownAspectRatio = MediaAspectRatioCache.get(
         widget.container,
         widget.fileName,
       );
       _ensurePosterLoaded();
+      _loadAudioCover();
     } else if (widget.posterBytes != null &&
         widget.posterBytes != oldWidget.posterBytes) {
       // Same file, but explicit new poster bytes provided
@@ -671,7 +740,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     final box = context.findRenderObject();
     final width = box is RenderBox && box.hasSize
         ? box.size.width
-        : MediaQuery.of(context).size.width;
+        : MediaQuery.sizeOf(context).width;
     final isLeft = details.localPosition.dx < width * 0.35;
 
     final double targetSpeed;
@@ -711,7 +780,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   void _onVideoTransformationChanged() {
     if (_isClampingMatrix || !mounted) return;
     _scheduleVideoRectReport();
-    final vpSize = MediaQuery.of(context).size;
+    final vpSize = _viewportSize;
     if (vpSize.width <= 0 || vpSize.height <= 0) return;
 
     final matrix = _videoTransformationController.value;
@@ -845,7 +914,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
     }
 
-    final vpSize = MediaQuery.of(context).size;
+    final vpSize = _viewportSize;
     final clampedMatrix = _clampVideoMatrix(
       targetMatrix,
       vpSize.width,
@@ -1082,7 +1151,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         fit = BoxFit.cover;
       case VideoAspectRatioMode.centre:
         fit = BoxFit.none;
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         if (dpr > 0) {
           sizedWidth = rawSize.width / dpr;
           sizedHeight = rawSize.height / dpr;
@@ -1127,7 +1196,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         fit = BoxFit.cover;
       case VideoAspectRatioMode.centre:
         fit = BoxFit.none;
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         if (dpr > 0 && rawSize.width > 0 && rawSize.height > 0) {
           sizedWidth = rawSize.width / dpr;
           sizedHeight = rawSize.height / dpr;
@@ -1179,14 +1248,16 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   }
 
   Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
+    // The embedded cover is drawn by the audio visual itself.
+    if (widget.isAudio && _audioCover != null) return const SizedBox.expand();
     final poster =
         _localPosterBytes ??
         widget.posterBytes ??
         _thumbnailCache.peekMemory(widget.container, widget.fileName);
 
     final posterCacheWidth =
-        (MediaQuery.of(context).size.width *
-                MediaQuery.of(context).devicePixelRatio)
+        (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
             .round()
             .clamp(1, 1 << 20);
 
@@ -1232,7 +1303,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       }
 
       if (mode == VideoAspectRatioMode.centre) {
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         if (rawW > 0 && rawH > 0 && dpr > 0) {
           imageWidget = SizedBox(
             width: rawW / dpr,
@@ -1639,7 +1710,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                 : MediaSwipeDismissTarget(child: stackContent),
           );
     if (!widget.isAudio && widget.enableZoom && !_sphericalMode) {
-      final vpSize = MediaQuery.of(context).size;
+      final vpSize = _viewportSize;
       corePlayerWidget = InteractiveViewer(
         key: _interactiveViewerKey,
         transformationController: _videoTransformationController,
@@ -1689,7 +1760,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
     // Capture this during build because the tap recognizer can finish after
     // this playlist item is deactivated.
-    final tapViewportWidth = MediaQuery.sizeOf(context).width;
+    final tapViewportWidth = _viewportSize.width;
 
     // Outer detector captures double-taps anywhere across the entire viewport
     // (including the black letterbox bars and out-of-bounds space) to reset zoom.
@@ -1735,6 +1806,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       child: LayoutBuilder(
         builder: (context, outerConstraints) {
           _tapViewportWidth = outerConstraints.maxWidth;
+          _boxSize = outerConstraints.biggest;
           final rawEdgeWidth =
               outerConstraints.maxWidth * widget.edgeSwipeWidthFraction;
           final edgeWidth = rawEdgeWidth.clamp(
@@ -1746,6 +1818,12 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
+                if (widget.isAudio && _ambientColors != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: _buildAmbientBackdrop(_ambientColors!),
+                    ),
+                  ),
                 corePlayerWidget,
                 if (!widget.isAudio &&
                     _isActive &&
@@ -2499,27 +2577,68 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     );
   }
 
+  Widget _buildAudioCover(Uint8List cover) {
+    final mq = MediaQuery.of(context);
+    final side = math
+        .min(mq.size.width * 0.75, math.min(mq.size.height * 0.38, 340.0))
+        .clamp(130.0, 340.0);
+    final cacheSide = (side * mq.devicePixelRatio).round();
+    return Container(
+      width: side,
+      height: side,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Image.memory(
+          cover,
+          fit: BoxFit.cover,
+          cacheWidth: cacheSide,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) =>
+              const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAudioCenterVisual(ColorScheme cs, {required bool isPlaying}) {
     final fileTitle = widget.fileName.split('/').last;
+    final cover = _audioCover;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 130,
-          height: 130,
-          decoration: BoxDecoration(
-            color: cs.primaryContainer.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: cs.primary.withValues(alpha: 0.3),
-              width: 2,
+        if (cover != null)
+          _buildAudioCover(cover)
+        else
+          Container(
+            width: 130,
+            height: 130,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: cs.primary.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: Icon(
+                Icons.music_note_rounded,
+                size: 56,
+                color: cs.primary,
+              ),
             ),
           ),
-          child: Center(
-            child: Icon(Icons.music_note_rounded, size: 56, color: cs.primary),
-          ),
-        ),
         const SizedBox(height: 24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -2540,6 +2659,23 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       ],
     );
   }
+}
+
+/// Feeds the tag reader byte ranges of the open file through the vault engine.
+class _PlayerByteSource implements ByteSource {
+  final VaultFileIoApi _io;
+  final MountedContainer _container;
+  final String _path;
+  final int _size;
+
+  _PlayerByteSource(this._io, this._container, this._path, this._size);
+
+  @override
+  int get length => _size;
+
+  @override
+  Future<Uint8List?> read(int offset, int count) =>
+      _io.readFileChunk(_container, _path, offset, count);
 }
 
 class _AudioVisualizer extends StatefulWidget {

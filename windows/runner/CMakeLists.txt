@@ -7,6 +7,7 @@ project(runner LANGUAGES CXX)
 #
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
+  "desktop_media_session.cpp"
   "flutter_window.cpp"
   "main.cpp"
   "utils.cpp"
@@ -35,6 +36,15 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_link_libraries(${BINARY_NAME} PRIVATE "comctl32.lib")
+# System media controls (media keys, the media overlay): C++/WinRT.
+target_link_libraries(${BINARY_NAME} PRIVATE "windowsapp.lib")
+# The standard settings treat warnings as errors; the C++/WinRT headers are not
+# written for that.
+# Older Windows SDK C++/WinRT headers include <experimental/coroutine> when
+# building as C++17, which current MSVC STL rejects unless told to tolerate it.
+set_source_files_properties("desktop_media_session.cpp" PROPERTIES
+  COMPILE_OPTIONS "/WX-"
+  COMPILE_DEFINITIONS "_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.

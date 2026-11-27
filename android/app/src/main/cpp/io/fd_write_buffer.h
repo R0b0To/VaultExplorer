@@ -6,8 +6,12 @@
 #include <vector>
 #include <algorithm>
 #include <mutex>
+#include <atomic>
+#include <system_error>
+#include <fcntl.h>
 #include <unistd.h>
 #include <cerrno>
+#include "../platform/engine_log.h"
 
 // Two-Stream Write-Combining Cache for File Descriptor (fd)-backed Volumes:
 // - Coalesces sequential sector writes into uninterrupted 1 MB bursts before issuing pwrite64.
@@ -127,10 +131,45 @@ public:
             } else if (written < 0 && (errno == EINTR || errno == EAGAIN)) {
                 continue;
             } else {
+                // Capture errno before anything else can clobber it.
+                const int err = (written < 0) ? errno : 0;
+                logWriteFailure(fd, byteOffset + totalWritten, byteCount - totalWritten,
+                                totalWritten, written, err);
                 return false;
             }
         }
         return true;
+    }
+
+    // Every failure above used to collapse into a bare `false`, which the UI
+    // can only render as "check the container is still mounted". Say why:
+    // errno, where, and how the fd was opened (an O_RDONLY fd is the classic
+    // "mounted writable but the provider only gave read access" case).
+    // No paths or names are logged. Only the first few failures and then
+    // exponentially rarer ones are written, so a dead fd cannot flood logcat
+    // (counted process-wide: the first failure is the informative one).
+    static void logWriteFailure(int fd, uint64_t byteOffset, size_t remaining,
+                                size_t alreadyWritten, ssize_t result, int err) {
+        static std::atomic<unsigned> failures{0};
+        const unsigned n = failures.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n > 5 && (n & (n - 1)) != 0) return;
+        ENGINE_LOG_WARN("VaultExplorer_C++",
+            "pwrite64 failed (#%u): fd=%d fdAccess=%s errno=%d (%s) off=%llu len=%zu done=%zu ret=%zd",
+            n, fd, fdAccessName(fd), err, err ? std::generic_category().message(err).c_str() : "short write",
+            (unsigned long long)byteOffset, remaining, alreadyWritten, result);
+    }
+
+    // "RDONLY" / "WRONLY" / "RDWR" as the fd was actually opened, or "?" when
+    // fcntl itself fails (closed / revoked fd).
+    static const char* fdAccessName(int fd) {
+        const int fl = fcntl(fd, F_GETFL);
+        if (fl < 0) return "?";
+        switch (fl & O_ACCMODE) {
+            case O_RDONLY: return "RDONLY";
+            case O_WRONLY: return "WRONLY";
+            case O_RDWR:   return "RDWR";
+            default:       return "?";
+        }
     }
 
 private:

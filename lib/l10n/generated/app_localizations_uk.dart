@@ -381,6 +381,11 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return 'Не вдалося перейменувати \"$name\" — можливо, елемент із такою назвою вже існує';
   }
@@ -13335,4 +13340,84 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Місце недоступне';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Відкрито лише для читання, оскільки Android надав для цього файлу тільки доступ на читання.';
+
+  @override
+  String get mountDriveTitle => 'Mount drive';
+
+  @override
+  String get mountDriveSubtitle =>
+      'Unlock a BitLocker, VeraCrypt or LUKS disk or partition';
+
+  @override
+  String get unlockDriveTitle => 'Unlock Drive';
+
+  @override
+  String reconnectDriveTitle(String label) {
+    return 'Reconnect \"$label\"';
+  }
+
+  @override
+  String get noDrivesDetectedTitle => 'No drives found';
+
+  @override
+  String get drivesNeedAccessNote =>
+      'Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.';
+
+  @override
+  String get driveInUseLabel => 'Mounted by the system';
+
+  @override
+  String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return 'Виконано $percent%';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb: $items ($source → $destination)';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb: $items ($source)';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb: $items → $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return 'Швидкість: $speed/с';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return 'Залишилося часу: $time';
+  }
+
+  @override
+  String get fileOpWinCalculating => 'Обчислення…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return 'Залишилося елементів: $count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return 'Залишилося елементів: $count';
+  }
 }

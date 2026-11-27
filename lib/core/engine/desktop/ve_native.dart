@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 13;
+const int kVeAbiVersion = 15;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -28,6 +28,13 @@ const int veErrMountFailed = 7;
 const int veErrAuthFailed = 8;
 const int veErrUnsupported = 9;
 const int veErrBusy = 10;
+// Raw block devices (ve_unlock_device).
+const int veErrDeviceNotFound = 11;
+const int veErrDevicePermission = 12;
+const int veErrDeviceBusy = 13;
+const int veErrDeviceOpen = 14;
+const int veErrTooLarge = 15; // refused by a size guard (image thumbnails)
+const int veErrNoMemory = 16; // ran out of memory (image thumbnails)
 
 // Folder-vault formats for ve_fv_* (VE_FV_*), and the container-format codes an unlocked folder-vault
 // slot reports (VE_FORMAT_*, see veFormatWireName).
@@ -96,6 +103,60 @@ class VeMountInfo {
   final String mountPoint;
 }
 
+/// One disk from `ve_list_block_devices` (a JSON row, see ve_engine.h).
+class VeBlockDevice {
+  const VeBlockDevice({
+    required this.path,
+    required this.name,
+    required this.bus,
+    required this.sizeBytes,
+    required this.sectorSize,
+    required this.removable,
+    required this.readable,
+    required this.writable,
+    required this.inUse,
+    required this.system,
+    required this.formats,
+  });
+
+  factory VeBlockDevice.fromJson(Map<String, dynamic> j) => VeBlockDevice(
+        path: j['path'] as String? ?? '',
+        name: j['name'] as String? ?? '',
+        bus: j['bus'] as String? ?? '',
+        sizeBytes: (j['sizeBytes'] as num?)?.toInt() ?? 0,
+        sectorSize: (j['sectorSize'] as num?)?.toInt() ?? 512,
+        removable: j['removable'] as bool? ?? false,
+        readable: j['readable'] as bool? ?? false,
+        writable: j['writable'] as bool? ?? false,
+        inUse: j['inUse'] as bool? ?? false,
+        system: j['system'] as bool? ?? false,
+        formats: [for (final f in (j['formats'] as List<dynamic>? ?? const [])) f.toString()],
+      );
+
+  /// What `unlockDevice` takes: /dev/disk/by-id/... or /dev/sdX on Linux, \\.\PhysicalDriveN on Windows.
+  final String path;
+  final String name;
+
+  /// "usb" | "nvme" | "sata" | "mmc" | "scsi" | "virtual" | "".
+  final String bus;
+  final int sizeBytes;
+  final int sectorSize;
+  final bool removable;
+
+  /// This process may open it right now (root / disk group / elevated process).
+  final bool readable;
+  final bool writable;
+
+  /// A file system on it, or on one of its partitions, is mounted by the OS.
+  final bool inUse;
+
+  /// It carries the running operating system.
+  final bool system;
+
+  /// "bitlocker" / "luks" signatures found at the start of a partition (readable disks only).
+  final List<String> formats;
+}
+
 final class VeUnlockParams extends Struct {
   @Int32()
   external int structSize;
@@ -132,6 +193,47 @@ final class VeUnlockParams extends Struct {
   external Pointer<Int32> hiddenKeyfileFds;
   @Int32()
   external int hiddenKeyfileCount;
+}
+
+/// `ve_unlock_device_params` (ve_engine.h).
+final class VeUnlockDeviceParams extends Struct {
+  @Int32()
+  external int structSize;
+  external Pointer<Utf8> devicePath;
+  @Int32()
+  external int volId;
+  external Pointer<Uint8> password;
+  @Int32()
+  external int passwordLen;
+  @Int32()
+  external int pim;
+  @Int32()
+  external int cipherId;
+  @Int32()
+  external int hashId;
+  external Pointer<Uint8> preservedKey;
+  @Int32()
+  external int preservedKeyLen;
+  external Pointer<Int32> keyfileFds;
+  @Int32()
+  external int keyfileCount;
+  @Int32()
+  external int readOnly;
+  @Int64()
+  external int partitionOffsetHint;
+  external Pointer<Uint8> hiddenPassword;
+  @Int32()
+  external int hiddenPasswordLen;
+  @Int32()
+  external int hiddenPim;
+  @Int32()
+  external int hiddenCipherId;
+  @Int32()
+  external int hiddenHashId;
+  external Pointer<Int32> hiddenKeyfileFds;
+  @Int32()
+  external int hiddenKeyfileCount;
+  external Pointer<Int32> osErrorOut;
 }
 
 final class VeCreateParams extends Struct {
@@ -428,6 +530,8 @@ class VeNative {
     _maxVolumes = _lib.lookupFunction<Int32 Function(), int Function()>('ve_max_volumes');
     _probe = _lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('ve_probe_format');
     _unlock = _lib.lookupFunction<Int32 Function(Pointer<VeUnlockParams>), int Function(Pointer<VeUnlockParams>)>('ve_unlock');
+    _unlockDevice = _lib.lookupFunction<Int32 Function(Pointer<VeUnlockDeviceParams>), int Function(Pointer<VeUnlockDeviceParams>)>('ve_unlock_device');
+    _listBlockDevices = _lib.lookupFunction<Int32 Function(Pointer<VeBuffer>), int Function(Pointer<VeBuffer>)>('ve_list_block_devices');
     _cancelUnlock = _lib.lookupFunction<Void Function(Int32), void Function(int)>('ve_request_cancel_unlock');
     _lock = _lib.lookupFunction<Void Function(Int32), void Function(int)>('ve_lock');
     _format = _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('ve_get_container_format');
@@ -514,6 +618,8 @@ class VeNative {
   late final int Function(int, Pointer<Utf8>) _fvFinishWrite;
   late final int Function(int, int, int) _fvBatch;
   late final int Function(Pointer<VeUnlockParams>) _unlock;
+  late final int Function(Pointer<VeUnlockDeviceParams>) _unlockDevice;
+  late final int Function(Pointer<VeBuffer>) _listBlockDevices;
   late final void Function(int) _cancelUnlock;
   late final void Function(int) _lock;
 
@@ -531,6 +637,20 @@ class VeNative {
       _lib.lookupFunction<Int32 Function(Pointer<VeBuffer>), int Function(Pointer<VeBuffer>)>('ve_list_mounts');
   late final int Function(Pointer<Utf8>, int) _mountLastError =
       _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Size), int Function(Pointer<Utf8>, int)>('ve_mount_last_error');
+
+  // Image thumbnails (ABI 15): ve_image_thumbnail / ve_image_thumbnail_file / ve_image_thumbnail_mem (ve_engine.h).
+  late final int Function(int, Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>) _imageThumbnail =
+      _lib.lookupFunction<
+          Int32 Function(Int32, Pointer<Utf8>, Int32, Int32, Int32, Int64, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(int, Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>)>('ve_image_thumbnail');
+  late final int Function(Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>) _imageThumbnailFile =
+      _lib.lookupFunction<
+          Int32 Function(Pointer<Utf8>, Int32, Int32, Int32, Int64, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(Pointer<Utf8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>)>('ve_image_thumbnail_file');
+  late final int Function(Pointer<Uint8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>) _imageThumbnailMem =
+      _lib.lookupFunction<
+          Int32 Function(Pointer<Uint8>, Size, Int32, Int32, Int32, Pointer<VeBuffer>, Pointer<Int32>),
+          int Function(Pointer<Uint8>, int, int, int, int, Pointer<VeBuffer>, Pointer<Int32>)>('ve_image_thumbnail_mem');
 
   // Archives (ABI 10): ve_archive_scan / ve_archive_extract_entry / ve_archive_extract_all (ve_engine.h).
   late final int Function(int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>) _archiveScan = _lib.lookupFunction<
@@ -925,6 +1045,145 @@ class VeNative {
       }
       if (kfp != nullptr) calloc.free(kfp);
       if (hkfp != nullptr) calloc.free(hkfp);
+      calloc.free(params);
+    }
+  }
+
+  // ── raw block devices ──────────────────────────────────────────────────
+
+  /// The disks the OS lists (empty where the platform cannot enumerate, or on a read error).
+  List<VeBlockDevice> listBlockDevices() {
+    final (rc, bytes) = _withBuffer((b) => _listBlockDevices(b));
+    if (rc != veOk || bytes == null || bytes.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(utf8.decode(bytes, allowMalformed: true));
+      if (decoded is! List) return const [];
+      return [
+        for (final row in decoded)
+          if (row is Map<String, dynamic>) VeBlockDevice.fromJson(row),
+      ];
+    } on FormatException {
+      return const [];
+    }
+  }
+
+  /// Unlocks the disk, partition or disk image at [devicePath] into slot [volId]: the engine scans its partitions
+  /// for LUKS / BitLocker and tries VeraCrypt at the start of the device and of every partition. The engine
+  /// takes ownership of the keyfile descriptors opened here, exactly once, on success or failure.
+  ///
+  /// Returns (ve* result code, OS error number of a failed open). The code is veOk, veErrFailed (no volume on it
+  /// opened with these credentials), veErrDevice* (the device itself could not be opened), veErrMountFailed,
+  /// veErrCancelled, or -1 when a keyfile cannot be opened.
+  (int, int) unlockDevice({
+    required String devicePath,
+    required Uint8List password,
+    required int pim,
+    required int volId,
+    int cipherId = 255,
+    int hashId = 255,
+    Uint8List? preservedKey,
+    List<String> keyfilePaths = const [],
+    bool readOnly = false,
+    int partitionOffsetHint = -1,
+    Uint8List? hiddenPassword,
+    int hiddenPim = 0,
+    int hiddenCipherId = 255,
+    int hiddenHashId = 255,
+    List<String> hiddenKeyfilePaths = const [],
+  }) {
+    List<int> openAll(List<String> paths) {
+      final fds = <int>[];
+      for (final p in paths) {
+        final k = openFile(p);
+        if (k < 0) {
+          for (final f in fds) {
+            closeFd(f);
+          }
+          return const [];
+        }
+        fds.add(k);
+      }
+      return fds;
+    }
+
+    final kf = openAll(keyfilePaths);
+    if (keyfilePaths.isNotEmpty && kf.isEmpty) return (-1, 0);
+    final hkf = hiddenPassword != null ? openAll(hiddenKeyfilePaths) : const <int>[];
+    if (hiddenPassword != null && hiddenKeyfilePaths.isNotEmpty && hkf.isEmpty) {
+      for (final f in kf) {
+        closeFd(f);
+      }
+      return (-1, 0);
+    }
+
+    Pointer<Uint8> copyBytes(Uint8List? src) {
+      if (src == null) return nullptr;
+      final p = calloc<Uint8>(src.isEmpty ? 1 : src.length);
+      p.asTypedList(src.length).setAll(0, src);
+      return p;
+    }
+
+    Pointer<Int32> copyFds(List<int> fds) {
+      if (fds.isEmpty) return nullptr;
+      final p = calloc<Int32>(fds.length);
+      for (var i = 0; i < fds.length; i++) {
+        p[i] = fds[i];
+      }
+      return p;
+    }
+
+    final params = calloc<VeUnlockDeviceParams>();
+    final path = devicePath.toNativeUtf8();
+    final osError = calloc<Int32>();
+    final pw = copyBytes(password);
+    final pk = copyBytes(preservedKey);
+    final hpw = copyBytes(hiddenPassword);
+    final kfp = copyFds(kf);
+    final hkfp = copyFds(hkf);
+    try {
+      final r = params.ref;
+      r.structSize = sizeOf<VeUnlockDeviceParams>();
+      r.devicePath = path;
+      r.volId = volId;
+      r.password = pw;
+      r.passwordLen = password.length;
+      r.pim = pim;
+      r.cipherId = cipherId;
+      r.hashId = hashId;
+      r.preservedKey = pk;
+      r.preservedKeyLen = preservedKey?.length ?? 0;
+      r.keyfileFds = kfp;
+      r.keyfileCount = kf.length;
+      r.readOnly = readOnly ? 1 : 0;
+      r.partitionOffsetHint = partitionOffsetHint;
+      r.hiddenPassword = hpw;
+      r.hiddenPasswordLen = hiddenPassword?.length ?? 0;
+      r.hiddenPim = hiddenPim;
+      r.hiddenCipherId = hiddenCipherId;
+      r.hiddenHashId = hiddenHashId;
+      r.hiddenKeyfileFds = hkfp;
+      r.hiddenKeyfileCount = hkf.length;
+      r.osErrorOut = osError;
+      final rc = _unlockDevice(params);
+      return (rc, osError.value);
+    } finally {
+      // Wipe secrets before freeing.
+      if (pw != nullptr) {
+        pw.asTypedList(password.length).fillRange(0, password.length, 0);
+        calloc.free(pw);
+      }
+      if (pk != nullptr) {
+        pk.asTypedList(preservedKey!.length).fillRange(0, preservedKey.length, 0);
+        calloc.free(pk);
+      }
+      if (hpw != nullptr) {
+        hpw.asTypedList(hiddenPassword!.length).fillRange(0, hiddenPassword.length, 0);
+        calloc.free(hpw);
+      }
+      if (kfp != nullptr) calloc.free(kfp);
+      if (hkfp != nullptr) calloc.free(hkfp);
+      calloc.free(path);
+      calloc.free(osError);
       calloc.free(params);
     }
   }
@@ -1784,6 +2043,66 @@ class VeNative {
   /// Entries hidden from listings in [path] (>= 0), or a negative -veErr* code.
   int fvHiddenEntryCount(int volId, String path) => _withUtf8(path, (p) => _fvHidden(volId, p));
   int fvFinishWrite(int volId, String path) => _withUtf8(path, (p) => _fvFinishWrite(volId, p));
+
+  // ── image thumbnails (ABI 15) ───────────────────────────────────────────
+  // Each call answers (rc, thumbnail bytes, info). `info` is VE_IMAGE_INFO_COUNT ints, in this order:
+  // isPng (0 JPEG / 1 PNG), source width, source height, thumbnail width, thumbnail height, hasAlpha, isBlank.
+  // rc: veOk; veErrUnsupported when this decoder does not handle the format (use another one); veErrTooLarge;
+  // veErrNoMemory; veErrNotUnlocked / veErrInvalidArg; otherwise veErrFailed.
+
+  static const int _imageInfoCount = 8;
+
+  (int, Uint8List?, List<int>) _imageCall(int Function(Pointer<VeBuffer>, Pointer<Int32>) body) {
+    final info = calloc<Int32>(_imageInfoCount);
+    try {
+      final (rc, bytes) = _withBuffer((b) => body(b, info));
+      return (rc, bytes, rc == veOk ? List<int>.generate(_imageInfoCount, (i) => info[i]) : const <int>[]);
+    } finally {
+      calloc.free(info);
+    }
+  }
+
+  /// A thumbnail of the picture at [path] inside unlocked slot [volId].
+  (int, Uint8List?, List<int>) imageThumbnail(
+    int volId,
+    String path, {
+    required int targetSize,
+    required int quality,
+    required bool preserveAlpha,
+    required int maxSourceBytes,
+  }) =>
+      _withUtf8(
+        path,
+        (p) => _imageCall((b, info) =>
+            _imageThumbnail(volId, p, targetSize, quality, preserveAlpha ? 1 : 0, maxSourceBytes, b, info)),
+      );
+
+  /// A thumbnail of a picture file on this machine.
+  (int, Uint8List?, List<int>) imageThumbnailFile(
+    String hostPath, {
+    required int targetSize,
+    required int quality,
+    required bool preserveAlpha,
+    required int maxSourceBytes,
+  }) =>
+      _withUtf8(
+        hostPath,
+        (p) => _imageCall((b, info) =>
+            _imageThumbnailFile(p, targetSize, quality, preserveAlpha ? 1 : 0, maxSourceBytes, b, info)),
+      );
+
+  /// A thumbnail of a picture that is already in memory (a video frame).
+  (int, Uint8List?, List<int>) imageThumbnailMem(
+    Uint8List data, {
+    required int targetSize,
+    required int quality,
+    required bool preserveAlpha,
+  }) =>
+      _withBytes(
+        data,
+        (ptr, len) => _imageCall((b, info) =>
+            _imageThumbnailMem(ptr, len, targetSize, quality, preserveAlpha ? 1 : 0, b, info)),
+      );
 
   // ── archives (ABI 10) ───────────────────────────────────────────────────
   // Each call answers VE_OK with a result record (layout in ve_engine.h, decoded by ArchiveRecord in

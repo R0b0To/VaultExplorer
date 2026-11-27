@@ -17,16 +17,26 @@ class VaultLocalShareApi {
   final MethodChannel _channel;
   const VaultLocalShareApi(this._channel);
 
-  /// Opens [filePath] with whichever app the user picks from the system
-  /// chooser. [mimeType] overrides the extension-based guess when the
-  /// caller already knows it.
-  Future<bool> openLocalFileWithApp(String filePath, {String? mimeType}) async {
+  /// Opens [filePath] in [packageName] when that app is given (and able to
+  /// take the file), otherwise with whichever app the user picks from the
+  /// system chooser. [mimeType] overrides the extension-based guess when the
+  /// caller already knows it. A non-null [requestId] makes the chooser report
+  /// the picked app back as `onAppSelected` under that id, so it can be
+  /// remembered.
+  Future<bool> openLocalFileWithApp(
+    String filePath, {
+    String? mimeType,
+    String? packageName,
+    String? requestId,
+  }) async {
     try {
       final ok = await _channel.invokeMethod<bool>(
         ChannelMethods.openLocalFileWithApp,
         {
           'filePath': filePath,
           'mimeType': ?mimeType,
+          'packageName': ?packageName,
+          'requestId': ?requestId,
         },
       );
       return ok ?? false;

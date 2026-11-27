@@ -6,8 +6,9 @@ project("vaultexplorer")
 # C ABI (ffi/ve_engine.h) for dart:ffi, instead of the Android JNI library. The
 # engine core is shared; only the platform glue differs:
 #   Android: jni/*.cpp                    (JNI bridges + JVM callbacks)
-#   Desktop: ffi/ve_engine.cpp + ffi/ve_callbacks.cpp, with ffi/compat/ first on the
-#            include path (stand-ins for <jni.h> / <android/log.h>).
+#   Desktop: ffi/ve_engine.cpp + ffi/ve_callbacks.cpp (no JNI or NDK header is needed any more: logging goes
+#            through platform/engine_log.h, callbacks through platform/engine_hooks.h; ffi/compat/ holds only
+#            the Windows POSIX shims).
 # Off by default, so the Android build is exactly what it was.
 option(VAULTEXPLORER_DESKTOP "Build the desktop (dart:ffi) engine library instead of the Android JNI library" OFF)
 if(VAULTEXPLORER_DESKTOP)
@@ -701,6 +702,18 @@ if(TARGET volman_core)
 endif()
 
 if(VAULTEXPLORER_DESKTOP)
+    # Unicode NFC for Cryptomator names (fv::setNfcNormalizer, ffi/ve_nfc.cpp). Android asks java.text.Normalizer;
+    # the desktop engine has no JVM, so it carries utf8proc (MIT; the Unicode data tables fall under the Unicode
+    # license -- see NOTICE.md). Static, and PIC through CMAKE_POSITION_INDEPENDENT_CODE above.
+    FetchContent_Declare(
+        utf8proc
+        URL https://github.com/JuliaStrings/utf8proc/archive/refs/tags/v2.10.0.tar.gz
+        URL_HASH SHA256=6f4f1b639daa6dca9f80bc5db1233e9cbaa31a67790887106160b33ef743f136
+    )
+    set(UTF8PROC_INSTALL OFF CACHE BOOL "" FORCE)
+    set(UTF8PROC_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(utf8proc)
     # Drop every JNI bridge / JVM-callback file and add the C ABI + desktop callbacks.
     list(FILTER VE_ENGINE_SOURCES EXCLUDE REGEX "^jni/")
     list(APPEND VE_ENGINE_SOURCES
@@ -708,16 +721,36 @@ if(VAULTEXPLORER_DESKTOP)
             ffi/ve_crypto.cpp
             ffi/ve_foldervault.cpp
             ffi/ve_callbacks.cpp
+            ffi/ve_nfc.cpp
             ffi/ve_archive.cpp
+            ffi/ve_image.cpp
             ffi/ve_repair.cpp
             ffi/ve_tools.cpp
             ffi/ve_composite.cpp
             ffi/ve_mount_fs.cpp
-            ffi/ve_mount_fuse.cpp)
+            ffi/ve_mount_fuse.cpp
+            ffi/ve_raw_device.cpp)  # raw disks / partitions (BitLocker, VeraCrypt, LUKS) behind the USB hooks
     if(WIN32)
-        # pread/pwrite over CRT descriptors + BCryptGenRandom (the only file that includes <windows.h>)
-        list(APPEND VE_ENGINE_SOURCES ffi/ve_win_platform.cpp)
+        # pread/pwrite over CRT descriptors + BCryptGenRandom. With ve_rawdev_win.cpp (raw \\.\PhysicalDriveN)
+        # these are the only files that include <windows.h>; neither includes an engine header.
+        list(APPEND VE_ENGINE_SOURCES ffi/ve_win_platform.cpp ffi/ve_rawdev_win.cpp)
+    else()
+        list(APPEND VE_ENGINE_SOURCES ffi/ve_rawdev_posix.cpp)
     endif()
+    # Native image thumbnails (imaging/thumb.cpp) and the codecs behind them. Desktop only: Android decodes with
+    # BitmapFactory and does not build, fetch or link any of this. A static library of its own, so the codec
+    # headers (jpeglib.h, png.h, webp/) are visible to that one file and nothing else in the engine.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/imaging_deps.cmake)
+    add_library(ve_imaging STATIC imaging/thumb.cpp)
+    target_include_directories(ve_imaging PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${VE_IMAGING_INCLUDE_DIRS})
+    target_compile_features(ve_imaging PRIVATE cxx_std_17)
+    target_compile_options(ve_imaging PRIVATE -Wall -Wextra)
+    set_target_properties(ve_imaging PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+            C_VISIBILITY_PRESET hidden
+            CXX_VISIBILITY_PRESET hidden)
+    target_link_libraries(ve_imaging PUBLIC ${VE_JPEG_LIB} ${VE_PNG_LIB} ${VE_WEBP_DECODER_LIB})
+    add_dependencies(ve_imaging libjpeg_turbo_ep)  # its headers must be installed before thumb.cpp compiles
 endif()
 
 add_library(vaultexplorer SHARED ${VE_ENGINE_SOURCES})
@@ -766,7 +799,8 @@ target_compile_definitions(vaultexplorer PRIVATE
 
 # 5. Header search paths
 if(VAULTEXPLORER_DESKTOP)
-    # BEFORE: the stand-in <jni.h> / <android/log.h> must win over any JDK/NDK header.
+    # BEFORE: ffi/compat now only holds the Windows POSIX shims (ve_win_compat.h, ve_win_types.h) and the FatFs
+    # stand-ins; it must win over any system header of the same name.
     target_include_directories(vaultexplorer BEFORE PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat)
     target_include_directories(vaultexplorer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi ${VE_ZLIB_INCLUDE_DIRS})
@@ -840,7 +874,9 @@ target_link_libraries(
 
 if(VAULTEXPLORER_DESKTOP)
     find_package(Threads REQUIRED)
-    target_link_libraries(vaultexplorer Threads::Threads)
+    target_link_libraries(vaultexplorer Threads::Threads ve_imaging utf8proc)
+    # Lets session/session_prepare.cpp treat a whole raw device (no partition table) as one candidate volume.
+    target_compile_definitions(vaultexplorer PRIVATE VE_DESKTOP_RAW_DEVICES=1)
     if(WIN32)
         # OS mounts through WinFsp's FUSE 3 API (ffi/ve_mount_winfsp.cpp). winfsp-x64.dll is loaded at run time
         # from WinFsp's install dir, so only WinFsp's *headers* (the "Developer" install component, or
@@ -921,6 +957,11 @@ if(VAULTEXPLORER_DESKTOP)
     if(WIN32)
         target_link_options(ve_smoke_test PRIVATE -static)
     endif()
+
+    # Raw-device layer unit test: compiles ffi/ve_raw_device.cpp into itself against an in-memory fake disk that
+    # enforces raw-handle alignment (4Kn adapter, bounds, same-device guard, BitLocker/LUKS probing, JSON).
+    add_executable(ve_raw_device_test ffi/test/ve_raw_device_test.cpp ffi/ve_raw_device.cpp)
+    target_include_directories(ve_raw_device_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
 
     # Mount-layer test. It compiles ffi/ve_mount_fs.cpp into itself (the library keeps its internals
     # hidden) and drives it through the exported ve_* ABI, on every container format and a folder vault.
@@ -1099,6 +1140,18 @@ if(NOT ANDROID)
     target_link_libraries(ve_archive_test ${ARCHIVE_ENGINE_LIBRARY})
     list(APPEND VAULTEXPLORER_HOST_TESTS ve_archive_test)
 
+    # Native image thumbnails (imaging/thumb.cpp): every format and size, EXIF orientations, alpha, truncated and
+    # hostile input, size guards, many threads. Desktop engine builds only (it needs the codecs of
+    # imaging_deps.cmake, and the libwebp ENCODER for its fixtures). Compiles thumb.cpp into itself rather than
+    # linking ve_imaging, because it links libwebp's full library (encoder + decoder) instead of the decoder-only one.
+    if(VAULTEXPLORER_DESKTOP AND TARGET ve_png AND TARGET webp)
+        add_executable(thumb_test imaging/test/thumb_test.cpp imaging/thumb.cpp)
+        target_include_directories(thumb_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${VE_IMAGING_INCLUDE_DIRS})
+        target_link_libraries(thumb_test ${VE_JPEG_LIB} ${VE_PNG_LIB} webp Threads::Threads)
+        add_dependencies(thumb_test libjpeg_turbo_ep)
+        list(APPEND VAULTEXPLORER_HOST_TESTS thumb_test)
+    endif()
+
     # Folder-vault core: known-answer vectors, per-format scenarios, tamper /
     # rollback / legacy-name handling and thread stress. The interop scripts in
     # foldervault/test/interop additionally drive `fvcli` against the real
@@ -1271,5 +1324,8 @@ if(NOT ANDROID)
     endif()
     if(TARGET ve_archive_test)
         add_test(NAME ve_archive_test COMMAND ve_archive_test)
+    endif()
+    if(TARGET thumb_test)
+        add_test(NAME thumb_test COMMAND thumb_test)
     endif()
 endif()

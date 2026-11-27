@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -946,5 +948,62 @@ void main() {
         expect(calls, isEmpty);
       },
     );
+  });
+
+  group('plain device storage: one-stat existence, abandonable folder size', () {
+    late Directory root;
+    late MountedContainer local;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('vfio_raw_local_');
+      final downloads = Directory('${root.path}/Users/me/Downloads');
+      await downloads.create(recursive: true);
+      await File('${downloads.path}/a.bin').writeAsBytes(List.filled(100, 1));
+      await File('${downloads.path}/b.bin').writeAsBytes(List.filled(23, 2));
+      local = buildLocalStorageContainer(
+        rootPath: root.path,
+        displayName: 'Phone',
+      );
+    });
+
+    tearDown(() async {
+      if (await root.exists()) await root.delete(recursive: true);
+    });
+
+    test('rawLocalEntryExists tells files from folders without the platform', () async {
+      Future<bool> exists(String path, {required bool isDir}) =>
+          api.rawLocalEntryExists(local, path, isDir: isDir);
+
+      expect(await exists('Users/me/Downloads', isDir: true), isTrue);
+      expect(await exists('Users/me/Downloads/a.bin', isDir: false), isTrue);
+      expect(await exists('Users/me/Nope', isDir: true), isFalse);
+      expect(await exists('Users/me/Downloads/a.bin', isDir: true), isFalse);
+      expect(await exists('Users/me/Downloads', isDir: false), isFalse);
+      expect(calls, isEmpty);
+    });
+
+    test('startFolderSize adds up a plain-storage folder, root included', () async {
+      expect(await api.startFolderSize(local, 'Users/me/Downloads').result, 123);
+      expect(await api.startFolderSize(local, '').result, 123);
+      expect(calls, isEmpty);
+    });
+
+    test('a cancelled startFolderSize completes with null', () async {
+      final job = api.startFolderSize(local, 'Users/me');
+      job.cancel();
+
+      expect(await job.result, isNull);
+      expect(job.isCancelled, isTrue);
+    });
+
+    test('a vault folder size is one native call, which cancelling does not stop', () async {
+      nextResult = 4096;
+
+      final job = api.startFolderSize(container, 'docs');
+      job.cancel();
+
+      expect(await job.result, 4096);
+      expect(calls.single.method, 'getFolderSize');
+    });
   });
 }

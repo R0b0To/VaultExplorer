@@ -7,8 +7,13 @@
 // the request, then asks for the vault to be opened exactly as a tap on the
 // vault itself would; the browser that ends up showing that vault takes the
 // request and navigates. A tab that is already open does so immediately, so
-// its history and state are kept; a tab opened for the occasion does so once
-// it has finished loading.
+// its history and state are kept.
+//
+// A tab opened for the occasion [peek]s at the request before its first
+// listing and opens the bookmark's own folder instead of the root, so the root
+// is never listed just to be left again. It still [take]s the request once it
+// has finished loading, which is what finishes the job (opening a bookmarked
+// file, say).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/data/models/vault_marks.dart';
 
@@ -48,6 +53,16 @@ class BookmarkNavigationRequests extends Notifier<BookmarkNavigationRequest?> {
       bookmark: bookmark,
       revealName: revealName,
     );
+  }
+
+  /// The pending request for [volId], left in place for [take] to hand over.
+  /// Null when there is none for that vault, or it has expired. Changes no
+  /// state, so it is safe to call from anywhere, including while building.
+  BookmarkNavigationRequest? peek(int volId) {
+    final pending = state;
+    if (pending == null || pending.volId != volId) return null;
+    if (pending.isExpiredAt(DateTime.now())) return null;
+    return pending;
   }
 
   /// Hands the pending request to the browser of [volId] and clears it.

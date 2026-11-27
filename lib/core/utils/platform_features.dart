@@ -87,8 +87,14 @@ abstract final class PlatformFeatures {
   /// auto-close while the app is not running.
   static bool get backgroundScheduling => isAndroid;
 
-  /// USB mass-storage devices opened through Android's USB host API.
+  /// USB mass-storage devices opened through Android's USB host API (also what formatting a drive into a container
+  /// needs). Mounting an existing encrypted drive is [driveMount].
   static bool get usbHost => isAndroid;
+
+  /// Mounting an encrypted disk or partition (BitLocker, VeraCrypt, LUKS) picked from a drive list: on Android
+  /// through the USB host API, on desktop by opening the disk straight from the OS (needs root / the disk group on
+  /// Linux, an elevated process on Windows).
+  static bool get driveMount => usbHost || isDesktop;
 
   /// "All files access" / legacy storage permission.
   static bool get storagePermission => isAndroid;

@@ -200,7 +200,7 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
     final targetFolderLabel = widget.destDirPath.isEmpty
         ? context.l10n.rootFolderLabel
         : widget.destDirPath;
-    final viewInsetsBottom = MediaQuery.of(context).viewInsets.bottom;
+    final viewInsetsBottom = MediaQuery.viewInsetsOf(context).bottom;
 
     final String titleText;
     if (widget.isExtract) {

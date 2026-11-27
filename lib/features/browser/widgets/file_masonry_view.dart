@@ -545,14 +545,6 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   double _clampRatio(double ratio) =>
       ratio.clamp(_minRatio, _maxRatio).toDouble();
 
-  double _defaultRatioFor(String fileName) {
-    if (MediaViewerConstants.isVideo(fileName)) {
-      return _clampRatio(_videoDefaultRatio);
-    }
-    if (isBookWithCover(fileName)) return _clampRatio(_bookDefaultRatio);
-    return _clampRatio(_imageDefaultRatio);
-  }
-
   /// Height of the `GridCardShell` footer (the file-name row) under a preview.
   /// Only an estimate: the card is handed a fixed height and the preview takes
   /// whatever the real footer leaves.
@@ -1485,27 +1477,6 @@ void _hydrateFromIndex() {
               ),
       ),
     );
-  }
-
-   static String _extensionOfName(String fileName) {
-    final dot = fileName.lastIndexOf('.');
-    return dot < 0 ? fileName : fileName.substring(dot + 1);
-  }
-
-  /// Whether this file's cell is sized by decoded artwork (and so needs a
-  /// real aspect ratio) rather than by a centred icon.
-  bool _hasVisualPreview(String fileName) {
-    final ext = _extensionOfName(fileName);
-    if (vaultIconForExt(ext) != null) return false;
-    if (widget.archiveContext != null &&
-        MediaViewerConstants.isVideo(fileName)) {
-      return false;
-    }
-    // Not for a book inside an open archive: no cover is fetched there (see
-    // the build below), so it stays an icon cell like any other file.
-    if (widget.archiveContext == null && isBookWithCover(fileName)) return true;
-    return MediaViewerConstants.isImage(fileName) ||
-        MediaViewerConstants.isVideo(fileName);
   }
 
   Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath) {

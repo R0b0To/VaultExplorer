@@ -1114,4 +1114,66 @@ void main() {
       expect(w.state.tabs, hasLength(kMaxBrowserTabs));
     });
   });
+
+  group('BrowserTabs starting on a category', () {
+    // The window of a category tab that was dragged out of another window.
+    BrowserTabsConfig categoryConfig({
+      MountedContainer? local,
+      bool includeVaults = true,
+    }) => BrowserTabsConfig.create(
+      initialCategory: FileCategory.videos,
+      initialCategoryContainer: local,
+      initialCategoryIncludesVaults: includeVaults,
+    );
+
+    BrowserTabsState read(BrowserTabsConfig config) {
+      final sub = container.listen<BrowserTabsState>(
+        browserTabsProvider(config),
+        (_, _) {},
+      );
+      addTearDown(sub.close);
+      return container.read(browserTabsProvider(config));
+    }
+
+    test('opens with that category as its one active tab', () {
+      final state = read(categoryConfig());
+      expect(state.tabs, hasLength(1));
+      final tab = state.activeTab!;
+      expect(tab.isCategory, isTrue);
+      expect(tab.category, FileCategory.videos);
+      expect(state.activeTabId, tab.tabId);
+      expect(state.previousTabId, isNull);
+    });
+
+    test('keeps the tab\'s own settings', () {
+      final local = _container(7, 'device');
+      final tab = read(
+        categoryConfig(local: local, includeVaults: false),
+      ).activeTab!;
+      expect(tab.primaryLocalContainer, same(local));
+      expect(tab.includeVaults, isFalse);
+    });
+
+    test('a folder location wins over a category when both are given', () {
+      final config = BrowserTabsConfig.create(
+        initialContainer: _container(3),
+        initialCategory: FileCategory.images,
+      );
+      final tab = read(config).activeTab!;
+      expect(tab.isCategory, isFalse);
+      expect(tab.volId, 3);
+    });
+
+    test('with a Vaults tab as well, the category is the active one', () {
+      final config = BrowserTabsConfig.create(
+        includeDashboardTab: true,
+        initialCategory: FileCategory.audio,
+      );
+      final state = read(config);
+      expect(state.tabs, hasLength(2));
+      expect(state.tabs.first.isDashboard, isTrue);
+      expect(state.activeTab!.category, FileCategory.audio);
+      expect(state.previousTabId, state.tabs.first.tabId);
+    });
+  });
 }

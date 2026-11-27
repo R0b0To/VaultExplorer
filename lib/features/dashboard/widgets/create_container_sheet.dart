@@ -20,11 +20,18 @@ import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generato
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
+import 'package:vaultexplorer/core/widgets/wizard/wizard_window_style.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 
 enum _WizStep { basics, security, advanced, hiddenVolume, randomness, review }
 
 class CreateContainerSheet extends ConsumerStatefulWidget {
-  const CreateContainerSheet({super.key});
+  const CreateContainerSheet({super.key, this.onCreated});
+
+  /// Called once the vault has been created, with whether it is a folder
+  /// vault. Shown in a native window, the sheet closes that window, which takes
+  /// its own snackbar with it, so the opener reports the success instead.
+  final void Function(bool isFolderVault)? onCreated;
 
   @override
   ConsumerState<CreateContainerSheet> createState() => _CreateContainerSheetState();
@@ -167,14 +174,18 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     }
 
     if (ok && mounted) {
+      final inWindow = SecondaryWindowScope.maybeOf(context) != null;
+      if (inWindow) widget.onCreated?.call(state.isFolderVault);
       Navigator.pop(context);
-      showAppSnackBar(
-        context,
-        message: state.isFolderVault
-            ? l10n.vaultCreatedSuccessfully
-            : l10n.containerFileCreatedSuccessfully,
-        tone: AppBannerTone.success,
-      );
+      if (!inWindow || widget.onCreated == null) {
+        showAppSnackBar(
+          context,
+          message: state.isFolderVault
+              ? l10n.vaultCreatedSuccessfully
+              : l10n.containerFileCreatedSuccessfully,
+          tone: AppBannerTone.success,
+        );
+      }
     }
   }
 
@@ -315,7 +326,12 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     final currentKind = kinds[safeStep];
     final isLastStep = safeStep == kinds.length - 1;
 
-    final inputDecorationTheme = InputDecorationTheme(
+    // In a native window the fields are the desktop ones: hairline border,
+    // tight corners, tight padding.
+    final inWindow = SecondaryWindowScope.maybeOf(context) != null;
+    final inputDecorationTheme = inWindow
+        ? wizardWindowInputDecorationTheme(cs)
+        : InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
       contentPadding: EdgeInsets.symmetric(
@@ -505,15 +521,19 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
 
   Widget _buildCompositeContainerHint(ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
+    final inWindow = SecondaryWindowScope.maybeOf(context) != null;
+    final radius = inWindow ? kWizardWindowRadius : 16.0;
     return Card(
       elevation: 0,
-      color: cs.surfaceContainerHigh,
+      color: inWindow ? Colors.transparent : cs.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(radius),
+        side: BorderSide(
+          color: inWindow ? wizardWindowOutline(cs) : cs.outlineVariant.withValues(alpha: 0.3),
+        ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(radius),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: CompositeCreateSheet(
@@ -767,6 +787,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     final hasSelection = state.folderVaultUri != null;
     final busy = state.loading || state.pickingFolderVault;
     final format = ContainerFormat.fromWire(state.folderVaultFormat);
+    final inWindow = SecondaryWindowScope.maybeOf(context) != null;
 
     return GestureDetector(
       onTap: busy
@@ -778,8 +799,13 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               ),
       child: Card(
         elevation: 0,
-        color: hasSelection ? cs.primaryContainer.withValues(alpha: 0.15) : cs.surfaceContainerHigh,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        color: hasSelection
+            ? cs.primaryContainer.withValues(alpha: 0.15)
+            : (inWindow ? Colors.transparent : cs.surfaceContainerHigh),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(inWindow ? kWizardWindowRadius : 18),
+          side: inWindow ? BorderSide(color: wizardWindowOutline(cs)) : BorderSide.none,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(

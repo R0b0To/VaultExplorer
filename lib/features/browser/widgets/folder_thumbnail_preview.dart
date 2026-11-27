@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';

@@ -8,6 +8,7 @@ import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/utils/mouse_nav_buttons.dart';
 import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/widgets/desktop_semantics_gate.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/windowing/app_windows.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
@@ -61,10 +62,13 @@ class _DesktopAppHostState extends State<DesktopAppHost> {
   Widget build(BuildContext context) {
     return ViewCollection(
       views: _windows.buildViews(
-        mainBuilder: (context) => const MainWindowChrome(
-          child: VaultExplorerApp(ownsMouseNavigation: false),
+        mainBuilder: (context) => const DesktopSemanticsGate(
+          child: MainWindowChrome(
+            child: VaultExplorerApp(ownsMouseNavigation: false),
+          ),
         ),
-        secondaryBuilder: (context, entry) => SecondaryWindowApp(entry: entry),
+        secondaryBuilder: (context, entry) =>
+            DesktopSemanticsGate(child: SecondaryWindowApp(entry: entry)),
       ),
     );
   }

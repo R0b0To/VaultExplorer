@@ -493,6 +493,3 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
     );
   }
 }
-
-/// Backward-compatibility alias for [MediaDiagnosticsDialog].
-typedef MediaDiagnosticsSheet = MediaDiagnosticsDialog;

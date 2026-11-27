@@ -290,6 +290,10 @@ class SplitJoinHandlers(
 
                     if (bytesInCurrentPart >= chunkSizeBytes) {
                         partOut.stream.close()
+                        // This part is complete. From here it must survive any failure -- including the next
+                        // part failing to open (a full disk, a revoked folder) -- so it stops being "in progress".
+                        partInProgress = null
+                        partOutToClose = null
                         partIndex++
                         bytesInCurrentPart = 0L
                         partOut = openDestOutput(partName(partIndex), canWriteRaw, destDir, destTreeDoc)
@@ -300,6 +304,7 @@ class SplitJoinHandlers(
 
                 partOut.stream.close()
                 partOutToClose = null
+                partInProgress = null
                 // An exact multiple of chunkSizeBytes leaves one empty
                 // trailing part from the last part-rollover above -- drop
                 // it rather than shipping a useless zero-byte last chunk.
@@ -316,13 +321,10 @@ class SplitJoinHandlers(
                 activity.runOnUiThread { result.success(null) }
             } catch (e: Exception) {
                 try { partOutToClose?.stream?.close() } catch (_: Exception) {}
-                if (e is SplitJoinCancelledException) {
-                    // Every earlier part is already complete on disk and is
-                    // left in place (same as a cancelled import leaves
-                    // already-imported files) -- only the in-flight partial
-                    // part gets dropped.
-                    partInProgress?.delete()
-                }
+                // Every earlier part is already complete on disk and is left in place (same as a cancelled
+                // import leaves already-imported files) -- only the in-flight partial part gets dropped, whether
+                // the split was cancelled or failed (a full disk used to leave a truncated part behind).
+                partInProgress?.delete()
                 activity.runOnUiThread { dispatchSplitJoinError(e, result) }
             } finally {
                 try { inputToClose?.close() } catch (_: Exception) {}
@@ -405,9 +407,10 @@ class SplitJoinHandlers(
                 activity.runOnUiThread { result.success(null) }
             } catch (e: Exception) {
                 try { outToClose?.stream?.close() } catch (_: Exception) {}
-                if (e is SplitJoinCancelledException) {
-                    outToClose?.delete()
-                }
+                // Cancelled or failed alike: a joined file that stops short is not the original, so it is
+                // removed rather than left looking like a finished result (outToClose is cleared once the
+                // output has been closed successfully, so a completed join is never touched here).
+                outToClose?.delete()
                 activity.runOnUiThread { dispatchSplitJoinError(e, result) }
             } finally {
                 SplitJoinCancellation.clear(opId)

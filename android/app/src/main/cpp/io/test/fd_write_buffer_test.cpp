@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <string>
 #include <vector>
+#include <atomic>
 
 namespace {
 
@@ -143,9 +144,51 @@ void testResetDiscardsPending() {
     assert(lseek(f.fd, 0, SEEK_END) == 0);  // nothing was written
 }
 
+// ---- failure logging -------------------------------------------------------
+// A failed pwrite used to return a bare `false`. It must now leave one log
+// line with the errno and the fd's access mode (the diagnostic that tells
+// "fd was opened read-only" from "disk full"), without ever naming a file,
+// and must not flood the log when the fd stays broken.
+std::vector<std::string> g_logLines;
+void captureSink(int level, const char* tag, const char* message) {
+    if (level != ENGINE_LOG_LEVEL_WARN) return;
+    if (std::string(tag) != "VaultExplorer_C++") return;
+    if (!std::strstr(message, "pwrite64 failed")) return;
+    g_logLines.emplace_back(message);
+}
+
+// Must run before every other test: the failure counter is process-wide.
+void testFailedWriteLogsErrnoAndAccessMode() {
+    engineLogSetSink(captureSink);
+    TempFile f;
+    int ro = f.openReadOnly();
+    auto data = bytesOf(0x5A, 4096);
+    assert(!FdWriteBuffer::directWrite(ro, 8192, data.data(), data.size()));
+    assert(g_logLines.size() == 1);
+    const std::string& line = g_logLines[0];
+    assert(line.find("errno=9") != std::string::npos);         // EBADF on an O_RDONLY fd
+    assert(line.find("fdAccess=RDONLY") != std::string::npos);
+    assert(line.find("off=8192") != std::string::npos);
+    assert(line.find("len=4096") != std::string::npos);
+    assert(line.find(f.path) == std::string::npos);            // never a path
+
+    // 19 more failures: only #2..#5 and the powers of two (8, 16) are logged.
+    for (int i = 0; i < 19; i++) {
+        assert(!FdWriteBuffer::directWrite(ro, 0, data.data(), data.size()));
+    }
+    assert(g_logLines.size() == 7);
+
+    // A write that succeeds logs nothing.
+    assert(FdWriteBuffer::directWrite(f.fd, 0, data.data(), data.size()));
+    assert(g_logLines.size() == 7);
+    close(ro);
+    engineLogSetSink(nullptr);
+}
+
 }  // namespace
 
 int main() {
+    testFailedWriteLogsErrnoAndAccessMode();
     testDataStreamSurvivesFailedFlush();
     testMetaStreamSurvivesFailedFlush();
     testFlushIfOverlapsFailureKeepsData();

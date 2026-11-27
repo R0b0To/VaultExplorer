@@ -4,7 +4,9 @@
 #   scripts/build_desktop_engine.sh [output-dir]      (default: build/desktop-engine)
 #
 # Linux: needs cmake (>= 3.22), ninja, a C/C++ toolchain, git, zlib headers, and network access
-# (the engine's third-party sources are fetched by CMake FetchContent on first configure).
+# (the engine's third-party sources are fetched by CMake FetchContent on first configure; libjpeg-turbo is
+# fetched and built at build time by ExternalProject). Install nasm too: libjpeg-turbo's SIMD code needs it, and
+# without it JPEG thumbnails still work but decode more slowly (CMake warns).
 # Output: <output-dir>/libvaultexplorer_engine.so and <output-dir>/ve_smoke_test.
 # Windows: see docs/desktop-port.md (MSYS2 UCRT64 toolchain; not yet validated).
 set -euo pipefail

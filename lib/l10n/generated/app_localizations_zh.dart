@@ -357,6 +357,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return '无法创建“$name”——写入容器失败';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return '无法重命名“$name”——可能已存在同名项目';
   }
@@ -12318,4 +12323,84 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '位置不可用';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      '已以只读方式打开，因为 Android 仅授予了此文件的读取权限。';
+
+  @override
+  String get mountDriveTitle => 'Mount drive';
+
+  @override
+  String get mountDriveSubtitle =>
+      'Unlock a BitLocker, VeraCrypt or LUKS disk or partition';
+
+  @override
+  String get unlockDriveTitle => 'Unlock Drive';
+
+  @override
+  String reconnectDriveTitle(String label) {
+    return 'Reconnect \"$label\"';
+  }
+
+  @override
+  String get noDrivesDetectedTitle => 'No drives found';
+
+  @override
+  String get drivesNeedAccessNote =>
+      'Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.';
+
+  @override
+  String get driveInUseLabel => 'Mounted by the system';
+
+  @override
+  String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return '已完成 $percent%';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb：$items（$source → $destination）';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb：$items（$source）';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb：$items → $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return '速度：$speed/秒';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return '剩余时间：$time';
+  }
+
+  @override
+  String get fileOpWinCalculating => '正在计算…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return '剩余项目：$count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return '剩余项目：$count';
+  }
 }

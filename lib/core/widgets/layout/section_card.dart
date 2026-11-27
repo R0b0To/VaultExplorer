@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/widgets/wizard/wizard_window_style.dart';
 
 /// Bold, primary-tinted label introducing a [SectionCard] group.
 ///
@@ -43,6 +44,19 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const SizedBox.shrink();
+    // In a creation wizard's desktop window the rows sit directly on the
+    // window surface (no card behind them), 8px apart.
+    if (WizardWindowStyle.isActive(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            ListTileTheme(tileColor: Colors.transparent, child: children[i]),
+          ],
+        ],
+      );
+    }
     final cs = context.colors;
 
     return Column(

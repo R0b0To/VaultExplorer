@@ -11,7 +11,7 @@
 //
 // Usage: ve_smoke_test [filesystem ...]     (default: fat)
 //        e.g. ve_smoke_test fat exfat ntfs ext4
-//        ve_smoke_test tools | crypto | fv | chpw     (one section only)
+//        ve_smoke_test tools | crypto | fv | chpw | device     (one section only)
 // Exit code 0 = every check passed.
 
 #include "ve_crypto_vectors.inc"
@@ -797,6 +797,20 @@ static void runFolderVaults() {
         const auto docs = listDir(kFvVol, "/docs");
         CHECK(listContains(root1, "docs"));
         CHECK(listContains(docs, "hello.txt") && listContains(docs, "big.bin"));
+
+        if (fmt == 1) {
+            // Cryptomator stores names NFC-normalised. A decomposed name ("e" + U+0301) written by one host must be
+            // the same file as the composed one (U+00E9) on every other, so the engine needs a Unicode normaliser
+            // (ffi/ve_nfc.cpp; Android asks java.text.Normalizer).
+            const std::string nfdPath = "/docs/e\xCC\x81.txt";
+            const std::string nfcPath = "/docs/\xC3\xA9.txt";
+            CHECK_RC(ve_write_file_chunk(kFvVol, nfdPath.c_str(), 0, (const uint8_t*)payload.data(), payload.size()), VE_OK);
+            CHECK_RC(ve_fv_finish_write(kFvVol, nfdPath.c_str()), VE_OK);
+            CHECK(readAll(kFvVol, nfcPath.c_str()) == payload);
+            const auto nfcDocs = listDir(kFvVol, "/docs");
+            CHECK(listContains(nfcDocs, "\xC3\xA9.txt") && !listContains(nfcDocs, "e\xCC\x81.txt"));
+            CHECK_RC(ve_delete_file(kFvVol, nfcPath.c_str()), VE_OK);
+        }
 
         CHECK_RC(ve_rename_file(kFvVol, "/docs/hello.txt", "/docs/renamed.txt"), VE_OK);
         CHECK(readAll(kFvVol, "/docs/renamed.txt") == payload);
@@ -1997,6 +2011,161 @@ static void runComposite() {
     for (const auto& path : {a, b, c, plain, zipLike}) std::remove(path.c_str());
 }
 
+// ---- raw block devices (ve_unlock_device) -------------------------------------------------------------
+// A "device" may be a regular file (a raw disk image), which is how this runs without root or a loop device: the
+// engine's device path is the same one a /dev/sdX or \\.\PhysicalDriveN takes (sector reads/writes through the
+// attached-device hooks, partition scan, LUKS/VeraCrypt probing); only the OS open differs.
+
+static bool makeContainerFile(const std::string& path, int64_t size, int format, const char* fs, const char* password) {
+    std::remove(path.c_str());
+    const int fd = ve_create_file(path.c_str());
+    if (fd < 0) return false;
+    ve_create_params cp;
+    std::memset(&cp, 0, sizeof(cp));
+    cp.struct_size = sizeof(cp);
+    cp.fd = fd;
+    cp.password = reinterpret_cast<const uint8_t*>(password);
+    cp.password_len = static_cast<int32_t>(std::strlen(password));
+    cp.size_bytes = size;
+    cp.file_system = fs;
+    cp.container_format = format;
+    cp.cipher_id = cp.hash_id = format == 0 ? 255 : 0;  // LUKS creation takes concrete ids (no "auto")
+    cp.quick_format = 1;
+    return ve_create_container(&cp) == VE_OK;
+}
+
+static int32_t unlockDevice(const std::string& path, const char* password, int volId, int readOnly = 0,
+                            int32_t* osError = nullptr) {
+    ve_unlock_device_params p;
+    std::memset(&p, 0, sizeof(p));
+    p.struct_size = sizeof(p);
+    p.device_path = path.c_str();
+    p.vol_id = volId;
+    p.password = reinterpret_cast<const uint8_t*>(password);
+    p.password_len = static_cast<int32_t>(std::strlen(password));
+    p.cipher_id = 255;
+    p.hash_id = 255;
+    p.read_only = readOnly;
+    p.partition_offset_hint = -1;
+    p.os_error_out = osError;
+    return ve_unlock_device(&p);
+}
+
+static std::vector<unsigned char> slurp(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    return std::vector<unsigned char>((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+}
+
+static bool spit(const std::string& path, const std::vector<unsigned char>& bytes) {
+    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    return static_cast<bool>(f);
+}
+
+// Writes a file through the engine, reads it back, and reports whether it matched.
+static bool roundTrip(int vol, const char* name, const std::string& content) {
+    if (ve_write_file_chunk(vol, name, 0, reinterpret_cast<const uint8_t*>(content.data()), content.size()) != VE_OK) return false;
+    return readAll(vol, name) == content;
+}
+
+static void runRawDevices() {
+    std::printf("== raw block devices (ve_unlock_device) ==\n");
+    const char* kPw = "correct horse battery staple";
+    const std::string kMsg = "written through the raw device layer";
+
+    // The device list is JSON, and does not crash where the platform has nothing to list.
+    {
+        ve_buffer buf{};
+        CHECK_RC(ve_list_block_devices(&buf), VE_OK);
+        CHECK(buf.data != nullptr && buf.len >= 2 && buf.data[0] == '[' && buf.data[buf.len - 1] == ']');
+        ve_buffer_free(&buf);
+    }
+
+    // 1. A whole device that is one VeraCrypt volume (VeraCrypt "encrypt the whole drive": header at sector 0).
+    {
+        const std::string img = tempPath("ve_dev_vc.img");
+        CHECK(makeContainerFile(img, 8ll << 20, 0, "fat", kPw));
+        CHECK_RC(unlockDevice(img, "definitely wrong", 0), VE_ERR_FAILED);
+        CHECK_RC(unlockDevice(img, kPw, 0), VE_OK);
+        CHECK(ve_get_container_format(0) == 0);
+        CHECK(roundTrip(0, "/hello.txt", kMsg));
+        // The same device cannot be opened into a second slot while the first holds it.
+        CHECK_RC(unlockDevice(img, kPw, 1), VE_ERR_DEVICE_OPEN);
+        ve_lock(0);
+        // Writes went to the image: the plain file unlock sees them.
+        CHECK_RC(unlock(img, kPw, 0), VE_OK);
+        CHECK(readAll(0, "/hello.txt") == kMsg);
+        ve_lock(0);
+        // Read-only: opens, reads, refuses writes.
+        CHECK_RC(unlockDevice(img, kPw, 0, /*readOnly=*/1), VE_OK);
+        CHECK(readAll(0, "/hello.txt") == kMsg);
+        CHECK(ve_write_file_chunk(0, "/nope.txt", 0, reinterpret_cast<const uint8_t*>("x"), 1) != VE_OK);
+        ve_lock(0);
+        std::remove(img.c_str());
+    }
+
+    // 2. A raw LUKS2 volume with no partition table (a partition node such as /dev/sdb1 looks exactly like this).
+    {
+        const std::string img = tempPath("ve_dev_luks.img");
+        CHECK(makeContainerFile(img, 16ll << 20, 2, "ext4", kPw));
+        CHECK_RC(unlockDevice(img, "definitely wrong", 0), VE_ERR_FAILED);
+        CHECK_RC(unlockDevice(img, kPw, 0), VE_OK);
+        CHECK(ve_get_container_format(0) == 2);
+        CHECK(roundTrip(0, "/luks.txt", kMsg));
+        ve_lock(0);
+        CHECK_RC(unlock(img, kPw, 0), VE_OK);
+        CHECK(readAll(0, "/luks.txt") == kMsg);
+        ve_lock(0);
+        std::remove(img.c_str());
+    }
+
+    // 3. A disk with an MBR partition table and the VeraCrypt volume in partition 1 (1 MiB in).
+    {
+        const std::string inner = tempPath("ve_dev_part_inner.hc");
+        const std::string disk = tempPath("ve_dev_part.img");
+        CHECK(makeContainerFile(inner, 8ll << 20, 0, "fat", kPw));
+        std::vector<unsigned char> volume = slurp(inner);
+        CHECK(volume.size() == (8u << 20));
+        const size_t kStart = 1u << 20;  // sector 2048
+        std::vector<unsigned char> image(kStart + volume.size() + (1u << 20), 0);
+        std::copy(volume.begin(), volume.end(), image.begin() + kStart);
+        unsigned char* e = image.data() + 446;
+        e[4] = 0x0C;
+        const uint32_t startLba = static_cast<uint32_t>(kStart / 512), count = static_cast<uint32_t>(volume.size() / 512);
+        for (int i = 0; i < 4; ++i) { e[8 + i] = (startLba >> (8 * i)) & 0xFF; e[12 + i] = (count >> (8 * i)) & 0xFF; }
+        image[510] = 0x55;
+        image[511] = 0xAA;
+        CHECK(spit(disk, image));
+
+        CHECK_RC(unlockDevice(disk, "definitely wrong", 0), VE_ERR_FAILED);
+        CHECK_RC(unlockDevice(disk, kPw, 0), VE_OK);
+        CHECK(roundTrip(0, "/part.txt", kMsg));
+        ve_lock(0);
+        // The change landed inside the partition, at its offset, and nowhere else.
+        const std::vector<unsigned char> after = slurp(disk);
+        CHECK(after.size() == image.size());
+        CHECK(std::equal(after.begin(), after.begin() + kStart, image.begin()));
+        CHECK(std::equal(after.begin() + kStart + volume.size(), after.end(), image.begin() + kStart + volume.size()));
+        std::vector<unsigned char> extracted(after.begin() + kStart, after.begin() + kStart + volume.size());
+        CHECK(spit(inner, extracted));
+        CHECK_RC(unlock(inner, kPw, 0), VE_OK);
+        CHECK(readAll(0, "/part.txt") == kMsg);
+        ve_lock(0);
+        std::remove(inner.c_str());
+        std::remove(disk.c_str());
+    }
+
+    // 4. Open errors are told apart from a wrong password.
+    {
+        int32_t os = 0;
+        CHECK_RC(unlockDevice(tempPath("ve_dev_does_not_exist.img"), kPw, 0, 0, &os), VE_ERR_DEVICE_NOT_FOUND);
+        CHECK(os != 0);
+        CHECK_RC(unlockDevice(tempPath(""), kPw, 0), VE_ERR_DEVICE_OPEN);  // a directory is not a disk
+        CHECK_RC(unlockDevice("", kPw, 0), VE_ERR_INVALID_ARG);
+        CHECK_RC(unlockDevice(tempPath("x.img"), kPw, 9999), VE_ERR_INVALID_ARG);
+    }
+}
+
 int main(int argc, char** argv) {
     std::printf("ve abi %d, %d volume slots\n", ve_abi_version(), ve_max_volumes());
     CHECK(ve_abi_version() == VE_ABI_VERSION);
@@ -2023,6 +2192,12 @@ int main(int argc, char** argv) {
 
     if (argc == 2 && std::strcmp(argv[1], "composite") == 0) {  // fast path: composite containers only
         runComposite();
+        std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "device") == 0) {  // fast path: raw block devices only
+        runRawDevices();
         std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
         return g_failures == 0 ? 0 : 1;
     }
@@ -2056,6 +2231,7 @@ int main(int argc, char** argv) {
     runComposite();
     runChangePassword(0, "fat", 8ll << 20);
     runChangePassword(1, "ext4", 16ll << 20);
+    runRawDevices();
     runFolderVaults();
     runCrypto();
     runHashes();

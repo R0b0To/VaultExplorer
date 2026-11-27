@@ -1,5 +1,9 @@
 // See desktop_windowing.dart for why this file imports Flutter internals.
 // ignore_for_file: invalid_use_of_internal_member, implementation_imports
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/src/widgets/_window.dart' as flutter_window;
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -41,6 +45,19 @@ class SecondaryWindowEntry {
   );
 
   late final flutter_window.WindowController _controller;
+
+  final Completer<void> _closedCompleter = Completer<void>();
+
+  /// Completes once this window is gone, however it was closed (its own
+  /// close button, the page popping, a lock, or the main window closing).
+  ///
+  /// A page that is shown in a window instead of in-window can await this
+  /// the way it awaited `Navigator.push`.
+  Future<void> get closed => _closedCompleter.future;
+
+  /// The id of this window's view, which is how the platform runner knows the
+  /// window (see `windowChannelArgsFor`).
+  int get viewId => _controller.rootView.viewId;
 
   /// Closes this window.
   void close() => SecondaryWindows.instance.close(key);
@@ -100,12 +117,44 @@ class SecondaryWindows extends ChangeNotifier {
   List<SecondaryWindowEntry> get entries =>
       List<SecondaryWindowEntry>.unmodifiable(_entries.values);
 
+  /// The window open under [key], if any.
+  SecondaryWindowEntry? entryFor(String key) => _entries[key];
+
+  /// Completes once the scheduler is between frames (immediately when it
+  /// already is).
+  ///
+  /// Creating a native window must not happen while a frame is being built or
+  /// while its post-frame callbacks run (an `addPostFrameCallback` is exactly
+  /// that). On Windows the native create call pumps the message loop before it
+  /// returns, which lets the engine start a new frame inside the frame that is
+  /// still running; the scheduler then fails its `schedulerPhase == idle` and
+  /// `midFrameMicrotasks` assertions, and the new window never gets a valid
+  /// first frame (it ends up blank or behind the main window).
+  ///
+  /// A caller that may run inside a frame awaits this before [open].
+  static Future<void> untilBetweenFrames() {
+    if (WidgetsBinding.instance.schedulerPhase == SchedulerPhase.idle) {
+      return SynchronousFuture<void>(null);
+    }
+    final done = Completer<void>();
+    // A timer fires on a later turn of the event loop, after the frame that
+    // is running now has returned.
+    Timer.run(done.complete);
+    return done.future;
+  }
+
   /// Opens a window showing [builder], or brings the one already open under
   /// [key] to the front.
+  ///
+  /// Must not be called from inside a frame; see [untilBetweenFrames].
   ///
   /// With [survivesMainClose] the window outlives the main window: closing the
   /// main window leaves it open, and the app ends when the last window opened
   /// this way closes.
+  ///
+  /// [onCreated] runs once, right after a new window exists (not when an
+  /// open one is brought forward), before its first frame. It is the moment to
+  /// place the window, since the platform only shows it after that frame.
   ///
   /// Returns false when native windows are not available (Android, a
   /// `VE_MULTI_WINDOW=0` run, or an embedder that refused); the caller then
@@ -120,6 +169,7 @@ class SecondaryWindows extends ChangeNotifier {
       minWidth: 420,
       minHeight: 480,
     ),
+    void Function(SecondaryWindowEntry entry)? onCreated,
   }) {
     final existing = _entries[key];
     if (existing != null) {
@@ -151,6 +201,13 @@ class SecondaryWindows extends ChangeNotifier {
     }
     _entries[key] = entry;
     notifyListeners();
+    if (onCreated != null) {
+      try {
+        onCreated(entry);
+      } catch (error) {
+        VeLog.w(_kLogTag, 'Setting up window "$key" failed', error);
+      }
+    }
     return true;
   }
 
@@ -219,6 +276,7 @@ class SecondaryWindows extends ChangeNotifier {
   void _forget(SecondaryWindowEntry entry) {
     if (!identical(_entries[entry.key], entry)) return;
     _entries.remove(entry.key);
+    if (!entry._closedCompleter.isCompleted) entry._closedCompleter.complete();
     notifyListeners();
     // The window widget listens to the controller until the frame that drops
     // it from the tree, so the controller is disposed after that frame.

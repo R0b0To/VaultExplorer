@@ -310,7 +310,7 @@ class _DetailsSheetState extends ConsumerState<_DetailsSheet> {
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.75,
         ),
         child: ListView(
           shrinkWrap: true,

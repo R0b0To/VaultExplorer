@@ -48,3 +48,82 @@ Future<void> declareRunnerWindowUnused() async {
     VeLog.w('WindowCaption', 'The runner did not accept the call', error);
   }
 }
+
+/// Moves the window that shows [viewId] so that the mouse cursor ends up
+/// [anchor] (logical pixels) inside its top-left corner, and keeps it on the
+/// screen the cursor is on.
+///
+/// Used for a window opened by dragging a tab out of another one, so that it
+/// appears where the tab was let go. Windows only: that is where the runner
+/// can answer. Elsewhere the window manager places new windows itself and this
+/// does nothing. Never throws; a runner that does not know the call (or a
+/// window that is already gone) leaves the window where the platform put it.
+Future<void> placeWindowAtCursor(
+  int viewId, {
+  Offset anchor = Offset.zero,
+}) async {
+  if (!PlatformFeatures.isWindows) return;
+  try {
+    await kWindowChannel.invokeMethod<void>('placeAtCursor', <String, Object?>{
+      'viewId': viewId,
+      'anchorX': anchor.dx,
+      'anchorY': anchor.dy,
+    });
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not place the window at the cursor', error);
+  }
+}
+
+/// Moves the window that shows [viewId] to the middle of the window that shows
+/// [overViewId] (the one it was opened from), keeping it on that window's
+/// screen. Without [overViewId], or when that window is hidden or minimized, it
+/// is centered on the screen it is already on.
+///
+/// Windows only: the Linux window manager places new windows itself, and the
+/// window API has no way to ask it for more. Never throws. The native window of
+/// a view that was only just created can take a moment to exist, so a call that
+/// finds none is tried again a few times.
+Future<void> centerWindowOver(int viewId, {int? overViewId}) async {
+  if (!PlatformFeatures.isWindows) return;
+  const attempts = 4;
+  for (var attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await kWindowChannel.invokeMethod<void>('centerOverWindow', <String, Object?>{
+        'viewId': viewId,
+        if (overViewId != null) 'overViewId': overViewId,
+      });
+      return;
+    } catch (error) {
+      if (attempt == attempts) {
+        VeLog.w('WindowCaption', 'Could not center the window', error);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+  }
+}
+
+/// Puts a window into real fullscreen (no frame, covering its whole monitor,
+/// taskbar included) or back, and returns whether the runner did it.
+///
+/// [windowArgs] names the window, as [windowChannelArgsFor] gives it. Taking
+/// them rather than a context lets a page that is being disposed leave
+/// fullscreen again. Windows only: where the runner cannot (Linux), this
+/// returns false and the caller keeps whatever it did to its own chrome. Never
+/// throws.
+Future<bool> setWindowFullscreen(
+  Map<String, Object?>? windowArgs,
+  bool fullscreen,
+) async {
+  if (!PlatformFeatures.isWindows) return false;
+  try {
+    await kWindowChannel.invokeMethod<bool>('setFullscreen', <String, Object?>{
+      ...?windowArgs,
+      'fullscreen': fullscreen,
+    });
+    return true;
+  } catch (error) {
+    VeLog.w('WindowCaption', 'Could not change fullscreen', error);
+    return false;
+  }
+}

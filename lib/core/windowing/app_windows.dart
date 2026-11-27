@@ -77,6 +77,26 @@ class AppWindows extends ChangeNotifier {
     _policy.mainWindowOpened();
   }
 
+  /// Closes the main window, the way its own close button does: the windows
+  /// that only serve it close with it, and the app ends unless a window that
+  /// can stand on its own is left (see [DesktopWindowPolicy]).
+  ///
+  /// Where the main page is drawn in the runner's own window (no native
+  /// windows), that window is all there is, so this ends the app.
+  void closeMainWindow() {
+    final main = _main;
+    if (main != null) {
+      try {
+        // Reports back through the window's delegate, which does the rest.
+        main.destroy();
+      } catch (error) {
+        VeLog.w(_kLogTag, 'Could not close the main window', error);
+      }
+      return;
+    }
+    if (_mainInRunnerWindow) _exitApp();
+  }
+
   /// The app locked (or was told to). Everything the vaults showed closes, and
   /// the main window, which draws the lock gate, is there afterwards, even if
   /// the person had closed it while other windows kept the app running.
@@ -185,5 +205,16 @@ class _MainWindowDelegate with flutter_window.WindowControllerDelegate {
     super.onWindowDestroyed();
     final own = controller;
     if (own != null) _windows._mainWindowDestroyed(own);
+  }
+}
+
+/// Closes the window that [context] is in: the file manager window it belongs
+/// to, or the main window. This is what closing a window's last tab does.
+void closeWindowOf(BuildContext context) {
+  final entry = SecondaryWindowScope.maybeOf(context);
+  if (entry != null) {
+    entry.close();
+  } else {
+    AppWindows.instance.closeMainWindow();
   }
 }

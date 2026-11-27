@@ -279,8 +279,8 @@ class _CreateArchiveBottomSheetState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final viewInsetsBottom = MediaQuery.of(context).viewInsets.bottom;
-    final maxHeight = MediaQuery.of(context).size.height * 0.88;
+    final viewInsetsBottom = MediaQuery.viewInsetsOf(context).bottom;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.88;
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),

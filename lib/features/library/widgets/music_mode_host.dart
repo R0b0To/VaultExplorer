@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart'
+    show isDesktopEngineTarget;
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/library/controllers/library_providers.dart';
@@ -141,7 +143,13 @@ class _MusicModeHostState extends ConsumerState<MusicModeHost> {
             ],
           ),
         ),
-        if (enabled)
+        // On Android audio that outlives its viewer is steered from the media
+        // notification, so the bar is only needed with music mode on. Linux and
+        // Windows have no such notification: the bar is the only control for
+        // music kept playing after its viewer was closed, so it shows whether
+        // or not music mode is on (it falls back to the file name for tracks
+        // the library does not know, and is empty when nothing plays).
+        if (enabled || isDesktopEngineTarget)
           MusicMiniPlayer(hub: _library.hub, covers: _library.covers)
         else
           const SizedBox.shrink(),

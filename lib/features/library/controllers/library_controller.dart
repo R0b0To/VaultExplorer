@@ -15,7 +15,14 @@ class LibraryFileAccess {
   final LibraryDirectoryLister list;
   final LibraryChunkReader read;
 
-  const LibraryFileAccess({required this.list, required this.read});
+  /// A faster way to find every audio file, where the source has one.
+  final LibraryTreeWalker? walkTree;
+
+  const LibraryFileAccess({
+    required this.list,
+    required this.read,
+    this.walkTree,
+  });
 }
 
 enum LibraryPhase {
@@ -201,6 +208,7 @@ class LibraryController extends ChangeNotifier {
     final scanner = LibraryScanner(
       listDirectory: access.list,
       readChunk: access.read,
+      walkTree: access.walkTree,
       isAudioFile: _isAudioFile,
       readConcurrency: _readConcurrency,
     );

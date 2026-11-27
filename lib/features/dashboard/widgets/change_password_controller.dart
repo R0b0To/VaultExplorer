@@ -57,7 +57,6 @@ class ChangePassword extends _$ChangePassword {
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(containerFormat);
-  bool get _isFolderVault => _isCryptomator || _isGocryptfs || _isCryfs;
   bool get _isLuks => ContainerFormat.isLuksWire(containerFormat);
 
   ChangePasswordState _copy({

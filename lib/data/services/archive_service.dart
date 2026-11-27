@@ -5,7 +5,6 @@ import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/api/vault_archive_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -711,80 +710,5 @@ class ArchiveService {
       splitSizeBytes: splitSizeBytes,
       opId: opId,
     );
-  }
-
-  static Future<int> compressToContainer({
-    required MountedContainer container,
-    required List<RawEntry> entries,
-    required String currentDirPath,
-    required String destPathInContainer,
-    ArchiveFormatType format = ArchiveFormatType.zip,
-    String? passphrase,
-    int? opId,
-  }) async {
-    final srcPaths = <String>[];
-    final entryNames = <String>[];
-    final modifiedSecs = <int>[];
-
-    Future<void> collect(String containerPath, String archivePath) async {
-      final rawList = await _fileIo.listDirectory(container, containerPath);
-      final children = RawEntry.parseAll(rawList ?? const []);
-      for (final child in children) {
-        final childContainerPath = '$containerPath/${child.name}';
-        final childArchivePath = '$archivePath/${child.name}';
-        if (child.isDir) {
-          await collect(childContainerPath, childArchivePath);
-        } else {
-          srcPaths.add(
-            container.isRawLocal
-                ? p.join(container.uri, childContainerPath)
-                : childContainerPath,
-          );
-          entryNames.add(childArchivePath);
-          modifiedSecs.add(child.modifiedSecs);
-        }
-      }
-    }
-
-    for (final entry in entries) {
-      final containerPath = currentDirPath.isEmpty
-          ? entry.name
-          : '$currentDirPath/${entry.name}';
-      if (entry.isDir) {
-        await collect(containerPath, entry.name);
-      } else {
-        srcPaths.add(
-          container.isRawLocal
-              ? p.join(container.uri, containerPath)
-              : containerPath,
-        );
-        entryNames.add(entry.name);
-        modifiedSecs.add(entry.modifiedSecs);
-      }
-    }
-
-    if (srcPaths.isEmpty) {
-      return 0;
-    }
-
-    final ok = await createArchive(
-      format: format,
-      srcPaths: srcPaths,
-      entryNames: entryNames,
-      modifiedSecs: modifiedSecs,
-      srcUri: container.uri,
-      destUri: container.uri,
-      destVaultPath: destPathInContainer,
-      destFilePath: container.isRawLocal
-          ? p.join(container.uri, destPathInContainer)
-          : null,
-      passphrase: passphrase,
-      opId: opId,
-    );
-
-    if (!ok) {
-      throw Exception('Failed to create archive');
-    }
-    return srcPaths.length;
   }
 }

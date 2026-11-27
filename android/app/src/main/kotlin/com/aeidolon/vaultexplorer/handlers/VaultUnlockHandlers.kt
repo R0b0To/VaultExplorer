@@ -322,7 +322,11 @@ class VaultUnlockHandlers(
                             "matchedCipherId" to r.matchedCipherId,
                             "matchedHashId" to r.matchedHashId,
                             "containerFormat" to r.format.wireName,
+                            // The mode actually mounted, which can be tighter than
+                            // the requested one (provider refused write access).
+                            "readOnly" to r.readOnly,
                         )
+                        r.readOnlyReason?.let { resultMap["readOnlyReason"] = it }
                         if (r.partCount > 1) {
                             resultMap["partCount"] = r.partCount
                         }

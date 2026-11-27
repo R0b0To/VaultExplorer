@@ -16,6 +16,7 @@ import 'package:vaultexplorer/core/widgets/layout/docked_content_frame.dart';
 import 'package:vaultexplorer/core/widgets/layout/resizable_split_pane.dart';
 import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/core/windowing/view_focus.dart';
+import 'package:vaultexplorer/core/windowing/window_caption.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/features/browser/browser_tab_paths.dart';
@@ -25,6 +26,7 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_navigati
 import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
+import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/data/models/new_tab_behavior.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
@@ -56,14 +58,70 @@ bool openFileManagerWindow({
   String? initialPath,
   String? title,
 }) {
+  return _openFileManagerWindow(
+    title: title ?? container?.displayName ?? '',
+    content: () =>
+        FileManagerWindow(container: container, initialPath: initialPath),
+  );
+}
+
+/// Opens the location of [tab] in a new window of its own, for a tab that was
+/// dragged out of its window: a folder at [initialPath], a category, or the
+/// Vaults page. The window takes [windowSize] (the size of the window the tab
+/// came from) and, where the platform allows, appears under the mouse cursor.
+///
+/// Like [openFileManagerWindow], the window starts with a workspace of its own
+/// and nothing of the tab's state besides where it was. Moving the tab, that
+/// is closing it in the window it came from, is up to the caller. Returns false
+/// when native windows are not available, and then the tab should stay put.
+bool openFileManagerWindowForTab(
+  BrowserTabState tab, {
+  String? initialPath,
+  Size? windowSize,
+}) {
+  final container = tab.isDashboard || tab.isCategory ? null : tab.container;
+  if (!tab.isDashboard && !tab.isCategory && container == null) return false;
+  return _openFileManagerWindow(
+    // A category (or the Vaults page) has no name before the window can
+    // localize it; the window titles itself from its tab once it is built.
+    title: container?.displayName ?? '',
+    size: windowSize,
+    atCursor: true,
+    content: () => FileManagerWindow(
+      container: container,
+      initialPath: initialPath,
+      category: tab.category,
+      categoryContainer: tab.primaryLocalContainer,
+      categoryIncludesVaults: tab.includeVaults,
+    ),
+  );
+}
+
+/// How far inside a new window's top-left corner the mouse cursor lands when
+/// the window is placed under it: over the caption row, near the first tab.
+const Offset _kTornOutWindowAnchor = Offset(80, 16);
+
+bool _openFileManagerWindow({
+  required String title,
+  required Widget Function() content,
+  Size? size,
+  bool atCursor = false,
+}) {
+  const constraints = BoxConstraints(minWidth: 560, minHeight: 400);
   return SecondaryWindows.instance.open(
     key: 'files:${++_fileManagerWindowSerial}',
-    title: title ?? container?.displayName ?? '',
+    title: title,
     survivesMainClose: true,
-    size: const Size(1100, 760),
-    constraints: const BoxConstraints(minWidth: 560, minHeight: 400),
-    builder: (_) =>
-        FileManagerWindow(container: container, initialPath: initialPath),
+    size: size == null
+        ? const Size(1100, 760)
+        : constraints.constrain(size),
+    constraints: constraints,
+    builder: (_) => content(),
+    onCreated: atCursor
+        ? (entry) => unawaited(
+            placeWindowAtCursor(entry.viewId, anchor: _kTornOutWindowAnchor),
+          )
+        : null,
   );
 }
 
@@ -80,11 +138,24 @@ bool openFileManagerWindow({
 ///
 /// Closing its last tab closes the window.
 class FileManagerWindow extends ConsumerStatefulWidget {
-  const FileManagerWindow({super.key, this.container, this.initialPath});
+  const FileManagerWindow({
+    super.key,
+    this.container,
+    this.initialPath,
+    this.category,
+    this.categoryContainer,
+    this.categoryIncludesVaults = true,
+  });
 
-  /// What the window opens on; null opens the Vaults page.
+  /// What the window opens on; null (with no [category]) opens the Vaults page.
   final MountedContainer? container;
   final String? initialPath;
+
+  /// A category to open on instead of a folder, with that tab's own settings
+  /// (see [CategoryTab]). Ignored when there is a [container].
+  final FileCategory? category;
+  final MountedContainer? categoryContainer;
+  final bool categoryIncludesVaults;
 
   @override
   ConsumerState<FileManagerWindow> createState() => _FileManagerWindowState();
@@ -96,9 +167,12 @@ class _FileManagerWindowState extends ConsumerState<FileManagerWindow> {
   late final BrowserTabsConfig _workspace = BrowserTabsConfig.create(
     initialContainer: widget.container,
     initialPath: widget.initialPath,
+    initialCategory: widget.container == null ? widget.category : null,
+    initialCategoryContainer: widget.categoryContainer,
+    initialCategoryIncludesVaults: widget.categoryIncludesVaults,
     // A window opened on the Vaults page starts with a Vaults tab, and going
     // back from a vault's root returns to it, as in the main window.
-    includeDashboardTab: widget.container == null,
+    includeDashboardTab: widget.container == null && widget.category == null,
   );
 
   final FileManagerEnvironment _env = FileManagerEnvironment.instance;
@@ -405,8 +479,10 @@ Widget _buildSidebar({
       browserTabsProvider(_workspace).select((state) => state.activeTab),
     );
     if (active == null) return;
-    if (active.isDashboard) {
-      final title = context.l10n.vaultsSectionTitle;
+    if (active.isDashboard || active.isCategory) {
+      final title = active.isCategory
+          ? active.category!.label(context.l10n)
+          : context.l10n.vaultsSectionTitle;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) entry.setTitle(title);
       });

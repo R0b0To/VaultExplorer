@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/widgets/desktop_semantics_gate.dart';
 import 'package:vaultexplorer/core/windowing/desktop_windowing.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/sync/services/scheduled_sync_background.dart';
@@ -88,7 +89,9 @@ void main() async {
       DesktopWindowing.isSupportedPlatform && DesktopWindowing.ensureReady();
   final app = UncontrolledProviderScope(
     container: appContainer,
-    child: useWindowHost ? const DesktopAppHost() : const VaultExplorerApp(),
+    child: useWindowHost
+        ? const DesktopAppHost()
+        : const DesktopSemanticsGate(child: VaultExplorerApp()),
   );
   if (useWindowHost) {
     runWidget(app);

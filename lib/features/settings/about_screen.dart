@@ -479,7 +479,7 @@ class _PrivacySheet extends StatelessWidget {
     return AppBottomSheet(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.75,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

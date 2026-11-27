@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/app/app_theme_cache.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/core/widgets/activity/file_operation_windows.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_layer.dart';
 import 'package:vaultexplorer/features/skin_editor/skin_edit_session.dart';
@@ -68,6 +69,9 @@ class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
   @override
   Widget build(BuildContext context) {
     PerfTrace.count('ui.app.build');
+    // On Linux and Windows file operations get a window of their own while
+    // they run. This only starts that; the provider is null elsewhere.
+    ref.watch(fileOperationWindowsProvider);
     final appSkin = ref.watch(appSkinSettingsProvider);
     // While a skin is being edited the whole app is drawn from the live draft
     // (always as a custom skin), so every change shows on every page at once.

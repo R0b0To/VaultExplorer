@@ -357,6 +357,11 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return '\"$name\"의 이름을 변경할 수 없습니다 — 같은 이름의 항목이 이미 있을 수 있습니다';
   }
@@ -12513,4 +12518,84 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => '위치를 사용할 수 없음';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Android가 이 파일에 읽기 권한만 부여했기 때문에 읽기 전용으로 열었습니다.';
+
+  @override
+  String get mountDriveTitle => 'Mount drive';
+
+  @override
+  String get mountDriveSubtitle =>
+      'Unlock a BitLocker, VeraCrypt or LUKS disk or partition';
+
+  @override
+  String get unlockDriveTitle => 'Unlock Drive';
+
+  @override
+  String reconnectDriveTitle(String label) {
+    return 'Reconnect \"$label\"';
+  }
+
+  @override
+  String get noDrivesDetectedTitle => 'No drives found';
+
+  @override
+  String get drivesNeedAccessNote =>
+      'Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.';
+
+  @override
+  String get driveInUseLabel => 'Mounted by the system';
+
+  @override
+  String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return '$percent% 완료';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb: $items ($source → $destination)';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb: $items ($source)';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb: $items → $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return '속도: $speed/초';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return '남은 시간: $time';
+  }
+
+  @override
+  String get fileOpWinCalculating => '계산 중…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return '남은 항목: $count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return '남은 항목: $count';
+  }
 }

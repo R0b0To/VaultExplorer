@@ -257,32 +257,47 @@ class RealPasswordGate extends _$RealPasswordGate {
     try {
       final pim = clampPim(pimText.isEmpty ? 0 : int.tryParse(pimText) ?? 0);
       final keyfilePaths = state.keyfiles.map((k) => k.uri).toList();
-      final result = isUsb
-          ? await lifecycle.unlockUsbContainer(
-              usbDeviceName,
-              password,
-              pim,
-              displayName: '',
-              documentProvider: documentProvider,
-              cipherId: cipherId,
-              hashId: hashId,
-              preservedKey: null,
-              cacheDerivedKey: cacheDerivedKey,
-              keyfilePaths: keyfilePaths,
-            )
-          : await lifecycle.unlockContainer(
-              uri,
-              password,
-              pim,
-              displayName: '',
-              documentProvider: documentProvider,
-              cipherId: cipherId,
-              hashId: hashId,
-              preservedKey: null,
-              cacheDerivedKey: cacheDerivedKey,
-              keyfilePaths: keyfilePaths,
-            );
-      if (result == null) {
+      final ({int matchedCipherId, int matchedHashId})? matched;
+      if (isUsb) {
+        final r = await lifecycle.unlockUsbContainer(
+          usbDeviceName,
+          password,
+          pim,
+          displayName: '',
+          documentProvider: documentProvider,
+          cipherId: cipherId,
+          hashId: hashId,
+          preservedKey: null,
+          cacheDerivedKey: cacheDerivedKey,
+          keyfilePaths: keyfilePaths,
+        );
+        matched = r == null
+            ? null
+            : (
+                matchedCipherId: r.matchedCipherId,
+                matchedHashId: r.matchedHashId,
+              );
+      } else {
+        final r = await lifecycle.unlockContainer(
+          uri,
+          password,
+          pim,
+          displayName: '',
+          documentProvider: documentProvider,
+          cipherId: cipherId,
+          hashId: hashId,
+          preservedKey: null,
+          cacheDerivedKey: cacheDerivedKey,
+          keyfilePaths: keyfilePaths,
+        );
+        matched = r == null
+            ? null
+            : (
+                matchedCipherId: r.matchedCipherId,
+                matchedHashId: r.matchedHashId,
+              );
+      }
+      if (matched == null) {
         if (ref.mounted) {
           state = _copy(loading: false, error: l10n.incorrectCredentialsError);
         }
@@ -295,8 +310,8 @@ class RealPasswordGate extends _$RealPasswordGate {
       return (
         password: password,
         keyfiles: List<KeyfileRef>.from(state.keyfiles),
-        cipherId: result.matchedCipherId,
-        hashId: result.matchedHashId,
+        cipherId: matched.matchedCipherId,
+        hashId: matched.matchedHashId,
       );
     } catch (e) {
       final isCancelled = e is PlatformException && e.code == 'CANCELLED';

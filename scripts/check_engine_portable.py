@@ -24,7 +24,7 @@ CPP_ROOT = Path(__file__).resolve().parent.parent / "android" / "app" / "src" / 
 
 PORTABLE_DIRS = [
     "session", "io", "filesystems", "containers", "crypto", "foldervault",
-    "volman", "xfer", "platform", "Common", "archive", "docscan", "dislocker",
+    "volman", "xfer", "platform", "Common", "archive", "docscan", "dislocker", "imaging",
 ]
 
 # #include <jni.h> | "jni_callbacks.h" | "jni/anything.h" | <android/anything.h> | session_guard_jni.h ...

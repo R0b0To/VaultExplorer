@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_colors.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
@@ -316,6 +317,13 @@ extension AppThemeX on BuildContext {
 }
 
 const Color _seedColor = Color(0xFF0B57D0);
+
+/// How long the pointer has to rest on a control before its tooltip shows, on
+/// desktop. Without it a tooltip pops up the instant the pointer crosses a
+/// toolbar button, so moving along a row of icons flashes a tooltip for each
+/// one. Touch has no hover (a long press shows the tooltip at once), so
+/// Android keeps the framework default.
+const Duration _kDesktopTooltipWait = Duration(milliseconds: 500);
 
 ColorScheme _darkColorScheme() => const ColorScheme(
   brightness: Brightness.dark,
@@ -901,6 +909,7 @@ ThemeData _buildTheme(
       ),
     ),
     tooltipTheme: TooltipThemeData(
+      waitDuration: PlatformFeatures.isDesktop ? _kDesktopTooltipWait : null,
       decoration: BoxDecoration(
         color: tk(SkinToken.floatingTooltip),
         borderRadius: BorderRadius.circular(AppRadius.sm),

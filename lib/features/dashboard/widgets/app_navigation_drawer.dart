@@ -26,6 +26,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
+import 'package:vaultexplorer/features/browser/widgets/sidebar_drop_target.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/app_page_windows.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_launcher.dart';
@@ -522,6 +523,14 @@ class AppNavigationDrawer extends ConsumerWidget {
         (s) => s.settings.enableAuthenticator,
       ),
     );
+    final useBrowserTabs = ref.watch(
+      appSettingsControllerProvider.select((s) => s.settings.useBrowserTabs),
+    );
+    final useDualPane = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.useDualPaneBrowsing,
+      ),
+    );
     final primary = primaryLocalContainer;
     final vaultsExpanded = ref.watch(_vaultsExpandedProvider);
 
@@ -584,6 +593,23 @@ class AppNavigationDrawer extends ConsumerWidget {
           ),
         ),
       );
+    }
+
+    // Desktop only, and only with tabs: dual pane shows two open tabs side by
+    // side. The same setting as "Use dual pane" in the file manager settings,
+    // reachable from here because the menu is one place that exists once
+    // however many panes are open. A modal drawer closes so the new layout is
+    // visible straight away.
+    final showDualPaneToggle = PlatformFeatures.isDesktop && useBrowserTabs;
+    void toggleDualPane() {
+      unawaited(
+        ref
+            .read(appSettingsControllerProvider.notifier)
+            .updateSettings(
+              (s) => s.copyWith(useDualPaneBrowsing: !useDualPane),
+            ),
+      );
+      _closeDrawer(context);
     }
 
     return _DrawerShell(
@@ -754,7 +780,13 @@ class AppNavigationDrawer extends ConsumerWidget {
 
                         return Padding(
                           padding: const EdgeInsets.only(left: 6, bottom: 4),
-                          child: _DrawerVaultRow(
+                          // Items dragged out of a file manager pane can be
+                          // dropped on an unlocked vault; a locked one refuses.
+                          child: SidebarDropTarget(
+                            container: item is MountedVaultItem
+                                ? item.container
+                                : null,
+                            child: _DrawerVaultRow(
                             key: ValueKey('drawer_vault_${item.uri}'),
                             item: item,
                             isCurrent: isCurrent,
@@ -817,6 +849,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               _closeDrawer(context);
                               _handleDeleteVault(context, ref, item);
                             },
+                            ),
                           ),
                         );
                       })(),
@@ -876,7 +909,9 @@ class AppNavigationDrawer extends ConsumerWidget {
                     // Keeps the drives' free space current while the list is on screen.
                     if (PlatformFeatures.isDesktop) const DriveListRefresher(),
                     Builder(
-                      builder: (tileContext) => ContextMenuRegion(
+                      builder: (tileContext) => SidebarDropTarget(
+                        container: primary,
+                        child: ContextMenuRegion(
                         onOpen: (onOpenInNewTab != null && primary != null)
                             ? (pos) =>
                                   _showOpenInNewTabMenu(context, pos, primary)
@@ -935,13 +970,20 @@ class AppNavigationDrawer extends ConsumerWidget {
                           }
                         },
                         ),
+                        ),
                       ),
                     ),
 
                     for (final loc in externalStorages) ...[
                       Builder(
                         builder: (tileContext) {
-                          return GestureDetector(
+                          return SidebarDropTarget(
+                            container: buildExternalStorageContainer(
+                              rootPath: loc.resolvedUri,
+                              displayName: loc.displayName,
+                              volId: loc.volId,
+                            ),
+                            child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onSecondaryTapDown: (details) =>
                                 _showLocationContextMenu(
@@ -1069,6 +1111,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 onSelectContainer?.call(container);
                               },
                             ),
+                            ),
                           );
                         },
                       ),
@@ -1173,6 +1216,8 @@ class AppNavigationDrawer extends ConsumerWidget {
               settingsSelected: isSettings,
               onTools: openTools,
               onSettings: openSettings,
+              dualPaneSelected: useDualPane,
+              onDualPane: showDualPaneToggle ? toggleDualPane : null,
             ),
           ],
         ),
@@ -1187,18 +1232,25 @@ class AppNavigationDrawer extends ConsumerWidget {
 ///
 /// Shared with the decoy file manager's menu, which passes no [onTools] and so
 /// shows only the Settings button in the very same footer.
+///
+/// [onDualPane], when given, adds the dual pane switch after Settings, lit
+/// while [dualPaneSelected] (dual pane is on).
 class DrawerFooterStrip extends StatelessWidget {
   const DrawerFooterStrip({
     super.key,
     this.toolsSelected = false,
     this.settingsSelected = false,
+    this.dualPaneSelected = false,
     this.onTools,
+    this.onDualPane,
     required this.onSettings,
   });
 
   final bool toolsSelected;
   final bool settingsSelected;
+  final bool dualPaneSelected;
   final VoidCallback? onTools;
+  final VoidCallback? onDualPane;
   final VoidCallback onSettings;
 
   @override
@@ -1259,6 +1311,15 @@ class DrawerFooterStrip extends StatelessWidget {
                     settingsSelected,
                     onSettings,
                   ),
+                  if (onDualPane != null) ...[
+                    const SizedBox(width: 16),
+                    button(
+                      Icons.vertical_split_rounded,
+                      context.l10n.dualPaneEnabledTitle,
+                      dualPaneSelected,
+                      onDualPane!,
+                    ),
+                  ],
                 ],
               ),
             ),

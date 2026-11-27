@@ -5,7 +5,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'gallery_facets.dart';
 import 'gallery_filter_controller.dart';
 import 'gallery_filter_l10n.dart';
-import 'gallery_filter_labels.dart';
 import 'gallery_filters.dart';
 import 'gallery_grouping.dart';
 import 'gallery_meta_index.dart';
@@ -535,7 +534,3 @@ class GalleryFilterBar extends StatelessWidget {
     );
   }
 }
-
-@visibleForTesting
-String galleryFilterSummary(GalleryFilterSet set, GalleryFilterLabels labels) =>
-    set.filters.map((f) => '${f.reversed ? '-' : ''}${f.label(labels)}').join(', ');

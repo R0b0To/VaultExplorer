@@ -38,12 +38,16 @@ All entries below were checked directly against upstream sources/licenses
 | e2fsprogs -- `lib/ext2fs`, `lib/e2p` | tytso/e2fsprogs | LGPL-2.0 | 7ee1d505 (v1.47.4) | OK |
 | dislocker (BitLocker) | Aorimn/dislocker | GPL-2.0-or-later | 38dab031 | OK |
 | cJSON | DaveGamble/cJSON | MIT | acc76239 (v1.7.18) | OK |
+| utf8proc (Unicode NFC for Cryptomator file names in the **desktop engine only**, `ffi/ve_nfc.cpp`; Android uses `java.text.Normalizer`) | JuliaStrings/utf8proc | MIT, plus the Unicode data-file license for the bundled tables (both permissive; full text in the upstream `LICENSE.md`) | v2.10.0, tarball pinned by SHA-256 `6f4f1b63...f136` in `CMakeLists.txt` | OK, added -- needs the license text shipped with desktop builds (see Distribution notes) |
 | ZXing-C++ (offline QR/barcode decoding, `jni/qr_bridge.cpp`) | zxing-cpp/zxing-cpp | Apache-2.0 | 287c85df (v3.1.1); readers only, writers/examples disabled in `CMakeLists.txt` | OK, added -- was previously missing from this table |
 | libarchive (archive/ZIP/7-Zip/RAR/TAR browser engine, `archive/`) | libarchive/libarchive | BSD-2-Clause | 27cbc782 (v3.8.9) | OK |
 | bzip2 (libarchive filter) | libarchive/bzip2 | bzip2 license (BSD-style permissive) | tag `bzip2-1.0.8` | OK |
 | xz / liblzma (libarchive filter) | tukaani-project/xz | 0BSD | 4b73f2ec (v5.8.3) | OK |
 | zstd (libarchive filter) | facebook/zstd | BSD-3-Clause OR GPL-2.0-or-later (dual, at your option) | f8745da6 (v1.5.7) | OK |
 | BoringSSL (AES-256 ZIP / RAR5 passphrase support for libarchive) | google/boringssl | ISC (new code) + OpenSSL License/SSLeay License (ported OpenSSL code) -- all permissive | ef0c0723 | OK |
+| libjpeg-turbo (desktop engine only: native image thumbnails, `imaging/`; built by `imaging_deps.cmake`, not part of the Android build) | libjpeg-turbo/libjpeg-turbo | IJG License + BSD-3-Clause (+ zlib License for the Arm SIMD code) -- all permissive | e352b02f (3.1.4) | OK |
+| libpng (desktop engine only: native image thumbnails, `imaging/`) | glennrp/libpng | libpng License (permissive, zlib-style) | cd952f49 (v1.6.59); compiled from its sources against the engine's zlib | OK |
+| libwebp (desktop engine only: native image thumbnails, `imaging/`; the decoder is linked into the engine, the encoder only into the host test) | webmproject/libwebp | BSD-3-Clause | 4fa21912 (v1.6.0) | OK |
 | VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `Streebog.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), Streebog (BSD-2-clause, Alexey Degtyarev), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
 | CryFS extra ciphers -- `crypto/cryfs_legacy_ciphers.cpp`, generated `cryfs_legacy_tables.h` (CAST-256 / MARS / Twofish constant tables) and `cryfs_serpent_macros.inc` (bit-sliced Serpent S-boxes, after Dag Arne Osvik) | weidai11/cryptopp (Crypto++, the library official CryFS 1.x uses) | Boost Software License 1.0 (GPL-compatible) | CRYPTOPP_8_9_0 -- constants/algorithm structure only; the rest is written in-repo and verified against Crypto++ (`test/cryfs_cipher_oracle.cpp`, known answers in `fv_tests.cpp`). Needed for the twofish-*, serpent-*, cast-256-*, mars-* modes of C++ CryFS vaults | OK |
 | `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo. A host test exists at `cpp/Common/test/test_endian.c`, but in this snapshot it does not compile as shipped (a `LE*/BE*` inside a block comment ends the comment early, and the build line in its header needs `-I../..` rather than `-I..`) and it is not registered in CMake or CI | OK |
@@ -158,6 +162,10 @@ these test or build-time tools ship in the release APK.
   `libvaultexplorer.so` (`android/app/src/main/cpp/CMakeLists.txt`) are built from
   original, unmodified upstream source at pinned Git commits via CMake `FetchContent`.
   Nothing is shipped as a prebuilt binary in the `cpp/` directory of this repository.
+- **Desktop engine (`VAULTEXPLORER_DESKTOP`)**: built from the same pinned sources, plus utf8proc, which is
+  fetched as a release tarball whose SHA-256 is pinned in `CMakeLists.txt`. Its MIT notice and Unicode data-file
+  notice (upstream `LICENSE.md`) must accompany any desktop bundle that ships `libvaultexplorer_engine`; the
+  Android library does not contain it.
 - **Prebuilt native libraries from Maven Central (`nextlib-media3ext`)**:
   `nextlib-media3ext` is consumed as a prebuilt AAR artifact from Maven Central
   (`io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.16.0`). This is permitted under

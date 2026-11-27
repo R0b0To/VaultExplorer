@@ -14,6 +14,7 @@ dependencies:
   local_auth: ^3.0.2
   path: ^1.9.1
   ffi: ^2.1.4            # dart:ffi helpers (desktop engine bindings)
+  dbus: ^0.7.15          # MPRIS (system media controls) on Linux
   file_selector: ^1.1.0  # container picker on Linux/Windows
   # Native Windows OLE and Linux GTK3 drag-and-drop, OS file/image clipboard,
   # and multi-window drop support.

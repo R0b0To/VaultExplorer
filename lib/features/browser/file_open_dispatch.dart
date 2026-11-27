@@ -148,3 +148,14 @@ FileOpenAction decideFileOpenAction({
   if (ext == 'apk') return const ShowApkOpenChooser();
   return const ShowOpenWithDialog();
 }
+
+/// Whether a saved per-extension [preference] hands that extension to a
+/// system app: either the platform's own picker (`'external'`) or one app
+/// already remembered (`'package:<name>'`).
+///
+/// Opens that follow such a preference ask to learn the app picked in the
+/// chooser they fall back to, so a preference that never got its app (the
+/// system chooser didn't report one) or whose app can no longer open the file
+/// (uninstalled, or living in another profile) repairs itself.
+bool isExternalAppPreference(String? preference) =>
+    preference == 'external' || (preference?.startsWith('package:') ?? false);

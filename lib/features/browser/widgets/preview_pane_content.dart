@@ -8,15 +8,20 @@ import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
+import 'package:vaultexplorer/features/browser/widgets/preview_pane_handoff.dart';
 import 'package:vaultexplorer/features/library/tags/audio_tag_reader.dart';
 import 'package:vaultexplorer/features/library/tags/byte_source.dart';
 import 'package:vaultexplorer/features/library/tags/tag_models.dart';
@@ -409,11 +414,21 @@ class _PreviewByteSource implements ByteSource {
 /// file's tags. Nothing is opened until the user presses play, so clicking
 /// through a folder of songs does not start a player for each one; the player
 /// is disposed when the selection changes.
+///
+/// The pop-out button hands the live player to [BackgroundPlaybackHost] as a
+/// background audio session, so the music keeps playing after the selection
+/// moves on, steered from the music mini player (and, on Linux and Windows,
+/// the system media controls).
 class PreviewPaneAudio extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String filePath;
   final int sizeBytes;
   final Widget poster;
+
+  /// What the background session needs to be reopened in the full viewer.
+  final String? startingFolder;
+  final ThumbnailQuality quality;
+  final ThumbnailCacheMode cacheMode;
 
   const PreviewPaneAudio({
     super.key,
@@ -421,6 +436,9 @@ class PreviewPaneAudio extends ConsumerStatefulWidget {
     required this.filePath,
     required this.sizeBytes,
     required this.poster,
+    required this.quality,
+    required this.cacheMode,
+    this.startingFolder,
   });
 
   @override
@@ -428,11 +446,20 @@ class PreviewPaneAudio extends ConsumerStatefulWidget {
 }
 
 class _PreviewPaneAudioState extends ConsumerState<PreviewPaneAudio> {
+  VideoPlaybackManager? _manager;
   NativeVideoController? _controller;
   bool _starting = false;
   double? _dragMs;
   AudioTags? _tags;
   Uint8List? _cover;
+
+  /// True once the player belongs to [BackgroundPlaybackHost]: this pane must
+  /// then neither dispose nor drive it any more.
+  bool _handedOff = false;
+
+  /// The player's creation, which is asynchronous: a manager must not be
+  /// disposed under it.
+  Future<void>? _activation;
 
   @override
   void initState() {
@@ -442,10 +469,21 @@ class _PreviewPaneAudioState extends ConsumerState<PreviewPaneAudio> {
 
   @override
   void dispose() {
-    final controller = _controller;
-    if (controller != null) {
-      controller.removeListener(_onTick);
-      unawaited(controller.dispose());
+    if (!_handedOff) {
+      _controller?.removeListener(_onTick);
+      final manager = _manager;
+      if (manager != null) {
+        final pending = _activation;
+        if (pending != null && _controller == null) {
+          unawaited(
+            pending.then<void>((_) {}, onError: (_) {}).whenComplete(
+              manager.dispose,
+            ),
+          );
+        } else {
+          manager.dispose();
+        }
+      }
     }
     super.dispose();
   }
@@ -479,28 +517,78 @@ class _PreviewPaneAudioState extends ConsumerState<PreviewPaneAudio> {
   }
 
   Future<void> _start() async {
-    if (_starting || _controller != null) return;
+    if (_starting || _manager != null) return;
     setState(() => _starting = true);
     // The app has a single native player; background audio lets go of it first.
     if (BackgroundPlaybackHost.instance.needsRelease) {
       await BackgroundPlaybackHost.instance.closeAndWait();
       if (!mounted) return;
     }
+    // Played through a manager, like the viewer does, so the running player can
+    // be handed over as it is (see _popOut).
+    final manager = VideoPlaybackManager();
+    _handedOff = false;
+    _manager = manager;
     final container = widget.container;
-    final controller = NativeVideoController(
+    final activation = manager.activate(
+      fileName: widget.filePath,
       volId: container.volId,
       filePath: nativePlaybackPathFor(container, widget.filePath),
       isLocalStorage: container.isLocalStorage,
       autoPlay: true,
+      playbackSpeed: 1,
     );
+    _activation = activation;
+    try {
+      await activation;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _manager = null;
+          _starting = false;
+        });
+        manager.dispose();
+      }
+      return;
+    }
+    // Disposed while the player was being created: dispose() took care of it.
+    if (!mounted) return;
+    final controller = manager.activeController;
+    if (controller == null || controller.isDisposed) {
+      setState(() => _starting = false);
+      return;
+    }
     controller.addListener(_onTick);
     setState(() {
       _controller = controller;
       _starting = false;
     });
-    await controller.initialize();
-    if (!mounted || !identical(_controller, controller)) return;
-    await controller.play();
+  }
+
+  /// The pop-out button: the playing track moves to the background and carries
+  /// on there, so it survives the selection changing.
+  void _popOut() {
+    final manager = _manager;
+    final controller = _controller;
+    if (_handedOff || manager == null || controller == null) return;
+    final handedOff = handOffPreviewPlayback(
+      context: context,
+      container: widget.container,
+      filePath: widget.filePath,
+      manager: manager,
+      controller: controller,
+      quality: widget.quality,
+      cacheMode: widget.cacheMode,
+      startingFolder: widget.startingFolder,
+      floating: false,
+    );
+    if (!handedOff) return;
+    controller.removeListener(_onTick);
+    setState(() {
+      _handedOff = true;
+      _manager = null;
+      _controller = null;
+    });
   }
 
   Future<void> _togglePlay(NativeVideoController controller) async {
@@ -581,6 +669,23 @@ class _PreviewPaneAudioState extends ConsumerState<PreviewPaneAudio> {
                     width: 28,
                     height: 28,
                     child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
+                ),
+              if (controller != null && controller.value.isInitialized)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      color: Colors.white,
+                      iconSize: 18,
+                      tooltip: context.l10n.nowPlayingCollapse,
+                      icon: const Icon(Icons.picture_in_picture_alt_rounded),
+                      onPressed: _popOut,
+                    ),
                   ),
                 ),
             ],

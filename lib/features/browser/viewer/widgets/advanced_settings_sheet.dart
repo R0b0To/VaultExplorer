@@ -196,10 +196,10 @@ class _AdvancedSettingsSheetState extends ConsumerState<AdvancedSettingsSheet> {
     final state = ref.watch(advancedSettingsControllerProvider(params));
     final cs = context.colors;
     final isLandscapeLayout =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     final double maxSheetHeight = isLandscapeLayout
-        ? MediaQuery.of(context).size.height * 0.75
-        : MediaQuery.of(context).size.height * 0.9;
+        ? MediaQuery.sizeOf(context).height * 0.75
+        : MediaQuery.sizeOf(context).height * 0.9;
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxSheetHeight),

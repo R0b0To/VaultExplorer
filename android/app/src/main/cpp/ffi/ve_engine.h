@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 13 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 15 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -52,6 +52,13 @@ extern "C" {
 #define VE_ERR_AUTH_FAILED 8   /* the supplied OLD password / keyfile did not verify (LUKS password change) */
 #define VE_ERR_UNSUPPORTED 9   /* the operation does not exist for this kind of slot / on this platform */
 #define VE_ERR_BUSY 10         /* refused because the resource is in use (e.g. unmount with open files) */
+/* Raw block devices (ve_unlock_device): */
+#define VE_ERR_DEVICE_NOT_FOUND 11   /* no such disk / partition (unplugged, renumbered) */
+#define VE_ERR_DEVICE_PERMISSION 12  /* the OS refused: needs root / the disk group / an elevated process */
+#define VE_ERR_DEVICE_BUSY 13        /* a write open was refused because the OS has it (or a partition) mounted */
+#define VE_ERR_DEVICE_OPEN 14        /* anything else: not a disk or image, already open in another slot, I/O error */
+#define VE_ERR_TOO_LARGE 15          /* refused by a size guard (e.g. ve_image_thumbnail: the picture is too big to decode) */
+#define VE_ERR_NO_MEMORY 16          /* ran out of memory (ve_image_thumbnail) */
 
 /* ---- library info / logging -------------------------------------------- */
 VE_API int32_t ve_abi_version(void);
@@ -110,6 +117,52 @@ typedef struct ve_unlock_params {
 
 /* Unlocks fd into slot vol_id and mounts its filesystem. VE_OK on success. */
 VE_API int32_t ve_unlock(const ve_unlock_params* params);
+
+/* ---- raw block devices (desktop, ABI 14) ---------------------------------------- */
+/* Whole disks and partitions that hold a BitLocker, VeraCrypt or LUKS volume, opened straight from the OS
+ * (Linux /dev/sdX, /dev/nvme0n1, /dev/disk/by-id/...; Windows \\.\PhysicalDriveN). A regular file is accepted
+ * too (a raw disk image). The engine scans the MBR/GPT partitions for LUKS and BitLocker, then tries VeraCrypt
+ * at the start of the device and of every partition (with the hidden-volume header), exactly as it does for a USB
+ * mass-storage device on Android. Needs permission to open the device (root / disk group, or an elevated
+ * process on Windows). 4Kn disks work for whole-device volumes; partition scanning assumes 512-byte sectors. */
+
+/* UTF-8 JSON array, one object per disk the OS lists:
+ *   {"path","name","bus","sizeBytes","sectorSize","removable","readable","writable","inUse","system","formats":[..]}
+ * "path" is what ve_unlock_device takes (a stable /dev/disk/by-id path on Linux when there is one). "formats" lists
+ * "bitlocker" / "luks" signatures found at the start of a partition (readable disks only; VeraCrypt is invisible
+ * until it is unlocked). Free with ve_buffer_free. Empty array where the platform cannot enumerate. */
+VE_API int32_t ve_list_block_devices(ve_buffer* out_json);
+
+typedef struct ve_unlock_device_params {
+    int32_t struct_size;            /* sizeof(ve_unlock_device_params) */
+    const char* device_path;        /* UTF-8; the "path" of ve_list_block_devices, or a disk image */
+    int32_t vol_id;                 /* slot to unlock into */
+    const uint8_t* password;        /* UTF-8 bytes, may be NULL when keyfiles are used */
+    int32_t password_len;
+    int32_t pim;                    /* 0 = default */
+    int32_t cipher_id;              /* 255 = auto-detect */
+    int32_t hash_id;                /* 255 = auto-detect */
+    const uint8_t* preserved_key;   /* optional cached derived key material */
+    int32_t preserved_key_len;
+    const int32_t* keyfile_fds;     /* owned by the engine */
+    int32_t keyfile_count;
+    int32_t read_only;              /* 0 opens the device read-write (exclusive on Linux) */
+    int64_t partition_offset_hint;  /* start sector (512-byte units) of the partition to try first, -1 = scan */
+    /* Hidden-volume protection (VeraCrypt): all NULL/0 to disable. */
+    const uint8_t* hidden_password;
+    int32_t hidden_password_len;
+    int32_t hidden_pim;
+    int32_t hidden_cipher_id;
+    int32_t hidden_hash_id;
+    const int32_t* hidden_keyfile_fds;
+    int32_t hidden_keyfile_count;
+    int32_t* os_error_out;          /* optional: errno / GetLastError() of a failed open */
+} ve_unlock_device_params;
+
+/* Opens the device, unlocks it into slot vol_id and mounts its file system. VE_OK on success; VE_ERR_FAILED when
+ * no volume on it opened with these credentials; VE_ERR_DEVICE_* when the device itself could not be opened;
+ * VE_ERR_MOUNT_FAILED / VE_ERR_CANCELLED as ve_unlock. Lock it with ve_lock, which also closes the device. */
+VE_API int32_t ve_unlock_device(const ve_unlock_device_params* params);
 /* Asks an in-flight ve_unlock on vol_id to stop; it then returns VE_ERR_CANCELLED. */
 VE_API void ve_request_cancel_unlock(int32_t vol_id);
 /* Closes open streams, unmounts, and wipes the slot's key material. */
@@ -727,6 +780,31 @@ VE_API int32_t ve_archive_create(int32_t src_vol, const char* const* src_paths, 
                                  int32_t encrypt_filenames, int32_t compression_level,
                                  int32_t compression_method, uint64_t split_size, const char* temp_dir,
                                  int32_t op_id, ve_buffer* out);
+
+/* ---- image thumbnails (ABI 15) -----------------------------------------------------------------------
+ * Decodes a JPEG, PNG or WebP and answers a small picture that fits target_size x target_size (never enlarged),
+ * in ONE blocking call: the source is read through a read-ahead buffer (never loaded whole, except WebP), a JPEG
+ * is shrunk inside its DCT (1/2, 1/4, 1/8), a PNG is box-filtered row by row, and the result is a JPEG of the given
+ * quality (1..100) -- or a PNG when some pixel is really not opaque. EXIF orientation is applied, so the size
+ * reported is the picture as a viewer shows it. preserve_alpha is accepted for parity with Android and does not
+ * change the outcome. Thread-safe; run it in a worker isolate.
+ *   ve_image_thumbnail       a file inside an unlocked slot (container or folder vault)
+ *   ve_image_thumbnail_file  a file on the host (UTF-8 path)
+ *   ve_image_thumbnail_mem   a picture already in memory (e.g. a video frame)
+ * max_source_bytes > 0 refuses a larger file (VE_ERR_TOO_LARGE); <= 0 takes the 256 MiB default.
+ * `info` receives VE_IMAGE_INFO_COUNT int32 values:
+ *   [0] 1 = PNG, 0 = JPEG   [1] source width   [2] source height   [3] thumbnail width   [4] thumbnail height
+ *   [5] 1 = some pixel is not opaque   [6] 1 = the thumbnail looks blank (flat / black / white / low contrast)
+ * Results: VE_OK; VE_ERR_UNSUPPORTED (not one of the three formats, an animated WebP, a CMYK JPEG: the caller should
+ * use another decoder); VE_ERR_TOO_LARGE; VE_ERR_NO_MEMORY; VE_ERR_NOT_UNLOCKED / VE_ERR_INVALID_ARG; otherwise
+ * VE_ERR_FAILED (missing, unreadable or corrupt). *out is empty on every failure. */
+#define VE_IMAGE_INFO_COUNT 8
+VE_API int32_t ve_image_thumbnail(int32_t vol_id, const char* path, int32_t target_size, int32_t quality,
+                                  int32_t preserve_alpha, int64_t max_source_bytes, ve_buffer* out, int32_t* info);
+VE_API int32_t ve_image_thumbnail_file(const char* host_path_utf8, int32_t target_size, int32_t quality,
+                                       int32_t preserve_alpha, int64_t max_source_bytes, ve_buffer* out, int32_t* info);
+VE_API int32_t ve_image_thumbnail_mem(const uint8_t* data, size_t len, int32_t target_size, int32_t quality,
+                                      int32_t preserve_alpha, ve_buffer* out, int32_t* info);
 
 /* ---- OS mounts (Linux: FUSE 3; Windows: WinFsp, not built yet) -------------------------------------
  * Exposes an unlocked slot as a real folder / drive so any application and the file manager can use it --

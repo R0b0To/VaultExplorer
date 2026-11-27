@@ -28,6 +28,7 @@ import 'package:vaultexplorer/features/dashboard/dashboard_toolbar_actions.dart'
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_layout_button.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/lock_all_vaults.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/dashboard_tools_menu.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
@@ -175,9 +176,6 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
   @override
   ConsumerState<BrowserTabsShell> createState() => _BrowserTabsShellState();
 }
-
-/// Compatibility name retained for existing route builders and integrations.
-typedef BrowserTabsHost = BrowserTabsShell;
 
 class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     with TickerProviderStateMixin {
@@ -644,9 +642,21 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                     icon: Icons.add_rounded,
                     tooltip: context.l10n.addVaultFabLabel,
                   ),
-                  const VerticalDivider(width: 1, indent: 8, endIndent: 8),
                   const _DashboardLockAllButton(),
+                  const VerticalDivider(width: 1, indent: 8, endIndent: 8),
+                  // Vault helpers kept on hand: the password generator is one
+                  // click, the rest of the vault tools sit in the menu next to
+                  // it (the Tools page is its last entry).
+                  IconButton(
+                    icon: const Icon(Icons.password_rounded),
+                    tooltip: context.l10n.quickPasswordGeneratorSheetTitle,
+                    onPressed: () =>
+                        unawaited(showQuickPasswordGenerator(context)),
+                  ),
+                  const DashboardToolsMenuButton(),
                   const Spacer(),
+                  // Activity on the right: what is open elsewhere, then what
+                  // is being copied or moved.
                   const AppBarAuthenticatorButton(),
                   const AppBarTransferButton(),
                   const SizedBox(width: 8),
@@ -920,7 +930,30 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _workspaceActions.setSplitAvailable(available);
+      if (available) _duplicateLoneTabForSplit();
     });
+  }
+
+  /// Set when dual pane was just switched on, until the second pane has been
+  /// given its tab (or dual pane is switched off again).
+  bool _fillSecondPaneOnSplit = false;
+
+  /// With dual pane just enabled and a single tab open there is nothing for
+  /// the second pane to show, so it starts as a copy of the tab in front and
+  /// the two panes are visible straight away. The engine places the copy in
+  /// the other pane because the layout can split while everything is in one.
+  ///
+  /// Only the switch itself triggers this: a window that becomes wide enough,
+  /// or an app that starts with dual pane already on, keeps its one tab.
+  void _duplicateLoneTabForSplit() {
+    if (!_fillSecondPaneOnSplit) return;
+    _fillSecondPaneOnSplit = false;
+    final state = _workspaceState;
+    if (state.tabs.length != 1 || state.atLimit) return;
+    final tab = state.tabs.first;
+    // A category tab exists once; the copy would only focus the same tab.
+    if (tab.isCategory) return;
+    _duplicate(tab);
   }
 
   /// Tells the tabs which of them are on screen besides the active one. The
@@ -1518,6 +1551,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.useDualPaneBrowsing,
+      ),
+      (previous, next) {
+        if (previous == null) return;
+        _fillSecondPaneOnSplit = next;
+      },
+    );
     ref.listen<List<ExternalStorageLocation>>(
       externalStorageLocationsProvider,
       (previous, next) {

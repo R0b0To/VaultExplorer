@@ -1,0 +1,28 @@
+# Shared known-answer table for the import policy. Read by test/core/engine/desktop/desktop_import_policy_test.dart
+# (Dart: lib/core/engine/desktop/desktop_import_policy.dart) and by ImportExportHandlersGoldenTest.kt (Android:
+# ImportExportHandlers.kt), so the two implementations cannot drift apart unnoticed. Add a row and both pick it up.
+#
+# Fields are TAB separated; blank lines and lines starting with # are ignored.
+#   unique <caseSensitive> <names already taken, folded, joined by | ; - for none> <desired name> <expected name>
+#   margin <totalBytes> <availableBytes> <fits: true|false>
+#   fold   <caseSensitive> <name> <expected folded name>
+unique	false	-	anything.txt	anything.txt
+unique	false	other.txt	photo.jpg	photo.jpg
+unique	false	photo.jpg	photo.jpg	photo (1).jpg
+unique	false	photo.jpg	PHOTO.JPG	PHOTO (1).JPG
+unique	false	photo.jpg|photo (1).jpg|photo (2).jpg	photo.jpg	photo (3).jpg
+unique	false	myfolder	MyFolder	MyFolder (1)
+unique	false	.bashrc	.bashrc	.bashrc (1)
+unique	false	file.	file.	file. (1)
+unique	false	archive.tar.gz	archive.tar.gz	archive.tar (1).gz
+unique	true	notes.txt	Notes.txt	Notes.txt
+unique	true	Notes.txt	Notes.txt	Notes (1).txt
+margin	500	1000	true
+margin	990	1000	true
+margin	991	1000	false
+margin	1001	1000	false
+margin	0	0	true
+margin	144703488	148897792	true
+fold	false	Notes	notes
+fold	true	Notes	Notes
+fold	false	ÄÖ.TXT	äö.txt

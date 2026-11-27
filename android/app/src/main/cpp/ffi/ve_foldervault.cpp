@@ -27,7 +27,6 @@
 #include "foldervault/fv_vault.h"
 #include "platform/engine_hooks.h"
 #include "volman/vm_foldervault.h"
-#include "jni_callbacks.h"
 
 extern "C" int ve_log_enabled(void);
 extern "C" void ve_log_dispatch(int prio, const char* tag, const char* message);

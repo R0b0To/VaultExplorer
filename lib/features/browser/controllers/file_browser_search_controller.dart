@@ -22,6 +22,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/bounded_semaphore.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -40,12 +41,14 @@ typedef FileBrowserSearchState = ({
   List<RawEntry> deepSearchResults,
 });
 
-const _emptySearch = (
+/// The state of a search that is closed. [deep] is whether the next search
+/// also looks in subfolders (see [FileBrowserSearch._searchSubfolders]).
+FileBrowserSearchState _idleSearch({required bool deep}) => (
   active: false,
   query: '',
-  isDeepSearch: false,
+  isDeepSearch: deep,
   isSearchingSubfolders: false,
-  deepSearchResults: <RawEntry>[],
+  deepSearchResults: const <RawEntry>[],
 );
 
 const _maxScanDepth = 20;
@@ -66,10 +69,22 @@ class FileBrowserSearch extends _$FileBrowserSearch {
   Timer? _debounceTimer;
   int _generation = 0;
 
+  /// Whether a search also looks in the subfolders of the folder it was
+  /// started in. It is the person's choice and outlives any one search:
+  /// clearing the box, or moving to another folder (both close the search),
+  /// must not switch it back off, or the subfolder toggle would undo itself
+  /// every time.
+  ///
+  /// On desktop it starts on: the search box beside the path is always there
+  /// and, as in a desktop file explorer, searches the folder you are in with
+  /// everything under it. A phone's search bar starts on the current folder
+  /// only, as it always has.
+  bool _searchSubfolders = PlatformFeatures.isDesktop;
+
   @override
   FileBrowserSearchState build(TabId tabId) {
     ref.onDispose(() => _debounceTimer?.cancel());
-    return _emptySearch;
+    return _idleSearch(deep: _searchSubfolders);
   }
 
   /// Toggles the search bar itself open/closed -- matches the original's
@@ -92,7 +107,7 @@ class FileBrowserSearch extends _$FileBrowserSearch {
   void clear() {
     _debounceTimer?.cancel();
     _generation++;
-    state = _emptySearch;
+    state = _idleSearch(deep: _searchSubfolders);
   }
 
   /// Prunes [deletedFullPaths] out of the cached scan results, mirroring
@@ -187,6 +202,7 @@ class FileBrowserSearch extends _$FileBrowserSearch {
     ArchiveContext? archiveContext,
     String? archiveRootPath,
   }) {
+    _searchSubfolders = enabled;
     state = (
       active: state.active,
       query: state.query,

@@ -37,6 +37,43 @@ typedef LibraryChunkReader = Future<Uint8List?> Function(
   int length,
 );
 
+/// An audio file found by a [LibraryTreeWalker].
+class LibraryFoundFile {
+  final String path;
+  final int sizeBytes;
+
+  /// Unix seconds, 0 when the filesystem does not record one.
+  final int modifiedSecs;
+
+  const LibraryFoundFile(this.path, this.sizeBytes, this.modifiedSecs);
+}
+
+/// What a [LibraryTreeWalker] found.
+class LibraryWalkResult {
+  final List<LibraryFoundFile> files;
+  final int foldersChecked;
+  final int listFailures;
+  final bool limitReached;
+
+  const LibraryWalkResult({
+    required this.files,
+    required this.foldersChecked,
+    required this.listFailures,
+    required this.limitReached,
+  });
+}
+
+/// Finds every audio file under [startPaths] in one go, for sources where
+/// listing folder by folder is far slower than walking the tree directly
+/// (plain local storage). Null means "could not": the scanner then lists
+/// folder by folder. [onProgress] gets the folders visited and audio files
+/// found so far.
+typedef LibraryTreeWalker = Future<LibraryWalkResult?> Function(
+  List<String> startPaths,
+  CancellationToken token,
+  void Function(int foldersChecked, int audioFilesFound) onProgress,
+);
+
 enum LibraryScanPhase { listing, reading }
 
 class LibraryScanProgress {
@@ -97,6 +134,10 @@ class LibraryScanner {
   final LibraryChunkReader readChunk;
   final bool Function(String fileName) isAudioFile;
 
+  /// Replaces the folder-by-folder walk when it can do the job (see
+  /// [LibraryTreeWalker]).
+  final LibraryTreeWalker? walkTree;
+
   final int listConcurrency;
   final int readConcurrency;
   final int maxDepth;
@@ -108,6 +149,7 @@ class LibraryScanner {
     required this.listDirectory,
     required this.readChunk,
     required this.isAudioFile,
+    this.walkTree,
     this.listConcurrency = 4,
     this.readConcurrency = 4,
     this.maxDepth = 40,
@@ -180,7 +222,24 @@ class LibraryScanner {
       await Future.wait([for (final s in subdirs) walk(s, depth + 1)]);
     }
 
-    await Future.wait([for (final root in startPaths) walk(root, 0)]);
+    final walked = await walkTree?.call(startPaths, token, (folders, audio) {
+      foldersChecked = folders;
+      onProgress?.call(LibraryScanProgress(
+        phase: LibraryScanPhase.listing,
+        foldersChecked: folders,
+        audioFilesFound: audio,
+      ));
+    });
+    if (walked != null) {
+      foldersChecked = walked.foldersChecked;
+      listFailures = walked.listFailures;
+      limitReached = walked.limitReached;
+      for (final f in walked.files) {
+        foundByPath[f.path] = _Found(f.path, f.sizeBytes, f.modifiedSecs);
+      }
+    } else if (!token.isCancelled) {
+      await Future.wait([for (final root in startPaths) walk(root, 0)]);
+    }
 
     final found = foundList();
     final seen = <String>{for (final f in found) f.path};

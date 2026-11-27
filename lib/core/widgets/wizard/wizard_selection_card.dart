@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
+import 'package:vaultexplorer/core/widgets/wizard/wizard_window_style.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 
 /// One tappable card in a row of mutually-exclusive choices.
@@ -31,6 +32,8 @@ class WizardSelectionCard extends StatelessWidget {
     final cs = context.colors;
     final textTheme = context.typography;
     final isShortScreen = MediaQuery.sizeOf(context).height < 520;
+    final inWindow = WizardWindowStyle.isActive(context);
+    final cardRadius = BorderRadius.circular(inWindow ? kWizardWindowRadius : AppRadius.lg);
 
     return Opacity(
       opacity: enabled ? 1 : 0.5,
@@ -38,7 +41,7 @@ class WizardSelectionCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: cardRadius,
           child: AnimatedContainer(
             duration: AppMotion.short2,
             curve: AppMotion.standard,
@@ -48,9 +51,15 @@ class WizardSelectionCard extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: selected
-                  ? cs.primaryContainer.withValues(alpha: 0.35)
-                  : cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ? cs.primaryContainer.withValues(alpha: inWindow ? 0.25 : 0.35)
+                  : (inWindow ? Colors.transparent : cs.surfaceContainerHigh),
+              borderRadius: cardRadius,
+              border: inWindow
+                  ? Border.all(
+                      color: selected ? cs.primary : wizardWindowOutline(cs),
+                      width: selected ? 1.5 : 1,
+                    )
+                  : null,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -63,7 +72,7 @@ class WizardSelectionCard extends StatelessWidget {
                     color: selected
                         ? cs.primaryContainer
                         : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(isShortScreen ? 12 : 16),
+                    borderRadius: BorderRadius.circular(inWindow ? kWizardWindowRadius : (isShortScreen ? 12 : 16)),
                   ),
                   child: format != null
                       ? ContainerFormatIcon(

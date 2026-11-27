@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/core/diagnostics/stall_diagnostics.dart';
 import 'package:vaultexplorer/features/library/controllers/music_hub.dart';
 import 'package:vaultexplorer/features/library/widgets/library_cover.dart';
 import 'package:vaultexplorer/features/library/widgets/music_covers.dart';
@@ -168,10 +169,12 @@ class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
   void _onTick() {
     final controller = _bound;
     if (controller == null || controller.isDisposed) return;
+    StallDiagnostics.bump('mini.tick');
     _smooth.report(controller.value, speed: widget.session.playbackSpeed);
   }
 
   void _onFrame(Duration position, Duration duration) {
+    StallDiagnostics.bump('mini.frame');
     final total = duration.inMilliseconds;
     _progress.value = total > 0
         ? (position.inMilliseconds / total).clamp(0.0, 1.0)
@@ -281,7 +284,11 @@ class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
     final l10n = context.l10n;
     final host = widget.host;
     final session = widget.session;
-    final info = NowPlayingInfo.resolve(widget.hub, session, widget.path);
+    final info = StallDiagnostics.time(
+      'mini.build',
+      () => NowPlayingInfo.resolve(widget.hub, session, widget.path),
+      warnMs: 4,
+    );
     final drawerScope = FullScreenDragDrawerScope.maybeOf(context);
 
     // A floating rounded card. The player grows out of the
@@ -325,10 +332,18 @@ class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ValueListenableBuilder<double>(
-                  valueListenable: _progress,
-                  builder: (context, value, _) =>
-                      LinearProgressIndicator(minHeight: 2, value: value),
+                // Repainted on every frame while playing. Neither the frame
+                // loop's repaints nor a progress value that changes every
+                // frame should reach assistive technology (on Windows each
+                // semantics update is a call into the screen reader).
+                ExcludeSemantics(
+                  child: RepaintBoundary(
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: _progress,
+                      builder: (context, value, _) =>
+                          LinearProgressIndicator(minHeight: 2, value: value),
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(

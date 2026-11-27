@@ -8,6 +8,8 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:vaultexplorer/core/diagnostics/stall_diagnostics.dart';
+
 import 've_native.dart';
 
 class EngineWorkerPool {
@@ -33,7 +35,13 @@ class EngineWorkerPool {
     for (final w in _workers) {
       if (w.load < best.load) best = w;
     }
-    return best.call(op, args);
+    final diag = StallDiagnostics.poolBegin(op, best.load);
+    var execMicros = -1;
+    try {
+      return await best.call(op, args, (micros) => execMicros = micros);
+    } finally {
+      StallDiagnostics.poolEnd(diag, execMicros: execMicros);
+    }
   }
 
   Future<void> dispose() async {
@@ -52,6 +60,7 @@ class _Worker {
   final SendPort _send;
   final ReceivePort _recv;
   final Map<int, Completer<Object?>> _pending = {};
+  final Map<int, void Function(int)> _onExec = {};
   int _nextId = 0;
 
   int get load => _pending.length;
@@ -65,6 +74,8 @@ class _Worker {
         ready.complete(msg);
       } else if (msg is List<Object?>) {
         final c = worker._pending.remove(msg[0] as int);
+        final onExec = worker._onExec.remove(msg[0] as int);
+        if (onExec != null && msg.length > 3) onExec(msg[3] as int);
         if (c == null) return;
         final err = msg[2];
         if (err != null) {
@@ -80,10 +91,17 @@ class _Worker {
     return worker;
   }
 
-  Future<Object?> call(String op, List<Object?> args) {
+  /// [onExec] is told how long the worker spent inside the engine, in
+  /// microseconds (diagnostics: the rest of the time was spent queued).
+  Future<Object?> call(
+    String op,
+    List<Object?> args, [
+    void Function(int)? onExec,
+  ]) {
     final id = _nextId++;
     final c = Completer<Object?>();
     _pending[id] = c;
+    if (onExec != null) _onExec[id] = onExec;
     _send.send(<Object?>[id, op, args]);
     return c.future;
   }
@@ -95,6 +113,7 @@ class _Worker {
       c.completeError(StateError('engine worker disposed'));
     }
     _pending.clear();
+    _onExec.clear();
   }
 }
 
@@ -120,11 +139,12 @@ void _workerMain(List<Object?> init) {
       reply.send(<Object?>[id, null, loadError ?? 'engine library not loaded']);
       return;
     }
+    final watch = Stopwatch()..start();
     try {
       final result = veExecute(n, m[1] as String, (m[2] as List<Object?>));
-      reply.send(<Object?>[id, result, null]);
+      reply.send(<Object?>[id, result, null, watch.elapsedMicroseconds]);
     } on Object catch (e) {
-      reply.send(<Object?>[id, null, '$e']);
+      reply.send(<Object?>[id, null, '$e', watch.elapsedMicroseconds]);
     }
   });
 }
@@ -177,6 +197,58 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
           'files': listRc == veOk ? files : const <String>[],
         };
       }
+
+    case 'unlockDevice':
+      {
+        // A raw disk / partition (BitLocker, VeraCrypt, LUKS). The worker opens the device itself, so no descriptor
+        // crosses an isolate; the engine keeps it for the slot until `lock`.
+        final m = Map<String, Object?>.from(a[0] as Map);
+        final volId = m['volId'] as int;
+        final (rc, osError) = n.unlockDevice(
+          devicePath: m['path'] as String,
+          password: m['password'] as Uint8List,
+          pim: m['pim'] as int,
+          volId: volId,
+          cipherId: m['cipherId'] as int,
+          hashId: m['hashId'] as int,
+          preservedKey: m['preservedKey'] as Uint8List?,
+          keyfilePaths: (m['keyfilePaths'] as List<Object?>).cast<String>(),
+          readOnly: m['readOnly'] as bool,
+          hiddenPassword: m['hiddenPassword'] as Uint8List?,
+          hiddenPim: m['hiddenPim'] as int,
+          hiddenCipherId: m['hiddenCipherId'] as int,
+          hiddenHashId: m['hiddenHashId'] as int,
+          hiddenKeyfilePaths: (m['hiddenKeyfilePaths'] as List<Object?>).cast<String>(),
+        );
+        if (rc != veOk) return {'rc': rc, 'osError': osError};
+        final (listRc, files) = n.listDirectory(volId, '');
+        return {
+          'rc': veOk,
+          'osError': 0,
+          'format': veFormatWireName(n.containerFormat(volId)),
+          'cipherId': n.matchedCipherId(volId),
+          'hashId': n.matchedHashId(volId),
+          'files': listRc == veOk ? files : const <String>[],
+        };
+      }
+
+    case 'listBlockDevices':
+      return [
+        for (final d in n.listBlockDevices())
+          {
+            'path': d.path,
+            'name': d.name,
+            'bus': d.bus,
+            'sizeBytes': d.sizeBytes,
+            'sectorSize': d.sectorSize,
+            'removable': d.removable,
+            'readable': d.readable,
+            'writable': d.writable,
+            'inUse': d.inUse,
+            'system': d.system,
+            'formats': d.formats,
+          },
+      ];
 
     case 'createContainer':
       {
@@ -443,6 +515,8 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         final (rc, map) = n.vaultInfo(a[0] as int);
         return [rc, map];
       }
+    case 'containerFormat':
+      return n.containerFormat(a[0] as int);
     case 'fileSize':
       return n.fileSize(a[0] as int, a[1] as String);
     case 'folderSize':
@@ -851,6 +925,41 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         } finally {
           _wipe(password);
         }
+      }
+    // Image thumbnails (ABI 15) -> [resultCode, thumbnail bytes?, info ints]. Run in the thumbnail pool (see
+    // DesktopEngineHost), never next to unlocks and listings.
+    case 'imageThumbnail':
+      {
+        final (rc, bytes, info) = n.imageThumbnail(
+          a[0] as int,
+          a[1] as String,
+          targetSize: a[2] as int,
+          quality: a[3] as int,
+          preserveAlpha: a[4] as bool,
+          maxSourceBytes: a[5] as int,
+        );
+        return [rc, bytes, info];
+      }
+    case 'imageThumbnailFile':
+      {
+        final (rc, bytes, info) = n.imageThumbnailFile(
+          a[0] as String,
+          targetSize: a[1] as int,
+          quality: a[2] as int,
+          preserveAlpha: a[3] as bool,
+          maxSourceBytes: a[4] as int,
+        );
+        return [rc, bytes, info];
+      }
+    case 'imageThumbnailMem':
+      {
+        final (rc, bytes, info) = n.imageThumbnailMem(
+          a[0] as Uint8List,
+          targetSize: a[1] as int,
+          quality: a[2] as int,
+          preserveAlpha: a[3] as bool,
+        );
+        return [rc, bytes, info];
       }
     case 'opCancel':
       n.opCancel(a[0] as int);

@@ -240,5 +240,3 @@ class AppBarClipboardButton extends ConsumerWidget {
     );
   }
 }
-
-typedef AppBarClipboardChip = AppBarClipboardButton;

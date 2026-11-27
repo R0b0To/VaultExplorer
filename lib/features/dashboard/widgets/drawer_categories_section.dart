@@ -2,13 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_group.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
-import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
-import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/models/vault_marks.dart';
-import 'package:vaultexplorer/features/browser/category_browser_screen.dart';
-import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/category_shortcuts_editor.dart';
@@ -16,7 +10,7 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/widgets/menus/context_menu_region.dart';
 
 /// The drawer's CATEGORIES section: compact shortcuts that open a
-/// [CategoryBrowserScreen] gathering one kind of file from every storage.
+/// category tab gathering one kind of file from every storage.
 ///
 /// What it shows is the user's choice (see [CategoryShortcutsEditor]); hiding
 /// a shortcut here never touches the category or any file. Long-pressing any
@@ -125,52 +119,8 @@ class DrawerCategoriesSection extends ConsumerWidget {
 
   void _open(BuildContext context, FileCategory category) {
     final onOpen = onOpenCategory;
-    if (onOpen != null) {
-      if (!docked) Navigator.pop(context); // close the drawer
-      onOpen(category);
-      return;
-    }
-
-    // The drawer closes before the screen opens, and its own `ref` stops
-    // working with it, so keep what the "go to location" callback needs.
-    final providers = ProviderScope.containerOf(context);
+    if (onOpen == null) return;
     if (!docked) Navigator.pop(context); // close the drawer
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) => SkinAreaScope(
-          area: SkinArea.files,
-          child: CategoryBrowserScreen(
-            category: category,
-            primaryLocalContainer: primaryLocalContainer,
-            includeVaults: includeVaults,
-            onShowInFolder: (target, path) =>
-                _showInFolder(providers, target, path),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Opens [target] in the file manager at the folder holding [path], the way
-  /// tapping a bookmark of that file would.
-  void _showInFolder(
-    ProviderContainer providers,
-    MountedContainer target,
-    String path,
-  ) {
-    if (target.volId != currentVolId) {
-      if (target.isPrimaryLocalStorage && onOpenLocalStorage != null) {
-        onOpenLocalStorage!.call();
-      } else {
-        onSelectContainer?.call(target);
-      }
-    }
-    final dir = path.contains('/')
-        ? path.substring(0, path.lastIndexOf('/'))
-        : '';
-    providers
-        .read(bookmarkNavigationRequestsProvider.notifier)
-        .request(target.volId, VaultBookmark(dir, isDir: true));
+    onOpen(category);
   }
 }

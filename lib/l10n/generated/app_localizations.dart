@@ -650,6 +650,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t create \"{name}\" — check the container is still mounted'**
   String couldntCreateItem(String name);
 
+  /// Error shown when creating a folder or file fails because the write to the container itself failed (the container is mounted and not read-only, but the storage refused or failed the write)
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t create \"{name}\" — writing to the container failed'**
+  String couldntCreateItemWriteFailed(String name);
+
   /// Error shown when a single-item rename fails
   ///
   /// In en, this message translates to:
@@ -21997,6 +22003,119 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Location not available'**
   String get newTabStorageUnavailable;
+
+  /// Snackbar shown after unlocking a container when read-write was requested but the storage provider only granted read access, so the container was mounted read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Opened read-only because Android only granted read access to this file.'**
+  String get containerOpenedReadOnlyNoWriteAccess;
+
+  /// Desktop add-vault option title: unlock an encrypted disk or partition picked from the drives of this computer
+  ///
+  /// In en, this message translates to:
+  /// **'Mount drive'**
+  String get mountDriveTitle;
+
+  /// Desktop add-vault option subtitle under "Mount drive"
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock a BitLocker, VeraCrypt or LUKS disk or partition'**
+  String get mountDriveSubtitle;
+
+  /// Desktop AppBar title of the sheet that unlocks an encrypted disk or partition
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Drive'**
+  String get unlockDriveTitle;
+
+  /// Desktop AppBar title when reconnecting a previously saved drive
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect \"{label}\"'**
+  String reconnectDriveTitle(String label);
+
+  /// Desktop empty state of the drive list: the operating system lists no disk
+  ///
+  /// In en, this message translates to:
+  /// **'No drives found'**
+  String get noDrivesDetectedTitle;
+
+  /// Desktop note under the drive list when at least one disk cannot be opened by this app
+  ///
+  /// In en, this message translates to:
+  /// **'Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.'**
+  String get drivesNeedAccessNote;
+
+  /// Tag on a drive in the desktop drive list: a file system on it is mounted by the operating system
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted by the system'**
+  String get driveInUseLabel;
+
+  /// Tag on the drive in the desktop drive list that carries the running operating system
+  ///
+  /// In en, this message translates to:
+  /// **'System drive'**
+  String get driveSystemLabel;
+
+  /// Progress of a file operation in its own window, and that window's title. Example: "4% complete".
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% complete'**
+  String fileOpWinPercentComplete(int percent);
+
+  /// Summary line of the file operation window for a copy or move. verb is the in-progress verb (Copying, Moving), items is a count of items (1 item), source and destination are the names of the places. Example: "Copying 1 item from Documents to Backup".
+  ///
+  /// In en, this message translates to:
+  /// **'{verb} {items} from {source} to {destination}'**
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  );
+
+  /// Summary line of the file operation window for an operation that has a source only (delete, export, extract). Example: "Deleting 3 items from Documents".
+  ///
+  /// In en, this message translates to:
+  /// **'{verb} {items} from {source}'**
+  String fileOpWinFrom(String verb, String items, String source);
+
+  /// Summary line of the file operation window for an operation that has a destination only (import). Example: "Importing 3 items to Documents".
+  ///
+  /// In en, this message translates to:
+  /// **'{verb} {items} to {destination}'**
+  String fileOpWinTo(String verb, String items, String destination);
+
+  /// Current transfer speed in the file operation window. speed is a size such as "37.9 MB". Example: "Speed: 37.9 MB/s".
+  ///
+  /// In en, this message translates to:
+  /// **'Speed: {speed}/s'**
+  String fileOpWinSpeed(String speed);
+
+  /// Estimated time left in the file operation window. time is a duration such as "2m 15s". Example: "Time remaining: 2m 15s".
+  ///
+  /// In en, this message translates to:
+  /// **'Time remaining: {time}'**
+  String fileOpWinTimeRemaining(String time);
+
+  /// Shown instead of the time remaining while there is not yet enough progress to estimate it.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating…'**
+  String get fileOpWinCalculating;
+
+  /// Items left in the file operation window, with the size still to go. Example: "Items remaining: 1 (1.93 GB)".
+  ///
+  /// In en, this message translates to:
+  /// **'Items remaining: {count} ({size})'**
+  String fileOpWinItemsRemaining(int count, String size);
+
+  /// Items left in the file operation window when the total size is not known. Example: "Items remaining: 3".
+  ///
+  /// In en, this message translates to:
+  /// **'Items remaining: {count}'**
+  String fileOpWinItemsRemainingNoSize(int count);
 }
 
 class _AppLocalizationsDelegate

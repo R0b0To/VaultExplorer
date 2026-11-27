@@ -21,6 +21,7 @@ import com.aeidolon.vaultexplorer.ImageDecodeGuard
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
+import com.aeidolon.vaultexplorer.handlers.OpenWithChooser
 import com.aeidolon.vaultexplorer.share.StorageFolderShareProvider
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -1519,7 +1520,8 @@ class SafStorageManager(private val context: Context) {
         treeUri: Uri,
         relativePath: String,
         mimeTypeOverride: String?,
-        packageName: String?
+        packageName: String?,
+        requestId: String? = null,
     ): Boolean {
         val docUri = getDocumentUri(treeUri, relativePath) ?: return false
         val fileName = relativePath.substringAfterLast('/')
@@ -1538,11 +1540,18 @@ class SafStorageManager(private val context: Context) {
                 try {
                     context.startActivity(intent)
                     return true
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    OpenWithChooser.logReplayFailure(packageName, e)
                     intent.setPackage(null)
                 }
             }
-            val chooser = Intent.createChooser(intent, "Open with…").apply {
+            val chooser = OpenWithChooser.build(
+                context,
+                intent,
+                "Open with…",
+                fileName.substringAfterLast('.', ""),
+                requestId
+            ).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(chooser)

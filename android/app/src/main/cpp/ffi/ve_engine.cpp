@@ -18,6 +18,7 @@
 #include "ve_engine.h"
 #include "ve_volumes.h"
 #include "ve_mount_internal.h"
+#include "ve_raw_device.h"
 
 #include <algorithm>
 #include <atomic>
@@ -40,7 +41,6 @@ int ve_win_open_utf8(const char* path, int writable, int create);
 #  include <unistd.h>
 #endif
 
-#include <android/log.h>
 #include <mbedtls/platform_util.h>
 
 #include "container_create.h"
@@ -48,9 +48,10 @@ int ve_win_open_utf8(const char* path, int writable, int create);
 #include "container_utils.h"
 #include "crypto/single_file_crypto.h"
 #include "crypto/user_entropy.h"
+#include "platform/engine_log.h"
 #include "filesystems/fs_ops.h"
 #include "filesystems/stream_handles.h"
-#include "jni_callbacks.h"
+#include "platform/engine_hooks.h"
 #include "session_guard.h"
 #include "session_prepare.h"
 #include "virtual_block_device.h"
@@ -75,7 +76,22 @@ extern "C" void ve_log_dispatch(int prio, const char* tag, const char* message) 
     }
 }
 
-#define VE_LOG(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define VE_LOG(...) ENGINE_LOG_INFO("VaultExplorer_C++", __VA_ARGS__)
+
+namespace {
+// The portable engine (session/, io/, filesystems/, ...) logs through platform/engine_log.h, which on desktop
+// goes to a sink the host installs. This one hands each line to ve_log_dispatch() -- the host's callback, or
+// stderr -- but only while the host has switched logging on (ve_set_log_enabled): the lines can name volume ids,
+// paths and sizes, so logging stays off by default. The callback keeps receiving Android-style priorities.
+void desktopLogSink(int level, const char* tag, const char* message) {
+    if (!g_logEnabled.load(std::memory_order_relaxed)) return;
+    constexpr int kPrioInfo = 4, kPrioWarn = 5, kPrioError = 6;   // android/log.h's ANDROID_LOG_INFO / WARN / ERROR
+    const int prio = level >= ENGINE_LOG_LEVEL_ERROR ? kPrioError : level == ENGINE_LOG_LEVEL_WARN ? kPrioWarn : kPrioInfo;
+    ve_log_dispatch(prio, tag, message);
+}
+// Installed when the library loads, so the lines of an unlock in progress are not lost.
+[[maybe_unused]] const bool g_logSinkInstalled = (engineLogSetSink(&desktopLogSink), true);
+}  // namespace
 
 extern "C" VE_API void ve_set_log_enabled(int32_t enabled) { g_logEnabled.store(enabled ? 1 : 0); }
 extern "C" VE_API void ve_set_log_callback(void (*cb)(int32_t, const char*, const char*)) {
@@ -366,6 +382,107 @@ extern "C" VE_API int32_t ve_unlock(const ve_unlock_params* p) {
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
+// ── raw block devices ────────────────────────────────────────────────────
+// The device is attached to the slot first (ffi/ve_raw_device.cpp), because the engine reads it through the
+// usbReadSectors / usbWriteSectors hooks, which are keyed by slot. prepareUsbSession is the same call the
+// Android USB path uses: it scans the partitions for LUKS / BitLocker and tries VeraCrypt on each.
+
+extern "C" VE_API int32_t ve_list_block_devices(ve_buffer* out) {
+    if (!out) return VE_ERR_INVALID_ARG;
+    out->data = nullptr;
+    out->len = 0;
+    VE_TRY
+    const std::string json = veraw::devicesToJson(veraw::listDevices());
+    return emitBuffer(reinterpret_cast<const uint8_t*>(json.data()), json.size(), out) ? VE_OK : VE_ERR_FAILED;
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+extern "C" VE_API int32_t ve_unlock_device(const ve_unlock_device_params* p) {
+    auto closeAllFds = [](const ve_unlock_device_params* q) {
+        closeFds(q->keyfile_fds, q->keyfile_count);
+        closeFds(q->hidden_keyfile_fds, q->hidden_keyfile_count);
+    };
+    if (!p || p->struct_size < static_cast<int32_t>(sizeof(ve_unlock_device_params))) {
+        if (p) closeAllFds(p);
+        return VE_ERR_INVALID_ARG;
+    }
+    if (!p->device_path || !p->device_path[0] || !validVol(p->vol_id) || p->password_len < 0 || p->keyfile_count < 0) {
+        closeAllFds(p);
+        return VE_ERR_INVALID_ARG;
+    }
+    if (p->os_error_out) *p->os_error_out = 0;
+    VE_TRY
+    const int volId = p->vol_id;
+    if (!ve_internal_prepare_block_slot(volId)) {  // the slot holds an unlocked folder vault
+        closeAllFds(p);
+        return VE_ERR_FAILED;
+    }
+    clearUnlockCancellation(volId);
+
+    uint64_t deviceSize = 0;
+    int osError = 0;
+    switch (veraw::attach(volId, p->device_path, /*writable=*/p->read_only == 0, &deviceSize, &osError)) {
+        case veraw::AttachResult::kOk: break;
+        case veraw::AttachResult::kNotFound: closeAllFds(p); if (p->os_error_out) *p->os_error_out = osError; return VE_ERR_DEVICE_NOT_FOUND;
+        case veraw::AttachResult::kPermission: closeAllFds(p); if (p->os_error_out) *p->os_error_out = osError; return VE_ERR_DEVICE_PERMISSION;
+        case veraw::AttachResult::kBusy: closeAllFds(p); if (p->os_error_out) *p->os_error_out = osError; return VE_ERR_DEVICE_BUSY;
+        default: closeAllFds(p); if (p->os_error_out) *p->os_error_out = osError; return VE_ERR_DEVICE_OPEN;
+    }
+
+    static const unsigned char kEmpty[1] = {0};
+    const unsigned char* pw = p->password ? p->password : kEmpty;
+    const size_t pwLen = p->password ? static_cast<size_t>(p->password_len) : 0;
+
+    if (!prepareUsbSession(pw, pwLen, p->pim, volId, p->cipher_id, p->hash_id,
+                           p->preserved_key, p->preserved_key ? static_cast<size_t>(p->preserved_key_len) : 0,
+                           p->partition_offset_hint,
+                           p->keyfile_count > 0 ? p->keyfile_fds : nullptr, p->keyfile_count,
+                           p->read_only != 0, /*useBackupHeader=*/false, static_cast<int64_t>(deviceSize))) {
+        // prepareUsbSession owns (and has closed) the keyfile fds on every path.
+        closeFds(p->hidden_keyfile_fds, p->hidden_keyfile_count);
+        veraw::detach(volId);
+        return isUnlockCancelled(volId) ? VE_ERR_CANCELLED : VE_ERR_FAILED;
+    }
+
+    {
+        std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex);
+        volumes[volId].fileSize = deviceSize;
+    }
+    bool mountOk;
+    {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        mountOk = ensureMounted(volId);
+    }
+    if (!mountOk) {
+        VE_LOG("file system mount failed on device volume %d", volId);
+        closeFds(p->hidden_keyfile_fds, p->hidden_keyfile_count);
+        lockSlot(volId);
+        veraw::detach(volId);
+        return VE_ERR_MOUNT_FAILED;
+    }
+
+    if (p->hidden_password != nullptr) {
+        if (!enableHiddenVolumeProtection(
+                volId, p->hidden_password, static_cast<size_t>(p->hidden_password_len),
+                p->hidden_pim, p->hidden_cipher_id, p->hidden_hash_id,
+                p->hidden_keyfile_count > 0 ? p->hidden_keyfile_fds : nullptr,
+                p->hidden_keyfile_count)) {
+            lockSlot(volId);
+            veraw::detach(volId);
+            return VE_ERR_FAILED;
+        }
+    } else {
+        closeFds(p->hidden_keyfile_fds, p->hidden_keyfile_count);
+    }
+    if (!ve_internal_attach_block(volId)) {  // never leave a decrypted session behind that no call can reach
+        lockSlot(volId);
+        veraw::detach(volId);
+        return VE_ERR_FAILED;
+    }
+    return VE_OK;
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
 extern "C" VE_API void ve_request_cancel_unlock(int32_t vol_id) {
     if (validVol(vol_id)) requestUnlockCancellation(vol_id);
 }
@@ -379,7 +496,10 @@ extern "C" VE_API void ve_lock(int32_t vol_id) {
         // New calls see NotUnlocked from here on; streams end and calls in flight finish. Closing a folder vault
         // wipes its keys; a container is only detached -- the session below is what actually locks it.
         if (validVol(vol_id)) mgr().close(vol_id);
-        if (!folderVault) lockSlot(vol_id);
+        if (!folderVault) {
+            lockSlot(vol_id);       // flushes + syncs a raw device's write cache (unmountVolume), then wipes the keys
+            veraw::detach(vol_id);  // closes the raw disk (no-op for slots that never had one)
+        }
     } catch (...) {}
 }
 

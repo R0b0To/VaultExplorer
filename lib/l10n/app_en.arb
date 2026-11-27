@@ -529,6 +529,15 @@
       }
     }
   },
+  "couldntCreateItemWriteFailed": "Couldn't create \"{name}\" — writing to the container failed",
+  "@couldntCreateItemWriteFailed": {
+    "description": "Error shown when creating a folder or file fails because the write to the container itself failed (the container is mounted and not read-only, but the storage refused or failed the write)",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "couldntRenameSingle": "Couldn't rename \"{name}\" — an item with that name may already exist",
   "@couldntRenameSingle": {
     "description": "Error shown when a single-item rename fails",
@@ -15248,5 +15257,146 @@
   "newTabStorageUnavailable": "Location not available",
   "@newTabStorageUnavailable": {
     "description": "Shown in the new tab storage picker when the chosen storage no longer exists"
+  },
+  "containerOpenedReadOnlyNoWriteAccess": "Opened read-only because Android only granted read access to this file.",
+  "@containerOpenedReadOnlyNoWriteAccess": {
+    "description": "Snackbar shown after unlocking a container when read-write was requested but the storage provider only granted read access, so the container was mounted read-only"
+  },
+  "mountDriveTitle": "Mount drive",
+  "@mountDriveTitle": {
+    "description": "Desktop add-vault option title: unlock an encrypted disk or partition picked from the drives of this computer"
+  },
+  "mountDriveSubtitle": "Unlock a BitLocker, VeraCrypt or LUKS disk or partition",
+  "@mountDriveSubtitle": {
+    "description": "Desktop add-vault option subtitle under \"Mount drive\""
+  },
+  "unlockDriveTitle": "Unlock Drive",
+  "@unlockDriveTitle": {
+    "description": "Desktop AppBar title of the sheet that unlocks an encrypted disk or partition"
+  },
+  "reconnectDriveTitle": "Reconnect \"{label}\"",
+  "@reconnectDriveTitle": {
+    "description": "Desktop AppBar title when reconnecting a previously saved drive",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "noDrivesDetectedTitle": "No drives found",
+  "@noDrivesDetectedTitle": {
+    "description": "Desktop empty state of the drive list: the operating system lists no disk"
+  },
+  "drivesNeedAccessNote": "Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.",
+  "@drivesNeedAccessNote": {
+    "description": "Desktop note under the drive list when at least one disk cannot be opened by this app"
+  },
+  "driveInUseLabel": "Mounted by the system",
+  "@driveInUseLabel": {
+    "description": "Tag on a drive in the desktop drive list: a file system on it is mounted by the operating system"
+  },
+  "driveSystemLabel": "System drive",
+  "@driveSystemLabel": {
+    "description": "Tag on the drive in the desktop drive list that carries the running operating system"
+  },
+  "fileOpWinPercentComplete": "{percent}% complete",
+  "@fileOpWinPercentComplete": {
+    "description": "Progress of a file operation in its own window, and that window's title. Example: \"4% complete\".",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "fileOpWinFromTo": "{verb} {items} from {source} to {destination}",
+  "@fileOpWinFromTo": {
+    "description": "Summary line of the file operation window for a copy or move. verb is the in-progress verb (Copying, Moving), items is a count of items (1 item), source and destination are the names of the places. Example: \"Copying 1 item from Documents to Backup\".",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "items": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinFrom": "{verb} {items} from {source}",
+  "@fileOpWinFrom": {
+    "description": "Summary line of the file operation window for an operation that has a source only (delete, export, extract). Example: \"Deleting 3 items from Documents\".",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "items": {
+        "type": "String"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinTo": "{verb} {items} to {destination}",
+  "@fileOpWinTo": {
+    "description": "Summary line of the file operation window for an operation that has a destination only (import). Example: \"Importing 3 items to Documents\".",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "items": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinSpeed": "Speed: {speed}/s",
+  "@fileOpWinSpeed": {
+    "description": "Current transfer speed in the file operation window. speed is a size such as \"37.9 MB\". Example: \"Speed: 37.9 MB/s\".",
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinTimeRemaining": "Time remaining: {time}",
+  "@fileOpWinTimeRemaining": {
+    "description": "Estimated time left in the file operation window. time is a duration such as \"2m 15s\". Example: \"Time remaining: 2m 15s\".",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinCalculating": "Calculating…",
+  "@fileOpWinCalculating": {
+    "description": "Shown instead of the time remaining while there is not yet enough progress to estimate it."
+  },
+  "fileOpWinItemsRemaining": "Items remaining: {count} ({size})",
+  "@fileOpWinItemsRemaining": {
+    "description": "Items left in the file operation window, with the size still to go. Example: \"Items remaining: 1 (1.93 GB)\".",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "fileOpWinItemsRemainingNoSize": "Items remaining: {count}",
+  "@fileOpWinItemsRemainingNoSize": {
+    "description": "Items left in the file operation window when the total size is not known. Example: \"Items remaining: 3\".",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

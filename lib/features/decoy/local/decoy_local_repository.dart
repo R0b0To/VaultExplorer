@@ -204,24 +204,26 @@ class DecoyLocalRepository {
 
   /// Recursive byte total for a folder -- used for the selection summary
   /// only when the user is looking at a small enough selection that this
-  /// is worth computing; unreadable subtrees are skipped rather than
-  /// aborting the whole count.
+  /// is worth computing. Read on a worker isolate (see [folderSizeJob]). A
+  /// stream error from the tree ends the count where it stands, and what was
+  /// counted so far is returned.
   Future<int> folderSize(String path) async {
-    int total = 0;
     try {
-      await for (final entity in Directory(path).list(recursive: true, followLinks: false)) {
-        if (entity is File) {
-          try {
-            total += await entity.length();
-          } catch (_) {
-            // Unreadable file mid-tree -- keep counting the rest.
-          }
-        }
-      }
+      return await folderSizeJob(path).result ?? 0;
     } catch (_) {
-      // Unreadable subtree -- return whatever was counted so far.
+      return 0;
     }
-    return total;
+  }
+
+  /// [folderSize] as a job that can be abandoned. The walk runs on a worker
+  /// isolate, so a big tree no longer costs the UI isolate a round trip per
+  /// file, and cancelling stops the walk at its next entry instead of leaving
+  /// it to read the rest of the tree for nobody. [ListingJob.result] is null
+  /// when the job was cancelled.
+  ListingJob<int> folderSizeJob(String path) {
+    final run = _FolderSizeRun(path);
+    unawaited(run.start());
+    return ListingJob<int>(run.result, run.cancel);
   }
 
 Future<Directory> createFolder(String parentPath, String desiredName) async {
@@ -651,6 +653,94 @@ const _ProgressiveOutcome _emptyOutcome = (
   partials: 0,
   firstPartialUs: 0,
 );
+
+/// Adds up the size of every file under one folder on a worker isolate.
+class _FolderSizeRun {
+  _FolderSizeRun(this.path);
+
+  final String path;
+
+  final Completer<int?> _done = Completer<int?>();
+  bool _cancelled = false;
+  SendPort? _control;
+
+  Future<int?> get result => _done.future;
+
+  Future<void> start() async {
+    final fromWorker = ReceivePort()..listen(_onWorkerMessage);
+    try {
+      final total = await _spawnWorker(path, fromWorker.sendPort);
+      // A cancelled walk may have been cut short, so its total is not reported.
+      _finish(_cancelled ? null : total);
+    } catch (error, stack) {
+      if (!_done.isCompleted) _done.completeError(error, stack);
+    } finally {
+      fromWorker.close();
+    }
+  }
+
+  /// Kept out of the instance so the closure sent to the isolate captures only
+  /// the path and the port, never this object.
+  static Future<int> _spawnWorker(String path, SendPort fromWorker) {
+    return Isolate.run(() => _sumFolderSize(path, fromWorker));
+  }
+
+  void _onWorkerMessage(Object? message) {
+    if (message is SendPort) {
+      // The worker's control port. If cancelled before it arrived, say so now.
+      _control = message;
+      if (_cancelled) message.send('cancel');
+    }
+  }
+
+  /// Stops the walk. The result completes with null at once; the worker
+  /// notices at its next entry and ends.
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    _control?.send('cancel');
+    _finish(null);
+  }
+
+  void _finish(int? value) {
+    if (!_done.isCompleted) _done.complete(value);
+  }
+}
+
+/// Runs on a worker isolate: walks [path] and returns the total size of the
+/// files under it. Sends its own control port first so the caller can cancel
+/// the walk. Like the listing worker it only hears that message between
+/// entries, which the asynchronous directory stream makes frequent.
+Future<int> _sumFolderSize(String path, SendPort fromWorker) async {
+  final control = ReceivePort();
+  var cancelled = false;
+  control.listen((message) {
+    if (message == 'cancel') cancelled = true;
+  });
+  fromWorker.send(control.sendPort);
+
+  var total = 0;
+  try {
+    await for (final entity in Directory(path).list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (cancelled) break;
+      if (entity is File) {
+        try {
+          total += entity.lengthSync();
+        } catch (_) {
+          // Unreadable file mid-tree -- keep counting the rest.
+        }
+      }
+    }
+  } catch (_) {
+    // Stream error from the tree -- return whatever was counted so far.
+  } finally {
+    control.close();
+  }
+  return total;
+}
 
 /// Folders first, each group in natural-name order: the same order the final
 /// listing has, so a snapshot can be shown as it is.

@@ -160,7 +160,23 @@ class LocalFileHandlers(
                 setDataAndType(uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            val chooser = Intent.createChooser(intent, null)
+            val packageName = call.argument<String>("packageName")
+            if (!packageName.isNullOrEmpty()) {
+                try {
+                    activity.startActivity(Intent(intent).setPackage(packageName))
+                    result.success(true)
+                    return
+                } catch (e: Exception) {
+                    OpenWithChooser.logReplayFailure(packageName, e)
+                }
+            }
+            val chooser = OpenWithChooser.build(
+                activity,
+                intent,
+                null,
+                file.extension,
+                call.argument<String>("requestId")
+            )
             if (chooser.resolveActivity(activity.packageManager) != null) {
                 activity.startActivity(chooser)
                 result.success(true)

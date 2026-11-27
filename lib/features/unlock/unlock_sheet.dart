@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
+import 'package:vaultexplorer/core/windowing/secondary_windows.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -15,6 +17,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/features/unlock/unlock_controller.dart';
+import 'package:vaultexplorer/features/unlock/unlock_window_parts.dart';
 
 enum _UnlockCredentialState { loading, missing, biometric, pattern, pin, password, none }
 
@@ -64,10 +67,12 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   final _hiddenPasswordCtrl = TextEditingController();
   final _hiddenPimCtrl = TextEditingController();
   final _carrierScrollCtrl = ScrollController();
+  final _windowScrollCtrl = ScrollController();
 
   bool _obscure = true;
   bool _hiddenObscure = true;
   bool _showAdvanced = false;
+  bool _pimObscure = true;
 
   /// True until the password field has been fully cleared at least once
   /// since it was prefilled with a saved credential. Tracking "ever
@@ -138,6 +143,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     _hiddenPasswordCtrl.dispose();
     _hiddenPimCtrl.dispose();
     _carrierScrollCtrl.dispose();
+    _windowScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -231,13 +237,48 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     return context.l10n.veracryptAlgoProgress(algo, slotName);
   }
 
+  /// Read-write was requested but native mounted the container read-only:
+  /// the storage provider only granted read access.
+  bool _openedReadOnlyByProvider(MountedContainer container) =>
+      container.readOnly && !ref.read(unlockControllerProvider(_params)).readOnly;
+
+  /// Without this the user just sees writes fail, so say why, and offer All
+  /// files access (which bypasses the provider) when it isn't already on.
+  Future<void> _notifyOpenedReadOnlyByProvider() async {
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final l10n = context.l10n;
+    final hasAllFilesAccess = await lifecycle.hasAllFilesAccess();
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.containerOpenedReadOnlyNoWriteAccess,
+      tone: AppBannerTone.warning,
+      action: hasAllFilesAccess
+          ? null
+          : SnackBarAction(
+              label: l10n.localStorageGrantAccess,
+              onPressed: () => lifecycle.requestAllFilesAccess(openSettings: true),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    ref.listen(unlockControllerProvider(_params).select((s) => s.mountedSuccess), (prev, next) {
+    // Shown in a native desktop window (see pushWindowedPage) instead of as a
+    // phone page or an in-window dialog.
+    final windowed = SecondaryWindowScope.maybeOf(context) != null;
+    ref.listen(unlockControllerProvider(_params).select((s) => s.mountedSuccess), (prev, next) async {
       if (next != null && mounted) {
         HapticFeedback.lightImpact();
+        if (_openedReadOnlyByProvider(next.container)) {
+          await _notifyOpenedReadOnlyByProvider();
+          if (!mounted) return;
+        }
         widget.onMounted(next.container, record: next.record);
-        if (widget.openBrowserRoute != null) {
+        // A window has a Navigator of its own: a browser route pushed here
+        // would open inside the small unlock window. The opener takes care of
+        // showing the vault once the window has closed (see pushWindowedPage).
+        if (widget.openBrowserRoute != null && !windowed) {
           Navigator.of(context).pushReplacement(widget.openBrowserRoute!(next.container));
         } else {
           Navigator.pop(context);
@@ -264,7 +305,9 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           ref.read(unlockControllerProvider(_params).notifier).cancelUnlock();
         }
       },
-      child: Scaffold(
+      child: windowed
+          ? _buildWindowScaffold(context, state, credState, isBusy)
+          : Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),
@@ -304,6 +347,386 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                   : _buildPortraitLayout(context, state, credState, cs, textTheme),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Desktop window presentation (see pushWindowedPage)
+  //
+  // A flat form on the window surface with a pinned footer, instead of grouped
+  // cards and a full-width pill button. Everything the controller does is the
+  // same; only the layout differs.
+  // ---------------------------------------------------------------------------
+
+  bool get _isNewMount => widget.initialUri == null && widget.initialCompositeCarriers == null;
+
+  /// Closes the window the way its Cancel button and Escape do: as the back
+  /// button would, so an unlock in progress is cancelled first.
+  void _closeWindow() => Navigator.of(context).maybePop();
+
+  Widget _buildWindowScaffold(BuildContext context, UnlockState state, _UnlockCredentialState credState, bool isBusy) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final l10n = context.l10n;
+    final isPassword = credState == _UnlockCredentialState.password;
+    final canSubmit = isPassword && state.selectedUri != null && !state.checkingContainer && !state.loading;
+
+    final body = switch (credState) {
+      _UnlockCredentialState.password => _buildWindowPasswordForm(context, state, cs, textTheme),
+      _ => [
+        ..._buildCredentialSection(context, state, credState, cs, textTheme),
+        ..._buildQuickUnlockOptionsSection(context, state, credState, cs, textTheme),
+      ],
+    };
+
+    final notifier = ref.read(unlockControllerProvider(_params).notifier);
+
+    return CallbackShortcuts(
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): _closeWindow},
+      child: Scaffold(
+        backgroundColor: cs.surface,
+        body: AutofillGroup(
+          // `cancel`, so closing the window never makes the password manager
+          // offer to save the vault password.
+          onDisposeAction: AutofillContextAction.cancel,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 2,
+                child: isBusy ? LinearProgressIndicator(color: cs.primary, backgroundColor: Colors.transparent) : null,
+              ),
+              Expanded(
+                child: Scrollbar(
+                  controller: _windowScrollCtrl,
+                  child: SingleChildScrollView(
+                    controller: _windowScrollCtrl,
+                    physics: const ClampingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildWindowHeader(context, state, cs, textTheme),
+                        const SizedBox(height: kUnlockWindowGap),
+                        _buildPickerCard(context, state, cs, textTheme, windowed: true),
+                        if (body.isNotEmpty) const SizedBox(height: kUnlockWindowGap),
+                        ...body,
+                        if (isPassword && state.error != null) ...[
+                          const SizedBox(height: kUnlockWindowGap),
+                          InlineErrorBanner(state.error!),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              UnlockWindowFooter(
+                status: state.loading
+                    ? Row(
+                        children: [
+                          Icon(Icons.lock_clock_rounded, size: 16, color: cs.primary),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _unlockProgressLabel(context, state),
+                              style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      )
+                    : null,
+                // While unlocking the same button cancels the attempt; the
+                // window itself stays open, as with the back button.
+                secondary: TextButton(
+                  style: unlockWindowButtonStyle(),
+                  onPressed: state.loading
+                      ? (state.activeVolId != null ? () => notifier.cancelUnlock() : null)
+                      : _closeWindow,
+                  child: Text(state.loading ? l10n.cancelUnlockButtonLabel : l10n.cancel),
+                ),
+                primary: isPassword
+                    ? FilledButton(
+                        style: unlockWindowButtonStyle(),
+                        onPressed: canSubmit ? _onUnlock : null,
+                        child: state.loading
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2.2, color: cs.onPrimary),
+                              )
+                            : Text(
+                                state.isPlainDiskImage || state.containerFormat == 'plain'
+                                    ? l10n.mountContainerTitle
+                                    : (state.isFolderVault ? l10n.unlockVaultButtonLabel : l10n.unlockContainerLabel),
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                      )
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Title on the left; for a vault that is being added, the container /
+  /// folder-vault switch under it.
+  Widget _buildWindowHeader(BuildContext context, UnlockState state, ColorScheme cs, TextTheme textTheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          _isNewMount ? context.l10n.mountContainerTitle : context.l10n.unlockContainerTitle,
+          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (_isNewMount) ...[
+          const SizedBox(height: kUnlockWindowGap),
+          _buildVaultKindSegmentedButton(
+            context,
+            state,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kUnlockWindowRadius)),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// The vault badge: format icon, name and what kind of vault it is. For a
+  /// vault that is being added it is also the file picker.
+  Widget _buildWindowPicker(BuildContext context, UnlockState state, ColorScheme cs, TextTheme textTheme) {
+    final hasSelection = state.selectedUri != null;
+    final busy = state.loading || state.checkingContainer;
+    final notifier = ref.read(unlockControllerProvider(_params).notifier);
+    final name =
+        state.selectedName ??
+        (state.isFolderVault ? context.l10n.tapToSelectVaultFolder : context.l10n.tapToSelectContainerFile);
+    final iconColor = hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant;
+
+    final Widget icon = state.isComposite
+        ? Icon(Icons.layers_rounded, color: iconColor, size: 18)
+        : (state.isPlainDiskImage || state.containerFormat == 'plain'
+              ? Icon(Icons.album_outlined, color: iconColor, size: 18)
+              : ContainerFormatIcon(
+                  format: hasSelection
+                      ? ContainerFormat.fromWire(state.containerFormat)
+                      : ContainerFormat.directoryVault,
+                  color: iconColor,
+                  size: 18,
+                ));
+
+    return UnlockWindowRow(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      onTap: !_isNewMount || busy ? null : () => _suppressLock(() async => notifier.pickFile(context.l10n)),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: hasSelection ? cs.primaryContainer.withValues(alpha: 0.7) : cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(kUnlockWindowRadius),
+            ),
+            alignment: Alignment.center,
+            child: icon,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: hasSelection ? FontWeight.w700 : FontWeight.normal),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (hasSelection && !state.containerMissing)
+                  Text(
+                    _formatBadgeLabel(context, state),
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          if (_isNewMount)
+            hasSelection
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    tooltip: context.l10n.clearAllButton,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: busy
+                        ? null
+                        : () {
+                            _resetInputFields();
+                            notifier.clearSelection();
+                          },
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(Icons.folder_open_rounded, size: 20, color: cs.onSurfaceVariant),
+                  ),
+        ],
+      ),
+    );
+  }
+
+  /// The password form, flat: each row sits directly on the window surface with
+  /// the same gap between them.
+  List<Widget> _buildWindowPasswordForm(BuildContext context, UnlockState state, ColorScheme cs, TextTheme textTheme) {
+    final notifier = ref.read(unlockControllerProvider(_params).notifier);
+    final l10n = context.l10n;
+    final hasSelection = state.selectedUri != null;
+    final canConfigure = hasSelection && !state.loading && !state.checkingContainer;
+    final isPlain = state.isPlainDiskImage || state.containerFormat == 'plain';
+    final isKnownVeraCrypt = _isKnownVeraCrypt(state);
+    final isKnownLuks = _isKnownLuks(state);
+    final hasDirectOptions = _hasDirectOptions(state);
+    final showAdvanced = hasSelection && !state.containerMissing;
+
+    return [
+      AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: canConfigure ? 1.0 : 0.45,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (isPlain)
+              InlineBanner(l10n.plainDiskImageNotice, tone: AppBannerTone.info, icon: Icons.album_outlined)
+            else
+              TextField(
+                controller: _passwordCtrl,
+                autofillHints: _kPasswordAutofillHints,
+                enabled: canConfigure,
+                // Stay obscured, and block text selection so the real
+                // characters can't be copied out either, while _revealLocked:
+                // a saved credential shouldn't be revealable in plain text
+                // just by editing around it.
+                obscureText: _revealLocked ? true : _obscure,
+                autocorrect: false,
+                enableSuggestions: false,
+                enableIMEPersonalizedLearning: false,
+                enableInteractiveSelection: !_revealLocked && canConfigure,
+                autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                onChanged: (val) {
+                  if (val.isEmpty) _prefillCleared = true;
+                  setState(() {});
+                },
+                onSubmitted: (_) => _onUnlock(),
+                decoration: unlockWindowFieldDecoration(
+                  context,
+                  label: l10n.passwordFieldLabel,
+                  icon: Icons.lock_outline_rounded,
+                  suffix: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_passwordPrefilled)
+                        Tooltip(
+                          message: l10n.usingSavedPasswordTooltip,
+                          child: Icon(Icons.bookmark_rounded, size: AppIconSize.small, color: cs.primary),
+                        ),
+                      PasswordVisibilityToggle(
+                        obscured: _revealLocked ? true : _obscure,
+                        enabled: !_revealLocked && canConfigure,
+                        onToggle: () => setState(() => _obscure = !_obscure),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (isKnownVeraCrypt) ...[
+              const SizedBox(height: kUnlockWindowGap),
+              _buildWindowPimField(context, _pimCtrl, canConfigure),
+            ],
+            if (hasDirectOptions) ...[
+              const SizedBox(height: kUnlockWindowGap),
+              UnlockWindowKeyfilesRow(
+                keyfiles: state.keyfiles,
+                picking: state.pickingKeyfiles,
+                enabled: canConfigure,
+                onPick: () => _suppressLock(() async => notifier.pickKeyfiles()),
+                onRemove: notifier.removeKeyfile,
+              ),
+              if (isKnownLuks && state.keyfiles.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  l10n.luksKeyfileReplacesPasswordNote,
+                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ],
+            if (_isNewMount)
+              CheckboxListTile(
+                value: state.remember,
+                onChanged: canConfigure ? (val) => notifier.setRemember(val ?? false) : null,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                title: Text(l10n.rememberContainerLabel),
+                subtitle: Text(
+                  l10n.rememberContainerSubtitle,
+                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            if (showAdvanced) ...[
+              const SizedBox(height: 4),
+              UnlockWindowAdvancedToggle(
+                expanded: _showAdvanced,
+                enabled: canConfigure,
+                onToggle: () => setState(() => _showAdvanced = !_showAdvanced),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                alignment: Alignment.topCenter,
+                child: _showAdvanced
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(kUnlockWindowRadius),
+                            border: Border.all(color: unlockWindowOutline(cs)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: _buildAdvancedOptionsSection(context, state),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildWindowPimField(BuildContext context, TextEditingController controller, bool enabled) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _onUnlock(),
+      obscureText: _pimObscure,
+      obscuringCharacter: '*',
+      decoration: unlockWindowFieldDecoration(
+        context,
+        label: context.l10n.pimOptionalLabel,
+        icon: Icons.pin_outlined,
+        suffix: PasswordVisibilityToggle(
+          obscured: _pimObscure,
+          enabled: enabled,
+          onToggle: () => setState(() => _pimObscure = !_pimObscure),
         ),
       ),
     );
@@ -368,100 +791,6 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     );
   }
 
-  Widget _buildVaultKindSplitRow(BuildContext context, UnlockState state) {
-    final cs = context.colors;
-    final textTheme = context.typography;
-    final isFolder = state.isFolderVault;
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ( Container File )
-          Expanded(
-            child: InkWell(
-              onTap: state.loading || state.checkingContainer
-                  ? null
-                  : () {
-                      _resetInputFields();
-                      ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind('container');
-                    },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                color: !isFolder ? cs.primaryContainer.withValues(alpha: 0.7) : Colors.transparent,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.folder_zip_rounded,
-                      size: 18,
-                      color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        context.l10n.vaultKindContainerFile,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelLarge?.copyWith(
-                          fontWeight: !isFolder ? FontWeight.bold : FontWeight.w500,
-                          color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Middle separator "|"
-          VerticalDivider(width: 1, thickness: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
-
-          // ( Folder Vault )
-          Expanded(
-            child: InkWell(
-              onTap: state.loading || state.checkingContainer
-                  ? null
-                  : () {
-                      _resetInputFields();
-                      ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind('directory_vault');
-                    },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                color: isFolder ? cs.primaryContainer.withValues(alpha: 0.7) : Colors.transparent,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.folder, size: 18, color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        context.l10n.vaultKindFolderVault,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelLarge?.copyWith(
-                          fontWeight: isFolder ? FontWeight.bold : FontWeight.w500,
-                          color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildVaultKindSegmentedButton(BuildContext context, UnlockState state, {OutlinedBorder? shape}) {
     return SizedBox(
       width: shape != null ? double.infinity : null,
@@ -507,7 +836,13 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     );
   }
 
-  Widget _buildPickerCard(BuildContext context, UnlockState state, ColorScheme cs, TextTheme textTheme) {
+  Widget _buildPickerCard(
+    BuildContext context,
+    UnlockState state,
+    ColorScheme cs,
+    TextTheme textTheme, {
+    bool windowed = false,
+  }) {
     final hasSelection = state.selectedUri != null;
     final isWide = context.screen.useWideLayout;
     final showLoadingFeedback = hasSelection && (state.checkingContainer || state.loadingAuth);
@@ -515,7 +850,10 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide) ...[
+        // The window layout draws the kind switch and the picker itself (see
+        // _buildWindowHeader / _buildWindowPicker).
+        if (windowed) _buildWindowPicker(context, state, cs, textTheme),
+        if (!windowed && widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _buildVaultKindSegmentedButton(
@@ -525,7 +863,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
             ),
           ),
         ],
-        SectionCard(
+        if (!windowed) SectionCard(
           children: [
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

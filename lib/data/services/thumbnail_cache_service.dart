@@ -67,15 +67,6 @@ class ThumbnailCacheService {
         'ThumbnailCacheService must be configured during app startup.',
       ));
 
-  // No longer used for cache keys (see [_encodeKey]); the dependency is still
-  // injected so existing configure() call sites stay unchanged.
-  // ignore: unused_element
-  static VaultHashApi get _hash =>
-      _hashApi ??
-      (throw StateError(
-        'ThumbnailCacheService must be configured during app startup.',
-      ));
-
   // ── Instance Method Forwarders ─────────────────────────────────────────────
 
   Uint8List? peekMemory(
@@ -207,8 +198,6 @@ class ThumbnailCacheService {
     for (final strategy in ThumbnailGenerationStrategy.values)
       '${strategy.name}-120',
   };
-
-  static String get videoThumbnailVariant => _videoThumbnailVariant;
 
   static ThumbnailGenerationStrategy _videoThumbnailStrategy =
       ThumbnailGenerationStrategy.hybrid;
@@ -1322,21 +1311,6 @@ class ThumbnailCacheService {
     }
   }
 
-  static Future<void> clearAllAppCache() async {
-    _ensuredThumbDirs.clear();
-    try {
-      final root = await _getAppCacheRoot();
-      final dir = Directory('$root/thumbs');
-      if (await dir.exists()) await dir.delete(recursive: true);
-    } catch (e) {
-      logSwallowed('clearAllAppCache', e, expected: true);
-    }
-    _memoryCache.clear();
-    _latestKeyByFile.clear();
-    _sizeCache.clear();
-    _knownQualitiesByFile.clear();
-  }
-
   static Future<void> invalidateFile(
     MountedContainer container,
     String filePath, {
@@ -1566,30 +1540,6 @@ class ThumbnailCacheService {
       if (index.entries.length != before) index.dirty = true;
     }
     if (index.dirty && await queue.persist(index)) index.dirty = false;
-  }
-
-  static Future<void> pruneStaleAppCache(
-    Set<String> activeContainerUris,
-  ) async {
-    try {
-      final rootPath = await _getAppCacheRoot();
-      final root = Directory('$rootPath/thumbs');
-      if (!await root.exists()) return;
-      final activeKeys = <String>{};
-      for (final uri in activeContainerUris) {
-        activeKeys.add(_encodeKey(uri));
-      }
-      await for (final e in root.list()) {
-        if (e is! Directory) continue;
-        final dirName = e.path.split('/').last;
-        if (!activeKeys.contains(dirName)) {
-          _ensuredThumbDirs.removeWhere((key, _) => key.contains(dirName));
-          await e.delete(recursive: true);
-        }
-      }
-    } catch (e) {
-      logSwallowed('pruneStaleAppCache', e, expected: true);
-    }
   }
 
   // ── Dimension Parsers ──────────────────────────────────────────────────────

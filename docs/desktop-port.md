@@ -3,8 +3,10 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
+**Raw drives (ABI 14).** The desktop app can mount an encrypted disk or partition (BitLocker, VeraCrypt, LUKS) picked from the list of drives of the computer (see "Raw drives" below). `VE_ABI_VERSION` is 14: `ve_list_block_devices` and `ve_unlock_device` are new, on top of the composite-container calls of ABI 13.
+
 **Update for v1.66.0 (ABI 13).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine
-library is at `VE_ABI_VERSION` 13 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls, ABI 12 the container tools: expand, grow the file system, hidden volume in an existing volume, ABI 13 composite containers). Method coverage is now measured, not counted by hand:
+library is at `VE_ABI_VERSION` 14 (`ffi/ve_engine.h`; ABI 10 added the `ve_archive_*` calls, ABI 11 the repair, header-backup and folder-vault check calls, ABI 12 the container tools: expand, grow the file system, hidden volume in an existing volume, ABI 13 composite containers, ABI 14 raw drives). Method coverage is now measured, not counted by hand:
 `test/core/engine/desktop/desktop_method_coverage_test.dart` diffs `ChannelMethods` against the host, the crypto
 handler, the Android-only defaults and the two explicit lists in `lib/core/engine/desktop/desktop_method_support.dart`
 (see "Engine-channel coverage" under "Not yet"). CI (`ci.yml`, job `desktop_engine_linux`) now builds the Linux engine,
@@ -148,6 +150,12 @@ Android is untouched: the JNI bridges and Kotlin are not involved on desktop, an
     scripts/build_desktop_engine.sh
     build/desktop-engine/ve_smoke_test fat exfat ntfs ext4     # expect: "N checks, 0 failed"
 
+Install `nasm` too (`sudo apt install nasm`): libjpeg-turbo, which the native image thumbnails use (see "Image
+thumbnails"), builds its SIMD code with it. Without NASM the build still works, with a CMake warning, and JPEG
+decoding is slower. The thumbnailer has its own host test:
+
+    cmake --build build/desktop-engine --target thumb_test && build/desktop-engine/thumb_test    # "N groups of checks passed"
+
 ## Run the app on Linux
 
 0. Linux packages for the secret store (saved vaults and credentials live in the OS keyring):
@@ -188,7 +196,7 @@ Build the engine (either way produces the same DLL):
 
     scripts/build_desktop_engine_windows.sh                # from Linux, cross-compiling with MinGW-w64
     # or, natively in an MSYS2 UCRT64 shell (install these tools once):
-    pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc git
+    pacman -S --needed mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-nasm git
     cmake -S android/app/src/main/cpp -B build/desktop-engine-win -G Ninja -DVAULTEXPLORER_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release
     cmake --build build/desktop-engine-win --target vaultexplorer ve_smoke_test
 
@@ -226,7 +234,7 @@ What the Windows port changed, and why (all behind the desktop/Windows switches,
   import/export round-trip in the smoke test.
 - `Common/Endian.h` allows little-endian Windows explicitly (it deliberately refuses unknown platforms).
 - zlib is vendored (MinGW has none); libarchive is built without a regex library (MinGW has none).
-- Not applicable on Windows: raw USB mass-storage access, the Android file-descriptor tricks.
+- Not applicable on desktop: Android's USB host mode (a drive is opened as a disk by the OS instead, see "Raw drives"), the Android file-descriptor tricks.
 - Newer MinGW compilers (GCC 14+) make several legacy-C constructs hard errors (implicit function
   declarations, int/pointer conversions). The vendored C libraries still contain a few, so the desktop build
   declares the POSIX functions they use (`ffi/compat/ve_win_types.h`, force-included into every vendored C
@@ -345,8 +353,9 @@ a link to a folder is listed as `LD|0|mtime|name`.
   `<app support>/cryfs-state` (it must survive restarts). A wrong password surfaces as `AUTH_FAIL` /
   `INCORRECT_PASSWORD`, anything else as `INVALID_VAULT`.
 - The CryFS derived key (Android's "remember" fast path) is not surfaced: there is no keystore on desktop.
-- The NFC filename normaliser hook (`fv::setNfcNormalizer`) is not installed, so only non-ASCII names that
-  arrive in decomposed form are affected (see `foldervault/README.md`).
+- The NFC filename normaliser hook (`fv::setNfcNormalizer`) is installed by `ffi/ve_nfc.cpp` (utf8proc, fetched in
+  `CMakeLists.txt`, desktop only), so Cryptomator names written in decomposed form open by their composed form as
+  on Android; `ve_smoke_test fv` checks it. A name that is not valid UTF-8 is left as it is (see `foldervault/README.md`).
 - **Windows:** `foldervault/fv_storage_win.cpp` is the Win32 twin of the POSIX-only `fv_storage.cpp` (same
   `fv::PosixStorage` interface; UTF-16 paths in the `\\?\` form, so no MAX_PATH limit and no DOS device names;
   path segments with `\`, `:` or wildcards are refused; only real symlinks / junctions count as links, not OneDrive
@@ -399,6 +408,46 @@ media viewer -> NativeVideoController -> VideoPlaybackBackend
   Without libmpv the app still runs; opening a video shows an "install libmpv" error. `pubspec.lock` was not
   regenerated.
 
+### Image thumbnails
+
+`getImageThumbnail` / `getImageThumbnailWithSize` (and the large-image preview, which asks for 2048 px) are made by
+the engine itself, in C++, the way Android's BitmapFactory path does it (ABI 15: `ve_image_thumbnail`,
+`ve_image_thumbnail_file`, `ve_image_thumbnail_mem`; the decoding is `imaging/thumb.cpp`, platform-neutral, with a
+host test):
+
+```
+host -> DesktopImages (desktop_images.dart)
+          |- DesktopNativeThumbnails (desktop_native_thumbnails.dart): a pool of its own, min(cores-1, 8) workers
+          |     '- one blocking native call: read through a 256 KiB read-ahead, decode, shrink, encode
+          '- Flutter's codecs, only for what the engine does not handle (GIF, BMP, ICO, animated WebP, CMYK JPEG)
+             or when the native pool cannot run: whole file read into Dart, dart:ui, PNG out
+```
+
+- **JPEG** is decoded at 1/2, 1/4 or 1/8 size straight from the DCT (libjpeg-turbo's scaled IDCT), as much as keeps
+  the result at least the thumbnail's size, then box-filtered to the exact size. The entropy decode still reads
+  every byte of the file, so a photo costs a few tens of milliseconds at 24 MP, not a few. **PNG** is decoded row by
+  row into a streaming box filter (memory is proportional to the thumbnail; only an interlaced PNG needs the whole
+  picture). **WebP** is scaled inside libwebp while decoding. EXIF orientation is applied and the reported source
+  size is the upright one, as on Android.
+- The answer is a JPEG of the requested quality, or a PNG when some pixel is really not opaque (the Flutter route
+  always answered PNG; a transparent picture still shows its transparency).
+- Thumbnails run in their own worker pool, so a screen full of tiles never queues a directory listing or an unlock
+  behind it, and no file is copied across an isolate boundary: only the few-KB result is.
+- Size guards mirror Android's contract: a source above 256 MiB, or one whose decode would need more than 1 GiB
+  (a progressive JPEG or interlaced PNG; a baseline JPEG and a plain PNG stream and have no such limit) answers
+  `IMAGE_TOO_LARGE`; running out of memory answers `OUT_OF_MEMORY`. All decoders in flight share a 1.5 GiB budget,
+  so several big ones take turns instead of exhausting the machine.
+- Local-storage items and the temp files of archive previews (`isLocalStorage`) are read from the host path. The
+  Flutter route ignored that flag and failed on them.
+- The desktop capability tier (which sizes the Dart-side thumbnail concurrency and caches) is now "LOW" only up to 2
+  logical processors, "HIGH" from 6 (it was 4 and 8): a computer is not a phone.
+- Codecs (desktop engine only, pinned, in `imaging_deps.cmake`): libjpeg-turbo (built through ExternalProject,
+  because its CMakeLists refuses `add_subdirectory`), libpng (compiled from source against the engine's zlib),
+  libwebp (decoder linked into the engine; the encoder only into the host test). They are listed in NOTICE.md.
+  Android builds none of this.
+- Not done natively: GIF / BMP / ICO / TIFF (Flutter fallback), animated WebP (Flutter shows the first frame), ICC
+  colour profiles, HEIC / AVIF / JPEG XL (neither route can decode them).
+
 ### Video thumbnails
 
 `getVideoThumbnail` / `getVideoThumbnailWithSize` take one frame out of the same libmpv the player uses (Android
@@ -408,8 +457,9 @@ uses MediaMetadataRetriever; the engine has no video decoder of its own):
 host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), slots, cancel on lock)
           |- grabFrameWithMpv   (mpv_frame_grabber.dart: fresh paused Player + VideoController, first picture,
           |                      Player.screenshot as JPEG, player disposed)
-          '- decodeVideoFrame   (video_frame_decoder.dart: scale-while-decoding to the target size, PNG out,
-                                  8x8 "is this frame blank" check)
+          '- nativeFrameDecoder (video_frame_decoder.dart: the frame goes to the thumbnail pool; the engine shrinks it,
+                                  runs the 8x8 "is this frame blank" check and answers a small JPEG. Flutter's
+                                  decodeVideoFrame -- PNG out -- is the fallback)
 ```
 
 - Source: the loopback media server session of the file (so nothing decrypted touches storage), or a `file:` URL
@@ -423,7 +473,8 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
   `framePosition`, 25% or 45%. An explicit `timeUs` (the video editor) is used as is.
 - At most 2 players at a time; a locked vault drops its queued requests. Any failure answers `null`, which the Dart
   side treats as "no thumbnail for this video" (placeholder icon), exactly as for an Android `FRAME_FAILED`.
-- Thumbnails are PNG (like image thumbnails), so they are larger than Android's JPEG ones in the cache.
+- Thumbnails are JPEG, like Android's (a frame with transparency would be PNG). Starting a libmpv player per frame is
+  still the dominant cost of a video thumbnail; the frame decode no longer is.
 - The pure parts (`video_thumbnail_logic.dart`, `desktop_video_thumbnails.dart`) are covered by
   `test/core/engine/desktop/video_thumbnail_logic_test.dart` and `desktop_video_thumbnails_test.dart`. The mpv and
   `dart:ui` adapters have **not been run inside Flutter**: they follow `desktop_video_backend.dart` and
@@ -434,7 +485,7 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 
 - Engine-channel coverage: `ChannelMethods` has 283 methods. The desktop host answers 155 of them (including the
   crypto primitives), gives 42 more an Android-only default (`_androidOnlyDefaults`), lists 66 as Android-only
-  (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, USB, SAF, APK install, Jetpack PDF, ...)
+  (`desktopAndroidOnlyMethods`: automation, panic, quick capture, share sheet, formatting a USB drive, SAF, APK install, Jetpack PDF, ...)
   and 20 as pending (`desktopPendingMethods`, grouped by the plan phase that delivers them:
   split containers, AVIF, PDF, comic/EPUB, image probing, audio/video editing). The coverage test fails when a method is in none of these places or is in two of them, so the split above
   stays true; run it to see the current numbers. These counts cover the one engine channel only. Camera, Media3,
@@ -451,10 +502,54 @@ host -> DesktopVideoThumbnails (desktop_video_thumbnails.dart: which frame(s), s
 - PDF, camera, video/audio editing -- need their
   desktop backends (they are platform code on Android). Video **playback** and **thumbnails** are done (below);
   scrub-preview frames, picture-in-picture and background playback / media session are not.
-- Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification
-  (the engine still rejects an illegal name when it writes it).
+- Import (`desktop_transfers.dart`, rules in `desktop_import_policy.dart`): names are checked with Android's two
+  rule sets (encrypted vault for a folder vault, the conservative union for a disk-image container); a name that
+  cannot be held is skipped and reported (`onImportItemSkipped`); siblings that differ only by case on a
+  case-insensitive destination get unique names; every file is hashed before it is written and read back out of the
+  vault afterwards, and "delete after import" is only offered after a complete run whose read-back matched. The
+  rules are checked against the same known-answer table as Android (`test/fixtures/import_policy_golden.tsv`). Not
+  yet: progress events while the read-back runs, and the same checks for export.
 - Share sheet; JPEG/WebP encoding for the image editor (PNG only for now).
 - Pre-flight free-space check on create (Android reports `INSUFFICIENT_SPACE`; desktop just fails).
 - Windows: the engine was validated under Wine on v1.39 (see "Windows" above; re-run it after the rebase); the
   Flutter app on Windows is untested.
 - macOS / iOS: not started.
+
+## Raw drives (BitLocker, VeraCrypt, LUKS disks and partitions)
+
+"Mount existing container" opens a file picker, so a disk or partition cannot be chosen there. "Mount drive" (desktop's
+counterpart of Android's "Mount USB drive", same sheet) lists the disks the OS knows and unlocks the one you pick.
+
+How it works. The engine already unlocks a raw device (`session/session_prepare.cpp`, `prepareUsbSession`): it scans the
+MBR/GPT partitions for LUKS and BitLocker, then tries VeraCrypt at the start of the device and of every partition (with the
+hidden-volume header). It reads and writes in 512-byte sectors through the `usbReadSectors` / `usbWriteSectors` /
+`usbSyncDevice` hooks, keyed by volume slot. On Android those call into Kotlin; on desktop `ffi/ve_callbacks.cpp` forwards
+them to `ffi/ve_raw_device.cpp`, which keeps one open device per slot.
+
+| File | Role |
+|---|---|
+| `ffi/ve_raw_device.{h,cpp}` | slot registry, the 512-byte view of a device whose real sector is larger (4Kn: read-modify-write), BitLocker/LUKS probing for the list, JSON |
+| `ffi/ve_rawdev_posix.cpp` | Linux: `open` (`O_EXCL` for a writable block device), `BLKGETSIZE64`/`BLKSSZGET`, `pread`/`pwrite`/`fsync`, `/sys/block` listing with stable `/dev/disk/by-id` paths |
+| `ffi/ve_rawdev_win.cpp` | Windows: `\\.\PhysicalDriveN`, sector-aligned I/O, `FlushFileBuffers`; includes `<windows.h>` and no engine header |
+| `ve_list_block_devices`, `ve_unlock_device` | the C ABI (ABI 14). `ve_lock` also closes the device |
+
+On the Dart side the three USB channel methods are answered by `DesktopEngineHost`: `listUsbDevices` (the disk list),
+`requestUsbPermission` (a re-check: desktop has no permission dialog) and `unlockUsbContainer`. A drive is addressed as
+`usb:<device path>`, like an Android USB source, so cards, re-unlock and lock need no special case. Formatting a drive
+(`createUsbContainer`, `getUsbDeviceCapacity`) stays Android-only.
+
+What to know:
+
+- **Permission.** Linux needs root, membership of the `disk` group, or a udev rule; Windows needs an elevated process. The
+  list shows disks it cannot open, and the unlock says why. (Unprivileged access through udisks2 `OpenDevice` is not done.)
+- **Safety.** A writable open of a Linux block device is exclusive (`O_EXCL`): the kernel refuses it while the disk or one of
+  its partitions is mounted, and the unlock reports that; mount read-only to look anyway. The list tags disks that are
+  mounted and the disk that carries the running OS. On Windows the OS blocks writes to the sectors of a mounted volume.
+- **Disk images.** A regular file is accepted as a "disk" by `ve_unlock_device`; the native smoke test uses that to run
+  without root (`ve_smoke_test device`: whole-device VeraCrypt, raw LUKS2, an MBR image with a VeraCrypt partition).
+  `ve_raw_device_test` covers the sector adapter, bounds, the same-device guard and the probing against a fake disk.
+- **Limits.** VeraCrypt *system* encryption (header at sector 62 of the boot drive) is not handled by the engine. On 4Kn disks
+  whole-device volumes work, but the engine's partition scan assumes 512-byte sectors, so volumes inside partitions are not
+  found. A raw LUKS/BitLocker volume with no partition table (for example `/dev/sdb1` on its own) is tried on desktop only
+  (`VE_DESKTOP_RAW_DEVICES` in `session_prepare.cpp`). The Windows `PhysicalDriveN` number can change between boots, so a saved
+  Windows drive may need to be picked again (Linux keeps a stable by-id path).

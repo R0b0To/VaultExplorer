@@ -371,6 +371,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String couldntCreateItemWriteFailed(String name) {
+    return 'Couldn\'t create \"$name\" — writing to the container failed';
+  }
+
+  @override
   String couldntRenameSingle(String name) {
     return '\"$name\" konnte nicht umbenannt werden — möglicherweise existiert bereits ein Element mit diesem Namen';
   }
@@ -13232,4 +13237,84 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newTabStorageUnavailable => 'Ort nicht verfügbar';
+
+  @override
+  String get containerOpenedReadOnlyNoWriteAccess =>
+      'Schreibgeschützt geöffnet, da Android für diese Datei nur Lesezugriff gewährt hat.';
+
+  @override
+  String get mountDriveTitle => 'Mount drive';
+
+  @override
+  String get mountDriveSubtitle =>
+      'Unlock a BitLocker, VeraCrypt or LUKS disk or partition';
+
+  @override
+  String get unlockDriveTitle => 'Unlock Drive';
+
+  @override
+  String reconnectDriveTitle(String label) {
+    return 'Reconnect \"$label\"';
+  }
+
+  @override
+  String get noDrivesDetectedTitle => 'No drives found';
+
+  @override
+  String get drivesNeedAccessNote =>
+      'Some drives are listed but cannot be opened. Reading a disk directly needs root or the \"disk\" group on Linux, or running VaultExplorer as administrator on Windows.';
+
+  @override
+  String get driveInUseLabel => 'Mounted by the system';
+
+  @override
+  String get driveSystemLabel => 'System drive';
+
+  @override
+  String fileOpWinPercentComplete(int percent) {
+    return '$percent % abgeschlossen';
+  }
+
+  @override
+  String fileOpWinFromTo(
+    String verb,
+    String items,
+    String source,
+    String destination,
+  ) {
+    return '$verb $items von $source nach $destination';
+  }
+
+  @override
+  String fileOpWinFrom(String verb, String items, String source) {
+    return '$verb $items von $source';
+  }
+
+  @override
+  String fileOpWinTo(String verb, String items, String destination) {
+    return '$verb $items nach $destination';
+  }
+
+  @override
+  String fileOpWinSpeed(String speed) {
+    return 'Geschwindigkeit: $speed/s';
+  }
+
+  @override
+  String fileOpWinTimeRemaining(String time) {
+    return 'Verbleibende Zeit: $time';
+  }
+
+  @override
+  String get fileOpWinCalculating => 'Wird berechnet…';
+
+  @override
+  String fileOpWinItemsRemaining(int count, String size) {
+    return 'Verbleibende Elemente: $count ($size)';
+  }
+
+  @override
+  String fileOpWinItemsRemainingNoSize(int count) {
+    return 'Verbleibende Elemente: $count';
+  }
 }

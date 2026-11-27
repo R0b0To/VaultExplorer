@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -13,14 +14,20 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 ///
 /// Everything goes through [container] and not a widget's `ref`, so the
 /// callbacks stay safe after the widget that set them up is gone.
+///
+/// [settings] defaults to the live app settings. The decoy file manager passes
+/// its own, with the app-password gate switched off.
 void configureSessionLock(
   ProviderContainer container, {
   required void Function() enforceAppLock,
+  AppSettings Function()? settings,
 }) {
   container
       .read(sessionLockControllerProvider)
       .configure(
-        settings: () => container.read(appSettingsControllerProvider).settings,
+        settings:
+            settings ??
+            () => container.read(appSettingsControllerProvider).settings,
         lockAllMountedContainers: () => container
             .read(vaultDashboardControllerProvider.notifier)
             .lockAllMountedContainersForAutoLock(),

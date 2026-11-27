@@ -13,6 +13,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.util.concurrent.atomic.AtomicInteger
 import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 
 data class SplitPartInfo(
@@ -314,6 +315,10 @@ class SplitFuseCallback(
     init {
         require(parts.isNotEmpty()) { "SplitFuseCallback needs at least one part" }
     }
+
+    // Rate limiter for the always-on (VeLog.diag) lines below: a dead backing
+    // file fails every write, and the first few lines are the useful ones.
+    private val diagCount = AtomicInteger(0)
 
     private val partStarts: LongArray = run {
         var acc = 0L
@@ -673,6 +678,11 @@ class SplitFuseCallback(
             // dirty-flag path as a genuinely local part.
             writeToPart(index, offsetInPart, data, inOffset, len)
         } catch (e: Exception) {
+            if (OpenDiagnostics.shouldLogOccurrence(diagCount)) {
+                VeLog.diagW("SplitFuseCallback") {
+                    "part $index: pwrite failed at $offsetInPart len=$len (${OpenDiagnostics.failureTag(e)})"
+                }
+            }
             fail("pwrite failed on part $index at $offsetInPart: ${e.message}")
         }
     }
@@ -694,8 +704,20 @@ class SplitFuseCallback(
         } catch (e: Exception) {
             if (mode == "rw" && !forWrite) {
                 openedForWrite = false
+                // The silent downgrade: reads keep working, the mount still says
+                // "writable", and the first write then fails. Say so.
+                if (OpenDiagnostics.shouldLogOccurrence(diagCount)) {
+                    VeLog.diagW("SplitFuseCallback") {
+                        "part $index: rw open refused (${OpenDiagnostics.failureTag(e)}), opened read-only for reading; writes to it will fail"
+                    }
+                }
                 RandomAccessFile(file, "r")
             } else {
+                if (OpenDiagnostics.shouldLogOccurrence(diagCount)) {
+                    VeLog.diagW("SplitFuseCallback") {
+                        "part $index: open failed (mode=$mode forWrite=$forWrite ${OpenDiagnostics.failureTag(e)})"
+                    }
+                }
                 fail("could not open part ${file.name}: ${e.message}")
             }
         }
@@ -722,6 +744,11 @@ class SplitFuseCallback(
         } catch (e: Exception) {
             if (mode == "rw" && !forWrite) {
                 openedForWrite = false
+                if (OpenDiagnostics.shouldLogOccurrence(diagCount)) {
+                    VeLog.diagW("SplitFuseCallback") {
+                        "part $index: provider refused rw (${OpenDiagnostics.failureTag(e)}), opened read-only for reading; writes to it will fail"
+                    }
+                }
                 context.contentResolver.openFileDescriptor(parts[index].uri, "r")
                     ?: fail("could not open part $index for read")
             } else if (mode == "rw" && forWrite && looksLikeRwModeUnsupported(e)) {
@@ -731,6 +758,11 @@ class SplitFuseCallback(
                 // failing the write outright.
                 throw SafRwUnsupportedException("part $index: ${e.message}", e)
             } else {
+                if (OpenDiagnostics.shouldLogOccurrence(diagCount)) {
+                    VeLog.diagW("SplitFuseCallback") {
+                        "part $index: provider open failed (mode=$mode forWrite=$forWrite ${OpenDiagnostics.failureTag(e)})"
+                    }
+                }
                 fail("could not open part $index: ${e.message}")
             }
         }

@@ -382,8 +382,15 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
   /// Whether the drag may start as soon as the gesture is accepted.
   bool _dragReady = false;
 
-  Offset get _currentPosition =>
-      initialPosition + (pendingDelta ?? Offset.zero);
+  /// Where the drag is handed to the [Draggable].
+  ///
+  /// Always [initialPosition], never the finger's current position: once the
+  /// drag starts, Flutter replays the movement accumulated in [pendingDelta]
+  /// as a first drag update on top of the start position. Starting at
+  /// `initialPosition + pendingDelta` counted that movement twice, so a finger
+  /// that moved before the drag was lifted (e.g. during the select-then-drag
+  /// delay) left the dragged item offset from the finger by that distance.
+  Offset get _startPosition => initialPosition;
 
   void _holdPassed() {
     _timer = null;
@@ -394,7 +401,7 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
       final starter = _starter;
       if (starter != null) {
         _starter = null;
-        starter(_currentPosition);
+        starter(_startPosition);
       } else {
         resolve(GestureDisposition.accepted);
       }
@@ -412,14 +419,14 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
     final starter = _starter;
     if (starter != null) {
       _starter = null;
-      starter(_currentPosition);
+      starter(_startPosition);
     }
   }
 
   @override
   void accepted(GestureMultiDragStartCallback starter) {
     if (_dragReady) {
-      starter(_currentPosition);
+      starter(_startPosition);
     } else {
       _starter = starter;
     }
@@ -434,7 +441,7 @@ class _HoldThenDragPointerState extends MultiDragPointerState {
       final starter = _starter;
       if (starter != null) {
         _starter = null;
-        starter(_currentPosition);
+        starter(_startPosition);
       } else {
         resolve(GestureDisposition.accepted);
       }

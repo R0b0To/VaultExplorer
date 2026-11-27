@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/widgets/activity/file_operation_windows.dart';
 import 'package:vaultexplorer/core/widgets/activity/file_operations_sheet.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 
@@ -29,6 +30,21 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
 
   // Store reference in a field instead of reading 'ref' on every getter access
   late final FileOperationService _svc;
+
+  /// Where file operations have a window of their own (Linux and Windows, see
+  /// `FileOperationWindows`) the ring leaves them to it and only shows the
+  /// mirror sync, which has no window.
+  final bool _opsHaveWindows = FileOperationWindows.isAvailable;
+
+  List<FileOperation> get _ops =>
+      _opsHaveWindows ? const <FileOperation>[] : _svc.operations;
+
+  List<FileOperation> get _activeOps =>
+      _opsHaveWindows ? const <FileOperation>[] : _svc.activeOperations;
+
+  int get _activityCount => _opsHaveWindows
+      ? (_svc.mirrorPushActiveCount > 0 ? 1 : 0)
+      : _svc.combinedActivityCount;
 
   @override
   void initState() {
@@ -69,7 +85,7 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
   }
 
   void _syncObservedOperations() {
-    final currentOps = _svc.operations;
+    final currentOps = _ops;
     final currentSet = currentOps.toSet();
 
     // Remove listeners from ops no longer in the service list
@@ -100,8 +116,8 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
     if (!mounted && !_initialEvaluating) return;
 
     final svc = _svc;
-    final ops = svc.operations;
-    final activeOps = svc.activeOperations;
+    final ops = _ops;
+    final activeOps = _activeOps;
     final now = DateTime.now();
     final mirrorPushActive = svc.mirrorPushActiveCount > 0;
     if (mirrorPushActive) {
@@ -159,7 +175,7 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
       _showDebounceTimer = Timer(remaining, () {
         _showDebounceTimer = null;
         if (mounted &&
-            (_svc.operations.isNotEmpty || _svc.mirrorPushActiveCount > 0)) {
+            (_ops.isNotEmpty || _svc.mirrorPushActiveCount > 0)) {
           setState(() => _isDebouncePassed = true);
         }
       });
@@ -224,7 +240,7 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
 
   double? _calculateAggregateProgress() {
     if (_svc.mirrorPushActiveCount > 0) return null;
-    final active = _svc.activeOperations;
+    final active = _activeOps;
     if (active.isEmpty) {
       return _svc.mirrorPushActiveCount > 0 ? null : 1.0;
     }
@@ -262,11 +278,11 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
   @override
   Widget build(BuildContext context) {
     final svc = _svc;
-    final ops = svc.operations;
+    final ops = _ops;
     final isVisible =
         _isDebouncePassed && (ops.isNotEmpty || svc.mirrorPushActiveCount > 0);
 
-    final activeCount = svc.combinedActivityCount;
+    final activeCount = _activityCount;
     final hasActive = activeCount > 0;
 
     final cs = Theme.of(context).colorScheme;

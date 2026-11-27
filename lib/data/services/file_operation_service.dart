@@ -28,7 +28,7 @@ class _DestinationWriteFailedException implements Exception {
 /// the contents of a volume, so every view of that volume (not only the one
 /// that started the operation) can bring its listing up to date.
 class VolumeContentChange {
-  const VolumeContentChange({required this.volId, required this.opId});
+  VolumeContentChange({required this.volId, required this.opId});
 
   /// The volume whose contents changed.
   final int volId;
@@ -37,6 +37,16 @@ class VolumeContentChange {
   /// operation; a view that started a numbered operation can skip its own
   /// notification after refreshing directly.
   final int opId;
+
+  final List<Future<void>> _refreshes = <Future<void>>[];
+
+  /// A view that re-lists its folder because of this change hands the listing
+  /// in here. The service keeps the operation's placeholders on screen until
+  /// every tracked refresh has finished (see
+  /// [FileOperationService.dismissWhenRefreshed]), so the placeholder is
+  /// replaced by the real entry in the same frame instead of vanishing for the
+  /// length of the re-list.
+  void trackRefresh(Future<void> refresh) => _refreshes.add(refresh);
 }
 
 class FileOperationService extends ChangeNotifier {
@@ -114,10 +124,54 @@ class FileOperationService extends ChangeNotifier {
     _volumeContentChanged.notify(VolumeContentChange(volId: volId, opId: 0));
   }
 
-  void _publishVolumeContentChanged(FileOperation op, int volId) {
-    _volumeContentChanged.notify(
-      VolumeContentChange(volId: volId, opId: op.id),
+  /// Operations whose initiator has handed over their dismissal until the
+  /// destination listing has been refreshed.
+  final Set<int> _dismissWhenRefreshed = <int>{};
+
+  /// Settled once every view of the destination volume has finished the
+  /// refresh it started for the operation, by operation id.
+  final Map<int, Future<void>> _destRefreshSettled = <int, Future<void>>{};
+
+  /// Dismisses [id] once the views of its destination have re-listed their
+  /// folder, so the operation's placeholders stay until the real entries are
+  /// listed. Dismisses right away when that refresh has already finished or no
+  /// view is doing one. Use it where the initiator is not the destination view
+  /// (a drag-and-drop), so it cannot reload and dismiss itself like a paste.
+  void dismissWhenRefreshed(int id) {
+    final settled = _destRefreshSettled[id];
+    if (settled != null) {
+      _destRefreshSettled.remove(id);
+      unawaited(settled.whenComplete(() => dismiss(id)));
+      return;
+    }
+    final op = _operations.cast<FileOperation?>().firstWhere(
+      (o) => o?.id == id,
+      orElse: () => null,
     );
+    if (op == null) return;
+    if (op.status == FileOperationStatus.pending ||
+        op.status == FileOperationStatus.running) {
+      return;
+    }
+    // The finished status reaches the initiator before the volume-changed
+    // notification does, so the refresh is not known yet: wait for it.
+    _dismissWhenRefreshed.add(id);
+  }
+
+  void _publishVolumeContentChanged(FileOperation op, int volId) {
+    final change = VolumeContentChange(volId: volId, opId: op.id);
+    _volumeContentChanged.notify(change);
+    if (volId == op.destVolId && !op.isDelete) {
+      final refreshes = change._refreshes;
+      final settled = refreshes.isEmpty
+          ? Future<void>.value()
+          : Future.wait<void>(refreshes).then((_) {});
+      if (_dismissWhenRefreshed.remove(op.id)) {
+        unawaited(settled.whenComplete(() => dismiss(op.id)));
+      } else {
+        _destRefreshSettled[op.id] = settled;
+      }
+    }
   }
 
   /// A copy or move has stopped (finished, failed or cancelled). It changed the
@@ -564,6 +618,8 @@ class FileOperationService extends ChangeNotifier {
         .toList();
     for (final op in toRemove) {
       _unbindOperationListener(op);
+      _dismissWhenRefreshed.remove(op.id);
+      _destRefreshSettled.remove(op.id);
     }
     _operations.removeWhere(
       (op) => op.sourceVolId == volId || op.destVolId == volId,
@@ -582,6 +638,8 @@ class FileOperationService extends ChangeNotifier {
         .toList();
     for (final op in toRemove) {
       _unbindOperationListener(op);
+      _dismissWhenRefreshed.remove(op.id);
+      _destRefreshSettled.remove(op.id);
     }
     _operations.removeWhere(
       (op) =>
@@ -604,6 +662,8 @@ class FileOperationService extends ChangeNotifier {
     }
     _unbindOperationListener(op);
     _operations.remove(op);
+    _dismissWhenRefreshed.remove(id);
+    _destRefreshSettled.remove(id);
     notifyListeners();
     _syncNotificationProgress();
   }

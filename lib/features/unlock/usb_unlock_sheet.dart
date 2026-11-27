@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -176,8 +177,12 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           ),
           title: Text(
             widget.existingRecord != null
-                ? context.l10n.reconnectUsbDriveTitle(widget.existingRecord!.label)
-                : context.l10n.unlockUsbDriveTitle,
+                ? (PlatformFeatures.isDesktop
+                      ? context.l10n.reconnectDriveTitle(widget.existingRecord!.label)
+                      : context.l10n.reconnectUsbDriveTitle(widget.existingRecord!.label))
+                : (PlatformFeatures.isDesktop
+                      ? context.l10n.unlockDriveTitle
+                      : context.l10n.unlockUsbDriveTitle),
             style: const TextStyle(fontWeight: FontWeight.bold),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -353,7 +358,9 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
             padding: const EdgeInsets.all(18),
             child: Center(
               child: Text(
-                context.l10n.noUsbStorageDetectedTitle,
+                PlatformFeatures.isDesktop
+                    ? context.l10n.noDrivesDetectedTitle
+                    : context.l10n.noUsbStorageDetectedTitle,
                 style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               ),
             ),
@@ -373,17 +380,61 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         children: [
           ...state.devices.map((d) {
             final isSelected = state.selected?.deviceName == d.deviceName;
+            final tags = _driveTags(d);
             return ListTile(
-              leading: Icon(Icons.usb_rounded, color: isSelected ? cs.primary : cs.onSurfaceVariant),
+              leading: Icon(_driveIcon(d), color: isSelected ? cs.primary : cs.onSurfaceVariant),
               title: Text(d.productName),
+              // Desktop disks say what they are (size, bus, path) and what is on them; Android shows the name only.
+              subtitle: d.detail == null && tags.isEmpty
+                  ? null
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (d.detail != null) Text(d.detail!, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        if (tags.isNotEmpty)
+                          Text(
+                            tags.join(' · '),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: d.inUse || d.isSystem ? cs.error : cs.primary,
+                            ),
+                          ),
+                      ],
+                    ),
               trailing: Radio<UsbDeviceInfo>(value: d),
               onTap: () => ref.read(usbUnlockControllerProvider(_params).notifier).selectDevice(d),
             );
           }),
+          // Listed but not openable: say what it takes, before the person types a password into a dead end.
+          if (PlatformFeatures.isDesktop && state.devices.any((d) => !d.hasPermission))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              child: Text(
+                context.l10n.drivesNeedAccessNote,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
         ],
       ),
     );
   }
+
+  IconData _driveIcon(UsbDeviceInfo d) => switch (d.bus) {
+    'usb' => Icons.usb_rounded,
+    'mmc' => Icons.sd_card_rounded,
+    '' => Icons.usb_rounded, // Android reports USB devices only
+    _ => Icons.storage_rounded,
+  };
+
+  /// What is on the disk and what to watch out for (desktop only; empty for Android's USB list).
+  List<String> _driveTags(UsbDeviceInfo d) => [
+    for (final f in d.formats)
+      switch (f) {
+        'bitlocker' => 'BitLocker',
+        'luks' => 'LUKS',
+        _ => f,
+      },
+    if (d.isSystem) context.l10n.driveSystemLabel else if (d.inUse) context.l10n.driveInUseLabel,
+  ];
 
   List<Widget> _buildCredentialSection(
     BuildContext context,

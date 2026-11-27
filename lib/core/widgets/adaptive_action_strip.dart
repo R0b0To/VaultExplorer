@@ -229,10 +229,26 @@ class AdaptiveActionStrip extends StatelessWidget {
     ];
 
     if (layout.overflow.isNotEmpty) {
-      final entries = <Widget>[
-        for (final index in layout.overflow)
-          if (items[index].menuBuilder!(context) case final Widget entry) entry,
-      ];
+      final overflowSet = layout.overflow.toSet();
+      final entries = <Widget>[];
+      var sawEntry = false;
+      var pendingSeparator = false;
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        if (item.isSeparator) {
+          if (sawEntry) pendingSeparator = true;
+          continue;
+        }
+        if (!overflowSet.contains(i)) continue;
+        final entry = item.menuBuilder!(context);
+        if (entry == null) continue;
+        if (pendingSeparator) {
+          entries.add(const Divider(height: 1));
+          pendingSeparator = false;
+        }
+        entries.add(entry);
+        sawEntry = true;
+      }
       if (entries.isNotEmpty) {
         children.add(
           SizedBox(

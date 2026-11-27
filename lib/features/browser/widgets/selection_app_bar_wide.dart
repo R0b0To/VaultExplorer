@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/widgets/adaptive_action_strip.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -55,9 +57,17 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onCopy;
   final VoidCallback onCut;
 
-  /// Desktop compact bar only: a paste button drawn right after copy. It
+   /// Desktop compact bar only: a paste button drawn right after copy. It
   /// handles its own enabled state (it works with nothing selected).
   final Widget? pasteAction;
+
+  /// Desktop compact bar only: overflow-menu form of [pasteAction] so Paste
+  /// can collapse into the overflow menu when the bar is narrow and idle.
+  final Widget? Function(BuildContext)? pasteMenuBuilder;
+
+  /// Desktop compact bar only: whether [pasteAction] currently has pasteable
+  /// content and can run. Controls its collapse priority.
+  final bool pasteActive;
 
   /// Desktop compact bar only: whether anything is selected. The selection
   /// buttons dim and ignore taps while it is false; [pasteAction] does not.
@@ -131,7 +141,9 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.allowRenameAction = true,
     required this.onCopy,
     required this.onCut,
-    this.pasteAction,
+  this.pasteAction,
+    this.pasteMenuBuilder,
+    this.pasteActive = false,
     this.selectionActive = true,
     this.onOpenInNewTab,
     this.onOpenInNewWindow,
@@ -196,140 +208,422 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
       quickActions: quickItemActions,
     );
 
-    Widget buildActionButton(FileItemAction action, {bool enabled = true}) =>
-        switch (action) {
-      FileItemAction.extract => IconButton(
-        icon: const Icon(Icons.unarchive_outlined),
-        tooltip: context.l10n.extract,
-        onPressed: enabled ? onExtractSelectedArchive : null,
-      ),
-      FileItemAction.share => IconButton(
-        icon: const Icon(Icons.share_rounded),
-        tooltip: context.l10n.shareAction,
-        onPressed: enabled ? onShare : null,
-      ),
-      FileItemAction.copy => IconButton(
-        icon: const Icon(Icons.copy_rounded),
-        tooltip: context.l10n.copyTooltip,
-        onPressed: enabled ? onCopy : null,
-      ),
-      FileItemAction.move => IconButton(
-        icon: Icon(
-          Icons.cut_rounded,
-          color: enabled && readOnly
-              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-              : null,
+    ({IconData icon, String label, VoidCallback? callback, Color? color})
+    describeAction(FileItemAction action, {required bool enabled}) {
+      final l10n = context.l10n;
+      final muted = cs.onSurfaceVariant.withValues(alpha: 0.5);
+      return switch (action) {
+        FileItemAction.goToLocation => (
+          icon: Icons.folder_open_rounded,
+          label: l10n.goToLocationAction,
+          callback: onGoToLocation,
+          color: null,
         ),
-        tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
-        onPressed: enabled ? onCut : null,
-      ),
-      FileItemAction.rename => IconButton(
-        icon: Icon(
-          Icons.drive_file_rename_outline_rounded,
-          color: enabled && readOnly
-              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-              : null,
+        FileItemAction.openInNewTab => (
+          icon: Icons.tab_rounded,
+          label: l10n.browserTabOpenInNewTab,
+          callback: onOpenInNewTab,
+          color: null,
         ),
-        tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
-        onPressed: enabled ? onRename : null,
-      ),
-      FileItemAction.delete => IconButton(
-        icon: Icon(
-          Icons.delete_outline_rounded,
-          color: !enabled
-              ? null
-              : readOnly
-              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-              : cs.error,
+        FileItemAction.openInNewWindow => (
+          icon: Icons.launch_rounded,
+          label: l10n.browserTabOpenInNewWindow,
+          callback: onOpenInNewWindow,
+          color: null,
         ),
-        tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
-        onPressed: enabled ? onDelete : null,
-      ),
-      _ => throw StateError('Unexpected selection-bar action: $action'),
-    };
+        FileItemAction.extract => (
+          icon: Icons.unarchive_outlined,
+          label: l10n.extract,
+          callback: onExtractSelectedArchive,
+          color: null,
+        ),
+        FileItemAction.openWith => (
+          icon: Icons.open_in_new_rounded,
+          label: l10n.openWithAppAction,
+          callback: onOpenWithApp,
+          color: null,
+        ),
+        FileItemAction.share => (
+          icon: Icons.share_rounded,
+          label: l10n.shareAction,
+          callback: onShare,
+          color: null,
+        ),
+        FileItemAction.editImage => (
+          icon: Icons.edit_outlined,
+          label: l10n.editImageAction,
+          callback: onEditImage,
+          color: readOnly ? muted : null,
+        ),
+        FileItemAction.editVideo => (
+          icon: Icons.content_cut_rounded,
+          label: l10n.videoEditorEditAction,
+          callback: onEditVideo,
+          color: readOnly ? muted : null,
+        ),
+        FileItemAction.editAudio => (
+          icon: Icons.graphic_eq_rounded,
+          label: l10n.audioEditorEditAction,
+          callback: onEditAudio,
+          color: readOnly ? muted : null,
+        ),
+        FileItemAction.editMetadata => (
+          icon: Icons.sell_outlined,
+          label: l10n.editMetadataAction,
+          callback: onEditMetadata,
+          color: readOnly ? muted : null,
+        ),
+        FileItemAction.rename => (
+          icon: Icons.drive_file_rename_outline_rounded,
+          label: readOnly
+              ? l10n.readOnlyCantRenameTooltip
+              : l10n.renameTooltip,
+          callback: onRename,
+          color: readOnly ? muted : null,
+        ),
+        FileItemAction.copy => (
+          icon: Icons.copy_rounded,
+          label: l10n.copyTooltip,
+          callback: onCopy,
+          color: null,
+        ),
+        FileItemAction.move => (
+          icon: Icons.cut_rounded,
+          label: readOnly ? l10n.readOnlyCantMoveTooltip : l10n.moveAction,
+          callback: onCut,
+          color: readOnly ? muted : null,
+        ),
+        FileItemAction.archive => (
+          icon: Icons.folder_zip_outlined,
+          label: l10n.archiveSelectionAction,
+          callback: onCompressSelection,
+          color: readOnly ? muted : null,
+        ),
+        FileItemAction.exportToDevice => (
+          icon: Icons.drive_folder_upload_rounded,
+          label: l10n.exportToDeviceAction,
+          callback: onExport,
+          color: null,
+        ),
+        FileItemAction.encrypt => (
+          icon: Icons.lock_outline_rounded,
+          label: l10n.cryptoDirectionEncrypt,
+          callback: onEncrypt,
+          color: null,
+        ),
+        FileItemAction.decrypt => (
+          icon: Icons.lock_open_rounded,
+          label: l10n.cryptoDirectionDecrypt,
+          callback: onDecrypt,
+          color: null,
+        ),
+        FileItemAction.docProvider => (
+          icon: folderDocumentProviderMounted
+              ? Icons.folder_shared_rounded
+              : Icons.folder_shared_outlined,
+          label: folderDocumentProviderMounted
+              ? l10n.documentProviderSettingsMenu
+              : l10n.exposeAsDocumentProviderMenu,
+          callback: onToggleDocumentProvider,
+          color: folderDocumentProviderMounted ? cs.tertiary : null,
+        ),
+        FileItemAction.syncSettings => (
+          icon: Icons.sync_rounded,
+          label: l10n.autoSyncMenuAction,
+          callback: onSyncSettings,
+          color: null,
+        ),
+        FileItemAction.pin => (!showPinOption && showUnpinOption)
+            ? (
+                icon: Icons.push_pin_outlined,
+                label: selectedCount > 1
+                    ? l10n.unpinSelectedAction
+                    : l10n.unpinAction,
+                callback: onUnpin,
+                color: null,
+              )
+            : (
+                icon: Icons.push_pin_rounded,
+                label: selectedCount > 1
+                    ? l10n.pinSelectedAction
+                    : l10n.pinAction,
+                callback: onPin,
+                color: enabled && showPinOption ? cs.primary : null,
+              ),
+        FileItemAction.bookmark => (!showBookmarkOption && showUnbookmarkOption)
+            ? (
+                icon: Icons.star_outline_rounded,
+                label: selectedCount > 1
+                    ? l10n.unbookmarkSelectedAction
+                    : l10n.unbookmarkAction,
+                callback: onUnbookmark,
+                color: null,
+              )
+            : (
+                icon: Icons.star_rounded,
+                label: selectedCount > 1
+                    ? l10n.bookmarkSelectedAction
+                    : l10n.bookmarkAction,
+                callback: onBookmark,
+                color: enabled && showBookmarkOption
+                    ? context.semanticColors.bookmark
+                    : null,
+              ),
+        FileItemAction.copyPath => (
+          icon: Icons.link_rounded,
+          label: l10n.copyPathAction,
+          callback: onCopyPath,
+          color: null,
+        ),
+        FileItemAction.delete => (
+          icon: Icons.delete_outline_rounded,
+          label: readOnly ? l10n.readOnlyCantDeleteTooltip : l10n.delete,
+          callback: onDelete,
+          color: readOnly ? muted : cs.error,
+        ),
+        FileItemAction.info => (
+          icon: Icons.info_outline_rounded,
+          label: l10n.fileInfoAction,
+          callback: onFileInfo,
+          color: null,
+        ),
+      };
+    }
+
+    Widget buildActionButton(FileItemAction action, {bool enabled = true}) {
+      final desc = describeAction(action, enabled: enabled);
+      return IconButton(
+        icon: Icon(desc.icon, color: enabled ? desc.color : null),
+        tooltip: desc.label,
+        onPressed: enabled ? desc.callback : null,
+      );
+    }
 
     // The same action as an overflow-menu entry, for when the bar is too
-    // narrow to show every button.
+    // narrow to show every button or inside the desktop "More item actions"
+    // menu.
     Widget buildActionMenuItem(FileItemAction action, {bool enabled = true}) {
-      final l10n = context.l10n;
-      final IconData icon;
-      final String label;
-      final VoidCallback callback;
-      Color? color;
-      switch (action) {
-        case FileItemAction.extract:
-          icon = Icons.unarchive_outlined;
-          label = l10n.extract;
-          callback = onExtractSelectedArchive;
-        case FileItemAction.share:
-          icon = Icons.share_rounded;
-          label = l10n.shareAction;
-          callback = onShare;
-        case FileItemAction.copy:
-          icon = Icons.copy_rounded;
-          label = l10n.copyTooltip;
-          callback = onCopy;
-        case FileItemAction.move:
-          icon = Icons.cut_rounded;
-          label = readOnly ? l10n.readOnlyCantMoveTooltip : l10n.moveAction;
-          callback = onCut;
-          if (readOnly) color = cs.onSurfaceVariant.withValues(alpha: 0.5);
-        case FileItemAction.rename:
-          icon = Icons.drive_file_rename_outline_rounded;
-          label = readOnly
-              ? l10n.readOnlyCantRenameTooltip
-              : l10n.renameTooltip;
-          callback = onRename;
-          if (readOnly) color = cs.onSurfaceVariant.withValues(alpha: 0.5);
-        case FileItemAction.delete:
-          icon = Icons.delete_outline_rounded;
-          label = readOnly ? l10n.readOnlyCantDeleteTooltip : l10n.delete;
-          callback = onDelete;
-          color = readOnly
-              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-              : cs.error;
-        default:
-          throw StateError('Unexpected selection-bar action: $action');
-      }
+      final desc = describeAction(action, enabled: enabled);
       return MenuItemButton(
-        leadingIcon: Icon(icon, color: enabled ? color : null),
-        onPressed: enabled ? callback : null,
-        child: Text(label),
+        leadingIcon: Icon(desc.icon, color: enabled ? desc.color : null),
+        onPressed: enabled ? desc.callback : null,
+        child: Text(desc.label),
       );
     }
 
     if (desktopCompact) {
-      // The desktop bar never adds or removes buttons as the selection
-      // changes: every action stays in place and the ones that do not apply
-      // right now are greyed out.
-      final compactOrder = orderFileItemActions(
-        [
-          if (shown(FileItemAction.extract)) FileItemAction.extract,
-          if (shown(FileItemAction.share)) FileItemAction.share,
-          if (shown(FileItemAction.copy)) FileItemAction.copy,
-          if (shown(FileItemAction.move)) FileItemAction.move,
-          if (shown(FileItemAction.rename)) FileItemAction.rename,
-          if (shown(FileItemAction.delete)) FileItemAction.delete,
-        ],
-        order: itemActionOrder,
-        quickActions: quickItemActions,
-      );
-      bool compactEnabled(FileItemAction action) => switch (action) {
+      bool desktopInlineVisible(FileItemAction action) {
+        if (!shown(action)) return false;
+        if (hideVaultOnlyActions &&
+            (action == FileItemAction.exportToDevice ||
+                action == FileItemAction.docProvider ||
+                action == FileItemAction.syncSettings)) {
+          return false;
+        }
+        return true;
+      }
+
+      // At untouched defaults, show Cut / Copy / Paste / Rename / Delete /
+      // Share inline. Once the user customizes Quick actions or Menu list in
+      // settings, inline buttons follow their Quick actions row exactly
+      // (supporting all 24 FileItemActions), and every remaining applicable
+      // action lives in the adjacent "More item actions" menu.
+      final bool isUntouchedDefaults =
+          listEquals(itemActionOrder, FileItemAction.values) &&
+          setEquals(quickItemActions, FileItemAction.defaultQuickActions);
+      final List<FileItemAction> compactOrder;
+      if (isUntouchedDefaults) {
+        const desktopDefaultQuick = [
+          FileItemAction.move,
+          FileItemAction.copy,
+          FileItemAction.rename,
+          FileItemAction.delete,
+          FileItemAction.share,
+        ];
+        compactOrder = [
+          for (final action in desktopDefaultQuick)
+            if (desktopInlineVisible(action)) action,
+        ];
+      } else {
+        compactOrder = [
+          for (final action in itemActionOrder)
+            if (quickItemActions.contains(action) &&
+                desktopInlineVisible(action))
+              action,
+          for (final action in quickItemActions)
+            if (!itemActionOrder.contains(action) &&
+                desktopInlineVisible(action))
+              action,
+        ];
+      }
+      final inlineActionSet = compactOrder.toSet();
+
+      bool compactVisibleInMoreMenu(FileItemAction action) => switch (action) {
+        FileItemAction.goToLocation => selectionActive && onGoToLocation != null,
+        FileItemAction.openInNewTab => selectionActive && onOpenInNewTab != null,
+        FileItemAction.openInNewWindow =>
+          selectionActive && onOpenInNewWindow != null,
         FileItemAction.extract =>
           selectionActive &&
               allowExtractAction &&
               (singleArchiveSelected || isInsideArchive),
+        FileItemAction.openWith => selectionActive && singleFileSelected,
         FileItemAction.share => selectionActive && showShareOption,
+        FileItemAction.editImage =>
+          selectionActive && !isInsideArchive && showEditImageOption,
+        FileItemAction.editVideo =>
+          selectionActive && !isInsideArchive && showEditVideoOption,
+        FileItemAction.editAudio =>
+          selectionActive &&
+              !isInsideArchive &&
+              showEditAudioOption &&
+              onEditAudio != null,
+        FileItemAction.editMetadata =>
+          selectionActive && !isInsideArchive && onEditMetadata != null,
         FileItemAction.rename =>
           selectionActive && !isInsideArchive && allowRenameAction,
-        _ => selectionActive && !isInsideArchive,
+        FileItemAction.copy => selectionActive && !isInsideArchive,
+        FileItemAction.move => selectionActive && !isInsideArchive,
+        FileItemAction.archive =>
+          selectionActive && !isInsideArchive && allowCompressAction,
+        FileItemAction.exportToDevice =>
+          selectionActive &&
+              allowExportAction &&
+              !hideVaultOnlyActions &&
+              !isInsideArchive,
+        FileItemAction.encrypt =>
+          selectionActive && !isInsideArchive && showEncryptOption,
+        FileItemAction.decrypt =>
+          selectionActive && !isInsideArchive && showDecryptOption,
+        FileItemAction.docProvider =>
+          selectionActive &&
+              !isInsideArchive &&
+              singleFolderSelected &&
+              !hideVaultOnlyActions,
+        FileItemAction.syncSettings =>
+          selectionActive &&
+              !isInsideArchive &&
+              singleFolderSelected &&
+              !hideVaultOnlyActions &&
+              onSyncSettings != null,
+        FileItemAction.pin =>
+          selectionActive &&
+              !isInsideArchive &&
+              (showPinOption || showUnpinOption),
+        FileItemAction.bookmark =>
+          selectionActive &&
+              !isInsideArchive &&
+              (showBookmarkOption || showUnbookmarkOption),
+        FileItemAction.copyPath => selectionActive && onCopyPath != null,
+        FileItemAction.delete => selectionActive && !isInsideArchive,
+        FileItemAction.info =>
+          selectionActive &&
+              !isInsideArchive &&
+              (singleFileSelected || singleFolderSelected) &&
+              onFileInfo != null,
       };
-      // Whatever does not fit the window moves into a "more" menu instead of
-      // being clipped or only reachable by scrolling. Paste has no menu form,
-      // so it stays inline.
+
+      bool compactEnabled(FileItemAction action) {
+        if (!compactVisibleInMoreMenu(action)) return false;
+        if (readOnly &&
+            (action == FileItemAction.editImage ||
+                action == FileItemAction.editVideo ||
+                action == FileItemAction.editAudio ||
+                action == FileItemAction.editMetadata ||
+                action == FileItemAction.archive)) {
+          return false;
+        }
+        return true;
+      }
+
+      List<Widget> buildDesktopMoreMenuChildren() {
+        final orderedMenuActions = [
+          for (final action in itemActionOrder)
+            if (!inlineActionSet.contains(action) &&
+                shown(action) &&
+                compactVisibleInMoreMenu(action))
+              action,
+          for (final action in FileItemAction.values)
+            if (!itemActionOrder.contains(action) &&
+                !inlineActionSet.contains(action) &&
+                shown(action) &&
+                compactVisibleInMoreMenu(action))
+              action,
+        ];
+        return [
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.select_all_rounded),
+            onPressed: onSelectAll,
+            child: Text(context.l10n.selectAllAction),
+          ),
+          if (orderedMenuActions.isNotEmpty) const Divider(height: 1),
+          for (final action in orderedMenuActions)
+            buildActionMenuItem(action, enabled: compactEnabled(action)),
+        ];
+      }
+
+      int compactActionPriority(FileItemAction action) {
+        if (!selectionActive) return 1;
+        return switch (action) {
+          FileItemAction.copy ||
+          FileItemAction.move ||
+          FileItemAction.delete ||
+          FileItemAction.rename => 4,
+          FileItemAction.extract =>
+            (allowExtractAction && (singleArchiveSelected || isInsideArchive))
+                ? 4
+                : 2,
+          FileItemAction.share => 2,
+          _ => 3,
+        };
+      }
+
+      int toolbarActionPriority(FileManagerAction action) {
+        return switch (action) {
+          FileManagerAction.viewToggle ||
+          FileManagerAction.sort ||
+          FileManagerAction.filter ||
+          FileManagerAction.options => selectionActive ? 3 : 4,
+          FileManagerAction.gallery ||
+          FileManagerAction.musicMode ||
+          FileManagerAction.playMedia => selectionActive ? 1 : 3,
+          FileManagerAction.search => selectionActive ? 1 : 2,
+          FileManagerAction.add => 5,
+        };
+      }
+
+      final hasAddAction =
+          showActionBar &&
+          visibleActions.contains(FileManagerAction.add) &&
+          actionBuilders.containsKey(FileManagerAction.add);
+      final otherToolbarActions = showActionBar
+          ? [
+              for (final action in visibleActions)
+                if (action != FileManagerAction.add &&
+                    actionBuilders.containsKey(action))
+                  action,
+            ]
+          : const <FileManagerAction>[];
+
+      // One unified adaptive strip on desktop: Add (pinned), the user's Quick
+      // actions (plus steady Paste, which collapses first when empty), a
+      // "More item actions" menu (Select All + all remaining Menu list actions),
+      // and folder view/mode controls.
       final compactItems = <AdaptiveActionItem>[
+        if (hasAddAction) ...[
+          AdaptiveActionItem(
+            id: FileManagerAction.add,
+            builder: actionBuilders[FileManagerAction.add]!,
+          ),
+          const AdaptiveActionItem.separator(id: 'add-separator'),
+        ],
         if (pasteAction != null && !compactOrder.contains(FileItemAction.copy))
-          AdaptiveActionItem(id: 'paste', builder: (_) => pasteAction!),
+          AdaptiveActionItem(
+            id: 'paste',
+            builder: (_) => pasteAction!,
+            menuBuilder: pasteMenuBuilder,
+            priority: pasteActive ? 4 : 0,
+          ),
         for (final action in compactOrder) ...[
           AdaptiveActionItem(
             id: action,
@@ -337,9 +631,43 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                 buildActionButton(action, enabled: compactEnabled(action)),
             menuBuilder: (_) =>
                 buildActionMenuItem(action, enabled: compactEnabled(action)),
+            priority: compactActionPriority(action),
           ),
           if (action == FileItemAction.copy && pasteAction != null)
-            AdaptiveActionItem(id: 'paste', builder: (_) => pasteAction!),
+            AdaptiveActionItem(
+              id: 'paste',
+              builder: (_) => pasteAction!,
+              menuBuilder: pasteMenuBuilder,
+              priority: pasteActive ? 4 : 0,
+            ),
+        ],
+        AdaptiveActionItem(
+          id: 'selection-more',
+          priority: selectionActive ? 3 : 0,
+          builder: (_) => BackDismissibleMenuAnchor(
+            menuChildren: buildDesktopMoreMenuChildren(),
+            builder: (ctx, controller, _) => IconButton(
+              icon: const Icon(Icons.more_vert_rounded),
+              tooltip: ctx.l10n.moreOptionsTooltip,
+              onPressed: () =>
+                  controller.isOpen ? controller.close() : controller.open(),
+            ),
+          ),
+          menuBuilder: (ctx) => SubmenuButton(
+            leadingIcon: const Icon(Icons.more_vert_rounded),
+            menuChildren: buildDesktopMoreMenuChildren(),
+            child: Text(ctx.l10n.moreOptionsTooltip),
+          ),
+        ),
+        if (otherToolbarActions.isNotEmpty) ...[
+          const AdaptiveActionItem.separator(id: 'toolbar-separator'),
+          for (final action in otherToolbarActions)
+            AdaptiveActionItem(
+              id: action,
+              builder: actionBuilders[action]!,
+              menuBuilder: actionMenuEntries[action],
+              priority: toolbarActionPriority(action),
+            ),
         ],
       ];
       return Material(
@@ -348,12 +676,15 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
           height: toolbarHeight,
           child: Align(
             alignment: Alignment.centerLeft,
-            child: AdaptiveActionStrip(itemExtent: 40, items: compactItems),
+            child: AdaptiveActionStrip(
+              itemExtent: 40,
+              rebuildOn: actionsRebuildOn,
+              items: compactItems,
+            ),
           ),
         ),
       );
     }
-
     final Widget selectionMoreMenu = PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
           tooltip: context.l10n.moreOptionsTooltip,

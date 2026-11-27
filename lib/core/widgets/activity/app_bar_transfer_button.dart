@@ -9,7 +9,14 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 
 /// App bar action button that displays active file operations and transfers.
 class AppBarTransferButton extends ConsumerStatefulWidget {
-  const AppBarTransferButton({super.key});
+  final bool collapseWhenIdle;
+  final double size;
+
+  const AppBarTransferButton({
+    super.key,
+    this.collapseWhenIdle = false,
+    this.size = 48,
+  });
 
   @override
   ConsumerState<AppBarTransferButton> createState() =>
@@ -279,8 +286,11 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
   Widget build(BuildContext context) {
     final svc = _svc;
     final ops = _ops;
-    final isVisible =
+   final isVisible =
         _isDebouncePassed && (ops.isNotEmpty || svc.mirrorPushActiveCount > 0);
+    if (widget.collapseWhenIdle && !isVisible) {
+      return const SizedBox.shrink();
+    }
 
     final activeCount = _activityCount;
     final hasActive = activeCount > 0;
@@ -305,9 +315,9 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
 
     final double? progress = hasActive ? _calculateAggregateProgress() : 1.0;
 
-    return SizedBox(
-      width: 48,
-      height: 48,
+   return SizedBox(
+      width: widget.size,
+      height: widget.size,
       child: AnimatedOpacity(
         opacity: isVisible ? 1 : 0,
         duration: AppMotion.short2,
@@ -318,7 +328,7 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
             child: Tooltip(
               message: context.l10n.transferActivityTooltip,
               child: IconButton(
-                padding: const EdgeInsets.all(8.0),
+                padding: EdgeInsets.all(widget.size < 44 ? 4.0 : 8.0),
                 onPressed: () => FileOperationsSheet.show(context),
                 icon: Badge(
                   isLabelVisible: activeCount > 1,

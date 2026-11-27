@@ -123,9 +123,11 @@ PreferredSizeWidget buildBrowserAppBar(
   VoidCallback? onBackAtRoot,
   bool isInsideArchive = false,
   bool showBackButton = true,
-  double selectionToolbarHeight = kToolbarHeight,
+ double selectionToolbarHeight = kToolbarHeight,
   bool desktopCompactSelection = false,
   Widget? pasteAction,
+  Widget? Function(BuildContext)? pasteMenuBuilder,
+  bool pasteActive = false,
   bool selectionActive = true,
   Widget Function(Widget title)? wrapTitle,
   VoidCallback? onOpenStorageSwitcher,
@@ -438,10 +440,12 @@ PreferredSizeWidget buildBrowserAppBar(
         hiddenItemActions: toolbarConfig.hiddenItemActions,
       );
     }
-    return SelectionAppBarWide(
+     return SelectionAppBarWide(
       toolbarHeight: selectionToolbarHeight,
       desktopCompact: desktopCompactSelection,
       pasteAction: pasteAction,
+      pasteMenuBuilder: pasteMenuBuilder,
+      pasteActive: pasteActive,
       selectionActive: selectionActive,
       selectedCount: selectedCount,
       selectionLabel: sizeLabel,
@@ -458,7 +462,9 @@ PreferredSizeWidget buildBrowserAppBar(
       showUnbookmarkOption: showUnbookmarkOption,
       showEncryptOption: showEncryptOption,
       showDecryptOption: showDecryptOption,
-      showActionBar: toolbarConfig.bottomSelectionBar ? false : showActionBar,
+       showActionBar: desktopCompactSelection
+          ? true
+          : (toolbarConfig.bottomSelectionBar ? false : showActionBar),
       visibleActions: toolbarConfig.visible,
       actionBuilders: actionBuilders,
       actionMenuEntries: actionMenuEntries,

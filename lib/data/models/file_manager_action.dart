@@ -45,7 +45,7 @@ enum FileManagerAction {
         FileManagerAction.filter => Icons.filter_alt_outlined,
         FileManagerAction.playMedia => Icons.play_circle_outline_rounded,
         FileManagerAction.musicMode => Icons.library_music_outlined,
-        FileManagerAction.options => Icons.more_vert_rounded,
+        FileManagerAction.options => Icons.tune_rounded,
       };
 
   String toJson() => name;

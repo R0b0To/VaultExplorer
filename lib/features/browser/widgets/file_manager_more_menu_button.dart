@@ -240,10 +240,10 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             onPressed: onToggleGallery,
             child: Text(l10n.galleryModeAction),
           );
-        case FileManagerAction.options:
+       case FileManagerAction.options:
           if (toolbarConfig == null) return null;
           return SubmenuButton(
-            leadingIcon: Icon(Icons.more_vert_rounded, color: cs.primary),
+            leadingIcon: Icon(Icons.tune_rounded, color: cs.primary),
             menuChildren: buildOptionsMenuItems(
               context: context,
               cs: cs,
@@ -450,10 +450,10 @@ class FileManagerMoreMenuButton extends StatelessWidget {
           onTap: onToggleGallery,
         );
 
-      case FileManagerAction.options:
+       case FileManagerAction.options:
         if (toolbarConfig == null) return const SizedBox.shrink();
         return menuFab(
-          icon: Icon(Icons.more_vert_rounded, color: cs.onSurface),
+          icon: Icon(Icons.tune_rounded, color: cs.onSurface),
           tooltip: l10n.optionsActionTooltip,
           menuChildren: buildOptionsMenuItems(
             context: context,

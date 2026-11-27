@@ -4252,9 +4252,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         allSelectionInOneTab &&
         selectedTabs.first.items.length == 1 &&
         !selectedTabs.first.insideArchive;
-    final hideVaultOnlyActionsForSelection =
-        selectedTabs.isNotEmpty &&
-        selectedTabs.every((t) => t.container.isLocalStorage);
+    final hideVaultOnlyActionsForSelection = selectedTabs.isEmpty
+        ? widget.container.isLocalStorage
+        : selectedTabs.every((t) => t.container.isLocalStorage);
+    final bool desktopCanPaste =
+        desktopFileManager &&
+        (ref.watch(
+              crossContainerClipboardProvider.select((clip) => clip.hasItems),
+            ) ||
+            _hasOsClipboardContent) &&
+        !_isReadOnly;
     final canExtractCurrentSelection =
         allSelectionInOneTab &&
         (selectedTabs.first.insideArchive ||
@@ -4468,22 +4475,31 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ? aggregateSelection?.hasPendingFolderSizes ??
                   appBarHasPendingFolderSizes
             : false,
-        toolbarConfig: useFab || (desktopFileManager && selectionMode)
+         toolbarConfig: useFab
             ? appBarToolbarConfig.copyWith(
-                hidden: useFab
-                    ? FileManagerAction.values.toSet()
-                    : appBarToolbarConfig.hidden,
-                bottomSelectionBar:
-                    desktopFileManager && selectionMode
-                        ? true
-                        : appBarToolbarConfig.bottomSelectionBar,
+                hidden: FileManagerAction.values.toSet(),
+              )
+            : (desktopFileManager && selectionMode && desktopInlineSearch)
+            ? appBarToolbarConfig.copyWith(
+                hidden: {
+                  ...appBarToolbarConfig.hidden,
+                  FileManagerAction.search,
+                },
               )
             : appBarToolbarConfig,
-        selectionToolbarHeight: desktopFileManager ? 40 : kToolbarHeight,
+       selectionToolbarHeight: desktopFileManager ? 40 : kToolbarHeight,
         desktopCompactSelection: desktopFileManager && selectionMode,
         pasteAction: desktopFileManager && selectionMode
             ? _buildPasteToolbarButton()
             : null,
+        pasteMenuBuilder: desktopFileManager && selectionMode
+            ? (menuCtx) => MenuItemButton(
+                leadingIcon: const Icon(Icons.content_paste_rounded),
+                onPressed: desktopCanPaste ? () => unawaited(_paste()) : null,
+                child: Text(menuCtx.l10n.actionPaste),
+              )
+            : null,
+        pasteActive: desktopFileManager && selectionMode && desktopCanPaste,
         selectionActive: selectionBarVisible,
         actionBuilders: actionBuilders,
         actionMenuEntries: actionMenuEntries,
@@ -4845,6 +4861,52 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       });
     }
 
+   Widget buildDesktopNavControls(BuildContext navContext) {
+      final showSidebar = widget.showSidebarButton && useBrowserTabs
+          ? navContext.showSidebarAction
+          : null;
+      final desktopBackAction = _atRoot
+          ? (!useBrowserTabs ? _handleBackAtRoot : null)
+          : _navigateUp;
+      return IconButtonTheme(
+        data: const IconButtonThemeData(
+          style: ButtonStyle(
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: WidgetStatePropertyAll(Size(36, 36)),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showSidebar != null)
+              IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                tooltip: navContext.l10n.showSidebarTooltip,
+                onPressed: showSidebar,
+              ),
+            IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              tooltip: navContext.l10n.backTooltip,
+              onPressed: desktopBackAction,
+            ),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_rounded),
+              tooltip: navContext.l10n.forwardTooltip,
+              onPressed: _forwardStack.isEmpty
+                  ? null
+                  : () => _navigateForward(0),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: navContext.l10n.refreshListButton,
+              onPressed: _refreshListing,
+            ),
+          ],
+        ),
+      );
+    }
+
     final Widget browserBody = Stack(
       children: [
         SafeArea(
@@ -4885,209 +4947,119 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                 child: AutoHideScrollHost(
                                   enabled: _toolbarConfig.autoHideBreadcrumbBar,
                                   resetKey: _currentDirPath,
-                                  bar: _toolbarConfig.showBreadcrumbBar
+                                bar: _toolbarConfig.showBreadcrumbBar
                                       ? IgnorePointer(
                                           ignoring: dragLocked,
-                                          child: BreadcrumbBar(
-                                            stack: _pathStack,
-                                            onTap: _jumpTo,
-                                            forwardStack: _forwardStack,
-                                            onForwardTap: _navigateForward,
-                                            rootLabel: _breadcrumbRootLabel,
-                                            rootIcon: breadcrumbRootIconFor(widget.container),
-                                            edit: _breadcrumbEditConfig(),
-                                            controller: _breadcrumbController,
-                                            trailing: desktopInlineSearch
-                                                ? AddressSearchField(
-                                                    focusNode:
-                                                        _desktopSearchFocus,
-                                                    query: _searchQuery,
-                                                    hintText: _isDeepSearch
-                                                        ? context
-                                                              .l10n
-                                                              .searchInSubfoldersHint
-                                                        : context
-                                                              .l10n
-                                                              .searchInThisFolderHint,
-                                                    onChanged:
-                                                        _onInlineSearchChanged,
-                                                    onClear: () => setState(
-                                                      _clearSearch,
-                                                    ),
-                                                    isSearching:
-                                                        _isSearchingSubfolders,
-                                                    isDeepSearch:
-                                                        _isDeepSearch,
-                                                    onDeepSearchToggle:
-                                                        _onDeepSearchToggled,
-                                                  )
-                                                : null,
-                                            // On desktop this is the navigation row
-                                            // the selected tab flows into.
-                                            backgroundColor: desktopFileManager
-                                                ? Theme.of(context)
-                                                      .colorScheme
-                                                      .surfaceContainer
-                                                : null,
+                                          child: Builder(
+                                            builder: (navContext) => BreadcrumbBar(
+                                              stack: _pathStack,
+                                              onTap: _jumpTo,
+                                              forwardStack: _forwardStack,
+                                              onForwardTap: _navigateForward,
+                                              rootLabel: _breadcrumbRootLabel,
+                                              rootIcon: breadcrumbRootIconFor(widget.container),
+                                              edit: _breadcrumbEditConfig(),
+                                              controller: _breadcrumbController,
+                                              leading: desktopFileManager
+                                                  ? buildDesktopNavControls(navContext)
+                                                  : null,
+                                              trailing: desktopInlineSearch
+                                                  ? AddressSearchField(
+                                                      focusNode:
+                                                          _desktopSearchFocus,
+                                                      query: _searchQuery,
+                                                      hintText: _isDeepSearch
+                                                          ? context
+                                                                .l10n
+                                                                .searchInSubfoldersHint
+                                                          : context
+                                                                .l10n
+                                                                .searchInThisFolderHint,
+                                                      onChanged:
+                                                          _onInlineSearchChanged,
+                                                      onClear: () => setState(
+                                                        _clearSearch,
+                                                      ),
+                                                      isSearching:
+                                                          _isSearchingSubfolders,
+                                                      isDeepSearch:
+                                                          _isDeepSearch,
+                                                      onDeepSearchToggle:
+                                                          _onDeepSearchToggled,
+                                                    )
+                                                  : null,
+                                              // On desktop this is the navigation row
+                                              // the selected tab flows into.
+                                              backgroundColor: desktopFileManager
+                                                  ? Theme.of(context)
+                                                        .colorScheme
+                                                        .surfaceContainer
+                                                  : null,
+                                            ),
                                           ),
                                         )
                                       : null,
                                   child: Column(
                                     children: [
-                                      if (desktopFileManager)
-                                        Builder(
-                                          builder: (toolbarContext) {
-                                            final showSidebar =
-                                                widget.showSidebarButton &&
-                                                        useBrowserTabs
-                                                    ? toolbarContext
-                                                          .showSidebarAction
-                                                    : null;
-                                            return LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              final desktopBackAction = _atRoot
-                                                  ? (!useBrowserTabs
-                                                        ? _handleBackAtRoot
-                                                        : null)
-                                                  : _navigateUp;
-                                              // Back, forward, refresh, the divider and the
-                                              // transfer button never move. The rest of the
-                                              // width is shared between the toolbar actions and
-                                              // the selection actions in proportion to what
-                                              // each wants, and each side moves whatever does
-                                              // not fit into its own "more" menu, so nothing
-                                              // overlaps or needs scrolling to reach.
-                                              final fixedToolbarWidth =
-                                                  (showSidebar != null ? 4 : 3) *
-                                                      40.0 +
-                                                  9 +
-                                                  1 +
-                                                  48 +
-                                                  4;
-                                              const selectionWanted = 7 * 40.0;
-                                              final actionsWanted = showActionBar
-                                                  ? _visibleActions.length * 40.0
-                                                  : 0.0;
-                                              final shareable =
-                                                  (constraints.maxWidth -
-                                                          fixedToolbarWidth)
-                                                      .clamp(0.0, double.infinity)
-                                                      .toDouble();
-                                              final toolbarActionWidth =
-                                                  actionsWanted == 0
-                                                  ? 0.0
-                                                  : actionsWanted +
-                                                            selectionWanted <=
-                                                        shareable
-                                                  ? actionsWanted
-                                                  : math.min(
-                                                      actionsWanted,
-                                                      math.max(
-                                                        80.0,
-                                                        shareable *
-                                                            actionsWanted /
-                                                            (actionsWanted +
-                                                                selectionWanted),
+                                       if (desktopFileManager)
+                                        MouseRegion(
+                                          onEnter: (_) => unawaited(
+                                            _refreshOsClipboardAvailability(),
+                                          ),
+                                          child: Material(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.surfaceContainer,
+                                            child: SizedBox(
+                                            height: 40,
+                                            child: IconButtonTheme(
+                                              data: const IconButtonThemeData(
+                                                style: ButtonStyle(
+                                                  visualDensity: VisualDensity.compact,
+                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  minimumSize: WidgetStatePropertyAll(Size(36, 36)),
+                                                ),
+                                              ),
+                                              child: Builder(
+                                                builder: (toolbarContext) => Row(
+                                                  children: [
+                                                    if (!_toolbarConfig.showBreadcrumbBar) ...[
+                                                      const SizedBox(width: 4),
+                                                      buildDesktopNavControls(toolbarContext),
+                                                      const VerticalDivider(
+                                                        width: 9,
+                                                        indent: 8,
+                                                        endIndent: 8,
                                                       ),
-                                                    );
-                                              return Material(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.surfaceContainer,
-                                                child: SizedBox(
-                                                  height: 40,
-                                                  child: IconButtonTheme(
-                                                    data: const IconButtonThemeData(
-                                                      style: ButtonStyle(
-                                                        visualDensity: VisualDensity.compact,
-                                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                        minimumSize: WidgetStatePropertyAll(Size(36, 36)),
+                                                    ] else
+                                                      const SizedBox(width: 4),
+                                                    Expanded(
+                                                      // Unified desktop action bar: Add, file &
+                                                      // clipboard actions (dimmed while nothing is
+                                                      // selected; paste stays usable), and folder
+                                                      // view tools in one strip with one overflow
+                                                      // menu.
+                                                      child: MediaQuery.removePadding(
+                                                        context: toolbarContext,
+                                                        removeTop: true,
+                                                        removeBottom: true,
+                                                        child: buildAppBar(
+                                                          toolbarContext,
+                                                          selectionMode: true,
+                                                        ),
                                                       ),
                                                     ),
-                                                    child: Row(
-                                                      children: [
-                                                        if (showSidebar != null)
-                                                          IconButton(
-                                                            icon: const Icon(Icons.menu_rounded),
-                                                            tooltip: context.l10n.showSidebarTooltip,
-                                                            onPressed: showSidebar,
-                                                          ),
-                                                        IconButton(
-                                                          icon: const Icon(Icons.arrow_back_rounded),
-                                                          tooltip: context.l10n.backTooltip,
-                                                          onPressed: desktopBackAction,
-                                                        ),
-                                                        IconButton(
-                                                          icon: const Icon(Icons.arrow_forward_rounded),
-                                                          tooltip: context.l10n.forwardTooltip,
-                                                          onPressed: _forwardStack.isEmpty
-                                                              ? null
-                                                              : () => _navigateForward(0),
-                                                        ),
-                                                        IconButton(
-                                                          icon: const Icon(Icons.refresh_rounded),
-                                                          tooltip: context.l10n.refreshListButton,
-                                                          onPressed: _refreshListing,
-                                                        ),
-                                                        const VerticalDivider(width: 9, indent: 8, endIndent: 8),
-                                                        if (toolbarActionWidth > 0)
-                                                          SizedBox(
-                                                            width: toolbarActionWidth,
-                                                            height: 40,
-                                                            child: ClipRect(
-                                                              child: Align(
-                                                                alignment: Alignment.centerLeft,
-                                                                child: AdaptiveActionStrip(
-                                                                  itemExtent: 40,
-                                                                  availableWidth: toolbarActionWidth,
-                                                                  rebuildOn: _music,
-                                                                  items: [
-                                                                    for (final action in _visibleActions)
-                                                                      AdaptiveActionItem(
-                                                                        id: action,
-                                                                        builder: actionBuilders[action]!,
-                                                                        // Add and search are
-                                                                        // what the bar is for,
-                                                                        // so they never collapse.
-                                                                        menuBuilder:
-                                                                            action == FileManagerAction.add ||
-                                                                                action == FileManagerAction.search
-                                                                            ? null
-                                                                            : actionMenuEntries[action],
-                                                                      ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        const VerticalDivider(width: 1, indent: 8, endIndent: 8),
-                                                        Expanded(
-                                                          // The bar dims its own selection buttons
-                                                          // while nothing is selected; paste stays
-                                                          // usable.
-                                                          child: MediaQuery.removePadding(
-                                                            context: toolbarContext,
-                                                            removeTop: true,
-                                                            removeBottom: true,
-                                                            child: buildAppBar(
-                                                              toolbarContext,
-                                                              selectionMode: true,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 48,
-                                                          child: AppBarTransferButton(),
-                                                        ),
-                                                        const SizedBox(width: 4),
-                                                      ],
+                                                    const AppBarTransferButton(
+                                                      collapseWhenIdle: true,
+                                                      size: 40,
                                                     ),
-                                                  ),
-                                                   ),
-                                              );
-                                            },
-                                          );
-                                          },
+                                                    const SizedBox(width: 4),
+                                                  ],
+                                                ),
+                                              ),
+                                           ),
+                                            ),
+                                          ),
                                         ),
                                       if (!widget.container.isLocalStorage &&
                                           _archiveContext == null)

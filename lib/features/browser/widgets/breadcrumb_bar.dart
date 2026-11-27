@@ -135,6 +135,10 @@ class BreadcrumbBar extends StatefulWidget implements PreferredSizeWidget {
   final List<PathSegment> forwardStack;
   final ValueChanged<int>? onForwardTap;
 
+   /// Controls placed before the address field (such as back/forward/refresh
+  /// on desktop).
+  final Widget? leading;
+
   /// A separate box at the end of the row (the desktop search field). The
   /// path then shares the row with it, like Explorer's address and search
   /// boxes, instead of filling it.
@@ -147,6 +151,7 @@ class BreadcrumbBar extends StatefulWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.forwardStack = const [],
     this.onForwardTap,
+    this.leading,
     this.trailing,
     this.rootLabel,
     this.rootIcon,
@@ -780,6 +785,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
       child: content,
     );
 
+    final leading = widget.leading;
     final trailing = widget.trailing;
     // The 4px above and below the field belong to the drag area too.
     Widget field = Padding(
@@ -787,52 +793,67 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
       child: pathField,
     );
     if (!editing) field = _withDragScroll(field);
-    final bar = Container(
+    if (edit != null && !editing) {
+      // Every part of the address field that is not a crumb link opens the
+      // editor: the empty space after the path, the current folder, and the
+      // field margins. Kept on the field itself so leading nav buttons and the
+      // trailing search box keep their own cursor and tap behavior.
+      field = Semantics(
+        label: edit.tooltip.isEmpty ? null : edit.tooltip,
+        onTap: _startEditing,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.text,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _startEditing,
+            onLongPress: _startEditing,
+            child: field,
+          ),
+        ),
+      );
+    }
+
+    return Container(
       width: double.infinity,
       height: 40,
-      padding: trailing == null
+      padding: (leading == null && trailing == null)
           ? null
-          : const EdgeInsets.symmetric(horizontal: 8),
+          : EdgeInsets.only(
+              left: leading == null ? 8 : 6,
+              right: 8,
+            ),
       decoration: BoxDecoration(
         color: widget.backgroundColor ?? cs.surface,
       ),
-      child: trailing == null
+      child: (leading == null && trailing == null)
           ? field
           : LayoutBuilder(
-              builder: (context, constraints) => Row(
-                children: [
-                  Expanded(child: field),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: math.min(260.0, constraints.maxWidth * 0.4),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: trailing,
-                    ),
-                  ),
-                ],
-              ),
+              builder: (context, constraints) {
+                final reservedLeading = leading != null ? 136.0 : 0.0;
+                final remaining = (constraints.maxWidth - reservedLeading)
+                    .clamp(0.0, double.infinity);
+                final trailingWidth = math.min(260.0, remaining * 0.4);
+                return Row(
+                  children: [
+                    if (leading != null) ...[
+                      leading,
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(child: field),
+                    if (trailing != null) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: trailingWidth,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: trailing,
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
-    );
-
-    if (edit == null || editing) return bar;
-    // Every part of the bar that is not a link opens the editor: the empty
-    // space after the path, the current folder, the margins around the field.
-    // Crumbs and the trailing search field handle their own taps first. A
-    // long press works from anywhere, which is the way in when the path fills
-    // the whole bar on a phone.
-    return Semantics(
-      label: edit.tooltip.isEmpty ? null : edit.tooltip,
-      onTap: _startEditing,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.text,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _startEditing,
-          onLongPress: _startEditing,
-          child: bar,
-        ),
-      ),
     );
   }
 }

@@ -192,9 +192,9 @@ class _FileManagerOptionsMenuButtonState
         onPickGalleryFolders: widget.onPickGalleryFolders,
         galleryFolderCount: widget.galleryFolderCount,
       ),
-      builder: (context, controller, child) {
+       builder: (context, controller, child) {
         return IconButton(
-          icon: const Icon(Icons.more_vert_rounded),
+          icon: const Icon(Icons.tune_rounded),
           tooltip: l10n.optionsActionTooltip,
           onPressed: () {
             if (controller.isOpen) {

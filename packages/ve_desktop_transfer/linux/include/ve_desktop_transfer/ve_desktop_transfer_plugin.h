@@ -16,6 +16,11 @@ typedef struct {
   GObjectClass parent_class;
 } VeDesktopTransferPluginClass;
 
+#define VE_TYPE_DESKTOP_TRANSFER_PLUGIN (ve_desktop_transfer_plugin_get_type())
+#define VE_DESKTOP_TRANSFER_PLUGIN(obj) \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj), VE_TYPE_DESKTOP_TRANSFER_PLUGIN, \
+                              VeDesktopTransferPlugin))
+
 FLUTTER_PLUGIN_EXPORT GType ve_desktop_transfer_plugin_get_type();
 
 FLUTTER_PLUGIN_EXPORT void ve_desktop_transfer_plugin_register_with_registrar(

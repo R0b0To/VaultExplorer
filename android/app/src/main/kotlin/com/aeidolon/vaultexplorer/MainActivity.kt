@@ -803,6 +803,14 @@ open class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.pdf.JetpackPdfViewerViewFactory(this, flutterEngine.dartExecutor.binaryMessenger),
         )
 
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            com.aeidolon.vaultexplorer.viewer.SPHERICAL_VIDEO_VIEW_TYPE,
+            com.aeidolon.vaultexplorer.viewer.SphericalVideoViewFactory(
+                nativePlayerManager,
+                flutterEngine.dartExecutor.binaryMessenger,
+            ),
+        )
+
         pipController.attach(flutterEngine.dartExecutor.binaryMessenger)
 
         val playerChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aeidolon.vaultexplorer/player")

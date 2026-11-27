@@ -37,6 +37,7 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
+import androidx.media3.ui.PlayerView
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor
@@ -99,6 +100,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
      * the player, and that item must keep showing in the window.
      */
     private var externalSurfaceView: android.view.SurfaceView? = null
+    // The in-view 360 renderer shares this ExoPlayer and its vault DataSource.
+    // PiP takes precedence while its external surface is showing.
+    private var sphericalView: PlayerView? = null
 
     private var player: ExoPlayer? = null
     private var decoderManager: DecoderManager? = null
@@ -497,6 +501,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         var exoPlayer = player
         if (exoPlayer != null) {
             exoPlayer.stop()
+            sphericalView?.player = null
             exoPlayer.clearVideoSurface()
             exoPlayer.clearMediaItems()
         }
@@ -556,6 +561,8 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         val pipView = externalSurfaceView
         if (pipView != null) {
             exoPlayer.setVideoSurfaceView(pipView)
+        } else if (sphericalView != null) {
+            sphericalView?.player = exoPlayer
         } else {
             exoPlayer.setVideoSurface(newSurface)
         }
@@ -604,6 +611,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
      */
     fun setAppInBackground(background: Boolean) {
         appInBackground = background
+        if (background) sphericalView?.onPause() else sphericalView?.onResume()
         player?.let { applyBackgroundVideoPolicy(it) }
     }
 
@@ -625,6 +633,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     fun attachExternalSurface(view: android.view.SurfaceView): Boolean {
         val p = player ?: return false
         externalSurfaceView = view
+        sphericalView?.player = null
         p.setVideoSurfaceView(view)
         applyBackgroundVideoPolicy(p)
         return true
@@ -636,8 +645,27 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         externalSurfaceView = null
         val p = player ?: return
         p.clearVideoSurfaceView(view)
-        surface?.let { p.setVideoSurface(it) }
+        val sphere = sphericalView
+        if (sphere != null) sphere.player = p else surface?.let { p.setVideoSurface(it) }
         applyBackgroundVideoPolicy(p)
+    }
+
+    fun attachSphericalView(view: PlayerView) {
+        if (sphericalView === view) return
+        sphericalView?.player = null
+        sphericalView = view
+        if (!appInBackground) view.onResume()
+        if (externalSurfaceView == null) player?.let { view.player = it }
+    }
+
+    fun detachSphericalView(view: PlayerView) {
+        if (sphericalView !== view) return
+        view.player = null
+        view.onPause()
+        sphericalView = null
+        if (externalSurfaceView == null) {
+            player?.let { p -> surface?.let { p.setVideoSurface(it) } }
+        }
     }
 
     private fun applyBackgroundVideoPolicy(p: ExoPlayer) {
@@ -1086,6 +1114,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             // every item change.
             VaultPlaybackSession.onPlayerReleasing(p)
             decoderManager?.detach()
+            sphericalView?.player = null
             p.clearVideoSurface()
             p.removeListener(this)
             p.release()

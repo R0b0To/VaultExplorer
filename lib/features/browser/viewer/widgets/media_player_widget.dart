@@ -22,6 +22,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_claim.dart';
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/android_spherical_video_view.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_seek_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_seek_hud.dart';
@@ -33,6 +34,7 @@ import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.d
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import '../caption_track.dart';
 import '../native_video_controller.dart';
+import '../native_media3_controller.dart';
 import '../video_scrub_preview_controller.dart';
 
 class VideoPlaybackProgress {
@@ -232,6 +234,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   NativeVideoController? _boundController;
   bool _isActive = false;
   bool _initialized = false;
+  bool _sphericalMode = false;
+  bool _sphericalSensorEnabled = false;
   String? _playerError;
   CaptionTrack? _captionFile;
   bool _isSeeking = false;
@@ -411,6 +415,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       widget.videoFrameProbe?._attach(this, _measureVideoRect);
     }
     if (oldWidget.fileName != widget.fileName) {
+      _sphericalMode = false;
+      _sphericalSensorEnabled = false;
       // File changed — reset poster for new file
       final newPoster =
           widget.posterBytes ??
@@ -493,6 +499,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       _lastKnownVideoSize = target.value.size;
     }
     if (becameInactive) {
+      _sphericalMode = false;
+      _sphericalSensorEnabled = false;
       _videoScale = _baselineZoomScale;
       _videoTransformationController.value = Matrix4.identity();
     }
@@ -859,6 +867,52 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     }
   }
 
+  void _toggleSphericalMode() {
+    if (_boundController?.backend is! NativeMedia3Controller) return;
+    HapticFeedback.selectionClick();
+    _zoomAnimationController?.stop();
+    _videoTransformationController.value = Matrix4.identity();
+    _videoScale = _baselineZoomScale;
+    final entering = !_sphericalMode;
+    setState(() {
+      _sphericalMode = entering;
+      _sphericalSensorEnabled = false;
+    });
+    widget.onZoomChanged(!entering);
+  }
+
+  Widget _sphericalModePill({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) => Material(
+    color: selected ? const Color(0xCC38658D) : const Color(0xCC25282B),
+    shape: const StadiumBorder(),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 17, color: Colors.white),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   void _resetVideoZoom() {
     HapticFeedback.selectionClick();
     _animateVideoZoomTo(Matrix4.identity(), toBaseline: true);
@@ -990,6 +1044,16 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
   Widget _buildVideoTexture(NativeVideoController controller) {
     _scheduleVideoRectReport();
+    if (_sphericalMode) {
+      return ColoredBox(
+        key: _videoFrameKey,
+        color: Colors.black,
+        child: AndroidSphericalVideoView(
+          sensorEnabled: _sphericalSensorEnabled,
+          onTap: () => widget.onToggleUI(!widget.showUI),
+        ),
+      );
+    }
     final mode = widget.videoAspectRatioMode;
     // The filter wraps only the texture, so the black letterbox bars stay
     // black and the filtered area is exactly the video frame. It sits inside
@@ -1293,15 +1357,20 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     // source or its rotation (a landscape frame stays 16:9 on screen no
     // matter how the source video itself is oriented); Best fit keeps the
     // historical rotation-aware, source-shaped box.
-    final double? effectiveOuterAspectRatio = widget.isAudio
-        ? outerAspectRatio
-        : switch (widget.videoAspectRatioMode) {
-            VideoAspectRatioMode.bestFit => outerAspectRatio,
-            VideoAspectRatioMode.ratio16x9 => 16 / 9,
-            VideoAspectRatioMode.ratio4x3 => 4 / 3,
-            VideoAspectRatioMode.fill => null,
-            VideoAspectRatioMode.centre => null,
-          };
+    final double? effectiveOuterAspectRatio;
+    if (_sphericalMode) {
+      effectiveOuterAspectRatio = null;
+    } else if (widget.isAudio) {
+      effectiveOuterAspectRatio = outerAspectRatio;
+    } else {
+      effectiveOuterAspectRatio = switch (widget.videoAspectRatioMode) {
+        VideoAspectRatioMode.bestFit => outerAspectRatio,
+        VideoAspectRatioMode.ratio16x9 => 16 / 9,
+        VideoAspectRatioMode.ratio4x3 => 4 / 3,
+        VideoAspectRatioMode.fill => null,
+        VideoAspectRatioMode.centre => null,
+      };
+    }
     final Widget stackContent = Stack(
       alignment: Alignment.center,
       children: [
@@ -1330,12 +1399,12 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                 final curve = _getMorphCurve(duration);
 
                 return AnimatedScale(
-                  scale: showVideo ? 1.0 : 0.985,
-                  duration: duration,
+                  scale: _sphericalMode ? 1.0 : (showVideo ? 1.0 : 0.985),
+                  duration: _sphericalMode ? Duration.zero : duration,
                   curve: curve,
                   child: AnimatedOpacity(
                     opacity: showVideo ? 1.0 : 0.0,
-                    duration: duration,
+                    duration: _sphericalMode ? Duration.zero : duration,
                     curve: curve,
                     child: _buildVideoTexture(controller),
                   ),
@@ -1476,9 +1545,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             colorScheme: cs,
             isAudio: widget.isAudio,
           ),
-        Positioned.fill(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
+        if (!_sphericalMode)
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
               return Listener(
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (event) =>
@@ -1549,20 +1619,26 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                   onLongPressEnd: _onSpeedHoldEnd,
                 ),
               );
-            },
+              },
+            ),
           ),
-        ),
       ],
     );
     Widget corePlayerWidget = effectiveOuterAspectRatio != null
         ? Center(
             child: AspectRatio(
               aspectRatio: effectiveOuterAspectRatio,
-              child: MediaSwipeDismissTarget(child: stackContent),
+              child: _sphericalMode
+                  ? stackContent
+                  : MediaSwipeDismissTarget(child: stackContent),
             ),
           )
-        : SizedBox.expand(child: MediaSwipeDismissTarget(child: stackContent));
-    if (!widget.isAudio && widget.enableZoom) {
+        : SizedBox.expand(
+            child: _sphericalMode
+                ? stackContent
+                : MediaSwipeDismissTarget(child: stackContent),
+          );
+    if (!widget.isAudio && widget.enableZoom && !_sphericalMode) {
       final vpSize = MediaQuery.of(context).size;
       corePlayerWidget = InteractiveViewer(
         key: _interactiveViewerKey,
@@ -1617,9 +1693,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
     // Outer detector captures double-taps anywhere across the entire viewport
     // (including the black letterbox bars and out-of-bounds space) to reset zoom.
-    corePlayerWidget = GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTapUp: (details) {
+    if (!_sphericalMode) {
+      corePlayerWidget = GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTapUp: (details) {
         if (_isSkipActive ||
             _isSwipeSeeking ||
             _showSwipeSeekHud ||
@@ -1639,14 +1716,15 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
           return;
         }
         widget.onToggleUI(!widget.showUI);
-      },
-      onDoubleTap: () {
+        },
+        onDoubleTap: () {
         if (_isZoomed && !widget.doubleTapPlayPause) {
           _handleVideoDoubleTap();
         }
-      },
-      child: corePlayerWidget,
-    );
+        },
+        child: corePlayerWidget,
+      );
+    }
 
     return Listener(
       behavior: HitTestBehavior.translucent,
@@ -1669,12 +1747,47 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
               alignment: Alignment.center,
               children: [
                 corePlayerWidget,
+                if (!widget.isAudio &&
+                    _isActive &&
+                    _initialized &&
+                    controller?.backend is NativeMedia3Controller &&
+                    widget.showUI)
+                  Positioned(
+                    top: MediaQuery.paddingOf(context).top + 72,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _sphericalModePill(
+                            label: _sphericalMode ? 'Exit 360°' : '360°',
+                            icon: Icons.explore_outlined,
+                            selected: _sphericalMode,
+                            onTap: _toggleSphericalMode,
+                          ),
+                          if (_sphericalMode) ...[
+                            const SizedBox(width: 8),
+                            _sphericalModePill(
+                              label: 'Gyro',
+                              icon: Icons.screen_rotation_alt_outlined,
+                              selected: _sphericalSensorEnabled,
+                              onTap: () => setState(
+                                () => _sphericalSensorEnabled =
+                                    !_sphericalSensorEnabled,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
                 // Lets a curved or L-shaped swipe be claimed for the playlist
                 // pager before the zoom viewer under it takes the touch. Audio
                 // has no zoom viewer, so nothing competes with the pager there.
-                if (!widget.isAudio && widget.enableZoom)
+                if (!widget.isAudio && widget.enableZoom && !_sphericalMode)
                   const Positioned.fill(child: PlaylistSwipeClaimLayer()),
-                if (widget.swipeToSeekEnabled && !widget.isAudio)
+                if (widget.swipeToSeekEnabled && !widget.isAudio && !_sphericalMode)
                   Positioned(
                     left: math.min(
                       MediaViewerConstants.swipeToSeekEdgeInset,
@@ -1697,7 +1810,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                       onDragCancel: _handleSwipeToSeekCancel,
                     ),
                   ),
-                if (widget.edgeSwipeBrightnessEnabled)
+                if (widget.edgeSwipeBrightnessEnabled && !_sphericalMode)
                   Positioned(
                     left: 0,
                     top: 0,
@@ -1711,7 +1824,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                       onDragCancel: _handleBrightnessDragCancel,
                     ),
                   ),
-                if (widget.edgeSwipeVolumeEnabled)
+                if (widget.edgeSwipeVolumeEnabled && !_sphericalMode)
                   Positioned(
                     right: 0,
                     top: 0,
@@ -1795,7 +1908,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                   ),
                 if (_showSwipeSeekHud)
                   _fadeWhileDismissing(_buildSwipeSeekHud()),
-                if (!widget.isAudio && widget.enableZoom)
+                if (!widget.isAudio && widget.enableZoom && !_sphericalMode)
                   AnimatedPositioned(
                     duration: MediaViewerConstants.animationDuration,
                     curve: Curves.easeOutCubic,

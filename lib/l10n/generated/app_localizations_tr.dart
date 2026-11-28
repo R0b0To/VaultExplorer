@@ -51,18 +51,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get pdfViewerGoButton => 'Git';
 
   @override
-  String get pdfViewerSearchHint => 'Belgede ara';
-
-  @override
-  String get pdfViewerNoMatches => 'Eşleşme yok';
-
-  @override
-  String get pdfViewerPreviousMatch => 'Önceki eşleşme';
-
-  @override
-  String get pdfViewerNextMatch => 'Sonraki eşleşme';
-
-  @override
   String get pdfViewerPrintTooltip => 'Belgeyi yazdır';
 
   @override
@@ -2356,12 +2344,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get deselectAll => 'Tüm seçimi kaldır';
 
   @override
-  String get layoutModeList => 'Liste görünümü';
-
-  @override
-  String get layoutModeGrid => 'Izgara görünümü';
-
-  @override
   String get layoutModeMasonry => 'Mozaik görünüm';
 
   @override
@@ -2624,15 +2606,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String charsCount(int count) {
     return 'Karakter: $count';
   }
-
-  @override
-  String get unsavedChangesLabel => 'Kaydedilmemiş değişiklikler';
-
-  @override
-  String get savedToVault => 'Kasaya kaydedildi';
-
-  @override
-  String get saveChangesTooltip => 'Değişiklikleri kaydet';
 
   @override
   String get textEditorDecryptFailedMessage =>
@@ -3504,11 +3477,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get savingLabel => 'Kaydediliyor…';
-
-  @override
-  String autosavedAtLabel(String time) {
-    return '$time saatinde otomatik kaydedildi';
-  }
 
   @override
   String cameraDisconnectedError(String message) {
@@ -6782,43 +6750,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get filesCopy => 'Kopyala';
 
   @override
-  String get filesChooseDestinationTitle => 'Bir klasör seçin';
-
-  @override
-  String get filesMoveHere => 'Buraya taşı';
-
-  @override
-  String get filesCopyHere => 'Buraya kopyala';
-
-  @override
   String get filesDeleteFailed => 'Silinemedi';
-
-  @override
-  String get filesFilterTooltip => 'Filtre';
-
-  @override
-  String get filesFilterAll => 'Tüm dosyalar';
-
-  @override
-  String get filesFilterImages => 'Resimler';
-
-  @override
-  String get filesFilterVideos => 'Videolar';
-
-  @override
-  String get filesFilterAudio => 'Ses';
-
-  @override
-  String get filesFilterDocuments => 'Belgeler';
-
-  @override
-  String get filesTextTooLarge => 'Bu dosya burada önizleme için çok büyük.';
-
-  @override
-  String get filesTextSaved => 'Kaydedildi';
-
-  @override
-  String get filesTextSaveFailed => 'Kaydedilemedi';
 
   @override
   String get toolHeaderBackupTitle => 'Başlık yedeği';
@@ -7548,10 +7480,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get addStorageLocationTitle => 'Depolama konumu ekle';
 
   @override
-  String get addStorageLocationSubtitle =>
-      'Harici bir SD kart, USB sürücü veya klasör ekle';
-
-  @override
   String get renameStorageLocationTitle => 'Konumu yeniden adlandır';
 
   @override
@@ -7561,10 +7489,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return '\"$name\" depolama konumlarından kaldırılsın mı? Depolamadaki dosyalar silinmez.';
   }
-
-  @override
-  String get storageLocationUnresolvedError =>
-      'Bu konuma doğrudan erişilemedi. Depolama izinlerinin verildiğinden emin ol.';
 
   @override
   String get storageLocationSelfReferenceError =>
@@ -7717,9 +7641,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => 'Gelişmiş ayarlara taşı';
-
-  @override
-  String get dashboardNavLabel => 'Pano';
 
   @override
   String get vaultsSectionTitle => 'Kasalar';
@@ -8455,9 +8376,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get textEditorAutoSaveDescription =>
       'Yazmayı bıraktığınızda değişiklikleri otomatik kaydet';
-
-  @override
-  String get cutTooltip => 'Kes';
 
   @override
   String get textEditorShowLineNumbersLabel => 'Satır numaralarını göster';
@@ -12320,12 +12238,6 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get galleryFoldersHint =>
       'Galerinin tarayacağı klasörleri seçin. Alt klasörler de taranır. Hiç klasör seçmezseniz tüm depolama alanı taranır.';
-
-  @override
-  String get galleryFoldersUseAll => 'Her şeyi tara';
-
-  @override
-  String get galleryFoldersApply => 'Uygula';
 
   @override
   String galleryFilterShownOfTotal(int shown, int total) {

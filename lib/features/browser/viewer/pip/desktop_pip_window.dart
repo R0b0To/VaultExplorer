@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/desktop_window_frame.dart';
 import 'package:vaultexplorer/core/windowing/app_windows.dart';
 import 'package:vaultexplorer/core/windowing/desktop_windowing.dart';
@@ -157,8 +159,13 @@ class DesktopPipWindowController {
 
 /// The content of the picture-in-picture window: the video edge to edge, and
 /// over it, while the pointer is on the window (or the video is paused), the
-/// controls: audio only, expand and close at the top; previous, play / pause
-/// and next in the middle; a thin seek bar along the bottom.
+/// controls:
+///
+///  * audio only, expand and close at the top;
+///  * back 10 seconds, play / pause and forward 10 seconds in the middle;
+///  * at the bottom a timeline to click or drag (the mouse wheel over it moves
+///    the video too), the clock ("1:04:32 / 1:18:50"), previous / next item
+///    where there are some, and mute.
 ///
 /// Pressing the video and moving drags the whole window; a click on it plays
 /// or pauses.
@@ -177,6 +184,10 @@ class _DesktopPipPageState extends State<DesktopPipPage> {
 
   bool _hovering = false;
   bool _stepping = false;
+
+  /// The volume to go back to when the sound is switched on again; null while
+  /// the sound is on.
+  int? _volumeBeforeMute;
   double _lastAspectRatio = 16 / 9;
   double? _appliedRatio;
   String? _lastTitle;
@@ -239,18 +250,38 @@ class _DesktopPipPageState extends State<DesktopPipPage> {
     }
   }
 
+  /// The clock buttons: [direction] -1 / 1 moves the video by [_skipStep].
+  void _skip(NativeVideoController controller, int direction) {
+    if (controller.isDisposed) return;
+    final value = controller.value;
+    if (!value.isInitialized) return;
+    var target = value.position + _skipStep * direction;
+    if (target < Duration.zero) target = Duration.zero;
+    if (value.duration > Duration.zero && target > value.duration) {
+      target = value.duration;
+    }
+    unawaited(controller.seekTo(target));
+  }
+
+  void _toggleMute(NativeVideoController controller) {
+    if (controller.isDisposed) return;
+    final before = _volumeBeforeMute;
+    if (before == null) {
+      _volumeBeforeMute = controller.currentVolume > 0
+          ? controller.currentVolume
+          : 100;
+      unawaited(controller.setVolume(0));
+    } else {
+      _volumeBeforeMute = null;
+      unawaited(controller.setVolume(before));
+    }
+    setState(() {});
+  }
+
   void _expand() {
     BackgroundPlaybackHost.instance.expand();
     final main = AppWindows.instance.mainViewId;
     if (main != null) unawaited(bringWindowForward(main));
-  }
-
-  void _seekTo(NativeVideoController controller, double fraction) {
-    if (controller.isDisposed) return;
-    final total = controller.value.duration;
-    if (total <= Duration.zero) return;
-    final target = total * fraction.clamp(0.0, 1.0);
-    unawaited(controller.seekTo(target));
   }
 
   @override
@@ -323,16 +354,6 @@ class _DesktopPipPageState extends State<DesktopPipPage> {
             ),
           ),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: _SeekBar(
-            value: value,
-            expanded: showControls,
-            onSeek: (fraction) => _seekTo(controller, fraction),
-          ),
-        ),
       ],
     );
   }
@@ -347,6 +368,14 @@ class _DesktopPipPageState extends State<DesktopPipPage> {
     final l10n = context.l10n;
     final host = BackgroundPlaybackHost.instance;
     final loading = value.isBuffering || !value.isInitialized;
+    final muted = _volumeBeforeMute != null;
+    const timeStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 12,
+      fontWeight: FontWeight.w500,
+      fontFeatures: [FontFeature.tabularFigures()],
+      shadows: [Shadow(blurRadius: 4, color: Colors.black87)],
+    );
 
     return Stack(
       fit: StackFit.expand,
@@ -359,8 +388,8 @@ class _DesktopPipPageState extends State<DesktopPipPage> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0x99000000), Color(0x00000000), Color(0x99000000)],
-                stops: [0.0, 0.5, 1.0],
+                colors: [Color(0x99000000), Color(0x00000000), Color(0xB3000000)],
+                stops: [0.0, 0.45, 1.0],
               ),
             ),
           ),
@@ -391,22 +420,19 @@ class _DesktopPipPageState extends State<DesktopPipPage> {
             ],
           ),
         ),
+        // Middle: back 10 seconds, play / pause, forward 10 seconds.
         Center(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 40,
-                child: canPrevious
-                    ? _PipButton(
-                        icon: Icons.skip_previous_rounded,
-                        tooltip: l10n.previousTooltip,
-                        onPressed: () => unawaited(_step(-1)),
-                        iconSize: 22,
-                      )
-                    : null,
+              _PipButton(
+                icon: Icons.replay_10_rounded,
+                tooltip: '-${_skipStep.inSeconds}s',
+                onPressed: () => _skip(controller, -1),
+                iconSize: 24,
+                box: 38,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               loading
                   ? const SizedBox(
                       width: 48,
@@ -431,17 +457,60 @@ class _DesktopPipPageState extends State<DesktopPipPage> {
                       iconSize: 30,
                       box: 48,
                     ),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 40,
-                child: canNext
-                    ? _PipButton(
-                        icon: Icons.skip_next_rounded,
-                        tooltip: l10n.nextTooltip,
-                        onPressed: () => unawaited(_step(1)),
-                        iconSize: 22,
-                      )
-                    : null,
+              const SizedBox(width: 12),
+              _PipButton(
+                icon: Icons.forward_10_rounded,
+                tooltip: '+${_skipStep.inSeconds}s',
+                onPressed: () => _skip(controller, 1),
+                iconSize: 24,
+                box: 38,
+              ),
+            ],
+          ),
+        ),
+        // Bottom: the timeline, and under it the clock and the small buttons.
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 6,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Timeline(controller: controller, value: value),
+              Row(
+                children: [
+                  Expanded(
+                    child: _Clock(value: value, style: timeStyle),
+                  ),
+                  if (canPrevious)
+                    _PipButton(
+                      icon: Icons.skip_previous_rounded,
+                      tooltip: l10n.previousTooltip,
+                      onPressed: () => unawaited(_step(-1)),
+                      iconSize: 18,
+                      box: 28,
+                      plain: true,
+                    ),
+                  if (canNext)
+                    _PipButton(
+                      icon: Icons.skip_next_rounded,
+                      tooltip: l10n.nextTooltip,
+                      onPressed: () => unawaited(_step(1)),
+                      iconSize: 18,
+                      box: 28,
+                      plain: true,
+                    ),
+                  _PipButton(
+                    icon: muted
+                        ? Icons.volume_off_rounded
+                        : Icons.volume_up_rounded,
+                    tooltip: muted ? l10n.unmuteTooltip : l10n.muteTooltip,
+                    onPressed: () => _toggleMute(controller),
+                    iconSize: 18,
+                    box: 28,
+                    plain: true,
+                  ),
+                ],
               ),
             ],
           ),
@@ -459,6 +528,7 @@ class _PipButton extends StatelessWidget {
     required this.onPressed,
     this.iconSize = 18,
     this.box = 34,
+    this.plain = false,
   });
 
   final IconData icon;
@@ -466,6 +536,9 @@ class _PipButton extends StatelessWidget {
   final VoidCallback onPressed;
   final double iconSize;
   final double box;
+
+  /// No round backdrop: a bare icon (the small buttons under the timeline).
+  final bool plain;
 
   @override
   Widget build(BuildContext context) {
@@ -476,7 +549,7 @@ class _PipButton extends StatelessWidget {
       iconSize: iconSize,
       color: Colors.white,
       style: IconButton.styleFrom(
-        backgroundColor: Colors.black45,
+        backgroundColor: plain ? Colors.transparent : Colors.black45,
         padding: EdgeInsets.zero,
         fixedSize: Size(box, box),
         minimumSize: Size(box, box),
@@ -486,57 +559,115 @@ class _PipButton extends StatelessWidget {
   }
 }
 
-/// A thin progress bar along the bottom edge that thickens while the controls
-/// show, and seeks when it is clicked or dragged.
-class _SeekBar extends StatelessWidget {
-  const _SeekBar({
-    required this.value,
-    required this.expanded,
-    required this.onSeek,
-  });
+/// "1:04:32 / 1:18:50".
+class _Clock extends StatelessWidget {
+  const _Clock({required this.value, required this.style});
 
   final NativeVideoValue value;
-  final bool expanded;
-  final ValueChanged<double> onSeek;
+  final TextStyle style;
 
   @override
   Widget build(BuildContext context) {
-    final total = value.duration.inMilliseconds;
-    final fraction = total <= 0
+    final position = formatClockDuration(value.position);
+    final total = value.duration > Duration.zero
+        ? formatClockDuration(value.duration)
+        : '--:--';
+    return Text(
+      '$position / $total',
+      style: style,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// The timeline: a slim bar with a thumb that is dragged (or clicked) to seek.
+/// The mouse wheel over it moves the video too (scroll up forward, down
+/// back, [wheelStep] a notch).
+///
+/// While the thumb is held the video follows it (seeks are throttled, so the
+/// player is not asked for every pixel), and the final position is applied
+/// when it is let go.
+class _Timeline extends StatefulWidget {
+  const _Timeline({required this.controller, required this.value});
+
+  final NativeVideoController controller;
+  final NativeVideoValue value;
+
+  static const Duration wheelStep = Duration(seconds: 5);
+
+  @override
+  State<_Timeline> createState() => _TimelineState();
+}
+
+class _TimelineState extends State<_Timeline> {
+  static const Duration _seekEvery = Duration(milliseconds: 150);
+
+  double? _dragFraction;
+  DateTime _lastSeekAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  Duration get _total => widget.value.duration;
+
+  void _seek(double fraction) {
+    final controller = widget.controller;
+    if (controller.isDisposed || _total <= Duration.zero) return;
+    unawaited(controller.seekTo(_total * fraction.clamp(0.0, 1.0)));
+  }
+
+  void _onWheel(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || _total <= Duration.zero) return;
+    final forward = event.scrollDelta.dy < 0;
+    final step = _Timeline.wheelStep * (forward ? 1 : -1);
+    var target = widget.value.position + step;
+    if (target < Duration.zero) target = Duration.zero;
+    if (target > _total) target = _total;
+    unawaited(widget.controller.seekTo(target));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = _total.inMilliseconds;
+    final playing = total <= 0
         ? 0.0
-        : (value.position.inMilliseconds / total).clamp(0.0, 1.0).toDouble();
+        : (widget.value.position.inMilliseconds / total)
+              .clamp(0.0, 1.0)
+              .toDouble();
+    final shown = _dragFraction ?? playing;
     final primary = Theme.of(context).colorScheme.primary;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        double at(Offset local) =>
-            width <= 0 ? 0 : (local.dx / width).clamp(0.0, 1.0).toDouble();
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (details) => onSeek(at(details.localPosition)),
-          onHorizontalDragUpdate: (details) =>
-              onSeek(at(details.localPosition)),
-          child: SizedBox(
-            // A taller hit area than the bar itself, so it is easy to grab.
-            height: 14,
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                height: expanded ? 5 : 3,
-                width: double.infinity,
-                color: const Color(0x40FFFFFF),
-                alignment: AlignmentDirectional.centerStart,
-                child: FractionallySizedBox(
-                  widthFactor: fraction,
-                  heightFactor: 1,
-                  child: ColoredBox(color: primary),
-                ),
-              ),
-            ),
+    return Listener(
+      onPointerSignal: _onWheel,
+      child: SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          trackHeight: 3,
+          activeTrackColor: primary,
+          inactiveTrackColor: const Color(0x59FFFFFF),
+          thumbColor: primary,
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+          overlayShape: SliderComponentShape.noOverlay,
+          trackShape: const RoundedRectSliderTrackShape(),
+        ),
+        child: SizedBox(
+          height: 22,
+          child: Slider(
+            value: shown,
+            onChangeStart: (_) => setState(() => _dragFraction = shown),
+            onChanged: total <= 0
+                ? null
+                : (fraction) {
+                    setState(() => _dragFraction = fraction);
+                    final now = DateTime.now();
+                    if (now.difference(_lastSeekAt) >= _seekEvery) {
+                      _lastSeekAt = now;
+                      _seek(fraction);
+                    }
+                  },
+            onChangeEnd: (fraction) {
+              _seek(fraction);
+              setState(() => _dragFraction = null);
+            },
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

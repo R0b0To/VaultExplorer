@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/engine/desktop/desktop_images.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_native_thumbnails.dart';
 import 'package:vaultexplorer/core/engine/desktop/desktop_video_thumbnails.dart';
 import 'package:vaultexplorer/core/engine/desktop/ve_native.dart';
+import 'package:vaultexplorer/core/services/desktop_thumbnail_slots.dart';
 import 'package:vaultexplorer/core/engine/desktop/video_frame_decoder.dart';
 
 /// A reply as the worker sends it: [resultCode, bytes?, info ints].
@@ -113,6 +114,14 @@ void main() {
     expect(nativeThumbnailWorkers(cores: 8), 7);
     expect(nativeThumbnailWorkers(cores: 16), 8);
     expect(nativeThumbnailWorkers(cores: 128), 8);
+  });
+
+  test('desktopVideoThumbnailSlots is half the cores, within 2..4', () {
+    expect(desktopVideoThumbnailSlots(cores: 1), 2);
+    expect(desktopVideoThumbnailSlots(cores: 4), 2);
+    expect(desktopVideoThumbnailSlots(cores: 6), 3);
+    expect(desktopVideoThumbnailSlots(cores: 8), 4);
+    expect(desktopVideoThumbnailSlots(cores: 32), 4);
   });
 
   group('DesktopImages with the native thumbnailer', () {

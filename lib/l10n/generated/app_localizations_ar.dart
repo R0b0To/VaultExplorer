@@ -50,18 +50,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pdfViewerGoButton => 'انتقال';
 
   @override
-  String get pdfViewerSearchHint => 'البحث في المستند';
-
-  @override
-  String get pdfViewerNoMatches => 'لا توجد نتائج مطابقة';
-
-  @override
-  String get pdfViewerPreviousMatch => 'النتيجة السابقة';
-
-  @override
-  String get pdfViewerNextMatch => 'النتيجة التالية';
-
-  @override
   String get pdfViewerPrintTooltip => 'طباعة المستند';
 
   @override
@@ -2410,12 +2398,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deselectAll => 'إلغاء تحديد الكل';
 
   @override
-  String get layoutModeList => 'عرض القائمة';
-
-  @override
-  String get layoutModeGrid => 'عرض شبكي';
-
-  @override
   String get layoutModeMasonry => 'شبكة متدرّجة';
 
   @override
@@ -2677,15 +2659,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String charsCount(int count) {
     return 'الأحرف: $count';
   }
-
-  @override
-  String get unsavedChangesLabel => 'تغييرات غير محفوظة';
-
-  @override
-  String get savedToVault => 'تم الحفظ في الخزنة';
-
-  @override
-  String get saveChangesTooltip => 'حفظ التغييرات';
 
   @override
   String get textEditorDecryptFailedMessage => 'فشل فك تشفير الملف من الخزنة.';
@@ -3582,11 +3555,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get savingLabel => 'جارٍ الحفظ…';
-
-  @override
-  String autosavedAtLabel(String time) {
-    return 'تم الحفظ التلقائي في $time';
-  }
 
   @override
   String cameraDisconnectedError(String message) {
@@ -6910,43 +6878,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get filesCopy => 'نسخ';
 
   @override
-  String get filesChooseDestinationTitle => 'اختر مجلدًا';
-
-  @override
-  String get filesMoveHere => 'نقل إلى هنا';
-
-  @override
-  String get filesCopyHere => 'نسخ إلى هنا';
-
-  @override
   String get filesDeleteFailed => 'تعذّر الحذف';
-
-  @override
-  String get filesFilterTooltip => 'تصفية';
-
-  @override
-  String get filesFilterAll => 'جميع الملفات';
-
-  @override
-  String get filesFilterImages => 'الصور';
-
-  @override
-  String get filesFilterVideos => 'الفيديوهات';
-
-  @override
-  String get filesFilterAudio => 'الصوت';
-
-  @override
-  String get filesFilterDocuments => 'المستندات';
-
-  @override
-  String get filesTextTooLarge => 'هذا الملف كبير جدًا للمعاينة هنا.';
-
-  @override
-  String get filesTextSaved => 'تم الحفظ';
-
-  @override
-  String get filesTextSaveFailed => 'تعذّر الحفظ';
 
   @override
   String get toolHeaderBackupTitle => 'النسخ الاحتياطي للرأس';
@@ -7682,10 +7614,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addStorageLocationTitle => 'إضافة موقع تخزين';
 
   @override
-  String get addStorageLocationSubtitle =>
-      'إضافة بطاقة SD خارجية أو محرك USB أو مجلد';
-
-  @override
   String get renameStorageLocationTitle => 'إعادة تسمية الموقع';
 
   @override
@@ -7695,10 +7623,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return 'هل تريد إزالة \"$name\" من مواقع التخزين؟ لن يتم حذف الملفات.';
   }
-
-  @override
-  String get storageLocationUnresolvedError =>
-      'تعذر الوصول إلى هذا الموقع مباشرة. تأكد من منح أذونات التخزين.';
 
   @override
   String get storageLocationSelfReferenceError =>
@@ -7850,9 +7774,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => 'نقل إلى الإعدادات المتقدمة';
-
-  @override
-  String get dashboardNavLabel => 'لوحة التحكم';
 
   @override
   String get vaultsSectionTitle => 'الخزائن';
@@ -8588,9 +8509,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get textEditorAutoSaveDescription =>
       'حفظ التغييرات تلقائيًا عند التوقف عن الكتابة';
-
-  @override
-  String get cutTooltip => 'قص';
 
   @override
   String get textEditorShowLineNumbersLabel => 'إظهار أرقام الأسطر';
@@ -12493,12 +12411,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get galleryFoldersHint =>
       'اختر المجلدات التي يفحصها المعرض. تُضمَّن المجلدات الفرعية. وإذا لم تختر أي مجلد، يُفحص التخزين بالكامل.';
-
-  @override
-  String get galleryFoldersUseAll => 'فحص الكل';
-
-  @override
-  String get galleryFoldersApply => 'تطبيق';
 
   @override
   String galleryFilterShownOfTotal(int shown, int total) {

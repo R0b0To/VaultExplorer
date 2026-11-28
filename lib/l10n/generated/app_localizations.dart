@@ -190,30 +190,6 @@ abstract class AppLocalizations {
   /// **'Go'**
   String get pdfViewerGoButton;
 
-  /// Hint text for the PDF in-document search field
-  ///
-  /// In en, this message translates to:
-  /// **'Search in document'**
-  String get pdfViewerSearchHint;
-
-  /// Shown when a PDF text search finds no results
-  ///
-  /// In en, this message translates to:
-  /// **'No matches'**
-  String get pdfViewerNoMatches;
-
-  /// Tooltip for the previous search match button
-  ///
-  /// In en, this message translates to:
-  /// **'Previous match'**
-  String get pdfViewerPreviousMatch;
-
-  /// Tooltip for the next search match button
-  ///
-  /// In en, this message translates to:
-  /// **'Next match'**
-  String get pdfViewerNextMatch;
-
   /// Tooltip for the print action
   ///
   /// In en, this message translates to:
@@ -3926,18 +3902,6 @@ abstract class AppLocalizations {
   /// **'Deselect All'**
   String get deselectAll;
 
-  /// Menu option for list layout mode
-  ///
-  /// In en, this message translates to:
-  /// **'List View'**
-  String get layoutModeList;
-
-  /// Menu option for grid layout mode
-  ///
-  /// In en, this message translates to:
-  /// **'Grid View'**
-  String get layoutModeGrid;
-
   /// Menu option for masonry layout mode
   ///
   /// In en, this message translates to:
@@ -4429,24 +4393,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Chars: {count}'**
   String charsCount(int count);
-
-  /// Bottom bar status when text editor has unsaved changes
-  ///
-  /// In en, this message translates to:
-  /// **'Unsaved Changes'**
-  String get unsavedChangesLabel;
-
-  /// Bottom bar status when text file is saved
-  ///
-  /// In en, this message translates to:
-  /// **'Saved to vault'**
-  String get savedToVault;
-
-  /// Tooltip for save icon button in text editor
-  ///
-  /// In en, this message translates to:
-  /// **'Save changes'**
-  String get saveChangesTooltip;
 
   /// Exception message when the text editor fails to decrypt a file from the vault for editing
   ///
@@ -5935,12 +5881,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saving…'**
   String get savingLabel;
-
-  /// Status label showing the time of the last autosave in the text editor
-  ///
-  /// In en, this message translates to:
-  /// **'Autosaved at {time}'**
-  String autosavedAtLabel(String time);
 
   /// Error message shown when the camera device drops out unexpectedly
   ///
@@ -11218,83 +11158,11 @@ abstract class AppLocalizations {
   /// **'Copy'**
   String get filesCopy;
 
-  /// Title of the copy/move destination picker screen
-  ///
-  /// In en, this message translates to:
-  /// **'Choose a folder'**
-  String get filesChooseDestinationTitle;
-
-  /// Confirm button in the destination picker when moving
-  ///
-  /// In en, this message translates to:
-  /// **'Move here'**
-  String get filesMoveHere;
-
-  /// Confirm button in the destination picker when copying
-  ///
-  /// In en, this message translates to:
-  /// **'Copy here'**
-  String get filesCopyHere;
-
   /// Snackbar after a failed delete
   ///
   /// In en, this message translates to:
   /// **'Couldn\'t delete'**
   String get filesDeleteFailed;
-
-  /// Tooltip for the type filter app bar action
-  ///
-  /// In en, this message translates to:
-  /// **'Filter'**
-  String get filesFilterTooltip;
-
-  /// Type filter option: no filter
-  ///
-  /// In en, this message translates to:
-  /// **'All files'**
-  String get filesFilterAll;
-
-  /// Type filter option: images only
-  ///
-  /// In en, this message translates to:
-  /// **'Images'**
-  String get filesFilterImages;
-
-  /// Type filter option: videos only
-  ///
-  /// In en, this message translates to:
-  /// **'Videos'**
-  String get filesFilterVideos;
-
-  /// Type filter option: audio only
-  ///
-  /// In en, this message translates to:
-  /// **'Audio'**
-  String get filesFilterAudio;
-
-  /// Type filter option: documents only
-  ///
-  /// In en, this message translates to:
-  /// **'Documents'**
-  String get filesFilterDocuments;
-
-  /// Shown instead of the text viewer when a file exceeds the preview size cap
-  ///
-  /// In en, this message translates to:
-  /// **'This file is too large to preview here.'**
-  String get filesTextTooLarge;
-
-  /// Snackbar after saving a text file
-  ///
-  /// In en, this message translates to:
-  /// **'Saved'**
-  String get filesTextSaved;
-
-  /// Snackbar after failing to save a text file
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t save'**
-  String get filesTextSaveFailed;
 
   /// AppBar title for the Header Backup & Restore utility
   ///
@@ -12464,12 +12332,6 @@ abstract class AppLocalizations {
   /// **'Add Storage Location'**
   String get addStorageLocationTitle;
 
-  /// Subtitle for adding a storage location
-  ///
-  /// In en, this message translates to:
-  /// **'Add an external SD card, USB drive, or folder'**
-  String get addStorageLocationSubtitle;
-
   /// Dialog title for renaming a storage location
   ///
   /// In en, this message translates to:
@@ -12487,12 +12349,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove \"{name}\" from storage locations? Files on the storage will not be deleted.'**
   String removeStorageLocationConfirm(String name);
-
-  /// Error shown when a picked folder cannot be resolved to an accessible path
-  ///
-  /// In en, this message translates to:
-  /// **'Could not access that location directly. Make sure storage permissions are granted.'**
-  String get storageLocationUnresolvedError;
 
   /// Error shown when the user picks a folder or vault that this app itself exposed via Storage Access Framework (e.g. its document-provider or an exposed subfolder), which would be a redundant self-reference
   ///
@@ -12763,12 +12619,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Move to Advanced Settings'**
   String get moveToAdvancedSettingsTooltip;
-
-  /// Drawer navigation destination label for the main vault dashboard
-  ///
-  /// In en, this message translates to:
-  /// **'Dashboard'**
-  String get dashboardNavLabel;
 
   /// Section header in the drawer for the list of encrypted vaults
   ///
@@ -13981,12 +13831,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatically save changes when you stop typing'**
   String get textEditorAutoSaveDescription;
-
-  /// Tooltip for the cut action button in the text editor accessory key bar
-  ///
-  /// In en, this message translates to:
-  /// **'Cut'**
-  String get cutTooltip;
 
   /// Toggle label for displaying line numbers in the gutter
   ///
@@ -20629,18 +20473,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose which folders the gallery scans. Subfolders are included. With none chosen, the whole storage is scanned.'**
   String get galleryFoldersHint;
-
-  /// Button in the gallery folder picker that clears the choice so the whole storage is scanned
-  ///
-  /// In en, this message translates to:
-  /// **'Scan everything'**
-  String get galleryFoldersUseAll;
-
-  /// Button in the gallery folder picker that applies the chosen folders
-  ///
-  /// In en, this message translates to:
-  /// **'Apply'**
-  String get galleryFoldersApply;
 
   /// Header of the gallery filter sheet when filters are applied: how many items are left out of the total
   ///

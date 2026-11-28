@@ -41,6 +41,7 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_search_c
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/browser/controllers/tab_pane_drag.dart';
 import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
@@ -207,6 +208,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   late final VaultEngineEvents _vaultEvents;
   late final PageController _pageController;
   late final ProviderSubscription<BrowserChromeHub> _chromeSubscription;
+  late final ProviderSubscription<TabPaneDrag> _paneDragSubscription;
   late final AnimationController _appBarVisibilityController;
   late final AnimationController _tabBarVisibilityController;
   late final AnimationController _toolbarVisibilityController;
@@ -307,7 +309,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     for (final pane in TabPane.values)
       pane: GlobalKey<_PaneTabPagerState>(debugLabel: 'pager-$pane'),
   };
-  final ValueNotifier<TabPane?> _dropPane = ValueNotifier<TabPane?>(null);
+  // Shared with the tab strips, which may be drawn in the window's title bar
+  // and so cannot be handed it directly (see TabPaneDrag).
+  ValueNotifier<TabPane?> get _dropPane => _paneDragSubscription.read().hover;
   TabPane? _loopingPane;
   Set<TabId> _requestedVisibleTabs = const <TabId>{};
   int? _pageViewDrivenActiveIndex;
@@ -343,6 +347,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       browserChromeProvider(_workspace),
       (_, _) {},
     );
+    _paneDragSubscription = ref.listenManual<TabPaneDrag>(
+      tabPaneDragProvider(_workspace),
+      (_, _) {},
+    );
+    _paneDragSubscription.read().paneBounds = _paneBounds;
     _appBarVisibilityController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
@@ -381,11 +390,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _workspaceSubscription.close();
     _pageController.dispose();
     _chromeSubscription.close();
+    // The strips may outlive this page for a moment; they must not be left
+    // asking a page that is gone where its panes are.
+    _paneDragSubscription.read().paneBounds = null;
+    _paneDragSubscription.close();
     _appBarVisibilityController.dispose();
     _tabBarVisibilityController.dispose();
     _toolbarVisibilityController.dispose();
     _loopTransitionController.dispose();
-    _dropPane.dispose();
     super.dispose();
   }
 

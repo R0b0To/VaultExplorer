@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart' show PaintingBinding;
+import 'package:vaultexplorer/core/services/desktop_thumbnail_slots.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -12,6 +15,11 @@ class DeviceCapabilityService {
   DeviceCapabilityService._();
 
   static bool _initialized = false;
+
+  /// Video thumbnail concurrency for this platform: the tier's value on a phone, and on a computer at least the desktop
+  /// figure (see [desktopVideoThumbnailSlots]) -- except a LOW tier (2 or fewer logical processors), which keeps its own.
+  static int _videoSlots(int tierValue, {bool low = false}) =>
+      (isDesktopPlatform && !low) ? math.max(tierValue, desktopVideoThumbnailSlots()) : tierValue;
 
   /// The tier native reported (`LOW`, `MEDIUM` or `HIGH`), or null until
   /// [init] has finished (or if the lookup failed and defaults stayed in use).
@@ -33,7 +41,7 @@ class DeviceCapabilityService {
         case 'LOW':
           ThumbnailConcurrency.resizeForDevice(
             imageConcurrency: 2,
-            videoConcurrency: 1,
+            videoConcurrency: _videoSlots(1, low: true),
             inFlightCapacity: 80,
           );
           ThumbnailCacheService.resizeMemoryBudget(12 * 1024 * 1024); // 12 MB
@@ -45,7 +53,7 @@ class DeviceCapabilityService {
           case 'HIGH':
           ThumbnailConcurrency.resizeForDevice(
             imageConcurrency: 6,
-            videoConcurrency: 2,
+            videoConcurrency: _videoSlots(2),
             inFlightCapacity: 240,
           );
           ThumbnailCacheService.resizeMemoryBudget(64 * 1024 * 1024); // 64 MB
@@ -59,7 +67,7 @@ class DeviceCapabilityService {
         default:
           ThumbnailConcurrency.resizeForDevice(
             imageConcurrency: 4,
-            videoConcurrency: 2,
+            videoConcurrency: _videoSlots(2),
             inFlightCapacity: 160,
           );
           ThumbnailCacheService.resizeMemoryBudget(40 * 1024 * 1024); // 40 MB

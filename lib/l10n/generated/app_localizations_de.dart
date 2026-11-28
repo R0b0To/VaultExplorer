@@ -51,18 +51,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pdfViewerGoButton => 'Los';
 
   @override
-  String get pdfViewerSearchHint => 'Im Dokument suchen';
-
-  @override
-  String get pdfViewerNoMatches => 'Keine Treffer';
-
-  @override
-  String get pdfViewerPreviousMatch => 'Vorheriger Treffer';
-
-  @override
-  String get pdfViewerNextMatch => 'Nächster Treffer';
-
-  @override
   String get pdfViewerPrintTooltip => 'Dokument drucken';
 
   @override
@@ -2375,12 +2363,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get deselectAll => 'Auswahl aufheben';
 
   @override
-  String get layoutModeList => 'Listenansicht';
-
-  @override
-  String get layoutModeGrid => 'Rasteransicht';
-
-  @override
   String get layoutModeMasonry => 'Mauerwerk-Ansicht';
 
   @override
@@ -2644,15 +2626,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String charsCount(int count) {
     return 'Zeichen: $count';
   }
-
-  @override
-  String get unsavedChangesLabel => 'Nicht gespeicherte Änderungen';
-
-  @override
-  String get savedToVault => 'Im Tresor gespeichert';
-
-  @override
-  String get saveChangesTooltip => 'Änderungen speichern';
 
   @override
   String get textEditorDecryptFailedMessage =>
@@ -3532,11 +3505,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get savingLabel => 'Wird gespeichert…';
-
-  @override
-  String autosavedAtLabel(String time) {
-    return 'Automatisch gespeichert um $time';
-  }
 
   @override
   String cameraDisconnectedError(String message) {
@@ -6837,43 +6805,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get filesCopy => 'Kopieren';
 
   @override
-  String get filesChooseDestinationTitle => 'Ordner auswählen';
-
-  @override
-  String get filesMoveHere => 'Hierher verschieben';
-
-  @override
-  String get filesCopyHere => 'Hierher kopieren';
-
-  @override
   String get filesDeleteFailed => 'Konnte nicht gelöscht werden';
-
-  @override
-  String get filesFilterTooltip => 'Filter';
-
-  @override
-  String get filesFilterAll => 'Alle Dateien';
-
-  @override
-  String get filesFilterImages => 'Bilder';
-
-  @override
-  String get filesFilterVideos => 'Videos';
-
-  @override
-  String get filesFilterAudio => 'Audio';
-
-  @override
-  String get filesFilterDocuments => 'Dokumente';
-
-  @override
-  String get filesTextTooLarge => 'Diese Datei ist zu groß für eine Vorschau.';
-
-  @override
-  String get filesTextSaved => 'Gespeichert';
-
-  @override
-  String get filesTextSaveFailed => 'Konnte nicht gespeichert werden';
 
   @override
   String get toolHeaderBackupTitle => 'Header-Backup';
@@ -7611,10 +7543,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get addStorageLocationTitle => 'Speicherort hinzufügen';
 
   @override
-  String get addStorageLocationSubtitle =>
-      'Externe SD-Karte, USB-Laufwerk oder Ordner hinzufügen';
-
-  @override
   String get renameStorageLocationTitle => 'Speicherort umbenennen';
 
   @override
@@ -7624,10 +7552,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return '\"$name\" aus Speicherorten entfernen? Dateien werden nicht gelöscht.';
   }
-
-  @override
-  String get storageLocationUnresolvedError =>
-      'Auf diesen Speicherort konnte nicht direkt zugegriffen werden. Bitte Speicherberechtigungen prüfen.';
 
   @override
   String get storageLocationSelfReferenceError =>
@@ -7781,9 +7705,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get moveToAdvancedSettingsTooltip =>
       'Zu erweiterten Einstellungen verschieben';
-
-  @override
-  String get dashboardNavLabel => 'Dashboard';
 
   @override
   String get vaultsSectionTitle => 'Tresore';
@@ -8529,9 +8450,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get textEditorAutoSaveDescription =>
       'Änderungen automatisch speichern, wenn die Eingabe stoppt';
-
-  @override
-  String get cutTooltip => 'Ausschneiden';
 
   @override
   String get textEditorShowLineNumbersLabel => 'Zeilennummern anzeigen';
@@ -12420,12 +12338,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get galleryFoldersHint =>
       'Wähle die Ordner, die die Galerie durchsucht. Unterordner sind eingeschlossen. Ohne Auswahl wird der gesamte Speicher durchsucht.';
-
-  @override
-  String get galleryFoldersUseAll => 'Alles durchsuchen';
-
-  @override
-  String get galleryFoldersApply => 'Übernehmen';
 
   @override
   String galleryFilterShownOfTotal(int shown, int total) {

@@ -50,18 +50,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pdfViewerGoButton => '이동';
 
   @override
-  String get pdfViewerSearchHint => '문서 내 검색';
-
-  @override
-  String get pdfViewerNoMatches => '일치하는 항목 없음';
-
-  @override
-  String get pdfViewerPreviousMatch => '이전 항목';
-
-  @override
-  String get pdfViewerNextMatch => '다음 항목';
-
-  @override
   String get pdfViewerPrintTooltip => '문서 인쇄';
 
   @override
@@ -2248,12 +2236,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get deselectAll => '모두 선택 해제';
 
   @override
-  String get layoutModeList => '목록 보기';
-
-  @override
-  String get layoutModeGrid => '그리드 보기';
-
-  @override
   String get layoutModeMasonry => '매스너리';
 
   @override
@@ -2510,15 +2492,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String charsCount(int count) {
     return '글자 수: $count';
   }
-
-  @override
-  String get unsavedChangesLabel => '저장되지 않은 변경 사항';
-
-  @override
-  String get savedToVault => '볼트에 저장됨';
-
-  @override
-  String get saveChangesTooltip => '변경 사항 저장';
 
   @override
   String get textEditorDecryptFailedMessage => '볼트에서 파일을 복호화하지 못했습니다.';
@@ -3356,11 +3329,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get savingLabel => '저장 중…';
-
-  @override
-  String autosavedAtLabel(String time) {
-    return '$time에 자동 저장됨';
-  }
 
   @override
   String cameraDisconnectedError(String message) {
@@ -6513,43 +6481,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get filesCopy => '복사';
 
   @override
-  String get filesChooseDestinationTitle => '폴더 선택';
-
-  @override
-  String get filesMoveHere => '여기로 이동';
-
-  @override
-  String get filesCopyHere => '여기에 복사';
-
-  @override
   String get filesDeleteFailed => '삭제할 수 없습니다';
-
-  @override
-  String get filesFilterTooltip => '필터';
-
-  @override
-  String get filesFilterAll => '모든 파일';
-
-  @override
-  String get filesFilterImages => '이미지';
-
-  @override
-  String get filesFilterVideos => '동영상';
-
-  @override
-  String get filesFilterAudio => '오디오';
-
-  @override
-  String get filesFilterDocuments => '문서';
-
-  @override
-  String get filesTextTooLarge => '이 파일은 너무 커서 여기서 미리 볼 수 없습니다.';
-
-  @override
-  String get filesTextSaved => '저장됨';
-
-  @override
-  String get filesTextSaveFailed => '저장할 수 없습니다';
 
   @override
   String get toolHeaderBackupTitle => '헤더 백업';
@@ -7210,9 +7142,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get addStorageLocationTitle => '저장소 위치 추가';
 
   @override
-  String get addStorageLocationSubtitle => '외부 SD 카드, USB 드라이브 또는 폴더 추가';
-
-  @override
   String get renameStorageLocationTitle => '위치 이름 변경';
 
   @override
@@ -7222,10 +7151,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return '저장소 위치에서 \"$name\"을(를) 제거하시겠습니까? 파일은 삭제되지 않습니다.';
   }
-
-  @override
-  String get storageLocationUnresolvedError =>
-      '해당 위치에 직접 접근할 수 없습니다. 저장소 권한을 확인하세요.';
 
   @override
   String get storageLocationSelfReferenceError =>
@@ -7367,9 +7292,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => '고급 설정으로 이동';
-
-  @override
-  String get dashboardNavLabel => '대시보드';
 
   @override
   String get vaultsSectionTitle => '보관함';
@@ -8075,9 +7997,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get textEditorAutoSaveDescription => '입력을 멈추면 변경 사항을 자동으로 저장합니다';
-
-  @override
-  String get cutTooltip => '잘라내기';
 
   @override
   String get textEditorShowLineNumbersLabel => '줄 번호 표시';
@@ -11738,12 +11657,6 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get galleryFoldersHint =>
       '갤러리가 검색할 폴더를 선택하세요. 하위 폴더도 포함됩니다. 아무것도 선택하지 않으면 저장소 전체를 검색합니다.';
-
-  @override
-  String get galleryFoldersUseAll => '전체 검색';
-
-  @override
-  String get galleryFoldersApply => '적용';
 
   @override
   String galleryFilterShownOfTotal(int shown, int total) {

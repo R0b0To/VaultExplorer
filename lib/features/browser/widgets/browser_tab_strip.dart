@@ -23,6 +23,7 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_tab_paths.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
+import 'package:vaultexplorer/features/browser/controllers/tab_pane_drag.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/file_manager_environment.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
@@ -154,6 +155,10 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   TabId? _draggingTabId;
   TabPane? _hoverPane;
 
+  /// Shared with the page, for dragging a tab to the other pane when this strip
+  /// is drawn in the window's title bar (see [TabPaneDrag]).
+  late final ProviderSubscription<TabPaneDrag> _paneDragSubscription;
+
   /// Where the latest press landed (window coordinates), from which it is
   /// worked out how the pressed tab was grabbed once its drag starts.
   Offset? _lastPressPosition;
@@ -203,6 +208,12 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   @override
   void initState() {
     super.initState();
+    // Held for as long as the strip is, so that it can always be reached (the
+    // page that normally holds it may not be there yet, or any more).
+    _paneDragSubscription = ref.listenManual<TabPaneDrag>(
+      tabPaneDragProvider(widget.workspaceConfig),
+      (_, _) {},
+    );
     _scrollController = ScrollController(
       initialScrollOffset: ref
           .read(browserTabsProvider(widget.workspaceConfig).notifier)
@@ -235,6 +246,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     _scrollController.dispose();
     _stripHovered.dispose();
     tabDropTargets.unregister(_dropTarget);
+    _paneDragSubscription.close();
     // A drag in progress is given up. Its end is not reported back here.
     final session = _session;
     _session = null;
@@ -308,16 +320,34 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     final pane = widget.pane;
     TabPane? over;
     if (pane != null) {
-      final bounds = widget.paneBounds?.call(pane.other);
+      final bounds = _paneArea(pane.other);
       if (bounds != null && bounds.contains(event.position)) {
         over = pane.other;
       }
     }
-    if (over != _hoverPane) {
-      _hoverPane = over;
-      widget.onDragOverPane?.call(over);
-    }
+    if (over != _hoverPane) _setHoverPane(over);
     _updateTearOff(event.position, overOtherPane: over != null);
+  }
+
+  /// Where a tab dropped on [pane] lands. A strip drawn in a pane is given the
+  /// area by the page that draws both. A strip drawn in the window's title bar
+  /// finds it through [TabPaneDrag]; that area starts below the title bar, and
+  /// the strip of the pane above it counts as part of the pane, so it is
+  /// reached up to the top of the window.
+  Rect? _paneArea(TabPane pane) {
+    final explicit = widget.paneBounds?.call(pane);
+    if (explicit != null) return explicit;
+    final shared = _paneDragSubscription.read().paneBounds?.call(pane);
+    if (shared == null) return null;
+    return Rect.fromLTRB(shared.left, 0, shared.right, shared.bottom);
+  }
+
+  /// The pane that the dragged tab is held over changed: this strip's page
+  /// highlights it, and so does the page of a strip that is in the title bar.
+  void _setHoverPane(TabPane? over) {
+    _hoverPane = over;
+    widget.onDragOverPane?.call(over);
+    _paneDragSubscription.read().hover.value = over;
   }
 
   void _onPointerUp(PointerUpEvent event) {
@@ -435,10 +465,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 
   void _resetDrag({bool keepProxyHidden = false}) {
     _draggingTabId = null;
-    if (_hoverPane != null) {
-      _hoverPane = null;
-      widget.onDragOverPane?.call(null);
-    }
+    if (_hoverPane != null) _setHoverPane(null);
     _tornOut = false;
     _syncGhost();
     if (!keepProxyHidden) _dragProxyHidden.value = false;

@@ -50,18 +50,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pdfViewerGoButton => '跳转';
 
   @override
-  String get pdfViewerSearchHint => '在文档中搜索';
-
-  @override
-  String get pdfViewerNoMatches => '无匹配结果';
-
-  @override
-  String get pdfViewerPreviousMatch => '上一个匹配项';
-
-  @override
-  String get pdfViewerNextMatch => '下一个匹配项';
-
-  @override
   String get pdfViewerPrintTooltip => '打印文档';
 
   @override
@@ -2212,12 +2200,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deselectAll => '取消全选';
 
   @override
-  String get layoutModeList => '列表视图';
-
-  @override
-  String get layoutModeGrid => '网格视图';
-
-  @override
   String get layoutModeMasonry => '瀑布流';
 
   @override
@@ -2471,15 +2453,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String charsCount(int count) {
     return '字符数：$count';
   }
-
-  @override
-  String get unsavedChangesLabel => '未保存的更改';
-
-  @override
-  String get savedToVault => '已保存到保险库';
-
-  @override
-  String get saveChangesTooltip => '保存更改';
 
   @override
   String get textEditorDecryptFailedMessage => '从保险库解密文件失败。';
@@ -3309,11 +3282,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get savingLabel => '正在保存…';
-
-  @override
-  String autosavedAtLabel(String time) {
-    return '已于$time自动保存';
-  }
 
   @override
   String cameraDisconnectedError(String message) {
@@ -6439,43 +6407,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get filesCopy => '复制';
 
   @override
-  String get filesChooseDestinationTitle => '选择文件夹';
-
-  @override
-  String get filesMoveHere => '移动到此处';
-
-  @override
-  String get filesCopyHere => '复制到此处';
-
-  @override
   String get filesDeleteFailed => '无法删除';
-
-  @override
-  String get filesFilterTooltip => '筛选';
-
-  @override
-  String get filesFilterAll => '所有文件';
-
-  @override
-  String get filesFilterImages => '图片';
-
-  @override
-  String get filesFilterVideos => '视频';
-
-  @override
-  String get filesFilterAudio => '音频';
-
-  @override
-  String get filesFilterDocuments => '文档';
-
-  @override
-  String get filesTextTooLarge => '此文件过大，无法在此预览。';
-
-  @override
-  String get filesTextSaved => '已保存';
-
-  @override
-  String get filesTextSaveFailed => '无法保存';
 
   @override
   String get toolHeaderBackupTitle => '头部备份';
@@ -7113,9 +7045,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addStorageLocationTitle => '添加存储位置';
 
   @override
-  String get addStorageLocationSubtitle => '添加外部SD卡、U盘或文件夹';
-
-  @override
   String get renameStorageLocationTitle => '重命名位置';
 
   @override
@@ -7125,9 +7054,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return '是否从存储位置移除“$name”？原文件不会被删除。';
   }
-
-  @override
-  String get storageLocationUnresolvedError => '无法直接访问该位置。请确认已授予存储权限。';
 
   @override
   String get storageLocationSelfReferenceError =>
@@ -7266,9 +7192,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => '移动到高级设置';
-
-  @override
-  String get dashboardNavLabel => '仪表板';
 
   @override
   String get vaultsSectionTitle => '保险库';
@@ -7958,9 +7881,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get textEditorAutoSaveDescription => '停止输入时自动保存更改';
-
-  @override
-  String get cutTooltip => '剪切';
 
   @override
   String get textEditorShowLineNumbersLabel => '显示行号';
@@ -11555,12 +11475,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get galleryFoldersHint => '选择图库要扫描的文件夹，其子文件夹也会包含在内。未选择时将扫描整个存储空间。';
-
-  @override
-  String get galleryFoldersUseAll => '扫描全部';
-
-  @override
-  String get galleryFoldersApply => '应用';
 
   @override
   String galleryFilterShownOfTotal(int shown, int total) {

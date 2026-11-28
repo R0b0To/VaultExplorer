@@ -50,18 +50,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get pdfViewerGoButton => '移動';
 
   @override
-  String get pdfViewerSearchHint => '文書内を検索';
-
-  @override
-  String get pdfViewerNoMatches => '一致する結果がありません';
-
-  @override
-  String get pdfViewerPreviousMatch => '前の一致';
-
-  @override
-  String get pdfViewerNextMatch => '次の一致';
-
-  @override
   String get pdfViewerPrintTooltip => '文書を印刷';
 
   @override
@@ -2250,12 +2238,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get deselectAll => '選択を解除';
 
   @override
-  String get layoutModeList => 'リスト表示';
-
-  @override
-  String get layoutModeGrid => 'グリッド表示';
-
-  @override
   String get layoutModeMasonry => 'マソンリー';
 
   @override
@@ -2511,15 +2493,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String charsCount(int count) {
     return '文字数: $count';
   }
-
-  @override
-  String get unsavedChangesLabel => '未保存の変更';
-
-  @override
-  String get savedToVault => '保管庫に保存しました';
-
-  @override
-  String get saveChangesTooltip => '変更を保存';
 
   @override
   String get textEditorDecryptFailedMessage => '保管庫からファイルを復号できませんでした。';
@@ -3358,11 +3331,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get savingLabel => '保存中…';
-
-  @override
-  String autosavedAtLabel(String time) {
-    return '$timeに自動保存しました';
-  }
 
   @override
   String cameraDisconnectedError(String message) {
@@ -6517,43 +6485,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get filesCopy => 'コピー';
 
   @override
-  String get filesChooseDestinationTitle => 'フォルダを選択';
-
-  @override
-  String get filesMoveHere => 'ここに移動';
-
-  @override
-  String get filesCopyHere => 'ここにコピー';
-
-  @override
   String get filesDeleteFailed => '削除できませんでした';
-
-  @override
-  String get filesFilterTooltip => 'フィルター';
-
-  @override
-  String get filesFilterAll => 'すべてのファイル';
-
-  @override
-  String get filesFilterImages => '画像';
-
-  @override
-  String get filesFilterVideos => '動画';
-
-  @override
-  String get filesFilterAudio => '音声';
-
-  @override
-  String get filesFilterDocuments => 'ドキュメント';
-
-  @override
-  String get filesTextTooLarge => 'このファイルは大きすぎるため、ここではプレビューできません。';
-
-  @override
-  String get filesTextSaved => '保存しました';
-
-  @override
-  String get filesTextSaveFailed => '保存できませんでした';
 
   @override
   String get toolHeaderBackupTitle => 'ヘッダーのバックアップ';
@@ -7213,9 +7145,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get addStorageLocationTitle => 'ストレージの場所を追加';
 
   @override
-  String get addStorageLocationSubtitle => '外部SDカード、USBドライブ、またはフォルダを追加';
-
-  @override
   String get renameStorageLocationTitle => '場所の名前を変更';
 
   @override
@@ -7225,10 +7154,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return 'ストレージの場所から「$name」を削除しますか？ファイルは削除されません。';
   }
-
-  @override
-  String get storageLocationUnresolvedError =>
-      'その場所に直接アクセスできませんでした。ストレージの権限を確認してください。';
 
   @override
   String get storageLocationSelfReferenceError =>
@@ -7369,9 +7294,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get moveToAdvancedSettingsTooltip => '詳細設定に移動';
-
-  @override
-  String get dashboardNavLabel => 'ダッシュボード';
 
   @override
   String get vaultsSectionTitle => '保管庫';
@@ -8079,9 +8001,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get textEditorAutoSaveDescription => '入力を停止したときに変更を自動的に保存します';
-
-  @override
-  String get cutTooltip => '切り取り';
 
   @override
   String get textEditorShowLineNumbersLabel => '行番号を表示';
@@ -11737,12 +11656,6 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get galleryFoldersHint =>
       'ギャラリーがスキャンするフォルダを選択します。サブフォルダも含まれます。何も選択しない場合は、ストレージ全体をスキャンします。';
-
-  @override
-  String get galleryFoldersUseAll => 'すべてスキャン';
-
-  @override
-  String get galleryFoldersApply => '適用';
 
   @override
   String galleryFilterShownOfTotal(int shown, int total) {

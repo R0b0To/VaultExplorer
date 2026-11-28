@@ -51,18 +51,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get pdfViewerGoButton => 'Перейти';
 
   @override
-  String get pdfViewerSearchHint => 'Пошук у документі';
-
-  @override
-  String get pdfViewerNoMatches => 'Збігів не знайдено';
-
-  @override
-  String get pdfViewerPreviousMatch => 'Попередній збіг';
-
-  @override
-  String get pdfViewerNextMatch => 'Наступний збіг';
-
-  @override
   String get pdfViewerPrintTooltip => 'Друкувати документ';
 
   @override
@@ -2397,12 +2385,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get deselectAll => 'Зняти виділення';
 
   @override
-  String get layoutModeList => 'Список';
-
-  @override
-  String get layoutModeGrid => 'Сітка';
-
-  @override
   String get layoutModeMasonry => 'Мозаїка';
 
   @override
@@ -2663,15 +2645,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String charsCount(int count) {
     return 'Символів: $count';
   }
-
-  @override
-  String get unsavedChangesLabel => 'Незбережені зміни';
-
-  @override
-  String get savedToVault => 'Збережено у сховище';
-
-  @override
-  String get saveChangesTooltip => 'Зберегти зміни';
 
   @override
   String get textEditorDecryptFailedMessage =>
@@ -3558,11 +3531,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get savingLabel => 'Збереження…';
-
-  @override
-  String autosavedAtLabel(String time) {
-    return 'Автозбережено о $time';
-  }
 
   @override
   String cameraDisconnectedError(String message) {
@@ -6892,44 +6860,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get filesCopy => 'Копіювати';
 
   @override
-  String get filesChooseDestinationTitle => 'Виберіть папку';
-
-  @override
-  String get filesMoveHere => 'Перемістити сюди';
-
-  @override
-  String get filesCopyHere => 'Копіювати сюди';
-
-  @override
   String get filesDeleteFailed => 'Не вдалося видалити';
-
-  @override
-  String get filesFilterTooltip => 'Фільтр';
-
-  @override
-  String get filesFilterAll => 'Усі файли';
-
-  @override
-  String get filesFilterImages => 'Зображення';
-
-  @override
-  String get filesFilterVideos => 'Відео';
-
-  @override
-  String get filesFilterAudio => 'Аудіо';
-
-  @override
-  String get filesFilterDocuments => 'Документи';
-
-  @override
-  String get filesTextTooLarge =>
-      'Цей файл завеликий для попереднього перегляду.';
-
-  @override
-  String get filesTextSaved => 'Збережено';
-
-  @override
-  String get filesTextSaveFailed => 'Не вдалося зберегти';
 
   @override
   String get toolHeaderBackupTitle => 'Резервна копія заголовка';
@@ -7674,10 +7605,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get addStorageLocationTitle => 'Додати місце зберігання';
 
   @override
-  String get addStorageLocationSubtitle =>
-      'Додати зовнішню карту SD, USB-накопичувач або папку';
-
-  @override
   String get renameStorageLocationTitle => 'Перейменувати місце';
 
   @override
@@ -7687,10 +7614,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String removeStorageLocationConfirm(String name) {
     return 'Вилучити «$name» з місць зберігання? Файли не буде видалено.';
   }
-
-  @override
-  String get storageLocationUnresolvedError =>
-      'Не вдалося отримати прямий доступ до цього місця зберігання. Переконайтеся, що надано відповідні дозволи.';
 
   @override
   String get storageLocationSelfReferenceError =>
@@ -7845,9 +7768,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get moveToAdvancedSettingsTooltip =>
       'Перемістити до розширених налаштувань';
-
-  @override
-  String get dashboardNavLabel => 'Панель керування';
 
   @override
   String get vaultsSectionTitle => 'Сховища';
@@ -8602,9 +8522,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get textEditorAutoSaveDescription =>
       'Автоматично зберігати зміни після завершення введення';
-
-  @override
-  String get cutTooltip => 'Вирізати';
 
   @override
   String get textEditorShowLineNumbersLabel => 'Показувати номери рядків';
@@ -12527,12 +12444,6 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get galleryFoldersHint =>
       'Виберіть папки, які сканує галерея. Вкладені папки включено. Якщо нічого не вибрано, сканується все сховище.';
-
-  @override
-  String get galleryFoldersUseAll => 'Сканувати все';
-
-  @override
-  String get galleryFoldersApply => 'Застосувати';
 
   @override
   String galleryFilterShownOfTotal(int shown, int total) {

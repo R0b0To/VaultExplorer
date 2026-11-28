@@ -21,6 +21,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/core/services/desktop_thumbnail_slots.dart';
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
@@ -151,6 +152,7 @@ class DesktopEngineHost {
     },
     // The engine decodes the picture itself (FFmpeg, one keyframe, no player). libmpv below stays for what it cannot
     // open: AV1, exotic containers and codecs, or an engine built without FFmpeg.
+    maxNativeConcurrent: desktopVideoThumbnailSlots(),
     native: (r) {
       final strategy = r.strategy.index; // firstFrame, frameAtPercentage, hybrid: the order ve_video_thumbnail takes
       const timeout = Duration(seconds: 20);

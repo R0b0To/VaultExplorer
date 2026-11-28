@@ -124,30 +124,12 @@ class SyncAction {
     this.skipReason,
   });
 
-  /// Bytes this action will move, for progress reporting.
-  int get transferBytes => switch (kind) {
-    SyncActionKind.copyToTarget => vaultState?.size ?? 0,
-    SyncActionKind.copyToVault => targetState?.size ?? 0,
-    SyncActionKind.moveOnTarget => vaultState?.size ?? targetState?.size ?? 0,
-    SyncActionKind.moveOnVault => vaultState?.size ?? targetState?.size ?? 0,
-    SyncActionKind.keepBoth =>
-      (winner == SyncSide.vault ? vaultState?.size : targetState?.size) ?? 0,
-    _ => 0,
-  };
-
   bool get isDelete =>
       kind == SyncActionKind.deleteOnTarget ||
       kind == SyncActionKind.deleteOnVault ||
       kind == SyncActionKind.deleteSourceAfterImport ||
       kind == SyncActionKind.deleteDirOnTarget ||
       kind == SyncActionKind.deleteDirOnVault;
-
-  bool get movesData =>
-      kind == SyncActionKind.copyToTarget ||
-      kind == SyncActionKind.copyToVault ||
-      kind == SyncActionKind.moveOnTarget ||
-      kind == SyncActionKind.moveOnVault ||
-      kind == SyncActionKind.keepBoth;
 
   @override
   String toString() =>

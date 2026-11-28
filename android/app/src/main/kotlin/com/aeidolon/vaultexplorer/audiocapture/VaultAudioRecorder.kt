@@ -324,9 +324,6 @@ class VaultAudioRecorder(private val context: Context) {
         return out
     }
 
-    /** True once at least one part of a segmented recording has been closed. */
-    val hasClosedParts: Boolean get() = closedPartCount > 0
-
     private fun discardFinishedParts() {
         while (true) {
             val part = finishedParts.poll() ?: break

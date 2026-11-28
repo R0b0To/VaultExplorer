@@ -185,13 +185,6 @@ class CustomAppSkin {
   Color colorFor(String role, {required bool dark, required Color fallback}) =>
       _color((dark ? darkColors : lightColors)[role], fallback);
 
-  Color semanticColorFor(
-    String role, {
-    required bool dark,
-    required Color fallback,
-  }) =>
-      _color((dark ? darkSemanticColors : lightSemanticColors)[role], fallback);
-
   Color componentColorFor(
     String role, {
     required bool dark,

@@ -119,7 +119,6 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
 
   Widget _buildSplitSection(ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
-    final isZip = _effectiveFormat == ArchiveFormatType.zip;
     final active = _splitCustom || _splitSizeBytes > 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

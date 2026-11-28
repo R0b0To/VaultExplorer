@@ -231,10 +231,6 @@ enum SyncDirection {
   /// right is copied over (whichever copy is newer), and anything that exists
   /// only on the left is deleted.
   mirrorToLeft;
-
-  /// Whether this direction deletes items that exist only on the target side.
-  bool get deletesExtras =>
-      this == SyncDirection.mirrorToRight || this == SyncDirection.mirrorToLeft;
 }
 
 /// One differing path discovered by `VaultSyncService.scanDiff`. Identical

@@ -154,7 +154,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                 emitEvent("mirrorPullStatus", mapOf("isDownloading" to true))
             }
         }
-    var setPlaybackActiveCallback: ((Boolean) -> Unit)? = null
 
      private var isMirrorDownloading = false
     private var isFallbackMode = false
@@ -1036,7 +1035,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
                     ext.setDataSource(filePath)
                 }
             } else {
-                ext.setDataSource(ContainerMediaDataSource(context, filePath, filePath, volId))
+                ext.setDataSource(ContainerMediaDataSource(filePath, volId))
             }
 
             var videoTrackIndex = -1
@@ -1138,8 +1137,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         currentFilePath = ""
         currentIsLocalStorage = false
     }
-
-    fun getPlayer(): ExoPlayer? = player
 
     override fun onRenderedFirstFrame() {
         emitEvent("renderedFirstFrame", emptyMap())

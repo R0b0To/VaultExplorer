@@ -24,9 +24,6 @@ class DrawOverlay extends StatefulWidget {
   /// Default logical pixel diameter of the brush footprint on screen.
   static const double kDefaultBrushDiameter = 60.0;
 
-  /// Backward-compatible alias for [kDefaultBrushDiameter].
-  static const double kBrushScreenDiameter = kDefaultBrushDiameter;
-
   /// Maximum zoom scale allowed during drawing gestures (3000%).
   static const double kMaxZoomScale = 30.0;
 

@@ -2,9 +2,6 @@ package com.aeidolon.vaultexplorer.cancellation
 
 import java.util.concurrent.ConcurrentHashMap
 
-/** Thrown out of a video export when the user cancels it (see [VideoEditCancellation]). */
-class VideoEditCancelledException(message: String) : Exception(message)
-
 /**
  * Cancellation flags for Video Editor exports, keyed by the opId Dart passes
  * with `videoEditExport`. Same shape as [HashCancellation]; kept as its own

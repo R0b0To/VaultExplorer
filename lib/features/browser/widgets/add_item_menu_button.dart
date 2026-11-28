@@ -68,11 +68,6 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
 }
 
 class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
-  // Was `_menuIsOpen` on the parent's State, shared (and never actually
-  // read) across three different popup buttons -- see the identical note
-  // in sort_menu_button.dart. Kept local here for the same reason.
-  bool _menuIsOpen = false;
-
   /// Renders the anchor as a plain app-bar [IconButton], or -- when
   /// [AddItemMenuButton.asFab] is set -- as a 56dp elevated
   /// [FloatingActionButton], so the same menu (and its three states:
@@ -152,8 +147,6 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
           }
         },
       ),
-      onOpen: () => setState(() => _menuIsOpen = true),
-      onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: buildAddItemMenuChildren(
         context: context,
         ref: ref,

@@ -261,7 +261,6 @@ class BrowserTabsState {
   }
 
   bool get hasMultiple => tabs.length > 1;
-  int get fileTabCount => tabs.where((tab) => !tab.isDashboard).length;
   bool get atLimit => tabs.length >= kMaxBrowserTabs;
 
   /// The pane that has focus (the active tab's pane).

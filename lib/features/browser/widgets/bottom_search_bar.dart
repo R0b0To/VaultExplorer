@@ -55,11 +55,12 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final mediaQuery = MediaQuery.of(context);
+    final mediaQueryPadding = MediaQuery.paddingOf(context);
+    final mediaQueryViewInsets = MediaQuery.viewInsetsOf(context);
     final view = View.of(context);
     final rootNavInset = view.padding.bottom / view.devicePixelRatio;
     final keyboardInset = math.max(
-      mediaQuery.viewInsets.bottom,
+      mediaQueryViewInsets.bottom,
       view.viewInsets.bottom / view.devicePixelRatio,
     );
     // When the keyboard is dismissed, the search bar must sit above the
@@ -69,7 +70,7 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
     // obscured behind the 3 buttons. When the keyboard is up, its inset
     // already covers the navigation bar, so no additional nav inset is added.
     final systemNavBar = keyboardInset == 0
-        ? math.max(mediaQuery.padding.bottom, rootNavInset)
+        ? math.max(mediaQueryPadding.bottom, rootNavInset)
         : 0.0;
 
     return Padding(

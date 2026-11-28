@@ -48,8 +48,10 @@ class _PatternSetupSheetState extends ConsumerState<PatternSetupSheet> {
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final mq = MediaQuery.of(context);
-    final isLandscape = mq.orientation == Orientation.landscape;
+    final mqOrientation = MediaQuery.orientationOf(context);
+    final mqSize = MediaQuery.sizeOf(context);
+    final mqViewInsets = MediaQuery.viewInsetsOf(context);
+    final isLandscape = mqOrientation == Orientation.landscape;
 
     final title = state.step == PatternSetupStep.draw
         ? context.l10n.drawUnlockPatternTitle
@@ -61,7 +63,7 @@ class _PatternSetupSheetState extends ConsumerState<PatternSetupSheet> {
               : context.l10n.drawSamePatternAgain);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: mqViewInsets.bottom),
       child: SafeArea(
         top: false,
         child: Padding(
@@ -122,7 +124,7 @@ class _PatternSetupSheetState extends ConsumerState<PatternSetupSheet> {
                       child: Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxHeight: mq.size.height * 0.7,
+                            maxHeight: mqSize.height * 0.7,
                           ),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,

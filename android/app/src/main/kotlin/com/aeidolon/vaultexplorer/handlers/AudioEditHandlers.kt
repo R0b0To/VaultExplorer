@@ -1,9 +1,7 @@
 package com.aeidolon.vaultexplorer.handlers
 
-import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
-import android.os.PowerManager
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.extractor.DefaultExtractorsFactory
@@ -19,7 +17,6 @@ import com.aeidolon.vaultexplorer.audioedit.PlatformAudioSource
 import com.aeidolon.vaultexplorer.audioedit.ReadAheadMediaDataSource
 import com.aeidolon.vaultexplorer.bridge.AudioEditProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.AudioEditCancellation
-import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
 import com.aeidolon.vaultexplorer.engine.AiffAwareExtractorsFactory
 import com.aeidolon.vaultexplorer.engine.VaultMedia3DataSourceFactory
@@ -58,7 +55,6 @@ class AudioEditHandlers(
         const val TAG = "AudioEditHandlers"
         const val TEMP_PREFIX = "vx_vid_aud_cut_"
         const val TEMP_SUFFIX = ".mp4"
-        const val COPY_BUFFER = 256 * 1024
     }
 
     /**
@@ -107,7 +103,7 @@ class AudioEditHandlers(
             if (isLocal) {
                 extractor.setDataSource(filePath)
             } else {
-                val vaultFile = ContainerMediaDataSource(activity, filePath, filePath, volId)
+                val vaultFile = ContainerMediaDataSource(filePath, volId)
                 // A front-to-back scan (the waveform) reads in big blocks instead of one native call per
                 // audio frame; the other operations keep reading exactly as before.
                 extractor.setDataSource(if (readAhead) ReadAheadMediaDataSource(vaultFile) else vaultFile)
@@ -254,86 +250,31 @@ class AudioEditHandlers(
     // ── audioEditExport ──────────────────────────────────────────────────
 
     /**
-     * Args: `volId`, `filePath`, `isLocalStorage`, `segments` (list of
-     * `[startUs, endUs]`), `merge` (one output holding every segment vs. one
-     * output per segment), `outputPaths` (exactly 1 when merging, else one
-     * per segment -- container-relative for a vault, absolute for local
-     * storage; Dart has already made them unique), `opId`, and optionally
+     * Args: see [parseEditExportArgs], plus optionally
      * `compressBitratePerChannel` (re-encode to AAC at that bitrate per channel
      * instead of copying; the output is then always `.m4a`).
      */
     fun handleExport(call: MethodCall, result: MethodChannel.Result) {
-        val volId = call.argument<Number>("volId")?.toInt()
-        val filePath = call.argument<String>("filePath")
-        val isLocal = call.argument<Boolean>("isLocalStorage") ?: false
-        val merge = call.argument<Boolean>("merge") ?: false
-        val opId = call.argument<Number>("opId")?.toInt() ?: 0
-        val rawSegments = call.argument<List<List<Number>>>("segments")
-        val outputPaths = call.argument<List<String>>("outputPaths")
+        val args = parseEditExportArgs(call, result) ?: return
+        val volId = args.volId
+        val opId = args.opId
+        val outputPaths = args.outputPaths
         val compressBitratePerChannel = call.argument<Number>("compressBitratePerChannel")?.toInt()
-
-        if (volId == null || filePath.isNullOrEmpty() || rawSegments.isNullOrEmpty() || outputPaths.isNullOrEmpty()) {
-            result.error("INVALID_ARGS", "volId, filePath, segments and outputPaths are required", null)
-            return
-        }
-        val ranges = rawSegments.map { LosslessAudioCutter.Range(it[0].toLong(), it[1].toLong()) }
-        if (ranges.any { it.endUs <= it.startUs }) {
-            result.error("INVALID_ARGS", "Every segment needs an end after its start", null)
-            return
-        }
-        val groups: List<List<LosslessAudioCutter.Range>> =
-            if (merge) listOf(ranges) else ranges.map { listOf(it) }
-        if (outputPaths.size != groups.size) {
-            result.error("INVALID_ARGS", "Expected ${groups.size} output path(s), got ${outputPaths.size}", null)
-            return
-        }
+        val groups = args.groups { startUs, endUs -> LosslessAudioCutter.Range(startUs, endUs) }
 
         ioExecutor.execute {
-            val powerManager = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            val wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VaultExplorer:AudioExport")
             // A compress export decodes and re-encodes the whole selection, which for a multi-hour
             // recording takes longer than a stream copy, so it gets a longer (still bounded) timeout.
             val wakeLockMs = if (compressBitratePerChannel != null) 60 * 60 * 1000L else 15 * 60 * 1000L
-            wakeLock?.acquire(wakeLockMs)
+            val wakeLock = EditExportSupport.acquireWakeLock(activity, "VaultExplorer:AudioExport", wakeLockMs)
             val tempFiles = ArrayList<File>()
             // Outputs created so far (successfully or not) -- rolled back if the export fails or is cancelled.
             val created = ArrayList<String>()
             try {
-                // Free-space preflight: the output is never larger than the source, so size the check on it.
-                val sourceSize = if (isLocal) {
-                    File(filePath).length().coerceAtLeast(1L)
-                } else {
-                    ContainerFileSystem.getFileSize(volId, filePath).coerceAtLeast(1L)
-                }
-                val estimatedBytes = ((sourceSize * 1.2).toLong() + 5 * 1024 * 1024L).coerceAtLeast(10 * 1024 * 1024L)
+                EditExportSupport.checkFreeSpace(activity.cacheDir, args)
 
-                val cacheUsable = activity.cacheDir.usableSpace
-                if (cacheUsable in 1 until estimatedBytes) {
-                    val needMb = estimatedBytes / (1024 * 1024)
-                    val freeMb = cacheUsable / (1024 * 1024)
-                    throw IOException("Not enough free space in app cache (need $needMb MB, only $freeMb MB available)")
-                }
-
-                if (isLocal) {
-                    val destDir = File(outputPaths[0]).parentFile ?: File(outputPaths[0])
-                    val localUsable = destDir.usableSpace
-                    if (localUsable in 1 until estimatedBytes) {
-                        val needMb = estimatedBytes / (1024 * 1024)
-                        val freeMb = localUsable / (1024 * 1024)
-                        throw IOException("Not enough free space on storage (need $needMb MB, only $freeMb MB available)")
-                    }
-                } else {
-                    val freeBytes = ContainerFileSystem.getSpaceInfo(volId)
-                        ?.let { if (it.size > 1) it[1] else null }
-                    if (freeBytes != null && freeBytes in 1 until estimatedBytes) {
-                        val needMb = estimatedBytes / (1024 * 1024)
-                        val freeMb = freeBytes / (1024 * 1024)
-                        throw IOException("Not enough free space in vault (need $needMb MB, only $freeMb MB available)")
-                    }
-                }
-
-                val factory = extractorFactory(volId, filePath, isLocal)
-                val sourceExtension = extensionOf(filePath)
+                val factory = extractorFactory(volId, args.filePath, args.isLocal)
+                val sourceExtension = extensionOf(args.filePath)
 
                 for ((i, group) in groups.withIndex()) {
                     if (AudioEditCancellation.isCancelled(opId)) {
@@ -362,13 +303,9 @@ class AudioEditHandlers(
 
                     val dest = outputPaths[i]
                     created.add(dest)
-                    val saved = if (isLocal) {
-                        copyToLocal(temp, File(dest))
-                    } else {
-                        val written = ContainerFileSystem.writeBackFile(volId, dest, temp.absolutePath)
-                        written && ContainerFileSystem.finishWrite(volId, dest)
+                    if (!EditExportSupport.saveOutput(args, temp, dest, TAG)) {
+                        throw IOException("Could not save the cut audio (is there enough free space?)")
                     }
-                    if (!saved) throw IOException("Could not save the cut audio (is there enough free space?)")
 
                     // Wipe right away: don't keep a plaintext copy around between outputs.
                     SecureFileWipe.secureDeleteFile(temp)
@@ -378,42 +315,16 @@ class AudioEditHandlers(
                 val payload = hashMapOf<String, Any?>("outputPaths" to outputPaths)
                 activity.runOnUiThread { result.success(payload) }
             } catch (e: Exception) {
-                rollBack(volId, isLocal, created)
-                val cancelled = e is LosslessAudioCutter.CutCancelledException
-                if (!cancelled) VeLog.w(TAG, e) { "audioEditExport failed" }
-                activity.runOnUiThread {
-                    if (cancelled) {
-                        result.error("CANCELLED", "Export cancelled", null)
-                    } else {
-                        result.error("EXPORT_FAILED", e.message ?: "Export failed", null)
-                    }
-                }
+                EditExportSupport.rollBack(args, created)
+                EditExportSupport.replyFailure(
+                    activity, result, e,
+                    cancelled = e is LosslessAudioCutter.CutCancelledException,
+                    tag = TAG, logMessage = "audioEditExport failed",
+                )
             } finally {
                 tempFiles.forEach { SecureFileWipe.secureDeleteFile(it) }
                 AudioEditCancellation.clear(opId)
-                if (wakeLock?.isHeld == true) {
-                    runCatching { wakeLock.release() }
-                }
-            }
-        }
-    }
-
-    private fun copyToLocal(src: File, dest: File): Boolean = try {
-        dest.parentFile?.mkdirs()
-        src.inputStream().use { input ->
-            dest.outputStream().use { output -> input.copyTo(output, COPY_BUFFER) }
-        }
-        true
-    } catch (e: Exception) {
-        VeLog.w(TAG, e) { "copyToLocal failed" }
-        false
-    }
-
-    /** Removes outputs this call created, so a failed/cancelled export leaves nothing half-written behind. */
-    private fun rollBack(volId: Int, isLocal: Boolean, created: List<String>) {
-        for (path in created) {
-            runCatching {
-                if (isLocal) File(path).delete() else ContainerFileSystem.deleteFile(volId, path)
+                EditExportSupport.releaseWakeLock(wakeLock)
             }
         }
     }

@@ -18,13 +18,9 @@ import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import com.aeidolon.vaultexplorer.handlers.OpenWithChooser
-import com.aeidolon.vaultexplorer.saf.SafDocumentOps
-import com.aeidolon.vaultexplorer.saf.VaultPathUtils
-import androidx.documentfile.provider.DocumentFile
 import android.net.Uri
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
-import com.aeidolon.vaultexplorer.bridge.ExternalOpenBridge
 import com.aeidolon.vaultexplorer.bridge.HashProgressBridge
 import com.aeidolon.vaultexplorer.bridge.HiddenVolumeProtectionBridge
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
@@ -59,7 +55,6 @@ import com.aeidolon.vaultexplorer.handlers.HeaderBackupHandlers
 import com.aeidolon.vaultexplorer.handlers.VeraCryptToolsHandlers
 import com.aeidolon.vaultexplorer.handlers.SecureStorageHandlers
 import com.aeidolon.vaultexplorer.handlers.SingleFileCryptoHandlers
-import com.aeidolon.vaultexplorer.handlers.SplitContainerMountHandlers
 import com.aeidolon.vaultexplorer.handlers.SplitJoinHandlers
 import com.aeidolon.vaultexplorer.handlers.SystemPermissionHandlers
 import com.aeidolon.vaultexplorer.handlers.ThumbnailHandlers
@@ -433,7 +428,6 @@ open class MainActivity : FlutterFragmentActivity() {
     private val splitJoinHandlers = SplitJoinHandlers(this, ioExecutor)
     private val singleFileCryptoHandlers = SingleFileCryptoHandlers(this, ioExecutor, nativeOps)
     private val hashVerifierHandlers = HashVerifierHandlers(this, ioExecutor)
-    private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val localFileHandlers = LocalFileHandlers(this, ioExecutor)
@@ -681,7 +675,6 @@ open class MainActivity : FlutterFragmentActivity() {
         }
 
         vaultUnlockHandlers.onActivityDestroyed()
-        splitContainerMountHandlers.onActivityDestroyed()
         usbHandlers.onActivityDestroyed()
         super.onDestroy()
     }
@@ -734,30 +727,6 @@ open class MainActivity : FlutterFragmentActivity() {
         }
     }
     
-   private fun resolveSafDocument(treeUriStr: String, relativePath: String): DocumentFile? {
-        val treeUri = Uri.parse(treeUriStr)
-        var doc: DocumentFile? = DocumentFile.fromTreeUri(this, treeUri)
-        if (doc == null) {
-            VeLog.w("MainActivity") { "resolveSafDocument: DocumentFile.fromTreeUri returned null for $treeUriStr" }
-            return null
-        }
-        val clean = relativePath.trim().trim('/')
-        if (clean.isEmpty()) return doc
-
-        for (segment in clean.split('/')) {
-            if (segment.isEmpty()) continue
-            val current = doc ?: return null
-            val child = current.findFile(segment)
-            if (child == null) {
-                val currentUri = current.uri
-                VeLog.w("MainActivity") { "resolveSafDocument: child '$segment' not found under $currentUri" }
-                return null
-            }
-            doc = child
-        }
-        return doc
-    }
-
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         methodChannel?.invokeMethod("onTrimMemory", mapOf("level" to level))
@@ -1063,7 +1032,6 @@ open class MainActivity : FlutterFragmentActivity() {
         VaultCameraStopRequestedBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
-        ExternalOpenBridge.channel = disguiseChannel
 
         // ONLY VaultShareActivity should receive incoming share pushes
         if (this is VaultShareActivity) {
@@ -1574,7 +1542,6 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.AUDIO_EDIT_WAVEFORM -> audioEditHandlers.handleWaveform(call, result)
                 ChannelMethods.AUDIO_EDIT_EXPORT -> audioEditHandlers.handleExport(call, result)
                 ChannelMethods.CANCEL_AUDIO_EDIT -> audioEditHandlers.handleCancel(call, result)
-                ChannelMethods.UNLOCK_SPLIT_CONTAINER -> splitContainerMountHandlers.handleUnlockSplitContainer(call, result)
                 ChannelMethods.ENCRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleEncryptSingleFile(call, result)
                 ChannelMethods.DECRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleDecryptSingleFile(call, result)
                 ChannelMethods.COMPUTE_EXTERNAL_FILE_HASH -> hashVerifierHandlers.handleComputeExternalFileHash(call, result)

@@ -248,10 +248,12 @@ class _SkinEditorContentState extends ConsumerState<_SkinEditorContent> {
     // is what each color is compared against.
     final base = Theme.of(context);
     final dark = base.brightness == Brightness.dark;
-    final media = MediaQuery.of(context);
-    final size = media.size;
-    final safe = media.padding;
-    final keyboard = media.viewInsets.bottom;
+    final mediaSize = MediaQuery.sizeOf(context);
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final mediaViewInsets = MediaQuery.viewInsetsOf(context);
+    final size = mediaSize;
+    final safe = mediaPadding;
+    final keyboard = mediaViewInsets.bottom;
     final picking = session.picking;
 
     final minTop = safe.top + 8;

@@ -9,8 +9,6 @@ class VeraCryptToolsException implements Exception {
   final String code;
   final String message;
 
-  bool get isIncorrectPassword => code == 'PASSWORD_INCORRECT';
-
   @override
   String toString() => message;
 }

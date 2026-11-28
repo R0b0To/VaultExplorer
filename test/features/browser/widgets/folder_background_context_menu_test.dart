@@ -126,4 +126,69 @@ void main() {
     expect(find.text('Second'), findsOneWidget);
     expect(find.text('First'), findsNothing);
   });
+
+  testWidgets('a left click anywhere on the listing closes the menu', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        menuBuilder: (_) => [
+          MenuItemButton(onPressed: () {}, child: const Text('Paste')),
+        ],
+      ),
+    );
+
+    // Empty part of the listing.
+    await _rightClick(tester, const Offset(200, 350));
+    expect(find.text('Paste'), findsOneWidget);
+    await tester.tapAt(const Offset(300, 380));
+    await tester.pumpAndSettle();
+    expect(find.text('Paste'), findsNothing);
+
+    // On a tile: also closes it.
+    await _rightClick(tester, const Offset(200, 350));
+    expect(find.text('Paste'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.text('Paste'), findsNothing);
+  });
+
+  testWidgets('the click that closes the menu does not open the tile', (
+    tester,
+  ) async {
+    var tileTaps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 400,
+            child: FolderBackgroundContextMenu(
+              menuBuilder: (_) => [
+                MenuItemButton(onPressed: () {}, child: const Text('Paste')),
+              ],
+              child: ListView(
+                children: [
+                  InkWell(
+                    key: const Key('tile'),
+                    onTap: () => tileTaps++,
+                    child: const SizedBox(height: 48, child: Text('file.txt')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await _rightClick(tester, const Offset(200, 350));
+    expect(find.text('Paste'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('tile')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Paste'), findsNothing);
+    expect(tileTaps, 0);
+  });
 }

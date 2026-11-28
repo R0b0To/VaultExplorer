@@ -239,10 +239,6 @@ class SyncCoordinatorService {
     return true;
   }
 
-  /// True while [ruleId] is running or waiting for its turn.
-  bool isRuleBusy(MountedContainer vault, String ruleId) =>
-      _sessions[vault.uri]?.scheduler.isActive(ruleId) ?? false;
-
   /// The result of the latest run of [ruleId] in this session, if any.
   SyncRunReport? lastReportFor(MountedContainer vault, String ruleId) =>
       _sessions[vault.uri]?.lastReports[ruleId];

@@ -5,8 +5,6 @@
 // from the construction documented in user_entropy.h:
 //   seed    = SHA-512("VaultExplorer/user-entropy/v1" || u32be(len) || input)
 //   block_i = SHA-512(seed || u64be(i))
-// util/UserEntropy.kt's unit test checks the SAME vectors, which is what keeps
-// the native and JVM mixers interchangeable.
 #include "../user_entropy.h"
 
 #include <cstdio>

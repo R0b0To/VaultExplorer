@@ -1,6 +1,5 @@
 package com.aeidolon.vaultexplorer.camera
 
-import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaCodecList
 import android.media.MediaExtractor

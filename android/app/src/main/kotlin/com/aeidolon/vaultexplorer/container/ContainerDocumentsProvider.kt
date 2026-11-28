@@ -574,7 +574,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val handler = Handler(handlerThread.looper)
 
         return try {
-            val callback = ContainerProxyCallback(context, volId, currentSession, fatPath, isWrite, handlerThread, ioLease)
+            val callback = ContainerProxyCallback(context, volId, fatPath, isWrite, handlerThread, ioLease)
             val parcelMode = ParcelFileDescriptor.parseMode(mode ?: "r")
             storageManager.openProxyFileDescriptor(parcelMode, callback, handler)
         } catch (e: Exception) {
@@ -711,8 +711,8 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                 // lambda below without smart-cast ambiguity over the
                 // enclosing var.
                 val mmr = retriever
-                val session = ContainerSessionRegistry.activeSessions[volId] ?: return null
-                val dataSource = ContainerMediaDataSource(context ?: return null, session.uri, fatPath, volId)
+                if (ContainerSessionRegistry.activeSessions[volId] == null || context == null) return null
+                val dataSource = ContainerMediaDataSource(fatPath, volId)
                 mmr.setDataSource(dataSource)
 
                 val durationUs = mmr

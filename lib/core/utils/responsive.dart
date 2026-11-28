@@ -14,12 +14,6 @@ abstract final class AppBreakpoints {
   /// columns justice (e.g. small/older phones, split-screen multitasking).
   static const wideContentMinWidth = 600.0;
 
-  /// Soft cap on how wide the "secondary" pane (a side rail's content, or
-  /// the left pane of a two-pane screen) is allowed to grow on very wide
-  /// windows, so it reads as a fixed-width panel rather than stretching
-  /// with the rest of the screen.
-  static const secondaryPaneMaxWidth = 420.0;
-
   /// Minimum window width at which the navigation menu is docked as a
   /// permanent sidebar instead of a modal drawer (Material's "expanded"
   /// window class). Tablets in landscape and desktop windows reach it;
@@ -41,10 +35,6 @@ abstract final class AppBreakpoints {
   static bool useDockedSidebarFor(Size size) =>
       size.width >= dockedSidebarMinWidth &&
       size.height >= dockedSidebarMinHeight;
-
-  /// Widest a single-column page (a form, a settings detail pane, a list of
-  /// cards) is allowed to grow before it is centered instead of stretched.
-  static const pageMaxWidth = 1100.0;
 
   /// Narrowest a card in an adaptive card grid is allowed to be.
   static const cardGridMinTileWidth = 340.0;
@@ -130,13 +120,6 @@ class ScreenInfo {
     if (maxColumns != null && fit > maxColumns) return maxColumns;
     return fit;
   }
-
-  /// Clamped width for a fixed-width secondary pane in a two-pane layout,
-  /// so it reads as a panel of a sensible size rather than stretching to
-  /// half the screen on very wide windows or getting squeezed too thin
-  /// right at the [useWideLayout] threshold.
-  double secondaryPaneWidth({double fraction = 0.4}) =>
-      (width * fraction).clamp(280.0, AppBreakpoints.secondaryPaneMaxWidth);
 }
 
 extension ScreenInfoX on BuildContext {

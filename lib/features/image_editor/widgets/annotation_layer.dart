@@ -21,8 +21,6 @@ const List<Color> editorColorPalette = [
   Color(0xFF000000), // Black
 ];
 
-const List<double> editorStrokeWidthFractions = [0.005, 0.010, 0.020, 0.035];
-
 class AnnotationLayer extends StatefulWidget {
   final Size imageSize;
   final List<EditAnnotation> annotations;

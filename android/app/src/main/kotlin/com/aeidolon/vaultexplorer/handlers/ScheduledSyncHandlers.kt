@@ -26,7 +26,6 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import java.util.Calendar
-import java.util.Locale
 
 /** Schedules device-local daily syncs. No password is stored in alarms or work input. */
 class ScheduledSyncHandlers(context: Context) {

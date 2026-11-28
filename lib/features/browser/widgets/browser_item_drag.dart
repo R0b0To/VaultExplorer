@@ -796,7 +796,6 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
     final currentDirectory = widget.currentDirectory;
     final visibleItems = widget.visibleItems;
     final selectedItems = widget.selectedItems;
-    final isSelectionMode = widget.isSelectionMode;
     final onDrop = widget.onDrop;
     final scope = BrowserPaneScope.maybeOf(context);
     final locked = scope?.interactionLocked ?? false;
@@ -1186,15 +1185,16 @@ class _DragFeedback extends StatelessWidget {
       if (item != entry) previews.add(item);
     }
 
-    final media = MediaQuery.of(context);
+    final mediaSize = MediaQuery.sizeOf(context);
+    final mediaPadding = MediaQuery.paddingOf(context);
     final isMulti = count > 1;
     final maxWidth = isMulti ? _multiMaxWidth : _singleMaxWidth;
     final height = isMulti ? _multiHeight : _singleHeight;
 
     return _DragShiftBox(
       pointer: pointer,
-      screenSize: media.size,
-      topPadding: media.padding.top,
+      screenSize: mediaSize,
+      topPadding: mediaPadding.top,
       isMouse: isMouse,
       child: _buildCard(
         context,

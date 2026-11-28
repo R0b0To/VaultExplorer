@@ -432,7 +432,6 @@ class _SlideshowStatusChipState extends State<_SlideshowStatusChip>
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.colors;
 
     return Material(
       color: Colors.white.withValues(alpha: 0.14),

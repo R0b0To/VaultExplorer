@@ -2,7 +2,6 @@ package com.aeidolon.vaultexplorer.foldervault
 
 import android.content.Context
 import android.net.Uri
-import com.aeidolon.vaultexplorer.DirEntryWire
 import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.container.VaultBackend
 import com.aeidolon.vaultexplorer.saf.VaultPathUtils

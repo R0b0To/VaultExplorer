@@ -208,7 +208,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.edgeSwipeBrightnessEnabled = true,
     this.edgeSwipeVolumeEnabled = true,
     this.edgeSwipeHudEnabled = true,
-    this.edgeSwipeWidthFraction = 0.25,
+    this.edgeSwipeWidthFraction = MediaViewerConstants.defaultEdgeSwipeWidthFraction,
     this.pinchZoomOutEnabled = true,
     this.minVideoZoomScale = 0.25,
     this.holdToSpeedMultiplier = 2.0,
@@ -2578,11 +2578,12 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   }
 
   Widget _buildAudioCover(Uint8List cover) {
-    final mq = MediaQuery.of(context);
+    final mqSize = MediaQuery.sizeOf(context);
+    final mqDevicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final side = math
-        .min(mq.size.width * 0.75, math.min(mq.size.height * 0.38, 340.0))
+        .min(mqSize.width * 0.75, math.min(mqSize.height * 0.38, 340.0))
         .clamp(130.0, 340.0);
-    final cacheSide = (side * mq.devicePixelRatio).round();
+    final cacheSide = (side * mqDevicePixelRatio).round();
     return Container(
       width: side,
       height: side,

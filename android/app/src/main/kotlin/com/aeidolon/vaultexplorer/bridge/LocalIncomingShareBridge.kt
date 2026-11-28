@@ -1,8 +1,6 @@
 package com.aeidolon.vaultexplorer.bridge
 
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import io.flutter.plugin.common.MethodChannel
 
 /**
@@ -12,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
  * .handleIncomingIntent] to Dart's decoy file manager
  * (lib/features/decoy/local/decoy_share_import_flow.dart) -- kept as a
  * fully separate object, on its own channel
- * (`disguise_channel`, alongside [ExternalOpenBridge]; never the
+ * (`disguise_channel`; never the
  * shared engine [channel][IncomingShareBridge] uses), so that nothing
  * here is reachable from -- or even routed through the same plumbing
  * as -- any vault-labeled Dart code before the person has actually
@@ -28,93 +26,56 @@ import io.flutter.plugin.common.MethodChannel
  * buffered until the person finishes picking a destination folder, at
  * which point [LocalFileHandlers.handleImportSharedUrisToLocal] calls
  * [takePendingUris] to actually stream the bytes. Same cold/warm dual
- * delivery too: [deliver] always buffers into [pending] first (covers
+ * delivery too: [deliver] always buffers into the pending buffer first (covers
  * cold start, where Dart isn't listening yet) and pushes only if
  * [channel] is already wired up (covers warm start, where the decoy
  * screen is already on screen and listening).
  *
- * [pending] always holds only the most recent request -- "most recent
+ * the pending buffer always holds only the most recent request -- "most recent
  * wins" is the right behavior for the same reason [IncomingShareBridge]
  * picks it: a second share almost certainly means the person changed
  * their mind about what to send in, not that they want both queued.
  */
 object LocalIncomingShareBridge {
-    data class ShareItem(
-        val uri: Uri,
-        val displayName: String,
-        val sizeBytes: Long,
-        val mimeType: String?,
-    )
+    private val buffer = PendingShareBuffer("onLocalIncomingShareRequest")
 
-    @Volatile
-    var channel: MethodChannel? = null
-
-    @Volatile
-    private var pending: List<ShareItem>? = null
-
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    private fun metadataOf(items: List<ShareItem>): Map<String, Any?> = mapOf(
-        "items" to items.map {
-            mapOf(
-                "uri" to it.uri.toString(),
-                "displayName" to it.displayName,
-                "sizeBytes" to it.sizeBytes,
-                "mimeType" to it.mimeType,
-            )
-        },
-    )
+    var channel: MethodChannel?
+        get() = buffer.channel
+        set(value) {
+            buffer.channel = value
+        }
 
     @JvmStatic
-    fun deliver(items: List<ShareItem>) {
-        if (items.isEmpty()) return
-        pending = items
-        val ch = channel ?: return
-        val payload = metadataOf(items)
-        mainHandler.post { ch.invokeMethod("onLocalIncomingShareRequest", payload) }
-    }
-
-    /** See [IncomingShareBridge.peekPending] -- identical contract. */
-    @JvmStatic
-    fun peekPending(): Map<String, Any?>? {
-        val items = pending ?: return null
-        return metadataOf(items)
-    }
-
-    /** Consumes and returns the metadata map, clearing pending buffer. */
-    @JvmStatic
-    fun takePending(): Map<String, Any?>? {
-        val items = pending ?: return null
-        pending = null
-        return metadataOf(items)
-    }
+    fun deliver(items: List<ShareItem>) = buffer.deliver(items)
 
     /**
-     * Internal, non-wire counterpart of [peekPending] -- returns and
-     * consumes the raw [ShareItem] list rather than the Dart-facing
-     * metadata map, for [com.aeidolon.vaultexplorer.handlers
-     * .ShareIntentHandlers.handleHandoffLocalShareToVault] to reconstruct
-     * [IncomingShareBridge.ShareItem]s from. Never exposed to Dart
-     * directly.
+     * Read-only snapshot of whatever is currently buffered, as the `{"items": [...]}` shape the Dart side
+     * expects. Does *not* clear the buffer: the metadata (filenames/sizes from the *other* app, nothing about
+     * this app's vaults) can be shown well before the person has finished picking a destination.
      */
     @JvmStatic
-    fun takePendingRaw(): List<ShareItem>? {
-        val items = pending ?: return null
-        pending = null
-        return items
-    }
+    fun peekPending(): Map<String, Any?>? = buffer.peekMetadata()
 
-    /** See [IncomingShareBridge.takePendingUris] -- identical contract. */
+    /** Consumes and returns the metadata map, clearing the buffer. */
     @JvmStatic
-    fun takePendingUris(): List<Uri>? {
-        val items = pending ?: return null
-        pending = null
-        return items.map { it.uri }
-    }
+    fun takePending(): Map<String, Any?>? = buffer.takeMetadata()
 
-    /** See [IncomingShareBridge.clear] -- identical contract. */
+    /**
+     * Internal, non-wire counterpart of [peekPending]: returns and consumes the raw [ShareItem] list, for
+     * [com.aeidolon.vaultexplorer.handlers.ShareIntentHandlers.handleHandoffLocalShareToVault] to re-deliver
+     * through [IncomingShareBridge]. Never exposed to Dart directly.
+     */
     @JvmStatic
-    fun clear() {
-        pending = null
-    }
+    fun takePendingRaw(): List<ShareItem>? = buffer.takeItems()
+
+    /**
+     * Hands the buffered URIs to the caller and clears the buffer -- called once a destination has actually
+     * been chosen, so a second, unrelated share arriving afterward doesn't inherit the URIs of the first.
+     */
+    @JvmStatic
+    fun takePendingUris(): List<Uri>? = buffer.takeUris()
+
+    /** Drops whatever is buffered without importing it. */
+    @JvmStatic
+    fun clear() = buffer.clear()
 }

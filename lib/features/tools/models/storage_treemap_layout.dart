@@ -22,9 +22,6 @@ class TmRect {
   double get bottom => top + height;
   double get area => width * height;
 
-  bool containsPoint(double x, double y) =>
-      x >= left && x < right && y >= top && y < bottom;
-
   @override
   String toString() => 'TmRect($left, $top, $width x $height)';
 }

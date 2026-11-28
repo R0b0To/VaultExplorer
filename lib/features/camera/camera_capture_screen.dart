@@ -86,10 +86,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   bool _backgroundRecordingActive = false;
 
-  String? _currentRecordingName;
-
-  String? _currentRecordingPath;
-
   String? _firstSavedCaptureName;
 
   bool _hasSavedVideoCapture = false;
@@ -1074,9 +1070,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     try {
       final name = await _vaultService.nextAvailableName(isPhoto: false);
       final virtualPath = _vaultService.buildVirtualPath(name);
-
-      _currentRecordingName = name;
-      _currentRecordingPath = virtualPath;
 
       final segmentSeconds = captureControls.segmentMinutes * 60;
       _segmentedRecording = segmentSeconds > 0;

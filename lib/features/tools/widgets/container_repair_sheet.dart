@@ -641,13 +641,6 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
                 itemCount: state.logLines.length,
                 itemBuilder: (context, index) {
                   final line = state.logLines[index];
-                  final color = line.contains('[ERROR]')
-                      ? Colors.redAccent
-                      : line.contains('[SUCCESS]')
-                          ? Colors.greenAccent
-                          : line.contains('[WARNING]')
-                              ? Colors.amberAccent
-                              : Colors.white70;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),

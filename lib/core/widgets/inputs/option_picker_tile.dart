@@ -81,8 +81,9 @@ class OptionPickerTile<T> extends StatelessWidget {
       builder: (dialogContext) {
         final dialogTheme = Theme.of(dialogContext);
         final cs = dialogTheme.colorScheme;
-        final mediaQuery = MediaQuery.of(dialogContext);
-        final isLandscape = mediaQuery.orientation == Orientation.landscape;
+        final mediaQueryOrientation = MediaQuery.orientationOf(dialogContext);
+        final mediaQuerySize = MediaQuery.sizeOf(dialogContext);
+        final isLandscape = mediaQueryOrientation == Orientation.landscape;
 
         return Dialog(
           shape: RoundedRectangleBorder(
@@ -92,8 +93,8 @@ class OptionPickerTile<T> extends StatelessWidget {
             constraints: BoxConstraints(
               maxWidth: 440,
               maxHeight: isLandscape
-                  ? mediaQuery.size.height * 0.85
-                  : mediaQuery.size.height * 0.75,
+                  ? mediaQuerySize.height * 0.85
+                  : mediaQuerySize.height * 0.75,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),

@@ -3,7 +3,6 @@ package com.aeidolon.vaultexplorer.bridge
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.MethodChannel
-import com.aeidolon.vaultexplorer.FilesystemNameValidator
 import com.aeidolon.vaultexplorer.automation.VaultAutomationProgress
 
 object ImportProgressBridge {

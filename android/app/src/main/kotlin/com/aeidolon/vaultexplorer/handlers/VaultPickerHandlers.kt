@@ -246,7 +246,14 @@ class VaultPickerHandlers(
         }
     }
 
-    private val pickCryptomatorVaultLauncher = activity.registerForActivityResult(
+    /**
+     * Registers a launcher for a folder-vault picker: takes the persistable
+     * grant, sniffs the vault format in the picked folder and replies with
+     * `uri`, `displayName`, `looksLikeVault` and `format` (or null when the
+     * picker was dismissed). Each caller gets its own launcher so the entry
+     * points stay independent of one another.
+     */
+    private fun registerFolderVaultPickerLauncher() = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
         val res = pendingResult.take() ?: return@registerForActivityResult
@@ -276,102 +283,13 @@ class VaultPickerHandlers(
         }
     }
 
-    private val pickGocryptfsVaultLauncher = activity.registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { activityResult ->
-        val res = pendingResult.take() ?: return@registerForActivityResult
-        val data = activityResult.data
-        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
-            val uri = data.data!!
-            ioExecutor.execute {
-                try {
-                    activity.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                } catch (_: SecurityException) {}
-                val format = detectVaultFormatInFolder(uri)
-                val name = UriNameResolver.resolve(activity.contentResolver, uri)
-                activity.runOnUiThread {
-                    res.success(mapOf(
-                        "uri" to uri.toString(),
-                        "displayName" to name,
-                        "looksLikeVault" to (format != null),
-                        "format" to format,
-                    ))
-                }
-            }
-        } else {
-            res.success(null)
-        }
-    }
-
-    private val pickCryfsVaultLauncher = activity.registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { activityResult ->
-        val res = pendingResult.take() ?: return@registerForActivityResult
-        val data = activityResult.data
-        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
-            val uri = data.data!!
-            ioExecutor.execute {
-                try {
-                    activity.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                } catch (_: SecurityException) {}
-                val format = detectVaultFormatInFolder(uri)
-                val name = UriNameResolver.resolve(activity.contentResolver, uri)
-                activity.runOnUiThread {
-                    res.success(mapOf(
-                        "uri" to uri.toString(),
-                        "displayName" to name,
-                        "looksLikeVault" to (format != null),
-                        "format" to format,
-                    ))
-                }
-            }
-        } else {
-            res.success(null)
-        }
-    }
+    private val pickCryptomatorVaultLauncher = registerFolderVaultPickerLauncher()
+    private val pickGocryptfsVaultLauncher = registerFolderVaultPickerLauncher()
+    private val pickCryfsVaultLauncher = registerFolderVaultPickerLauncher()
 
     // Check & Repair tool's folder-vault picker (see
     // foldercheck/FolderVaultChecker.kt and RepairHandlers.handleCheckFolderVault).
-    // Same body as pickCryptomatorVaultLauncher/pickGocryptfsVaultLauncher/
-    // pickCryfsVaultLauncher above -- kept as its own launcher rather than
-    // reused so the repair tool's entry point stays independent of the
-    // per-format "add a vault" flows (e.g. free to gain repair-specific
-    // intent hints later without touching those).
-    private val pickFolderVaultForRepairLauncher = activity.registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { activityResult ->
-        val res = pendingResult.take() ?: return@registerForActivityResult
-        val data = activityResult.data
-        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
-            val uri = data.data!!
-            ioExecutor.execute {
-                try {
-                    activity.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                } catch (_: SecurityException) {}
-                val format = detectVaultFormatInFolder(uri)
-                val name = UriNameResolver.resolve(activity.contentResolver, uri)
-                activity.runOnUiThread {
-                    res.success(mapOf(
-                        "uri" to uri.toString(),
-                        "displayName" to name,
-                        "looksLikeVault" to (format != null),
-                        "format" to format,
-                    ))
-                }
-            }
-        } else {
-            res.success(null)
-        }
-    }
+    private val pickFolderVaultForRepairLauncher = registerFolderVaultPickerLauncher()
 
     // Used by the decoy Archive Explorer screen to let the user open a zip
     // that isn't sitting in the public Downloads folder. Unlike the other

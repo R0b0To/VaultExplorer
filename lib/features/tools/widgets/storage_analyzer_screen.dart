@@ -834,7 +834,6 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
     StorageAnalyzer notifier,
   ) {
     final l10n = context.l10n;
-    final cs = context.colors;
     final selected = st.selected;
     final actions = _actions(notifier);
     final rootLabel = selected?.displayName ?? '';

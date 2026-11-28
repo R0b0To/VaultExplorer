@@ -90,10 +90,6 @@ class Mp3Reader {
   /// How far past [audioStart] to look for the first frame (junk, padding).
   static const int _syncSearchWindow = 16 * 1024;
 
-  /// Whether the bytes at [offset] look like an MPEG audio frame header.
-  static bool looksLikeFrame(Uint8List b, int offset) =>
-      _parseHeader(b, offset) != null;
-
   static _FrameHeader? _parseHeader(Uint8List b, int o) {
     if (o + 4 > b.length) return null;
     if (b[o] != 0xFF || (b[o + 1] & 0xE0) != 0xE0) return null;

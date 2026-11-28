@@ -66,8 +66,6 @@ class RuleWatcher {
     _debouncer = SyncDebouncer(quiet: quiet, maxWait: maxWait, onFire: _trigger);
   }
 
-  bool get isStarted => _started;
-
   /// True while a host-folder subscription is live.
   bool get isWatchingHost => _hostSub != null;
 

@@ -69,8 +69,6 @@ class StorageDeleteResult {
 
   /// The volume is mounted read-only; nothing was attempted.
   final bool readOnly;
-
-  bool get isTotalSuccess => !readOnly && failed == 0 && deleted > 0;
 }
 
 class StorageAnalyzerState {

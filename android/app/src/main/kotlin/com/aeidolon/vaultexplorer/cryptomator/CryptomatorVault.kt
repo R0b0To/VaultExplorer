@@ -17,8 +17,6 @@ import com.aeidolon.vaultexplorer.foldervault.NativeFolderVault
  */
 object CryptomatorVault {
     private val MASTERKEY_FILE_NAME: String get() = NativeFolderVault.configFileName(NativeFolderVault.CRYPTOMATOR)
-    const val CURRENT_VAULT_FORMAT = 8
-    const val CURRENT_CIPHER_COMBO = "SIV_GCM"
 
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return false

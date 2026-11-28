@@ -6,7 +6,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.ext.SdkExtensions
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -25,8 +24,6 @@ import io.flutter.plugin.platform.PlatformViewFactory
  *  under; per-instance method/event channels are namespaced with the
  *  platform-view id. */
 const val JETPACK_PDF_VIEWER_VIEW_TYPE = "com.aeidolon.vaultexplorer/jetpack_pdf_viewer"
-
-private const val TAG = "JetpackPdfViewer"
 
 /**
  * `PdfViewerFragment` throws [UnsupportedOperationException] on any device

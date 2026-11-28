@@ -699,20 +699,21 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
+    final mediaSize = MediaQuery.sizeOf(context);
+    final mediaPadding = MediaQuery.paddingOf(context);
     final session = _session;
     final path = session?.playlist.currentFile ?? '';
     final info = session == null || path.isEmpty
         ? null
         : NowPlayingInfo.resolve(widget.handle.hub, session, path);
 
-    final size = media.size;
+    final size = mediaSize;
     _screenHeight = size.height;
-    _padBottom = media.padding.bottom;
+    _padBottom = mediaPadding.bottom;
     _sheetMin = 0.0;
     _sheetMax =
         ((size.height -
-                    media.padding.top -
+                    mediaPadding.top -
                     8 -
                     widget.handle.miniRect.height -
                     8) /
@@ -737,8 +738,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                         animation: Listenable.merge([_c, _queueP]),
                         builder: (context, _) => _layers(
                           context,
-                          media.size,
-                          media.padding,
+                          mediaSize,
+                          mediaPadding,
                           info,
                           session!,
                         ),

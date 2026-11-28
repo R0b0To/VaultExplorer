@@ -275,7 +275,6 @@ class VaultCameraSession(
     val snapshotWhileRecordingAvailable: Boolean
         get() = isRecording && recordingHasSnapshot && snapshotReader != null
 
-    val isRecordingPaused: Boolean get() = videoRecorder?.isPaused == true
     val hasFlash: Boolean get() = isFlashSupported
     val intrinsicZoomRatio: Float get() = intrinsicZoom
     val currentZoomMin: Float get() = zoomMinCurrent
@@ -285,8 +284,6 @@ class VaultCameraSession(
     val previewWidth: Int get() = currentPreviewWidth
     val previewHeight: Int get() = currentPreviewHeight
     val sensorOrientationDegrees: Int get() = characteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
-
-    fun listLenses(): List<CameraLensInfo> = listCameraLenses(cameraManager)
 
     private fun runOnCameraThread(block: () -> Unit) {
         if (Thread.currentThread() === bgThread) block() else bgHandler.post(block)

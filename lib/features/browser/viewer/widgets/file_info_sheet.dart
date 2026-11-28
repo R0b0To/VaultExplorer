@@ -153,10 +153,11 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final mediaQuery = MediaQuery.of(context);
-    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+    final mediaQueryOrientation = MediaQuery.orientationOf(context);
+    final mediaQuerySize = MediaQuery.sizeOf(context);
+    final isLandscape = mediaQueryOrientation == Orientation.landscape;
     final double sheetHeight =
-        mediaQuery.size.height * (isLandscape ? 0.88 : 0.72);
+        mediaQuerySize.height * (isLandscape ? 0.88 : 0.72);
     final ext = widget.entry.name.contains('.')
         ? widget.entry.name.split('.').last
         : '';

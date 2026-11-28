@@ -19,9 +19,6 @@ LogcatService logcatService(Ref ref) => const LogcatService();
 class LogcatService {
   const LogcatService();
 
-  /// Instance-method forwarders so a migrated (Consumer) logcat_screen.dart
-  /// can resolve this via [logcatServiceProvider] instead of the statics.
-  DateTime? get lastClearedAtValue => lastClearedAt;
   Future<bool> clearLog() => clear();
   Stream<String> get logStream => stream;
   Future<String?> captureLogSnapshot() => captureSnapshot();

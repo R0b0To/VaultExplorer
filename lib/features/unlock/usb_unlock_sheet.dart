@@ -579,7 +579,6 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
         final isKnownVeraCrypt = isUnlock && format == ContainerFormat.veracrypt;
         final isKnownLuks = isUnlock && format.isLuks;
-        final isKnownBitlocker = isUnlock && format == ContainerFormat.bitlocker;
         final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
         final isWide = context.screen.useWideLayout;
         final hasSelection = state.selected != null;

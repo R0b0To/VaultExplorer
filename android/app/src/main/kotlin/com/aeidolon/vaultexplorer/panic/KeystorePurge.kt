@@ -57,15 +57,4 @@ object KeystorePurge {
             0
         }
     }
-
-    /** Number of aliases currently present, for tests/diagnostics -- not used
-     *  on the purge path itself, which re-enumerates fresh in [purgeAll]. */
-    fun aliasCount(): Int = try {
-        java.util.Collections.list(
-            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.aliases(),
-        ).size
-    } catch (e: Exception) {
-        VeLog.w(TAG, e) { "aliasCount: failed to open/enumerate AndroidKeyStore" }
-        0
-    }
 }

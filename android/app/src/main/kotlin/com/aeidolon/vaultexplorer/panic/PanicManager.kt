@@ -80,9 +80,6 @@ object PanicManager {
     // ── Tier 1: Session & Vault Credentials Purge ─────────────────────
 
     private fun sessionPurge(context: Context, source: String): PanicResult {
-        runCatching { hooks?.onBeforeSessionPurge(context) }
-            .onFailure { VeLog.w(TAG, it) { "onBeforeSessionPurge hook threw" } }
-
         val lockedCount = unmountAllContainers(context)
         cancelBackgroundWork(context)
         val vaultCredsCleared = StorageShredder.clearVaultCredentials(context)
@@ -125,9 +122,6 @@ object PanicManager {
     // ── Tier 3: Nuclear Destruction ────────────────────────────────────
 
     private fun nuclearWipe(context: Context, source: String): PanicResult {
-        runCatching { hooks?.onBeforeSessionPurge(context) }
-            .onFailure { VeLog.w(TAG, it) { "onBeforeSessionPurge hook threw" } }
-
         val lockedCount = unmountAllContainers(context)
         cancelBackgroundWork(context)
 
@@ -141,9 +135,6 @@ object PanicManager {
             .onFailure { VeLog.w(TAG, it) { "onAfterCredentialPurge hook threw" } }
 
         val filesWiped = StorageShredder.wipeAllInternalStorage(context)
-
-        runCatching { hooks?.onBeforeProcessDeath(context) }
-            .onFailure { VeLog.w(TAG, it) { "onBeforeProcessDeath hook threw" } }
 
         VeLog.i(TAG) { "nuclearWipe(source=$source): wiped $filesWiped file(s); dispatching system uninstall prompt" }
 

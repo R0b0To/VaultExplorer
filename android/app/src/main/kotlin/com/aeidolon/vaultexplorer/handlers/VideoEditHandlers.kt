@@ -1,15 +1,12 @@
 package com.aeidolon.vaultexplorer.handlers
 
-import android.content.Context
 import android.media.MediaExtractor
 import android.media.MediaMetadataRetriever
-import android.os.PowerManager
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.VideoEditProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.VideoEditCancellation
-import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
 import com.aeidolon.vaultexplorer.videoedit.LosslessVideoCutter
 import io.flutter.plugin.common.MethodCall
@@ -47,7 +44,6 @@ class VideoEditHandlers(
         const val TAG = "VideoEditHandlers"
         const val TEMP_PREFIX = "vx_vid_cut_"
         const val TEMP_SUFFIX = ".mp4"
-        const val COPY_BUFFER = 256 * 1024
     }
 
     private fun extractorFactory(volId: Int, filePath: String, isLocal: Boolean): () -> MediaExtractor = {
@@ -56,7 +52,7 @@ class VideoEditHandlers(
             if (isLocal) {
                 extractor.setDataSource(filePath)
             } else {
-                extractor.setDataSource(ContainerMediaDataSource(activity, filePath, filePath, volId))
+                extractor.setDataSource(ContainerMediaDataSource(filePath, volId))
             }
         } catch (e: Exception) {
             runCatching { extractor.release() }
@@ -92,7 +88,7 @@ class VideoEditHandlers(
                                 retriever.setDataSource(filePath)
                             } else {
                                 retriever.setDataSource(
-                                    ContainerMediaDataSource(activity, filePath, filePath, volId),
+                                    ContainerMediaDataSource(filePath, volId),
                                 )
                             }
                             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE)
@@ -135,79 +131,25 @@ class VideoEditHandlers(
     // ── videoEditExport ──────────────────────────────────────────────────
 
     /**
-     * Args: `volId`, `filePath`, `isLocalStorage`, `segments` (list of
-     * `[startUs, endUs]`), `merge` (one output holding every segment vs. one
-     * output per segment), `outputPaths` (exactly 1 when merging, else one
-     * per segment -- container-relative for a vault, absolute for local
-     * storage; Dart has already made them unique), `opId`.
+     * Args: see [parseEditExportArgs]; each output is one lossless cut of the
+     * requested segments.
      */
     fun handleExport(call: MethodCall, result: MethodChannel.Result) {
-        val volId = call.argument<Number>("volId")?.toInt()
-        val filePath = call.argument<String>("filePath")
-        val isLocal = call.argument<Boolean>("isLocalStorage") ?: false
-        val merge = call.argument<Boolean>("merge") ?: false
-        val opId = call.argument<Number>("opId")?.toInt() ?: 0
-        val rawSegments = call.argument<List<List<Number>>>("segments")
-        val outputPaths = call.argument<List<String>>("outputPaths")
-
-        if (volId == null || filePath.isNullOrEmpty() || rawSegments.isNullOrEmpty() || outputPaths.isNullOrEmpty()) {
-            result.error("INVALID_ARGS", "volId, filePath, segments and outputPaths are required", null)
-            return
-        }
-        val ranges = rawSegments.map { LosslessVideoCutter.Range(it[0].toLong(), it[1].toLong()) }
-        if (ranges.any { it.endUs <= it.startUs }) {
-            result.error("INVALID_ARGS", "Every segment needs an end after its start", null)
-            return
-        }
-        val groups: List<List<LosslessVideoCutter.Range>> =
-            if (merge) listOf(ranges) else ranges.map { listOf(it) }
-        if (outputPaths.size != groups.size) {
-            result.error("INVALID_ARGS", "Expected ${groups.size} output path(s), got ${outputPaths.size}", null)
-            return
-        }
+        val args = parseEditExportArgs(call, result) ?: return
+        val volId = args.volId
+        val opId = args.opId
+        val outputPaths = args.outputPaths
+        val groups = args.groups { startUs, endUs -> LosslessVideoCutter.Range(startUs, endUs) }
 
         ioExecutor.execute {
-            val powerManager = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            val wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VaultExplorer:VideoExport")
-            wakeLock?.acquire(15 * 60 * 1000L) // 15 mins timeout
+            val wakeLock = EditExportSupport.acquireWakeLock(activity, "VaultExplorer:VideoExport", 15 * 60 * 1000L)
             val tempFiles = ArrayList<File>()
             // Outputs created so far (successfully or not) -- rolled back if the export fails or is cancelled.
             val created = ArrayList<String>()
             try {
-                // Free-space preflight check: estimate required space based on source file size and cuts.
-                val sourceSize = if (isLocal) {
-                    File(filePath).length().coerceAtLeast(1L)
-                } else {
-                    ContainerFileSystem.getFileSize(volId, filePath).coerceAtLeast(1L)
-                }
-                val estimatedBytes = ((sourceSize * 1.2).toLong() + 5 * 1024 * 1024L).coerceAtLeast(10 * 1024 * 1024L)
+                EditExportSupport.checkFreeSpace(activity.cacheDir, args)
 
-                val cacheUsable = activity.cacheDir.usableSpace
-                if (cacheUsable in 1 until estimatedBytes) {
-                    val needMb = estimatedBytes / (1024 * 1024)
-                    val freeMb = cacheUsable / (1024 * 1024)
-                    throw IOException("Not enough free space in app cache (need $needMb MB, only $freeMb MB available)")
-                }
-
-                if (isLocal) {
-                    val destDir = File(outputPaths[0]).parentFile ?: File(outputPaths[0])
-                    val localUsable = destDir.usableSpace
-                    if (localUsable in 1 until estimatedBytes) {
-                        val needMb = estimatedBytes / (1024 * 1024)
-                        val freeMb = localUsable / (1024 * 1024)
-                        throw IOException("Not enough free space on storage (need $needMb MB, only $freeMb MB available)")
-                    }
-                } else {
-                    val freeBytes = ContainerFileSystem.getSpaceInfo(volId)
-                        ?.let { if (it.size > 1) it[1] else null }
-                    if (freeBytes != null && freeBytes in 1 until estimatedBytes) {
-                        val needMb = estimatedBytes / (1024 * 1024)
-                        val freeMb = freeBytes / (1024 * 1024)
-                        throw IOException("Not enough free space in vault (need $needMb MB, only $freeMb MB available)")
-                    }
-                }
-
-                val factory = extractorFactory(volId, filePath, isLocal)
+                val factory = extractorFactory(volId, args.filePath, args.isLocal)
                 var dropped = 0
                 val actual = ArrayList<List<Long>>()
 
@@ -238,13 +180,9 @@ class VideoEditHandlers(
 
                     val dest = outputPaths[i]
                     created.add(dest)
-                    val saved = if (isLocal) {
-                        copyToLocal(temp, File(dest))
-                    } else {
-                        val written = ContainerFileSystem.writeBackFile(volId, dest, temp.absolutePath)
-                        written && ContainerFileSystem.finishWrite(volId, dest)
+                    if (!EditExportSupport.saveOutput(args, temp, dest, TAG)) {
+                        throw IOException("Could not save the cut video (is there enough free space?)")
                     }
-                    if (!saved) throw IOException("Could not save the cut video (is there enough free space?)")
 
                     // Wipe right away: don't keep a plaintext copy around between outputs.
                     SecureFileWipe.secureDeleteFile(temp)
@@ -258,42 +196,16 @@ class VideoEditHandlers(
                 )
                 activity.runOnUiThread { result.success(payload) }
             } catch (e: Exception) {
-                rollBack(volId, isLocal, created)
-                val cancelled = e is LosslessVideoCutter.CutCancelledException
-                if (!cancelled) VeLog.w(TAG, e) { "videoEditExport failed" }
-                activity.runOnUiThread {
-                    if (cancelled) {
-                        result.error("CANCELLED", "Export cancelled", null)
-                    } else {
-                        result.error("EXPORT_FAILED", e.message ?: "Export failed", null)
-                    }
-                }
+                EditExportSupport.rollBack(args, created)
+                EditExportSupport.replyFailure(
+                    activity, result, e,
+                    cancelled = e is LosslessVideoCutter.CutCancelledException,
+                    tag = TAG, logMessage = "videoEditExport failed",
+                )
             } finally {
                 tempFiles.forEach { SecureFileWipe.secureDeleteFile(it) }
                 VideoEditCancellation.clear(opId)
-                if (wakeLock?.isHeld == true) {
-                    runCatching { wakeLock.release() }
-                }
-            }
-        }
-    }
-
-    private fun copyToLocal(src: File, dest: File): Boolean = try {
-        dest.parentFile?.mkdirs()
-        src.inputStream().use { input ->
-            dest.outputStream().use { output -> input.copyTo(output, COPY_BUFFER) }
-        }
-        true
-    } catch (e: Exception) {
-        VeLog.w(TAG, e) { "copyToLocal failed" }
-        false
-    }
-
-    /** Removes outputs this call created, so a failed/cancelled export leaves nothing half-written behind. */
-    private fun rollBack(volId: Int, isLocal: Boolean, created: List<String>) {
-        for (path in created) {
-            runCatching {
-                if (isLocal) File(path).delete() else ContainerFileSystem.deleteFile(volId, path)
+                EditExportSupport.releaseWakeLock(wakeLock)
             }
         }
     }

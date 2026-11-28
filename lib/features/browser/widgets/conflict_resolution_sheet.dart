@@ -108,8 +108,9 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final mediaQuery = MediaQuery.of(context);
-    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+    final mediaQueryOrientation = MediaQuery.orientationOf(context);
+    final mediaQueryPadding = MediaQuery.paddingOf(context);
+    final isLandscape = mediaQueryOrientation == Orientation.landscape;
     final count = widget.conflicts.length;
 
     final double initialChildSize;
@@ -243,7 +244,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                   16,
                   isLandscape ? 8 : 12,
                   16,
-                  (isLandscape ? 8 : 12) + mediaQuery.padding.bottom,
+                  (isLandscape ? 8 : 12) + mediaQueryPadding.bottom,
                 ),
                 child: Row(
                   children: [

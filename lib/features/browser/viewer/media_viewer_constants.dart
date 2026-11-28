@@ -7,7 +7,6 @@ enum MediaKind { image, video, audio }
 class MediaViewerConstants {
   static const Duration uiHideDelay = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 250);
-  static const Duration pageTransitionDuration = Duration(milliseconds: 300);
   static const Duration doubleTapIndicatorDelay = Duration(milliseconds: 550);
 
   static const double maxImageZoom = 12.0;
@@ -59,7 +58,6 @@ class MediaViewerConstants {
   /// lifts before fading out.
   static const Duration edgeSwipeHudHideDelay = Duration(milliseconds: 700);
 
-  static const int maxPrefetchCacheSize = 5;
   static const int maxDirectorySearchDepth = 20;
   // Caps how many subdirectories _scanDirectoryRecursively will walk
   // concurrently at each level, so a huge "All (incl. subfolders)" vault

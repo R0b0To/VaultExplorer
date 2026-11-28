@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -142,6 +144,28 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
     }
   }
 
+  /// A mouse wheel only produces vertical deltas, which a horizontal list
+  /// ignores: turn them into horizontal scrolling. Claims the event so the
+  /// wheel does not also act on whatever sits behind the carousel.
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final dy = event.scrollDelta.dy;
+    // Horizontal wheels / shift+wheel already scroll the list natively.
+    if (dy == 0 || event.scrollDelta.dx != 0) return;
+    if (!_scrollController.hasClients ||
+        _scrollController.positions.length != 1) {
+      return;
+    }
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      final position = _scrollController.position;
+      final target = (position.pixels + dy).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if (target != position.pixels) _scrollController.jumpTo(target);
+    });
+  }
+
   void _onScroll() {
     if (_isDraggingSlider ||
         !_scrollController.hasClients ||
@@ -228,7 +252,17 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       _onViewportWidthKnown(constraints.maxWidth);
-                      return ListView.builder(
+                      return Listener(
+                        onPointerSignal: _onPointerSignal,
+                        // Let a mouse drag the strip like a finger does.
+                        child: ScrollConfiguration(
+                          behavior: ScrollConfiguration.of(context).copyWith(
+                            dragDevices: {
+                              ...ScrollConfiguration.of(context).dragDevices,
+                              PointerDeviceKind.mouse,
+                            },
+                          ),
+                          child: ListView.builder(
                         controller: _scrollController,
                         scrollDirection: Axis.horizontal,
                         itemExtent: _tileWidth + _tileSpacing,
@@ -260,7 +294,8 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                 borderRadius: BorderRadius.circular(
                                   isSelected ? 13 : 15,
                                 ),
-                                child: Stack(
+                                child: ExcludeSemantics(
+                                  child: Stack(
                                   fit: StackFit.expand,
                                   children: [
                                     widget.thumbnailBuilder?.call(
@@ -307,11 +342,14 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                         ),
                                       ),
                                   ],
+                                  ),
                                 ),
                               ),
                             ),
                           );
                         },
+                      ),
+                        ),
                       );
                     },
                   ),

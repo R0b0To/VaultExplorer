@@ -970,5 +970,3 @@ class SplitFuseCallback(
     }
 }
 
-// Retained for backward-compatibility with tests/invocations that construct LocalSplitFuseCallback
-typealias LocalSplitFuseCallback = SplitFuseCallback

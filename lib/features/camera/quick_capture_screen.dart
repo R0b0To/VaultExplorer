@@ -75,8 +75,6 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
   ScratchpadSession? _pendingScratchpad;
 
-  String? _saveError;
-
   // --- Segmented video recording ---------------------------------------------
   // Quick capture normally lets the person pick the vault after shooting. A
   // segmented recording saves each part as soon as it closes, so it needs the
@@ -993,7 +991,6 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     setState(() {
       capturedMedia.clear();
       _phase = _Phase.camera;
-      _saveError = null;
     });
   }
 

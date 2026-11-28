@@ -181,13 +181,6 @@ class StorageNode {
   /// Path of the folder containing this node ('' at the root level).
   String get parentPath => parent?.path ?? '';
 
-  bool isAncestorOf(StorageNode other) {
-    for (var n = other.parent; n != null; n = n.parent) {
-      if (identical(n, this)) return true;
-    }
-    return false;
-  }
-
   void addChild(StorageNode child) {
     assert(isDir, 'only folders can have children');
     child.parent = this;

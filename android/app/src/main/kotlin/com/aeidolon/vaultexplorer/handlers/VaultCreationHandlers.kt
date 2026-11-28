@@ -14,6 +14,11 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.util.concurrent.ExecutorService
 import com.aeidolon.vaultexplorer.container.ContainerEngine
+import com.aeidolon.vaultexplorer.cryfs.CryfsVault
+import com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault
+import com.aeidolon.vaultexplorer.engine.VaultOpenResult
+import com.aeidolon.vaultexplorer.foldervault.NativeVaultSession
+import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault
 import com.aeidolon.vaultexplorer.internalvault.InternalVaultStorage
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeOpSupport
@@ -351,14 +356,14 @@ class VaultCreationHandlers(
                     val passwordChars = password.toCharArray()
                     val createResult = try {
                         when (format) {
-                            "cryptomator" -> com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.create(
+                            "cryptomator" -> CryptomatorVault.create(
                                 activity, stageUri, passwordChars, userEntropy,
                             )
-                            "gocryptfs" -> com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(
+                            "gocryptfs" -> GocryptfsVault.create(
                                 activity, stageUri, passwordChars, cipher, userEntropy = userEntropy,
                                 deterministicNames = deterministicNames, longNameMax = longNameMax,
                             )
-                            else -> com.aeidolon.vaultexplorer.cryfs.CryfsVault.create(
+                            else -> CryfsVault.create(
                                 activity, stageUri, passwordChars, cipher, blockSize, userEntropy,
                             )
                         }
@@ -367,8 +372,8 @@ class VaultCreationHandlers(
                         userEntropy?.fill(0)
                     }
                     when (createResult) {
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> createResult.session.close()
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault ->
+                        is VaultOpenResult.Success -> createResult.session.close()
+                        is VaultOpenResult.InvalidVault ->
                             throw IOException(createResult.reason)
                         else -> throw IOException("Unexpected result")
                     }
@@ -411,7 +416,16 @@ class VaultCreationHandlers(
         reserved?.let { store.deleteTree(it) }
     }
 
-    fun handleCreateCryptomatorVault(call: MethodCall, result: MethodChannel.Result) {
+    /**
+     * Shared body of the three directory-vault create handlers. Reads and checks `filePath`, `password` and
+     * `userEntropy`, runs [create] off the UI thread (the password and the entropy are wiped afterwards), then
+     * closes the session -- creating only writes the vault config -- and replies `true`.
+     */
+    private fun createFolderVault(
+        call: MethodCall,
+        result: MethodChannel.Result,
+        create: (uri: Uri, password: CharArray, userEntropy: ByteArray?) -> VaultOpenResult<NativeVaultSession>,
+    ) {
         val uriString = call.argument<String>("filePath")
         val password = call.argument<String>("password") ?: ""
         val userEntropy = call.argument<ByteArray>("userEntropy")
@@ -425,119 +439,57 @@ class VaultCreationHandlers(
                 val uri = Uri.parse(uriString)
                 val passwordChars = password.toCharArray()
                 val createResult = try {
-                    com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.create(
-                        activity, uri, passwordChars, userEntropy
-                    )
+                    create(uri, passwordChars, userEntropy)
                 } finally {
                     passwordChars.fill('\u0000')
                     userEntropy?.fill(0)
                 }
                 activity.runOnUiThread {
                     when (createResult) {
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
+                        is VaultOpenResult.Success -> {
                             createResult.session.close()
                             result.success(true)
                         }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
-                            result.error("CREATE_FAILED", createResult.reason, null)
-                        }
+                        is VaultOpenResult.InvalidVault -> result.error("CREATE_FAILED", createResult.reason, null)
                         else -> result.error("CREATE_FAILED", "Unexpected result", null)
                     }
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }
+        }
+    }
+
+    fun handleCreateCryptomatorVault(call: MethodCall, result: MethodChannel.Result) {
+        createFolderVault(call, result) { uri, password, userEntropy ->
+            CryptomatorVault.create(activity, uri, password, userEntropy)
         }
     }
 
     fun handleCreateGocryptfsVault(call: MethodCall, result: MethodChannel.Result) {
-        val uriString = call.argument<String>("filePath")
-        val password = call.argument<String>("password") ?: ""
         // 'aes-256-gcm' (default) or 'xchacha20-poly1305'. Passed through as is: the native core picks the cipher
         // and falls back to AES-256-GCM for anything else (including omitted/older Dart callers).
         val cipher = call.argument<String>("cipher") ?: ""
-        val userEntropy = call.argument<ByteArray>("userEntropy")
         // Both optional: callers from before these options existed omit them.
         val deterministicNames = call.argument<Boolean>("deterministicNames") ?: false
         val longNameMax = call.argument<Number>("longNameMax")?.toInt() ?: 0
-        if (uriString == null || password.isEmpty()) {
-            userEntropy?.fill(0)
-            result.error("INVALID_ARGS", "filePath and password required", null)
-            return
-        }
-        ioExecutor.execute {
-            try {
-                val uri = Uri.parse(uriString)
-                val passwordChars = password.toCharArray()
-                val createResult = try {
-                    com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(
-                        activity, uri, passwordChars, cipher, userEntropy = userEntropy,
-                        deterministicNames = deterministicNames, longNameMax = longNameMax,
-                    )
-                } finally {
-                    passwordChars.fill('\u0000')
-                    userEntropy?.fill(0)
-                }
-                activity.runOnUiThread {
-                    when (createResult) {
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
-                            createResult.session.close()
-                            result.success(true)
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
-                            result.error("CREATE_FAILED", createResult.reason, null)
-                        }
-                        else -> result.error("CREATE_FAILED", "Unexpected result", null)
-                    }
-                }
-            } catch (e: Exception) {
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            }
+        createFolderVault(call, result) { uri, password, userEntropy ->
+            GocryptfsVault.create(
+                activity, uri, password, cipher, userEntropy = userEntropy,
+                deterministicNames = deterministicNames, longNameMax = longNameMax,
+            )
         }
     }
 
     fun handleCreateCryfsVault(call: MethodCall, result: MethodChannel.Result) {
-        val uriString = call.argument<String>("filePath")
-        val password = call.argument<String>("password") ?: ""
         // 'xchacha20-poly1305' (default) or 'aes-256-gcm', and the on-disk block size in bytes (CryFS CLI's
         // `--blocksize`). Passed through as is: the native core (fv_formats.h) falls back to its defaults for a
         // missing or unsupported cipher and for a block size outside 4 KiB..64 MiB, so older Dart callers and
         // malformed values cannot produce a vault that does not work.
         val cipher = call.argument<String>("cipher") ?: ""
         val blockSize = call.argument<Number>("blockSize")?.toInt() ?: 0
-        val userEntropy = call.argument<ByteArray>("userEntropy")
-        if (uriString == null || password.isEmpty()) {
-            userEntropy?.fill(0)
-            result.error("INVALID_ARGS", "filePath and password required", null)
-            return
-        }
-        ioExecutor.execute {
-            try {
-                val uri = Uri.parse(uriString)
-                val passwordChars = password.toCharArray()
-                val createResult = try {
-                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.create(
-                        activity, uri, passwordChars, cipher, blockSize, userEntropy
-                    )
-                } finally {
-                    passwordChars.fill('\u0000')
-                    userEntropy?.fill(0)
-                }
-                activity.runOnUiThread {
-                    when (createResult) {
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
-                            createResult.session.close()
-                            result.success(true)
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
-                            result.error("CREATE_FAILED", createResult.reason, null)
-                        }
-                        else -> result.error("CREATE_FAILED", "Unexpected result", null)
-                    }
-                }
-            } catch (e: Exception) {
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            }
+        createFolderVault(call, result) { uri, password, userEntropy ->
+            CryfsVault.create(activity, uri, password, cipher, blockSize, userEntropy)
         }
     }
 }

@@ -739,7 +739,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       );
       _sessionController.setEnableCarousel(config.showMediaCarousel);
       if (!config.showMediaCarousel) {
-        _sessionController.setCarouselVisible(false);
+        _setCarouselVisible(false);
       }
       _sessionController.setTransitionEffect(config.playlistTransitionEffect);
       _sessionController.setScrollMode(appSettings.playlistScrollMode);
@@ -1758,15 +1758,27 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     };
   }
 
-  void _toggleCarousel() {
-    HapticFeedback.lightImpact();
-    final next = !_isCarouselVisible;
-    _sessionController.setCarouselVisible(next);
-    if (next) {
+  /// Whether the open carousel is currently counted in [_activeMenuCount]
+  /// (that keeps the chrome from auto-hiding while it is up).
+  bool _carouselHoldsMenu = false;
+
+  /// The single way to show or hide the carousel, so the menu count it holds
+  /// is taken and released exactly once however it was closed (the toolbar,
+  /// the T key, a swipe down, or the setting being turned off).
+  void _setCarouselVisible(bool visible) {
+    _sessionController.setCarouselVisible(visible);
+    if (visible && !_carouselHoldsMenu) {
+      _carouselHoldsMenu = true;
       _menuOpened();
-    } else {
+    } else if (!visible && _carouselHoldsMenu) {
+      _carouselHoldsMenu = false;
       _menuClosed();
     }
+  }
+
+  void _toggleCarousel() {
+    HapticFeedback.lightImpact();
+    _setCarouselVisible(!_isCarouselVisible);
   }
 
   void _selectFromCarousel(int index) {
@@ -1870,7 +1882,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     // Everything below is a plain key (Shift only matters for < and >).
     if (primary || kb.isAltPressed) return KeyEventResult.ignored;
     // A menu or sheet is open, or the touch lock is on: leave the keys alone.
-    if (OpenMenuBackGuard.hasOpenMenu || _activeMenuCount > 0) {
+    // The carousel is not modal: it counts as an open menu only so the
+    // chrome stays up, and must not swallow the keys (T has to close it).
+    final blockingMenus = _activeMenuCount - (_carouselHoldsMenu ? 1 : 0);
+    if (OpenMenuBackGuard.hasOpenMenu || blockingMenus > 0) {
       return KeyEventResult.ignored;
     }
     if (_controlsLocked) return KeyEventResult.ignored;
@@ -1989,7 +2004,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       return markHandled();
     }
     if (key == LogicalKeyboardKey.escape) {
-      if (!isRepeat) unawaited(Navigator.of(context).maybePop());
+      if (!isRepeat) {
+        // Esc closes the carousel first; a second press leaves the viewer.
+        if (_isCarouselVisible) {
+          _toggleCarousel();
+        } else {
+          unawaited(Navigator.of(context).maybePop());
+        }
+      }
       return markHandled();
     }
     return KeyEventResult.ignored;
@@ -2509,7 +2531,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
             next.config.showMediaCarousel) {
           _sessionController.setEnableCarousel(next.config.showMediaCarousel);
           if (!next.config.showMediaCarousel) {
-            _sessionController.setCarouselVisible(false);
+            _setCarouselVisible(false);
           }
         }
       },
@@ -2723,10 +2745,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
                     // Only registered while the list is transformed, so a plain
                     // tap at 1x isn't held back waiting to rule out a double tap.
-                    final zoomed = !_continuousTransformationController.value
-                        .isIdentity();
-                    final listCanScroll =
-                        physics is! NeverScrollableScrollPhysics;
 
                     final effectiveMinScale =
                         mediaViewerConfig.pinchZoomOutEnabled

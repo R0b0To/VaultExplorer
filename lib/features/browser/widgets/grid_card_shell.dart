@@ -29,25 +29,6 @@ abstract final class GridCardUtils {
     return (tileWidth * factor).clamp(32.0, 200.0);
   }
 
-  /// Adapts column count when rotating between portrait and landscape
-  /// so blocks retain a consistent physical size.
-  static int adaptColumnsForOrientation({
-    required Orientation currentOrientation,
-    required Orientation? lastOrientation,
-    required int currentColumns,
-    required int minColumns,
-    required int maxColumns,
-  }) {
-    if (lastOrientation != null && lastOrientation != currentOrientation) {
-      if (currentOrientation == Orientation.landscape) {
-        return (currentColumns * 1.7).round().clamp(minColumns, maxColumns);
-      } else {
-        return (currentColumns / 1.7).round().clamp(minColumns, maxColumns);
-      }
-    }
-    return currentColumns.clamp(minColumns, maxColumns);
-  }
-
   static Color folderCardColor(ColorScheme cs, {required bool isMounted}) {
     return isMounted
         ? cs.tertiaryContainer.withValues(alpha: 0.32)

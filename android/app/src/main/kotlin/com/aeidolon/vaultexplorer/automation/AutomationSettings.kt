@@ -111,9 +111,6 @@ object AutomationSettings {
 
     // --- API token -----------------------------------------------------
 
-    /** True once a token has ever been generated, i.e. automation has been turned on at least once. */
-    fun isConfigured(context: Context): Boolean = prefs(context).contains(PREF_TOKEN)
-
     /**
      * Returns the current token, generating one on first call. A settings
      * screen should show this exactly once with a copy button plus a

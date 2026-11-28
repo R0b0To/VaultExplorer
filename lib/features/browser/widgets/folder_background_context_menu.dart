@@ -41,32 +41,54 @@ class _FolderBackgroundContextMenuState
   final MenuController _controller = MenuController();
   List<Widget> _entries = const <Widget>[];
 
+  /// Where the last click landed, in this widget's own coordinates. The
+  /// menu's zero-size anchor sits exactly here.
+  Offset _clickAt = Offset.zero;
+
   void _onSecondaryTapUp(TapUpDetails details) {
     if (!widget.enabled) return;
     final entries = widget.menuBuilder(context);
     if (entries.isEmpty) return;
     if (_controller.isOpen) _controller.close();
-    setState(() => _entries = entries);
-    // `position` is relative to the anchor's top-left corner, and the anchor
-    // is exactly this detector's box, so the local position is the click.
-    final position = details.localPosition;
-    // Rebuild MenuAnchor with the latest children before opening its overlay.
+    setState(() {
+      _entries = entries;
+      _clickAt = details.localPosition;
+    });
+    // Rebuild MenuAnchor with the latest children (and the anchor at the new
+    // click) before opening its overlay.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.enabled) return;
-      _controller.open(position: position);
+      _controller.open();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return BackDismissibleMenuAnchor(
-      controller: _controller,
-      menuChildren: _entries,
-      builder: (context, controller, _) => GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onSecondaryTapUp: widget.enabled ? _onSecondaryTapUp : null,
-        child: widget.child,
-      ),
+    // The anchor must NOT be the listing itself. A MenuAnchor counts a tap on
+    // its own anchor as a tap "inside" the menu, so with the whole listing as
+    // the anchor a click anywhere on it never dismissed the menu (only Esc or
+    // choosing an entry did). The listing is therefore a sibling, and the
+    // menu hangs off a zero-size anchor placed at the click; every click on
+    // the listing is then an outside click that closes the menu.
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onSecondaryTapUp: widget.enabled ? _onSecondaryTapUp : null,
+          child: widget.child,
+        ),
+        Positioned(
+          left: _clickAt.dx,
+          top: _clickAt.dy,
+          width: 0,
+          height: 0,
+          child: BackDismissibleMenuAnchor(
+            controller: _controller,
+            menuChildren: _entries,
+          ),
+        ),
+      ],
     );
   }
 }

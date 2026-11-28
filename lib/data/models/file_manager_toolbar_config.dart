@@ -330,7 +330,9 @@ class FileManagerToolbarConfig {
     gridAspectRatio: GridAspectRatio.square,
     gridCornerStyle: GridCornerStyle.rounded,
     gridSpacing: defaultGridSpacing,
-    showListThumbnails: true,
+    // Desktop lists default to plain file icons; thumbnails stay on for
+    // phones, and can be turned on from the options menu.
+    showListThumbnails: !PlatformFeatures.isDesktop,
     showItemActionsMenu: false,
     selectByIcon: true,
     doubleClickToOpen: PlatformFeatures.isDesktop,
@@ -1075,7 +1077,8 @@ class FileManagerToolbarConfig {
       ),
       gridSpacing: ((j['gridSpacing'] as num?)?.toInt() ?? defaultGridSpacing)
           .clamp(minGridSpacing, maxGridSpacing),
-      showListThumbnails: j['showListThumbnails'] as bool? ?? true,
+      showListThumbnails:
+          j['showListThumbnails'] as bool? ?? !PlatformFeatures.isDesktop,
       showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? false,
       // Absent in configs saved before these options existed -> the original
       // behavior (icon taps select; names shown in full).

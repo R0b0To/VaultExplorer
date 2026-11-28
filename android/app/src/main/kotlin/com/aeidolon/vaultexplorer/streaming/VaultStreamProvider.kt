@@ -80,10 +80,6 @@ class VaultStreamProvider : ContentProvider() {
                 }
             }
         }
-
-        fun clearAllSessions() {
-            activeSessions.clear()
-        }
     }
 
     override fun onCreate(): Boolean = true

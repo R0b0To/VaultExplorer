@@ -10,6 +10,7 @@ import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.IncomingShareBridge
 import com.aeidolon.vaultexplorer.bridge.LocalIncomingShareBridge
+import com.aeidolon.vaultexplorer.bridge.ShareItem
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
@@ -153,19 +154,8 @@ class ShareIntentHandlers(
                 }
             }
             if (resolved.isEmpty()) return@execute
-            if (decoyActive) {
-                LocalIncomingShareBridge.deliver(
-                    resolved.map {
-                        LocalIncomingShareBridge.ShareItem(it.uri, it.name, it.size, it.mime)
-                    },
-                )
-            } else {
-                IncomingShareBridge.deliver(
-                    resolved.map {
-                        IncomingShareBridge.ShareItem(it.uri, it.name, it.size, it.mime)
-                    },
-                )
-            }
+            val items = resolved.map { ShareItem(it.uri, it.name, it.size, it.mime) }
+            if (decoyActive) LocalIncomingShareBridge.deliver(items) else IncomingShareBridge.deliver(items)
         }
     }
 
@@ -346,9 +336,7 @@ class ShareIntentHandlers(
             result.success(false)
             return
         }
-        IncomingShareBridge.deliver(
-            items.map { IncomingShareBridge.ShareItem(it.uri, it.displayName, it.sizeBytes, it.mimeType) },
-        )
+        IncomingShareBridge.deliver(items)
         result.success(true)
     }
 }

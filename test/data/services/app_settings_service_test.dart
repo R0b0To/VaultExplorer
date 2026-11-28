@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -13,7 +15,13 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 // injected VaultLifecycleApi/VaultFileIoApi, and is a reasonable next
 // step but a separate one.
 void main() {
+  tearDown(() => PlatformFeatures.debugIsDesktopOverride = null);
+
   group('AppSettings defaults', () {
+    // The documented defaults below are the phone ones; the desktop ones
+    // are covered by the 'desktop defaults' group.
+    setUp(() => PlatformFeatures.debugIsDesktopOverride = false);
+
     test('a freshly-constructed instance has the documented defaults', () {
       final s = AppSettings();
       expect(s.useMasterPassword, isFalse);
@@ -432,6 +440,39 @@ void main() {
       final original = AppSettings(playlistScrollMode: PlaylistScrollMode.verticalContinuous);
       final copy = original.copyWith(autoLockMins: 3);
       expect(copy.playlistScrollMode, PlaylistScrollMode.verticalContinuous);
+    });
+  });
+
+  group('desktop defaults', () {
+    setUp(() => PlatformFeatures.debugIsDesktopOverride = true);
+
+    test('the default folder layout is the compact list', () {
+      expect(AppSettings().defaultLayoutMode, BrowserLayoutMode.compact);
+      expect(
+        AppSettings.fromJson({}).defaultLayoutMode,
+        BrowserLayoutMode.compact,
+      );
+    });
+
+    test('a layout the user chose is kept', () {
+      final s = AppSettings.fromJson({'defaultLayoutMode': 'grid'});
+      expect(s.defaultLayoutMode, BrowserLayoutMode.grid);
+    });
+
+    test('list thumbnails are off by default, on for phones', () {
+      expect(FileManagerToolbarConfig.defaults().showListThumbnails, isFalse);
+      expect(
+        FileManagerToolbarConfig.fromJson({}).showListThumbnails,
+        isFalse,
+      );
+      expect(
+        FileManagerToolbarConfig.fromJson({'showListThumbnails': true})
+            .showListThumbnails,
+        isTrue,
+      );
+
+      PlatformFeatures.debugIsDesktopOverride = false;
+      expect(FileManagerToolbarConfig.defaults().showListThumbnails, isTrue);
     });
   });
 }

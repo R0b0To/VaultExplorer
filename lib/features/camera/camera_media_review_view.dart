@@ -393,7 +393,7 @@ class _CameraMediaReviewViewState extends ConsumerState<CameraMediaReviewView> {
   void _deleteCurrentMedia() {
     if (_media.isEmpty) return;
     HapticFeedback.lightImpact();
-    final item = _media.removeAt(_selectedIndex);
+    _media.removeAt(_selectedIndex);
     _videoController?.removeListener(_onVideoTick);
     _videoController?.dispose();
     _videoController = null;

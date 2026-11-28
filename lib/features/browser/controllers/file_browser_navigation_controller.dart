@@ -567,19 +567,11 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     );
   }
 
-  Future<ArchiveContext> openArchive(
-    MountedContainer container,
-    String fullPath,
-    String archiveName, {
-    String? passphrase,
-    BrowserLayoutMode? layoutMode,
-    VoidCallback? onActivity,
-    double currentScrollOffset = 0.0,
-  }) async {
-    onActivity?.call();
-
-    // Cache current directory items and scroll position before entering the
-    // archive, so leaving it lands back on the same spot (as for folders).
+  /// Shared first step of opening an archive (top-level or nested): remembers
+  /// the scroll position and items of the folder being left so leaving the
+  /// archive lands back on the same spot (as for folders), flags the listing
+  /// as loading, and returns the items to show as the preview of the parent.
+  List<RawEntry>? _beginArchiveEntry(double currentScrollOffset) {
     if (state.pathStack.isNotEmpty) {
       state.pathStack.last.scrollOffset = currentScrollOffset;
       state.pathStack.last.items = List<RawEntry>.of(state.currentItems);
@@ -593,6 +585,62 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
               : null);
 
     state = state.copyWith(isLoading: true);
+    return parentPreviewItems;
+  }
+
+  /// Shared last step of opening an archive: for a password prompt it only
+  /// clears the loading flag and hands the context back; otherwise it pushes
+  /// the archive root onto the path stack and starts loading its contents.
+  ArchiveContext _enterOpenedArchive(
+    ArchiveContext ctx, {
+    required String fullPath,
+    required String archiveName,
+    required List<RawEntry>? parentPreviewItems,
+    required BrowserLayoutMode? layoutMode,
+  }) {
+    if (ctx.status == ArchiveOpenStatus.passphraseRequired ||
+        ctx.status == ArchiveOpenStatus.wrongPassphrase) {
+      state = state.copyWith(isLoading: false);
+      return ctx;
+    }
+
+    final newStack = List<PathSegment>.from(state.pathStack)
+      ..add(
+        PathSegment(
+          archiveName,
+          fullPath,
+          isArchiveRoot: true,
+          layoutMode: layoutMode ?? state.layoutMode,
+          previewItems: parentPreviewItems,
+          previewLayoutMode: state.layoutMode,
+        ),
+      );
+
+    state = state.copyWith(
+      archiveContext: ctx,
+      pathStack: newStack,
+      forwardStack: const [],
+      layoutMode: layoutMode ?? state.layoutMode,
+      clearCurrentFilter: true,
+    );
+    _liveArchiveContext = ctx;
+
+    _loadArchiveContents(fullPath, layoutMode: layoutMode);
+    return ctx;
+  }
+
+  Future<ArchiveContext> openArchive(
+    MountedContainer container,
+    String fullPath,
+    String archiveName, {
+    String? passphrase,
+    BrowserLayoutMode? layoutMode,
+    VoidCallback? onActivity,
+    double currentScrollOffset = 0.0,
+  }) async {
+    onActivity?.call();
+
+    final parentPreviewItems = _beginArchiveEntry(currentScrollOffset);
 
     try {
       final ctx = container.isLocalStorage
@@ -610,35 +658,13 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
               passphrase: passphrase,
             );
 
-      if (ctx.status == ArchiveOpenStatus.passphraseRequired ||
-          ctx.status == ArchiveOpenStatus.wrongPassphrase) {
-        state = state.copyWith(isLoading: false);
-        return ctx;
-      }
-
-      final newStack = List<PathSegment>.from(state.pathStack)
-        ..add(
-          PathSegment(
-            archiveName,
-            fullPath,
-            isArchiveRoot: true,
-            layoutMode: layoutMode ?? state.layoutMode,
-            previewItems: parentPreviewItems,
-            previewLayoutMode: state.layoutMode,
-          ),
-        );
-
-      state = state.copyWith(
-        archiveContext: ctx,
-        pathStack: newStack,
-        forwardStack: const [],
-        layoutMode: layoutMode ?? state.layoutMode,
-        clearCurrentFilter: true,
+      return _enterOpenedArchive(
+        ctx,
+        fullPath: fullPath,
+        archiveName: archiveName,
+        parentPreviewItems: parentPreviewItems,
+        layoutMode: layoutMode,
       );
-      _liveArchiveContext = ctx;
-
-      _loadArchiveContents(fullPath, layoutMode: layoutMode);
-      return ctx;
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;
@@ -670,21 +696,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     }
     onActivity?.call();
 
-    // Same as for a folder or a top-level archive: remember where the
-    // containing folder is scrolled to so leaving lands back on it.
-    if (state.pathStack.isNotEmpty) {
-      state.pathStack.last.scrollOffset = currentScrollOffset;
-      state.pathStack.last.items = List<RawEntry>.of(state.currentItems);
-      state.pathStack.last.layoutMode = state.layoutMode;
-    }
-
-    final parentPreviewItems = state.currentItems.isNotEmpty
-        ? List<RawEntry>.of(state.currentItems)
-        : (state.pathStack.isNotEmpty && state.pathStack.last.items != null
-              ? List<RawEntry>.of(state.pathStack.last.items!)
-              : null);
-
-    state = state.copyWith(isLoading: true);
+    final parentPreviewItems = _beginArchiveEntry(currentScrollOffset);
 
     try {
       final ctx = await ArchiveService.openNested(
@@ -695,35 +707,13 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         passphrase: passphrase,
       );
 
-      if (ctx.status == ArchiveOpenStatus.passphraseRequired ||
-          ctx.status == ArchiveOpenStatus.wrongPassphrase) {
-        state = state.copyWith(isLoading: false);
-        return ctx;
-      }
-
-      final newStack = List<PathSegment>.from(state.pathStack)
-        ..add(
-          PathSegment(
-            archiveName,
-            fullPath,
-            isArchiveRoot: true,
-            layoutMode: layoutMode ?? state.layoutMode,
-            previewItems: parentPreviewItems,
-            previewLayoutMode: state.layoutMode,
-          ),
-        );
-
-      state = state.copyWith(
-        archiveContext: ctx,
-        pathStack: newStack,
-        forwardStack: const [],
-        layoutMode: layoutMode ?? state.layoutMode,
-        clearCurrentFilter: true,
+      return _enterOpenedArchive(
+        ctx,
+        fullPath: fullPath,
+        archiveName: archiveName,
+        parentPreviewItems: parentPreviewItems,
+        layoutMode: layoutMode,
       );
-      _liveArchiveContext = ctx;
-
-      _loadArchiveContents(fullPath, layoutMode: layoutMode);
-      return ctx;
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;

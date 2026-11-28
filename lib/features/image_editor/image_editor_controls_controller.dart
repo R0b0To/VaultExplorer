@@ -4,8 +4,6 @@ import 'package:vaultexplorer/features/image_editor/widgets/annotation_layer.dar
 
 part 'image_editor_controls_controller.g.dart';
 
-const List<double> editorFontSizeFractions = [0.035, 0.055, 0.085, 0.125];
-
 class ImageEditorControlsState {
   const ImageEditorControlsState({
     this.activeTool = EditorTool.none,

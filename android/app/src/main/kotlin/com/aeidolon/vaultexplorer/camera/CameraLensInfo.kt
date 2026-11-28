@@ -55,7 +55,6 @@ enum class VaultVideoQuality(
         FHD -> 1920
         UHD -> 3840
     }
-    val targetLongEdge: Int get() = targetVideoLongEdge
 }
 
 private const val TAG = "VaultCameraLenses"

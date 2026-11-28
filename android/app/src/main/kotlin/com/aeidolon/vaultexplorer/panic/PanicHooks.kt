@@ -23,11 +23,6 @@ import android.content.Context
  * itself blocks on I/O.
  */
 interface PanicHooks {
-    /** Called once, before [PanicManager] unmounts any container --
-     *  Phase 4's implementation can read state here that unmounting is
-     *  about to invalidate. */
-    fun onBeforeSessionPurge(context: Context) {}
-
     /** Called once every container has been unmounted (Tier 1 and above).
      *  Phase 4's real implementation zeroes C++ session-key/buffer-pool
      *  memory and any Dart-managed decrypted buffers here, and (per
@@ -41,9 +36,4 @@ interface PanicHooks {
      *  mirroring those credentials (cached biometric-unlock flags, etc.)
      *  gets cleared too, not just its native backing store. */
     fun onAfterCredentialPurge(context: Context) {}
-
-    /** Called once, immediately before [PanicManager] dispatches the
-     *  uninstall intent and kills the process (Tier 3 only) -- the final
-     *  point at which the process is guaranteed to still exist. */
-    fun onBeforeProcessDeath(context: Context) {}
 }

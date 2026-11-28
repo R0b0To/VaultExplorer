@@ -1,7 +1,6 @@
 package com.aeidolon.vaultexplorer.handlers
 
 import android.Manifest
-import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -11,7 +10,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.os.PowerManager
 import android.provider.DocumentsContract
 import android.provider.Settings
@@ -36,8 +34,6 @@ const val AUTOMATION_PERMISSION_REQUEST_CODE = 9824
 class SystemPermissionHandlers(private val activity: MainActivity) {
     var userWantsSecureScreen = false
         private set
-
-    private var backgroundProtectionActive = false
 
     fun handleSetSecureScreen(call: MethodCall, result: MethodChannel.Result) {
         userWantsSecureScreen = call.argument<Boolean>("enabled") ?: false

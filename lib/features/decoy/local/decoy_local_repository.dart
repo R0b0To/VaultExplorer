@@ -226,21 +226,6 @@ class DecoyLocalRepository {
     return ListingJob<int>(run.result, run.cancel);
   }
 
-Future<Directory> createFolder(String parentPath, String desiredName) async {
-    invalidateDirectory(parentPath);
-    final name = desiredName.trim();
-    if (name.isEmpty) {
-      throw ArgumentError('Folder name cannot be empty');
-    }
-    var dir = Directory(p.join(parentPath, name));
-    var suffix = 1;
-    while (await dir.exists()) {
-      dir = Directory(p.join(parentPath, '$name ($suffix)'));
-      suffix++;
-    }
-    return dir.create(recursive: false);
-  }
-
  Future<String> rename(String path, String newName) async {
     invalidatePathAndParent(path);
     final trimmed = newName.trim();

@@ -459,9 +459,6 @@ ColorScheme _skinColorScheme(AppSkinPreset skin, Brightness brightness) {
   return ColorScheme.fromSeed(seedColor: _seedColor, brightness: brightness);
 }
 
-@Deprecated('Use buildDarkTheme() (or buildLightTheme()) instead.')
-ThemeData buildTheme() => buildDarkTheme();
-
 /// Builds the full app theme (component themes included) around an arbitrary
 /// [scheme], with light/dark chosen from `scheme.brightness`.
 ///

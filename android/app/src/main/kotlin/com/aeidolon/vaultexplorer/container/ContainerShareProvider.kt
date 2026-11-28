@@ -98,13 +98,10 @@ class ContainerShareProvider : ContentProvider() {
                 }
                 .build()
 
-        fun buildUri(volId: Int, fatPath: String): Uri =
-            buildUri(DocumentId(volId, "file", fatPath).toString())
-
         /**
-         * Same as above, but the entry's type is explicit ([isDir]) rather
-         * than assumed to be a file -- per the project rule that an entry's
-         * type is carried in metadata, never inferred from its name. A
+         * Same as above for the entry at [fatPath] of volume [volId], with the
+         * entry's type explicit ([isDir]) rather than inferred from its name --
+         * per the project rule that an entry's type is carried in metadata. A
          * folder is shared as a zip; [skipExtensions] names file extensions
          * (lower-case, no dot) to leave out of that zip.
          */
@@ -225,7 +222,7 @@ class ContainerShareProvider : ContentProvider() {
 
         val ioLease = ContainerDocumentIoRegistry.acquireHandle(volId)
             ?: throw FileNotFoundException("Container is being locked; retry after the lock completes")
-        val currentSession = try {
+        try {
             ContainerFileSystem.requireSession(volId)
         } catch (e: Exception) {
             ioLease.close()
@@ -236,7 +233,7 @@ class ContainerShareProvider : ContentProvider() {
         val handler = Handler(handlerThread.looper)
 
         return try {
-            val callback = ContainerProxyCallback(context, volId, currentSession, fatPath, isWrite = false, handlerThread, ioLease)
+            val callback = ContainerProxyCallback(context, volId, fatPath, isWrite = false, handlerThread, ioLease)
             storageManager.openProxyFileDescriptor(parcelMode, callback, handler)
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "openProxyFileDescriptor failed for $fatPath: ${e.message}" }

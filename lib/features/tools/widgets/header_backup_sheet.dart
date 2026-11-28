@@ -24,8 +24,6 @@ class HeaderBackupPasswordResult {
     this.keyfiles = const [],
   });
 
-  bool get hasAdvanced => keyfiles.isNotEmpty || (pim != null && pim! > 0);
-
   @override
   String toString() => password;
 }

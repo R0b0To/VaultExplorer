@@ -82,9 +82,6 @@ enum DrawerCategoryScope {
 
   final String storageKey;
 
-  bool get includesDevice => this != vaults;
-  bool get includesVaults => this != device;
-
   static DrawerCategoryScope fromStorageKey(String? key) {
     for (final scope in values) {
       if (scope.storageKey == key) return scope;

@@ -162,7 +162,6 @@ class FileOperation extends ChangeNotifier {
   int get archiveBytesWritten => _archiveBytesWritten;
 
   int _archiveTotalBytes = 0;
-  int get archiveTotalBytes => _archiveTotalBytes;
 
   int _removedCount = 0;
   int get removedCount => _removedCount;
@@ -183,8 +182,6 @@ class FileOperation extends ChangeNotifier {
 
   bool _cancelRequested = false;
   bool get cancelRequested => _cancelRequested;
-
-  String? completionFocusPath;
 
   // ── Public API ────────────────────────────────────────────────────────────
 

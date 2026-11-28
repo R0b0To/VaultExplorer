@@ -61,7 +61,6 @@ const _emptyClipboard = (
 extension ClipboardStateX on ClipboardState {
   bool get hasItems => items.isNotEmpty;
   bool get isCutOperation => action == ClipboardAction.move;
-  bool get isCopyOperation => action == ClipboardAction.copy;
   bool get isArchiveCreate => action == ClipboardAction.archiveCreate;
   bool get isArchiveExtract => action == ClipboardAction.archiveExtract;
 

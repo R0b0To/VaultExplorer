@@ -215,7 +215,6 @@ object ContainerSessionRegistry {
     fun isUnlocked(volId: Int) = activeSessions.containsKey(volId)
     fun hasAnyActiveSessions() = activeSessions.isNotEmpty()
     fun getFreeVolumeId(): Int? = (0 until MAX_VOLUMES).firstOrNull { !activeSessions.containsKey(it) }
-    fun getSessionByUri(uri: String): ContainerSession? = activeSessions.values.find { it.uri == uri }
     fun getVolumeIdByUri(uri: String): Int? = activeSessions.entries.find { it.value.uri == uri }?.key
 
     /**

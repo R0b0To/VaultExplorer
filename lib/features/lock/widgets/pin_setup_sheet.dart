@@ -48,8 +48,10 @@ class _PinSetupSheetState extends ConsumerState<PinSetupSheet> {
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final mq = MediaQuery.of(context);
-    final isLandscape = mq.orientation == Orientation.landscape;
+    final mqOrientation = MediaQuery.orientationOf(context);
+    final mqSize = MediaQuery.sizeOf(context);
+    final mqViewInsets = MediaQuery.viewInsetsOf(context);
+    final isLandscape = mqOrientation == Orientation.landscape;
 
     final title = state.step == PinSetupStep.enter
         ? context.l10n.createUnlockPinTitle
@@ -61,7 +63,7 @@ class _PinSetupSheetState extends ConsumerState<PinSetupSheet> {
               : context.l10n.enterSamePinAgain);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: mqViewInsets.bottom),
       child: SafeArea(
         top: false,
         child: Padding(
@@ -122,7 +124,7 @@ class _PinSetupSheetState extends ConsumerState<PinSetupSheet> {
                       child: Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxHeight: mq.size.height * 0.72,
+                            maxHeight: mqSize.height * 0.72,
                           ),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,

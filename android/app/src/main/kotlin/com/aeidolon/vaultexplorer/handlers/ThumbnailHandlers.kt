@@ -5,11 +5,8 @@ import android.net.Uri
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ImageDecoder
-import android.graphics.ImageFormat
 import android.graphics.Matrix
-import android.graphics.Rect
 import android.graphics.SurfaceTexture
-import android.graphics.YuvImage
 import android.content.pm.PackageManager
 import android.media.MediaCodec
 import android.media.MediaExtractor
@@ -36,7 +33,6 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
-import java.io.Closeable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
@@ -272,7 +268,7 @@ class ThumbnailHandlers(
                     // Adapt ContainerMediaDataSource into a Media3 DataSource
                     DataSource.Factory {
                         object : DataSource {
-                            private val mediaDataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                            private val mediaDataSource = ContainerMediaDataSource(fileName, volId)
                             private var currentPosition: Long = 0L
                             private var openUri: android.net.Uri? = null
 
@@ -754,7 +750,7 @@ class ThumbnailHandlers(
             if (isLocalStorage && localFile != null) {
                 retriever.setDataSource(localFile.absolutePath)
             } else {
-                val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                val dataSource = ContainerMediaDataSource(fileName, volId)
                 retriever.setDataSource(dataSource)
             }
             trace?.dsMs = (System.nanoTime() - dsT0) / 1_000_000L
@@ -819,7 +815,7 @@ class ThumbnailHandlers(
             if (isLocalStorage && localFile != null) {
                 fallbackRetriever.setDataSource(localFile.absolutePath)
             } else {
-                val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                val dataSource = ContainerMediaDataSource(fileName, volId)
                 fallbackRetriever.setDataSource(dataSource)
             }
 
@@ -1364,7 +1360,7 @@ class ThumbnailHandlers(
     ): java.io.InputStream = if (isLocalStorage && localFile != null) {
         java.io.FileInputStream(localFile)
     } else {
-        ContainerInputStream(activity, uriString, fileName, volId).apply { mark(0) }
+        ContainerInputStream(fileName, volId).apply { mark(0) }
     }
 
     private fun imageBufferSize(isLocalStorage: Boolean, localFile: java.io.File?): Int = 65536
@@ -2802,7 +2798,7 @@ class ThumbnailHandlers(
             if (isLocalStorage && localFile != null) {
                 extractor.setDataSource(localFile.absolutePath)
             } else {
-                val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                val dataSource = ContainerMediaDataSource(fileName, volId)
                 extractor.setDataSource(dataSource)
             }
             PerfLog.end("thumb.vid.sw_ds", swDsStart)

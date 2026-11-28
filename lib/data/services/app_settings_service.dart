@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
@@ -274,7 +275,7 @@ class AppSettings {
     this.lockAppOnScreenLock = true,
     this.appLockAfterMins = 0,
     this.appLockScreenLockOnly = false,
-    this.defaultLayoutMode = BrowserLayoutMode.detailed,
+    BrowserLayoutMode? defaultLayoutMode,
     this.useBrowserTabs = true,
     this.newTabBehavior = NewTabBehavior.duplicate,
     this.newTabStorageId = kNewTabLocalStorageId,
@@ -327,7 +328,15 @@ class AppSettings {
     this._masterPatternHash,
     this._masterPinHash,
   }) : extensionPreferences = extensionPreferences ?? {},
-       editorAppearancePrefs = editorAppearancePrefs ?? {};
+       editorAppearancePrefs = editorAppearancePrefs ?? {},
+       defaultLayoutMode = defaultLayoutMode ?? platformDefaultLayoutMode;
+
+  /// Compact list on desktop, where a mouse and a big screen favour density;
+  /// the two-row detailed list on phones.
+  static BrowserLayoutMode get platformDefaultLayoutMode =>
+      PlatformFeatures.isDesktop
+      ? BrowserLayoutMode.compact
+      : BrowserLayoutMode.detailed;
 
   Axis get playlistScrollDirection => playlistScrollMode.axis;
   set playlistScrollDirection(Axis axis) {
@@ -797,7 +806,7 @@ class AppSettings {
     appLockScreenLockOnly: j['appLockScreenLockOnly'] as bool? ?? false,
     defaultLayoutMode:
         BrowserLayoutMode.fromJson(j['defaultLayoutMode'] as String?) ??
-        BrowserLayoutMode.detailed,
+        AppSettings.platformDefaultLayoutMode,
     useBrowserTabs: j['useBrowserTabs'] as bool? ?? true,
     newTabBehavior: NewTabBehavior.fromJson(j['newTabBehavior']),
     newTabStorageId: (j['newTabStorageId'] as String?)?.isNotEmpty == true

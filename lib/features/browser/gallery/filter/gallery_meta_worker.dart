@@ -39,9 +39,6 @@ class GalleryMetaWorker {
   /// Whether the background isolate is up (for tests and diagnostics).
   bool get isRunning => _toWorker != null;
 
-  /// Whether parsing has fallen back to the calling isolate for good.
-  bool get isBroken => _broken;
-
   /// What [GalleryMetaParser.parse] returns for [bytes], computed off the
   /// calling isolate when possible. Completes with an error only if the worker
   /// was stopped (disposed) while the photo was being parsed.

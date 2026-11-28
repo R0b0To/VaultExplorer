@@ -1204,29 +1204,26 @@ class VaultLifecycleApi {
       ChannelMethods.unlockContainer,
       {
         'filePath': filePath,
-        'password': password,
-        'pim': pim,
-        'displayName': displayName,
-        'documentProvider': documentProvider,
-        'autoMountFolders': autoMountFolders,
-        'cipherId': cipherId ?? 255,
-        'hashId': hashId ?? 255,
-        if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
-        'cacheDerivedKey': cacheDerivedKey,
-        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
-          'keyfilePaths': keyfilePaths,
-        'readOnly': readOnly,
+        ..._veraCryptUnlockArgs(
+          password: password,
+          pim: pim,
+          displayName: displayName,
+          documentProvider: documentProvider,
+          autoMountFolders: autoMountFolders,
+          cipherId: cipherId,
+          hashId: hashId,
+          preservedKey: preservedKey,
+          cacheDerivedKey: cacheDerivedKey,
+          keyfilePaths: keyfilePaths,
+          readOnly: readOnly,
+          protectHiddenVolume: protectHiddenVolume,
+          hiddenVolumePassword: hiddenVolumePassword,
+          hiddenVolumePim: hiddenVolumePim,
+          hiddenVolumeCipherId: hiddenVolumeCipherId,
+          hiddenVolumeHashId: hiddenVolumeHashId,
+          hiddenVolumeKeyfilePaths: hiddenVolumeKeyfilePaths,
+        ),
         'useBackupHeader': useBackupHeader,
-        'protectHiddenVolume': protectHiddenVolume,
-        if (protectHiddenVolume) ...{
-          'hiddenVolumePassword': hiddenVolumePassword ?? '',
-          'hiddenVolumePim': hiddenVolumePim,
-          'hiddenVolumeCipherId': hiddenVolumeCipherId ?? 255,
-          'hiddenVolumeHashId': hiddenVolumeHashId ?? 255,
-          if (hiddenVolumeKeyfilePaths != null &&
-              hiddenVolumeKeyfilePaths.isNotEmpty)
-            'hiddenVolumeKeyfilePaths': hiddenVolumeKeyfilePaths,
-        },
       },
     );
 
@@ -1291,28 +1288,25 @@ class VaultLifecycleApi {
       ChannelMethods.unlockSplitContainer,
       {
         'firstPartUri': firstPartUri,
-        'password': password,
-        'pim': pim,
-        'displayName': displayName,
-        'documentProvider': documentProvider,
-        'autoMountFolders': autoMountFolders,
-        'cipherId': cipherId ?? 255,
-        'hashId': hashId ?? 255,
-        if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
-        'cacheDerivedKey': cacheDerivedKey,
-        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
-          'keyfilePaths': keyfilePaths,
-        'readOnly': readOnly,
-        'protectHiddenVolume': protectHiddenVolume,
-        if (protectHiddenVolume) ...{
-          'hiddenVolumePassword': hiddenVolumePassword ?? '',
-          'hiddenVolumePim': hiddenVolumePim,
-          'hiddenVolumeCipherId': hiddenVolumeCipherId ?? 255,
-          'hiddenVolumeHashId': hiddenVolumeHashId ?? 255,
-          if (hiddenVolumeKeyfilePaths != null &&
-              hiddenVolumeKeyfilePaths.isNotEmpty)
-            'hiddenVolumeKeyfilePaths': hiddenVolumeKeyfilePaths,
-        },
+        ..._veraCryptUnlockArgs(
+          password: password,
+          pim: pim,
+          displayName: displayName,
+          documentProvider: documentProvider,
+          autoMountFolders: autoMountFolders,
+          cipherId: cipherId,
+          hashId: hashId,
+          preservedKey: preservedKey,
+          cacheDerivedKey: cacheDerivedKey,
+          keyfilePaths: keyfilePaths,
+          readOnly: readOnly,
+          protectHiddenVolume: protectHiddenVolume,
+          hiddenVolumePassword: hiddenVolumePassword,
+          hiddenVolumePim: hiddenVolumePim,
+          hiddenVolumeCipherId: hiddenVolumeCipherId,
+          hiddenVolumeHashId: hiddenVolumeHashId,
+          hiddenVolumeKeyfilePaths: hiddenVolumeKeyfilePaths,
+        ),
       },
     );
 
@@ -1423,29 +1417,26 @@ class VaultLifecycleApi {
       ChannelMethods.unlockUsbContainer,
       {
         'deviceName': deviceName,
-        'password': password,
-        'pim': pim,
-        'displayName': displayName,
-        'documentProvider': documentProvider,
-        'autoMountFolders': autoMountFolders,
-        'cipherId': cipherId ?? 255,
-        'hashId': hashId ?? 255,
-        if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
-        'cacheDerivedKey': cacheDerivedKey,
-        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
-          'keyfilePaths': keyfilePaths,
-        'readOnly': readOnly,
+        ..._veraCryptUnlockArgs(
+          password: password,
+          pim: pim,
+          displayName: displayName,
+          documentProvider: documentProvider,
+          autoMountFolders: autoMountFolders,
+          cipherId: cipherId,
+          hashId: hashId,
+          preservedKey: preservedKey,
+          cacheDerivedKey: cacheDerivedKey,
+          keyfilePaths: keyfilePaths,
+          readOnly: readOnly,
+          protectHiddenVolume: protectHiddenVolume,
+          hiddenVolumePassword: hiddenVolumePassword,
+          hiddenVolumePim: hiddenVolumePim,
+          hiddenVolumeCipherId: hiddenVolumeCipherId,
+          hiddenVolumeHashId: hiddenVolumeHashId,
+          hiddenVolumeKeyfilePaths: hiddenVolumeKeyfilePaths,
+        ),
         'useBackupHeader': useBackupHeader,
-        'protectHiddenVolume': protectHiddenVolume,
-        if (protectHiddenVolume) ...{
-          'hiddenVolumePassword': hiddenVolumePassword ?? '',
-          'hiddenVolumePim': hiddenVolumePim,
-          'hiddenVolumeCipherId': hiddenVolumeCipherId ?? 255,
-          'hiddenVolumeHashId': hiddenVolumeHashId ?? 255,
-          if (hiddenVolumeKeyfilePaths != null &&
-              hiddenVolumeKeyfilePaths.isNotEmpty)
-            'hiddenVolumeKeyfilePaths': hiddenVolumeKeyfilePaths,
-        },
       },
     );
 
@@ -1726,3 +1717,50 @@ class VaultLifecycleApi {
     }
   }
 }
+
+/// Arguments common to the VeraCrypt-style unlock calls
+/// ([VaultLifecycleApi.unlockContainer], `unlockSplitContainer` and
+/// `unlockUsbContainer`). Each caller adds the key naming its source (and
+/// `useBackupHeader` where it applies); defaults (255 = "try every
+/// cipher/hash") and the hidden-volume block are the same for all of them.
+Map<String, Object?> _veraCryptUnlockArgs({
+  required String password,
+  required int pim,
+  required String? displayName,
+  required bool documentProvider,
+  required List<String> autoMountFolders,
+  required int? cipherId,
+  required int? hashId,
+  required Uint8List? preservedKey,
+  required bool cacheDerivedKey,
+  required List<String>? keyfilePaths,
+  required bool readOnly,
+  required bool protectHiddenVolume,
+  required String? hiddenVolumePassword,
+  required int hiddenVolumePim,
+  required int? hiddenVolumeCipherId,
+  required int? hiddenVolumeHashId,
+  required List<String>? hiddenVolumeKeyfilePaths,
+}) => {
+  'password': password,
+  'pim': pim,
+  'displayName': displayName,
+  'documentProvider': documentProvider,
+  'autoMountFolders': autoMountFolders,
+  'cipherId': cipherId ?? 255,
+  'hashId': hashId ?? 255,
+  if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
+  'cacheDerivedKey': cacheDerivedKey,
+  if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+    'keyfilePaths': keyfilePaths,
+  'readOnly': readOnly,
+  'protectHiddenVolume': protectHiddenVolume,
+  if (protectHiddenVolume) ...{
+    'hiddenVolumePassword': hiddenVolumePassword ?? '',
+    'hiddenVolumePim': hiddenVolumePim,
+    'hiddenVolumeCipherId': hiddenVolumeCipherId ?? 255,
+    'hiddenVolumeHashId': hiddenVolumeHashId ?? 255,
+    if (hiddenVolumeKeyfilePaths != null && hiddenVolumeKeyfilePaths.isNotEmpty)
+      'hiddenVolumeKeyfilePaths': hiddenVolumeKeyfilePaths,
+  },
+};

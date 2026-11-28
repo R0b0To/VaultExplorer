@@ -114,9 +114,6 @@ class GalleryDateHeader extends StatelessWidget {
     final isDark =
         theme.brightness == Brightness.dark || bg.computeLuminance() < 0.5;
     final titleColor = isDark ? Colors.white : const Color(0xFF1F1F1F);
-    final countColor = isDark
-        ? Colors.white.withValues(alpha: 0.7)
-        : const Color(0xFF1F1F1F).withValues(alpha: 0.6);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 8),

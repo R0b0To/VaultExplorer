@@ -107,11 +107,6 @@ class LayoutModeMenuButton extends StatefulWidget {
 }
 
 class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
-  // Was `_menuIsOpen` on the parent's State, shared (and never actually
-  // read) across three different popup buttons -- see the identical note
-  // in sort_menu_button.dart. Kept local here for the same reason.
-  bool _menuIsOpen = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -134,8 +129,6 @@ class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
           }
         },
       ),
-      onOpen: () => setState(() => _menuIsOpen = true),
-      onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: buildLayoutModeMenuItems(
         context: context,
         cs: cs,

@@ -2,7 +2,6 @@ package com.aeidolon.vaultexplorer.container
 
 import android.net.Uri
 import java.io.FileNotFoundException
-import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.PerfLog
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
@@ -40,9 +39,6 @@ object ContainerFileSystem {
             lock.unlock()
         }
     }
-
-    @Deprecated("Use withReadLock or withWriteLock instead")
-    fun <T> withLock(volId: Int, block: () -> T): T = withWriteLock(volId, block)
 
     fun requireSession(volId: Int): ContainerSession =
         ContainerSessionRegistry.activeSessions[volId]

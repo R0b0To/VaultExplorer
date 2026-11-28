@@ -1,10 +1,7 @@
 package com.aeidolon.vaultexplorer.saf
 
-import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -13,7 +10,6 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import androidx.exifinterface.media.ExifInterface
@@ -182,10 +178,7 @@ class SafStorageManager(private val context: Context) {
     companion object {
         private const val TAG = "SafStorageManager"
         private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
-        private const val DOCUMENT_ID_PRIMARY = "primary"
         private const val DOCUMENT_ID_PRIMARY_ANDROID = "primary:Android"
-        private const val DOCUMENT_ID_PRIMARY_ANDROID_DATA = "primary:Android/data"
-        private const val DOCUMENT_ID_PRIMARY_ANDROID_OBB = "primary:Android/obb"
 
         // Upper bound for how long a provider's stale folder listing is
         // corrected from what this app knows it changed (see

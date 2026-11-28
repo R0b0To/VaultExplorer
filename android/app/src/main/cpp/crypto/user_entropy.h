@@ -21,7 +21,7 @@
 // attacker-controlled. If /dev/urandom cannot be read, fillRandom() fails
 // instead of falling back to user entropy alone.
 //
-// Keystream construction (identical to util/UserEntropy.kt on the JVM side):
+// Keystream construction:
 //
 //   seed    = SHA-512( "VaultExplorer/user-entropy/v1" || u32be(len) || input )
 //   block_i = SHA-512( seed || u64be(i) )           i = 0, 1, 2, ...

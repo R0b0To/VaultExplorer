@@ -97,11 +97,6 @@ class DuressSettingsService {
 
   // ── PIN Duress ─────────────────────────────────────────────────────────────
 
-  Future<void> setDuressPin(String pin) async {
-    final hash = await pin_lock.hashPin(_cryptoApi, pin);
-    await _secure.write(key: _kPinHash, value: hash);
-  }
-
   Future<void> setDuressPinHash(String hash) async {
     await _secure.write(key: _kPinHash, value: hash);
   }

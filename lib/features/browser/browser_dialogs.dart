@@ -345,11 +345,6 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
             excluding: excluding,
           ));
 
-  List<String> get allMessages => [
-        ...issues.map((i) => i.message),
-        if (conflict.isConflict) conflict.message(context.l10n, '')!,
-      ];
-
   Widget buildIssuesList(String candidateName) {
     final hasIssues = issues.isNotEmpty || conflict.isConflict;
     final messages = hasIssues
@@ -394,9 +389,10 @@ Widget _buildNamePromptDialog(
   required Widget content,
   required List<Widget> actions,
 }) {
-  final media = MediaQuery.of(context);
-  final maxHeight = (media.size.height - media.viewInsets.bottom - 16)
-      .clamp(0.0, media.size.height)
+  final mediaSize = MediaQuery.sizeOf(context);
+  final mediaViewInsets = MediaQuery.viewInsetsOf(context);
+  final maxHeight = (mediaSize.height - mediaViewInsets.bottom - 16)
+      .clamp(0.0, mediaSize.height)
       .toDouble();
 
   return Dialog(

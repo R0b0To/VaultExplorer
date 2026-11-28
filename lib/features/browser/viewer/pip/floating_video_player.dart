@@ -370,8 +370,9 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     required bool canPrevious,
     required bool canNext,
   }) {
-    final media = MediaQuery.of(context);
-    final padding = media.padding;
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final mediaViewInsets = MediaQuery.viewInsetsOf(context);
+    final padding = mediaPadding;
     final landscape = screen.width > screen.height;
 
     // The window is the shape of the video, so it is filled edge to edge.
@@ -404,7 +405,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     final minX = padding.left + _margin;
     final maxX = math.max(minX, screen.width - padding.right - _margin - width);
     final minY = padding.top + _margin;
-    final bottomInset = math.max(padding.bottom, media.viewInsets.bottom);
+    final bottomInset = math.max(padding.bottom, mediaViewInsets.bottom);
     final maxY = math.max(minY, screen.height - bottomInset - _margin - height);
 
     final restX = _atRight ? maxX : minX;

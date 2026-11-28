@@ -27,7 +27,6 @@ import com.aeidolon.vaultexplorer.VeLog
 class ContainerProxyCallback(
     private val context: Context?,
     private val volId: Int,
-    private val session: ContainerSession,
     private val fatPath: String,
     private val isWrite: Boolean,
     private val handlerThread: HandlerThread,

@@ -21,8 +21,6 @@ import androidx.work.WorkManager
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.UriNameResolver
 import com.aeidolon.vaultexplorer.bridge.VaultAutomationUnlockedBridge
-import com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession
-import com.aeidolon.vaultexplorer.camera.VaultVideoQuality
 import com.aeidolon.vaultexplorer.camera.listCameraLenses
 import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
@@ -34,10 +32,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.CountDownLatch
-import java.util.UUID
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.panic.PanicManager
 import com.aeidolon.vaultexplorer.panic.PanicSettings

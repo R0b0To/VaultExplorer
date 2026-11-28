@@ -12,10 +12,8 @@
 // folder's size comes back), without a second provider to keep in sync.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 part 'file_browser_selection_controller.g.dart';
@@ -189,33 +187,5 @@ extension FileBrowserSelectionStateX on FileBrowserSelectionState {
       totalBytes: tBytes,
       hasPendingFolderSizes: pending,
     );
-  }
-
-  /// Ready-to-display summary for the selection action-bar, e.g.
-  /// "3 files · 42.3 MB" or "2 folders (calculating…)".
-  String selectionSummary(AppLocalizations l10n) {
-    final stats = summaryStats;
-    final fc = stats.folderCount;
-    final fileSize = stats.fileBytes;
-    final total = stats.totalBytes;
-    final fileCount = stats.fileCount;
-    final filePart = fileCount > 0
-        ? '${l10n.statsFileCount(fileCount)}'
-              '${fileSize > 0 ? ' · ${formatBytes(fileSize)}' : ''}'
-        : '';
-    if (fc == 0) return filePart;
-    final folderLabel = l10n.statsFolderCount(fc);
-    final String folderSizePart;
-    if (stats.hasPendingFolderSizes) {
-      folderSizePart = '(${l10n.sizeCalculatingLabel})';
-    } else {
-      final resolvedBytes = total - fileSize;
-      folderSizePart = resolvedBytes > 0
-          ? '· ${formatBytes(resolvedBytes)}'
-          : '';
-    }
-    final folderPart = '$folderLabel $folderSizePart'.trim();
-    if (filePart.isEmpty) return folderPart;
-    return l10n.selectionSummaryCombined(filePart, folderPart);
   }
 }

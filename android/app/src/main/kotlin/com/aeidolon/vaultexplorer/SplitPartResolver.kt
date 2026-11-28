@@ -1,7 +1,6 @@
 package com.aeidolon.vaultexplorer
 
 import java.io.File
-import com.aeidolon.vaultexplorer.handlers.SplitContainerMountHandlers
 import com.aeidolon.vaultexplorer.handlers.SplitJoinHandlers
 
 /**
@@ -10,7 +9,7 @@ import com.aeidolon.vaultexplorer.handlers.SplitJoinHandlers
  * itself writes). Pulled out of `SplitJoinHandlers` so both directions
  * that need "given one part, find the rest" -- joining them back into a
  * single file ([SplitJoinHandlers.handleJoinContainer]) and mounting them
- * directly without ever joining ([SplitContainerMountHandlers]) -- share
+ * directly without ever joining ([com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers]) -- share
  * one naming/ordering source of truth instead of drifting apart.
  */
 object SplitPartResolver {

@@ -1,15 +1,12 @@
 package com.aeidolon.vaultexplorer.container
 
 import android.annotation.TargetApi
-import android.content.Context
 import android.media.MediaDataSource
 import android.os.Build
 
 // ── ContainerInputStream (Optimized Subsampled Native Image Stream) ─────────────
 
 class ContainerInputStream(
-    private val context: Context,
-    private val uriString: String,
     private val fileName: String,
     private val volId: Int
 ) : java.io.InputStream() {
@@ -64,8 +61,6 @@ class ContainerInputStream(
 
 @TargetApi(Build.VERSION_CODES.M)
 class ContainerMediaDataSource(
-    private val context: Context,
-    private val uriString: String,
     private val fileName: String,
     private val volId: Int
 ) : MediaDataSource() {

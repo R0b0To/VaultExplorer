@@ -123,7 +123,6 @@ class SkinPickerPanel extends StatelessWidget {
 
   Widget _toolbar(BuildContext context) {
     final l10n = context.l10n;
-    final cs = Theme.of(context).colorScheme;
     const compact = VisualDensity.compact;
     return GestureDetector(
       // Flick the panel up or down to dock it to that edge, out of the way of

@@ -111,8 +111,6 @@ object PdfRendererRegistry {
         return doc.executor.submit<T> { block(doc) }.get()
     }
 
-    fun getPageCount(handle: Int): Int = runOnDocExecutor(handle) { it.renderer.pageCount }
-
     fun getPageSize(handle: Int, pageIndex: Int): PageSize = runOnDocExecutor(handle) { doc ->
         doc.renderer.openPage(pageIndex).use { page ->
             PageSize(page.width, page.height)

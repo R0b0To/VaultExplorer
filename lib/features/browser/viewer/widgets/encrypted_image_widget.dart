@@ -401,11 +401,12 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
       );
     }
 
-    final mq = MediaQuery.of(context);
-    final dpr = mq.devicePixelRatio;
+    final mqSize = MediaQuery.sizeOf(context);
+    final mqDevicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final dpr = mqDevicePixelRatio;
     final headroom = MediaViewerConstants.fullResDecodeZoomHeadroom;
-    final capWidth = (mq.size.width * dpr * headroom).round().clamp(1, 1 << 20);
-    final capHeight = (mq.size.height * dpr * headroom).round().clamp(
+    final capWidth = (mqSize.width * dpr * headroom).round().clamp(1, 1 << 20);
+    final capHeight = (mqSize.height * dpr * headroom).round().clamp(
       1,
       1 << 20,
     );

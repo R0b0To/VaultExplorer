@@ -291,16 +291,9 @@ class MediaViewerToolbarSettingsScreen extends ConsumerStatefulWidget {
 
 class _MediaViewerToolbarSettingsScreenState
     extends ConsumerState<MediaViewerToolbarSettingsScreen> {
-  late MediaViewerSection _selectedSection;
   bool _isSearching = false;
   String _searchQuery = '';
   final _searchController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedSection = MediaViewerSection.playback;
-  }
 
   @override
   void dispose() {

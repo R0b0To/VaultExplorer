@@ -4,14 +4,6 @@ package com.aeidolon.vaultexplorer.engine
  * Common exceptions for all vault backends.
  */
 open class VaultIOException(message: String, cause: Throwable? = null) : Exception(message, cause)
-class VaultPathNotFoundException(path: String) : VaultIOException("Path not found: $path")
-
-/**
- * Common tree node interface.
- */
-interface VaultTreeNode {
-    val cleartextName: String
-}
 
 /**
  * Common result type for vault opening operations.

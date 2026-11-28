@@ -75,7 +75,7 @@ class ImagePageItem extends StatefulWidget {
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
     this.edgeSwipeBrightnessEnabled = true,
     this.edgeSwipeHudEnabled = true,
-    this.edgeSwipeWidthFraction = 0.25,
+    this.edgeSwipeWidthFraction = MediaViewerConstants.defaultEdgeSwipeWidthFraction,
     this.isActive = true,
     this.zoomIndicatorBottomOffset = 16,
   });

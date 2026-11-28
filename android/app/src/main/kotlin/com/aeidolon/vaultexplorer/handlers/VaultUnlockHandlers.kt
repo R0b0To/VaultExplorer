@@ -3,30 +3,20 @@ package com.aeidolon.vaultexplorer.handlers
 import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.Looper
 import android.os.ParcelFileDescriptor
-import android.os.storage.StorageManager
 import android.provider.DocumentsContract
-import android.provider.OpenableColumns
 import java.util.Base64
 import androidx.documentfile.provider.DocumentFile
-import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.concurrent.ExecutorService
 import kotlin.concurrent.withLock
-import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
 import com.aeidolon.vaultexplorer.container.ContainerEngine
 import com.aeidolon.vaultexplorer.container.ContainerLifecycleCore
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
-import com.aeidolon.vaultexplorer.container.ContainerSession
-import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeOpSupport
-import com.aeidolon.vaultexplorer.SafSplitResolver
-import com.aeidolon.vaultexplorer.SplitFuseCallback
-import com.aeidolon.vaultexplorer.SplitPartInfo
 import com.aeidolon.vaultexplorer.UriNameResolver
 import com.aeidolon.vaultexplorer.VeLog
 
@@ -135,49 +125,6 @@ class VaultUnlockHandlers(
     private val fuseThread = HandlerThread("split-container-fuse").apply { start() }
     private val fuseHandler = Handler(fuseThread.looper)
 
-    private fun displayNameForSplit(fileName: String): String =
-        Regex("""^(.*)\.(\d+|part\d+)$""", RegexOption.IGNORE_CASE)
-            .find(fileName)?.groupValues?.get(1) ?: fileName
-
-    private fun getFileSize(uri: Uri): Long {
-        if (uri.scheme == "file" || uri.scheme == null) {
-            val path = uri.path
-            if (path != null) {
-                val f = File(path)
-                if (f.exists()) return f.length()
-            }
-        }
-        var size: Long? = null
-        try {
-            activity.contentResolver.query(
-                uri,
-                arrayOf(DocumentsContract.Document.COLUMN_SIZE, OpenableColumns.SIZE),
-                null,
-                null,
-                null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val colIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                        .takeIf { it >= 0 }
-                        ?: cursor.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 }
-                    if (colIdx != null && !cursor.isNull(colIdx)) {
-                        size = cursor.getLong(colIdx)
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-
-        if (size == null || size!! <= 0L) {
-            try {
-                activity.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                    val statSize = pfd.statSize
-                    if (statSize > 0) size = statSize
-                }
-            } catch (_: Exception) {}
-        }
-        return size ?: 0L
-    }
-
     fun onActivityDestroyed() {
         fuseThread.quitSafely()
     }
@@ -200,12 +147,6 @@ class VaultUnlockHandlers(
         }
         val ext = if (rawUri.contains(".")) "." + rawUri.substringAfterLast(".") else ""
         return "file://[path]/***$ext"
-    }
-
-    private fun censorName(name: String?): String {
-        if (name.isNullOrEmpty()) return "<null>"
-        val ext = if (name.contains(".")) "." + name.substringAfterLast(".") else ""
-        return "***$ext"
     }
 
     /**

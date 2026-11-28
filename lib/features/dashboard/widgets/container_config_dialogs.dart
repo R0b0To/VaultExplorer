@@ -147,8 +147,9 @@ class _PinVerifySheetState extends ConsumerState<_PinVerifySheet> {
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final mq = MediaQuery.of(context);
-    final isLandscape = mq.orientation == Orientation.landscape;
+    final mqOrientation = MediaQuery.orientationOf(context);
+    final mqSize = MediaQuery.sizeOf(context);
+    final isLandscape = mqOrientation == Orientation.landscape;
 
     Widget header = Column(
       mainAxisSize: MainAxisSize.min,
@@ -237,7 +238,7 @@ class _PinVerifySheetState extends ConsumerState<_PinVerifySheet> {
                         child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxHeight: mq.size.height * 0.72,
+                              maxHeight: mqSize.height * 0.72,
                             ),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,

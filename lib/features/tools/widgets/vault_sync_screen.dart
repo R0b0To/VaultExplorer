@@ -820,7 +820,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     final selected = await showDialog<SyncDirection>(
       context: context,
       builder: (dialogContext) {
-        final mediaQuery = MediaQuery.of(dialogContext);
+        final mediaQuerySize = MediaQuery.sizeOf(dialogContext);
         final theme = Theme.of(dialogContext);
         final cs = theme.colorScheme;
 
@@ -1026,7 +1026,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: 460,
-                  maxHeight: mediaQuery.size.height * 0.85,
+                  maxHeight: mediaQuerySize.height * 0.85,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 20, 12, 14),

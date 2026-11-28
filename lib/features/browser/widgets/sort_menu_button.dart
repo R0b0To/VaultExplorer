@@ -72,12 +72,6 @@ class SortMenuButton extends StatefulWidget {
 }
 
 class _SortMenuButtonState extends State<SortMenuButton> {
-  // Was `_menuIsOpen` on the parent's State, shared (and never actually
-  // read) across three different popup buttons. Kept local here since nothing
-  // outside this widget ever read it -- confirmed by searching every usage
-  // in file_browser_screen.dart before this extraction.
-  bool _menuIsOpen = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -93,8 +87,6 @@ class _SortMenuButtonState extends State<SortMenuButton> {
           }
         },
       ),
-      onOpen: () => setState(() => _menuIsOpen = true),
-      onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: buildSortMenuItems(
         context: context,
         cs: cs,

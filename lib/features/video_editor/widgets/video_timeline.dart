@@ -438,7 +438,6 @@ class _TimelineBackgroundPainter extends CustomPainter {
         } else {
           // Zoomed so far that this frame's span is wider than the natural
           // fit: tile the same cover-fitted thumbnail across the span.
-          final src = Rect.fromLTWH(0, 0, imgW, imgH);
           var tileX = xStart;
           while (tileX < xEnd) {
             final tileEnd = math.min(tileX + fitW, xEnd);

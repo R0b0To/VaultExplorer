@@ -8,9 +8,9 @@ class AppBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
+    final mqViewInsets = MediaQuery.viewInsetsOf(context);
     return Padding(
-      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: mqViewInsets.bottom),
       child: SafeArea(
         top: false,
         child: Padding(

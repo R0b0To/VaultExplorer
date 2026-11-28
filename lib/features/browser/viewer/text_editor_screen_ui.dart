@@ -1377,9 +1377,6 @@ extension _TextEditorUi on _TextEditorScreenState {
     final appearance = _effectiveAppearance(
       ref.watch(textEditorAppearanceProvider),
     );
-    final timeStr = activeTab.lastSavedAt != null
-        ? '${activeTab.lastSavedAt!.hour.toString().padLeft(2, '0')}:${activeTab.lastSavedAt!.minute.toString().padLeft(2, '0')}'
-        : null;
 
     final posStr = !activeTab.showMarkdownPreview
         ? '${context.l10n.textEditorCursorPosition(activeTab.cursorLine, activeTab.cursorCol)}  •  '

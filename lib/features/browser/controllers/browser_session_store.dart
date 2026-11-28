@@ -45,9 +45,6 @@ class BrowserSessionStore {
   ProviderSubscription<BrowserTabsState>? _workspaceSubscription;
   final Map<TabId, List<ProviderSubscription<Object?>>> _tabSubscriptions = {};
 
-  /// Whether a workspace is currently being kept.
-  bool get isHolding => _workspace != null;
-
   /// Starts keeping [workspace] alive. Calling it again for the workspace it
   /// already holds does nothing; a different workspace replaces the old one.
   void hold(ProviderContainer container, BrowserTabsConfig workspace) {

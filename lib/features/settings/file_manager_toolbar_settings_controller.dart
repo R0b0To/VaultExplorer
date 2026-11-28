@@ -8,7 +8,6 @@ import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
-import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
@@ -618,44 +617,9 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
         state.config.mediaViewerToolbarConfig.copyWith(audioDecoderMode: mode),
       );
 
-  Future<void> setMediaViewerTopBarActions(List<MediaViewerAction> actions) {
-    final updated = state.config.mediaViewerToolbarConfig.copyWith(
-      topBarActions: actions,
-    );
-    return updateMediaViewerConfig(updated);
-  }
-
-  Future<void> setMediaViewerBottomBarActions(List<MediaViewerAction> actions) {
-    final updated = state.config.mediaViewerToolbarConfig.copyWith(
-      bottomBarActions: actions,
-    );
-    return updateMediaViewerConfig(updated);
-  }
-
-  Future<void> setMediaViewerHiddenActions(Set<MediaViewerAction> hidden) {
-    final updated = state.config.mediaViewerToolbarConfig.copyWith(
-      hiddenActions: hidden,
-    );
-    return updateMediaViewerConfig(updated);
-  }
-
   Future<void> setMediaViewerShowProgressBar(bool show) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       showProgressBar: show,
-    );
-    return updateMediaViewerConfig(updated);
-  }
-
-  Future<void> setMediaViewerShowCenterTransport(bool show) {
-    final updated = state.config.mediaViewerToolbarConfig.copyWith(
-      showCenterTransport: show,
-    );
-    return updateMediaViewerConfig(updated);
-  }
-
-  Future<void> setMediaViewerShowPreviousNext(bool show) {
-    final updated = state.config.mediaViewerToolbarConfig.copyWith(
-      showPreviousNext: show,
     );
     return updateMediaViewerConfig(updated);
   }

@@ -796,10 +796,6 @@ class HtmlViewerView(
                 webView.reload()
                 result.success(null)
             }
-            "stopLoading" -> {
-                webView.stopLoading()
-                result.success(null)
-            }
             "loadEntry" -> {
                 val entry = call.argument<String>("entry") ?: ""
                 val fragment = call.argument<String>("fragment") ?: ""
@@ -877,12 +873,6 @@ class HtmlViewerView(
                     webView.postDelayed({ emitScrollEvent() }, 180)
                 }
                 result.success(null)
-            }
-            "pageScroll" -> {
-                // One screenful, for the reader's page buttons; false when already at the end.
-                val down = call.argument<Boolean>("down") ?: true
-                val moved = if (down) webView.pageDown(false) else webView.pageUp(false)
-                result.success(moved)
             }
             "setJavaScriptEnabled" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false

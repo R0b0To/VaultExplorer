@@ -927,12 +927,6 @@ open class MainActivity : FlutterFragmentActivity() {
                     nativePlayerManager.clearAbLoop()
                     result.success(null)
                 }
-                "getAudioTracks" -> {
-                    result.success(nativePlayerManager.getAudioTracks())
-                }
-                "getSubtitleTracks" -> {
-                    result.success(nativePlayerManager.getSubtitleTracks())
-                }
                 "selectAudioTrack" -> {
                     val groupIdx = call.argument<Int>("groupIndex") ?: -1
                     val trackIdx = call.argument<Int>("trackIndex") ?: -1

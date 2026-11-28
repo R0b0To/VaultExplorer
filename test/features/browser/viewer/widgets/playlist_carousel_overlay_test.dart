@@ -66,12 +66,11 @@ void main() {
     await tester.pumpAndSettle();
 
     final before = _position(tester).pixels;
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byType(ListView)),
+    await tester.drag(
+      find.byType(ListView),
+      const Offset(-200, 0),
       kind: PointerDeviceKind.mouse,
     );
-    await gesture.moveBy(const Offset(-200, 0));
-    await gesture.up();
     await tester.pumpAndSettle();
 
     expect(_position(tester).pixels, greaterThan(before));

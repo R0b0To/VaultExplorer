@@ -661,7 +661,7 @@ extern "C" VE_API int32_t ve_change_password(const ve_change_password_params* p)
 // ── filesystem operations ────────────────────────────────────────────────
 // Every call below asks the slot table (ve_volumes.h) for the volume in `vol`; the manager answers
 // NotUnlocked for an empty slot, so no call needs to know whether a container or a folder vault is behind it.
-// Block-device volumes keep the quirks their ABI always had (marked "legacy" where they differ from folder vaults).
+// Block-device and folder-vault slots answer alike: no per-family special cases in these wrappers.
 
 extern "C" VE_API int32_t ve_list_directory(int32_t vol, const char* path, ve_buffer* out) {
     if (!out) return VE_ERR_INVALID_ARG;
@@ -669,19 +669,12 @@ extern "C" VE_API int32_t ve_list_directory(int32_t vol, const char* path, ve_bu
     out->len = 0;
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
-    vm::VolumeManager::Traits t;
-    if (mgr().traits(vol, t) != vm::Status::Ok) return VE_ERR_NOT_UNLOCKED;
     std::vector<std::string> results;
     results.reserve(256);
+    // One answer for every kind of slot: a listing the backend reports as failed (I/O error) is VE_ERR_FAILED, an
+    // empty folder is VE_OK with count 0, an empty slot or an ended session is VE_ERR_NOT_UNLOCKED.
     const vm::Status st = mgr().listDirectory(vol, path, results);
-    if (st == vm::Status::NotUnlocked) return VE_ERR_NOT_UNLOCKED;
-    if (st != vm::Status::Ok) {
-        if (t.family == vm::Family::FolderVault) return VE_ERR_FAILED;
-        // Legacy: a block-device folder that cannot be read lists as empty (the callers -- browsing, the mount
-        // layer, archive part discovery -- were written against that). Only a session that ended meanwhile is an error.
-        if (!mgr().isUnlocked(vol)) return VE_ERR_NOT_UNLOCKED;
-        results.clear();
-    }
+    if (st != vm::Status::Ok) return rcOf(st);
     return packWireList(results, out);
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -750,14 +743,10 @@ extern "C" VE_API int32_t ve_read_file_chunk(int32_t vol, const char* path, int6
         return VE_ERR_INVALID_ARG;
     }
     VE_TRY
-    vm::VolumeManager::Traits t;
-    if (mgr().traits(vol, t) != vm::Status::Ok) return VE_ERR_NOT_UNLOCKED;
     std::vector<uint8_t> buffer;
     const vm::Status st = mgr().readFileChunk(vol, path, offset, static_cast<size_t>(length), buffer);
     if (st != vm::Status::Ok) return rcOf(st);
-    // Legacy: a block-device read that returns no bytes (end of file) is VE_ERR_FAILED, as ve_engine.h says;
-    // a folder vault answers OK with an empty buffer. Both mean "no more data" to the callers.
-    if (buffer.empty() && t.family == vm::Family::BlockDevice) return VE_ERR_FAILED;
+    // End of file is not an error, for any kind of slot: VE_OK with out->len == 0 (out->data stays null).
     const bool ok = emitBuffer(buffer.data(), buffer.size(), out);
     if (!buffer.empty()) mbedtls_platform_zeroize(buffer.data(), buffer.size());
     return ok ? VE_OK : VE_ERR_FAILED;
@@ -944,18 +933,13 @@ extern "C" VE_API int32_t ve_copy_file(int32_t srcVol, const char* srcPath,
 
 extern "C" VE_API int32_t ve_get_space_info(int32_t vol, uint64_t* total, uint64_t* free_bytes) {
     if (!total || !free_bytes || !validVol(vol)) return VE_ERR_INVALID_ARG;
+    *total = 0;
+    *free_bytes = 0;
     VE_TRY
-    vm::VolumeManager::Traits t;
-    if (mgr().traits(vol, t) != vm::Status::Ok) return VE_ERR_NOT_UNLOCKED;
     vm::SpaceInfo si;
+    // Unknown space is VE_ERR_FAILED (outputs stay 0), never a 0 / 0 answer: callers treat 0 free bytes as "full".
     const vm::Status st = mgr().spaceInfo(vol, si);
-    if (st == vm::Status::NotUnlocked) return VE_ERR_NOT_UNLOCKED;
-    if (st != vm::Status::Ok) {
-        if (t.family == vm::Family::FolderVault) return VE_ERR_FAILED;
-        // Legacy: a container whose filesystem cannot say reports 0 / 0 rather than an error.
-        if (!mgr().isUnlocked(vol)) return VE_ERR_NOT_UNLOCKED;
-        si = vm::SpaceInfo{0, 0};
-    }
+    if (st != vm::Status::Ok) return rcOf(st);
     *total = si.total > 0 ? static_cast<uint64_t>(si.total) : 0;
     *free_bytes = si.free > 0 ? static_cast<uint64_t>(si.free) : 0;
     return VE_OK;

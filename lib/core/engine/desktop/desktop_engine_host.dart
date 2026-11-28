@@ -609,6 +609,9 @@ class DesktopEngineHost {
         {
           final r = await pool.call('list', [_vol(args['filePath']), (args['dirPath'] as String?) ?? '']) as List<Object?>;
           _throwFor(r[0] as int);
+          // null = the listing failed (an I/O error the filesystem backend reported), as on Android; callers of
+          // listDirectory already treat null as a failed listing. An empty folder is an empty list.
+          if (r[0] != veOk) return null;
           return (r[1] as List<Object?>).cast<String>();
         }
       // The `...Media...` pair is what the viewers use (full-resolution images, prefetch, players). On Android
@@ -630,9 +633,14 @@ class DesktopEngineHost {
             (args['length'] as num).toInt(),
           ]) as List<Object?>;
           final rc = r[0] as int;
-          if (rc == veOk) return r[1] as Uint8List;
+          if (rc == veOk) {
+            // The engine answers OK with no bytes at the end of a file (every kind of slot); the channel contract
+            // is null there, as on Android, so no caller has to tell an empty chunk from a failed read.
+            final bytes = r[1] as Uint8List;
+            return bytes.isEmpty ? null : bytes;
+          }
           _throwFor(rc);
-          return null; // EOF / failure, same as the native side
+          return null; // failure, same as the native side
         }
       case ChannelMethods.writeFileChunk:
         return _ok(await pool.call('write', [

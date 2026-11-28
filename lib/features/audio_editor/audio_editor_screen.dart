@@ -24,9 +24,12 @@ import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
-import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/editor_seek_pump.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/editor_discard_dialog.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/editor_playback_buttons.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/editor_toast.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/editor_swipe_to_seek_area.dart';
 import 'package:vaultexplorer/features/video_editor/models/edit_segment.dart';
 import 'package:vaultexplorer/features/video_editor/models/video_edit_math.dart';
@@ -94,21 +97,18 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
   final GlobalKey<AudioTimelineState> _timelineKey =
       GlobalKey<AudioTimelineState>();
 
-  bool _scrubbing = false;
-  bool _resumeAfterScrub = false;
   bool _exporting = false;
   bool _previewResult = false;
   bool _skippingGap = false;
   bool _isMuted = false;
   int _volumeBeforeMute = 100;
   double _playbackSpeed = 1.0;
-  OverlayEntry? _toastEntry;
-  Timer? _toastTimer;
+  final EditorToast _toaster = EditorToast();
 
-  // Seek pump: only the latest requested position is ever sent, one at a time.
-  int? _pendingSeekUs;
-  bool _seeking = false;
-  Completer<void>? _seekIdle;
+  late final EditorSeekPump _seek = EditorSeekPump(
+    player: () => _player,
+    logTag: _tag,
+  );
 
   bool get _isLocal => widget.container.isLocalStorage;
 
@@ -141,7 +141,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     _events.removeContainerLockedListener(_onContainerLocked);
     unawaited(_fileIoApi.setKeepScreenOn(false));
     WidgetsBinding.instance.removeObserver(this);
-    _clearToast();
+    _toaster.clear();
     final waveOp = _waveOpId;
     if (waveOp != null) {
       unawaited(_api.cancel(waveOp)); // stop decoding for nobody
@@ -182,29 +182,8 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     if (didPop || _exporting) return;
     final editor = _editor;
     if (editor != null && editor.hasUnsavedChanges) {
-      final l10n = context.l10n;
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l10n.videoEditorDiscardTitle),
-          content: Text(l10n.videoEditorDiscardMessage),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: ctx.colors.error,
-                foregroundColor: ctx.colors.onError,
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(l10n.videoEditorDiscardAction),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true || !mounted) return;
+      final confirmed = await confirmDiscardEditorChanges(context);
+      if (!confirmed || !mounted) return;
     }
     await _shutdownPlayer();
     if (mounted) Navigator.of(context).pop();
@@ -342,7 +321,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
   }
 
   void _onPlayerChanged() {
-    if (_scrubbing || _seeking) return;
+    if (_seek.isBusy) return;
     final player = _player;
     final editor = _editor;
     if (player == null || editor == null) return;
@@ -416,48 +395,14 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     final editor = _editor;
     final t = editor == null ? us : us.clamp(0, editor.durationUs).toInt();
     _playhead.value = t;
-    return _requestSeek(t);
+    return _seek.request(t);
   }
 
-  Future<void> _requestSeek(int us) {
-    _pendingSeekUs = us;
-    if (_seeking) return _seekIdle!.future;
-    _seeking = true;
-    _seekIdle = Completer<void>();
-    unawaited(_runSeekLoop());
-    return _seekIdle!.future;
-  }
-
-  Future<void> _runSeekLoop() async {
-    try {
-      while (_pendingSeekUs != null) {
-        final us = _pendingSeekUs!;
-        _pendingSeekUs = null;
-        final player = _player;
-        if (player == null || player.isDisposed) break;
-        await player.seekTo(Duration(milliseconds: (us + 999) ~/ 1000));
-      }
-    } catch (e) {
-      VeLog.w(_tag, 'Seek failed', e);
-    } finally {
-      _seeking = false;
-      _seekIdle!.complete();
-    }
-  }
-
-  void _onScrubStart() {
-    _scrubbing = true;
-    _resumeAfterScrub = _player?.value.isPlaying ?? false;
-    if (_resumeAfterScrub) unawaited(_player?.pause());
-  }
+  void _onScrubStart() => _seek.scrubStart();
 
   void _onScrub(int us) => unawaited(_seekToUs(us));
 
-  void _onScrubEnd() {
-    _scrubbing = false;
-    if (_resumeAfterScrub) unawaited(_player?.play());
-    _resumeAfterScrub = false;
-  }
+  void _onScrubEnd() => _seek.scrubEnd();
 
   void _onTimelineTap(int us) {
     _editor?.selectAt(us);
@@ -518,11 +463,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     setState(() => _playbackSpeed = speed);
   }
 
-  String _speedValue(double speed) {
-    final value = speed.toString();
-    return value.endsWith('.0') ? value.substring(0, value.length - 2) : value;
-  }
-
   /// Jumps to the previous / next segment edge (or the start / end of the file).
   void _jumpCutPoint({required bool forward}) {
     final editor = _editor;
@@ -561,31 +501,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
 
   void _toast(String message, {AppBannerTone tone = AppBannerTone.info}) {
     if (!mounted) return;
-    _clearToast();
-    final overlay = Overlay.of(context);
-    final top = MediaQuery.paddingOf(context).top + kToolbarHeight + 8;
-    _toastEntry = OverlayEntry(
-      builder: (_) => Positioned(
-        top: top,
-        left: 16,
-        right: 16,
-        child: IgnorePointer(
-          child: Material(
-            color: Colors.transparent,
-            child: InlineBanner(message, tone: tone),
-          ),
-        ),
-      ),
-    );
-    overlay.insert(_toastEntry!);
-    _toastTimer = Timer(const Duration(seconds: 2), _clearToast);
-  }
-
-  void _clearToast() {
-    _toastTimer?.cancel();
-    _toastTimer = null;
-    _toastEntry?.remove();
-    _toastEntry = null;
+    _toaster.show(context, message, tone: tone);
   }
 
   void _setStart() {
@@ -1369,7 +1285,10 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
         ),
-        _buildSpeedButton(context),
+        EditorSpeedButton(
+          speed: _playbackSpeed,
+          onSelected: _setPlaybackSpeed,
+        ),
         const SizedBox(width: 4),
         ActionChip(
           avatar: const Icon(Icons.layers_rounded, size: 18),
@@ -1386,81 +1305,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
           ),
         ),
       ],
-    );
-  }
-
-  /// Mute toggle: a square transport-row button of [box] size.
-  Widget _buildMuteButton(
-    BuildContext context, {
-    required double box,
-    required double iconSize,
-  }) {
-    final l10n = context.l10n;
-    final cs = context.colors;
-    return IconButton.filledTonal(
-      style: IconButton.styleFrom(
-        minimumSize: Size(box, box),
-        padding: EdgeInsets.zero,
-        backgroundColor: _isMuted ? cs.primaryContainer : null,
-        foregroundColor: _isMuted ? cs.onPrimaryContainer : null,
-      ),
-      iconSize: iconSize,
-      tooltip: _isMuted ? l10n.unmuteTooltip : l10n.muteTooltip,
-      icon: Icon(_isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
-      onPressed: () => unawaited(_toggleMute()),
-    );
-  }
-
-  Widget _buildSpeedButton(BuildContext context) {
-    final l10n = context.l10n;
-    final cs = context.colors;
-    return PopupMenuButton<double>(
-      tooltip: l10n.playbackSpeedLabel,
-      initialValue: _playbackSpeed,
-      onSelected: _setPlaybackSpeed,
-      itemBuilder: (context) => [
-        for (final speed in MediaViewerConstants.playbackSpeeds)
-          PopupMenuItem<double>(
-            value: speed,
-            child: Text(
-              speed == 1.0
-                  ? l10n.playbackSpeedNormal(_speedValue(speed))
-                  : l10n.playbackSpeedValue(_speedValue(speed)),
-            ),
-          ),
-      ],
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: _playbackSpeed == 1.0
-              ? cs.surfaceContainerHighest
-              : cs.primaryContainer,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.speed_rounded,
-              size: 18,
-              color: _playbackSpeed == 1.0
-                  ? cs.onSurfaceVariant
-                  : cs.onPrimaryContainer,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${_speedValue(_playbackSpeed)}×',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: _playbackSpeed == 1.0
-                    ? cs.onSurfaceVariant
-                    : cs.onPrimaryContainer,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1549,7 +1393,12 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
             ),
             onPressed: () => setState(() => _previewResult = !_previewResult),
           ),
-          _buildMuteButton(context, box: box, iconSize: iconSize),
+          EditorMuteButton(
+            muted: _isMuted,
+            box: box,
+            iconSize: iconSize,
+            onToggle: () => unawaited(_toggleMute()),
+          ),
         ],
       ),
     );

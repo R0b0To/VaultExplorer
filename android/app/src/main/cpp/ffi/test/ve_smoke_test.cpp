@@ -231,6 +231,23 @@ static void runFilesystem(const char* fs, int64_t sizeBytes) {
                                      reinterpret_cast<const uint8_t*>(big.data()) + half, big.size() - half), VE_OK);
         CHECK(readAll(kVol, "/docs/big.bin") == big);
 
+        // ABI 17: the same honest answers as a folder vault gives. End of file (at or past the size) is VE_OK with
+        // no bytes; a file that does not exist is VE_ERR_FAILED, never an empty result. (A missing folder is not
+        // checked: the FAT backend lists it as empty on purpose and NTFS / ext always succeed, see fs_ops.h.)
+        {
+            ve_buffer atEof{};
+            CHECK_RC(ve_read_file_chunk(kVol, "/docs/hello.txt", (int64_t)payload.size(), 16, &atEof), VE_OK);
+            CHECK(atEof.len == 0);
+            ve_buffer_free(&atEof);
+            ve_buffer pastEof{};
+            CHECK_RC(ve_read_file_chunk(kVol, "/docs/hello.txt", (int64_t)payload.size() + 4096, 16, &pastEof), VE_OK);
+            CHECK(pastEof.len == 0);
+            ve_buffer_free(&pastEof);
+            ve_buffer noFile{};
+            CHECK_RC(ve_read_file_chunk(kVol, "/docs/no-such-file.bin", 0, 16, &noFile), VE_ERR_FAILED);
+            ve_buffer_free(&noFile);
+        }
+
         auto root = listDir(kVol, "/");
         auto docs = listDir(kVol, "/docs");
         std::printf("  / has %zu entries, /docs has %zu\n", root.size(), docs.size());

@@ -3,6 +3,8 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
+**Honest file-call answers (ABI 17).** The file-level `ve_*` calls answer the same way for a disk container and a folder vault. `ve_list_directory` returns `VE_ERR_FAILED` when the filesystem backend reports a failed listing (it used to turn that into OK with an empty list for a disk container; a folder that does not exist still lists as empty on FAT, and NTFS / ext never report a failure, see `fs_ops.h`), `ve_read_file_chunk` returns OK with no bytes at the end of a file (it used to return `VE_ERR_FAILED` for a disk container), and `ve_get_space_info` returns `VE_ERR_FAILED` when the filesystem cannot report its space (it used to answer OK with 0 / 0, which the import guard in `desktop_transfers.dart` read as "volume full"). On the channel, `listDirectory` now gives `null` for a failed listing and `readFileChunk` gives `null` at the end of a file, as on Android. `ve_smoke_test` checks the end-of-file and missing-file answers on FAT, exFAT, ext4 and NTFS. Operations after unlock report `VE_ERR_FAILED` rather than `VE_ERR_MOUNT_FAILED`; the Dart host only maps `veErrMountFailed` for the unlock calls, so nothing there changed.
+
 **Raw drives (ABI 14).** The desktop app can mount an encrypted disk or partition (BitLocker, VeraCrypt, LUKS) picked from the list of drives of the computer (see "Raw drives" below). `VE_ABI_VERSION` is 14: `ve_list_block_devices` and `ve_unlock_device` are new, on top of the composite-container calls of ABI 13.
 
 **Update for v1.66.0 (ABI 13).** The numbers and file lists below that mention v1.50 / ABI 8 are history; the engine

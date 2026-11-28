@@ -189,6 +189,12 @@ int MountFs::loadDirLocked(const std::string& dir, bool force, DirCache** out) {
     int32_t rc = ve_list_directory(vol_, ep.c_str(), &buf);
     if (rc != VE_OK) {
         ve_buffer_free(&buf);
+        // The engine says VE_ERR_FAILED for any folder it cannot list. When the folder is simply gone (never
+        // created, or removed by another route) that is "no such file or directory", not an I/O error.
+        if (rc == VE_ERR_FAILED && !isRoot(dir)) {
+            Attr parentAttr;
+            if (lookupLocked(dir, parentAttr) == -ENOENT) return -ENOENT;
+        }
         return engineErr(rc, -EIO);
     }
     const bool ok = parseWire(buf, items);

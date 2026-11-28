@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 16;
+const int kVeAbiVersion = 17;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;

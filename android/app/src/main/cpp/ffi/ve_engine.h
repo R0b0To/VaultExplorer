@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 16 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 17 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -250,7 +250,12 @@ VE_API int32_t ve_change_password(const ve_change_password_params* params);
  * Paths are UTF-8, '/'-separated, relative to the volume root ("/" or ""). */
 
 /* Directory listing, packed as: u32 count, then count x (u32 len, len bytes),
- * all little-endian. Each entry is the engine's directory-entry wire string. */
+ * all little-endian. Each entry is the engine's directory-entry wire string.
+ * An empty folder is VE_OK with count 0. When the filesystem backend reports that a folder could not be read
+ * (an I/O error) the answer is VE_ERR_FAILED, and an empty slot or an ended session is VE_ERR_NOT_UNLOCKED; both
+ * hold for every kind of slot (before ABI 17 a disk container turned a failed listing into VE_OK with an empty list).
+ * A folder that does not exist is not reported as an error by the FAT backend (it lists as empty, on purpose) and
+ * NTFS / ext always succeed; see fs_ops.h. */
 VE_API int32_t ve_list_directory(int32_t vol_id, const char* path, ve_buffer* out);
 
 /* Sizes: >= 0 on success; -1 when the path does not exist (or is the wrong kind) -- the same "-1 = missing"
@@ -258,7 +263,9 @@ VE_API int32_t ve_list_directory(int32_t vol_id, const char* path, ve_buffer* ou
 VE_API int64_t ve_get_file_size(int32_t vol_id, const char* path);
 VE_API int64_t ve_get_folder_size(int32_t vol_id, const char* path);
 
-/* Reads up to length bytes (<= 64 MiB) at offset. EOF/failure -> VE_ERR_FAILED. */
+/* Reads up to length bytes (<= 64 MiB) at offset. At or past the end of an existing file the answer is VE_OK with
+ * out->len == 0 (out->data null): end of file is not an error. A missing file or an I/O error is VE_ERR_FAILED.
+ * (Before ABI 17 a disk container reported end of file as VE_ERR_FAILED; a folder vault already answered VE_OK.) */
 VE_API int32_t ve_read_file_chunk(int32_t vol_id, const char* path, int64_t offset,
                                   int32_t length, ve_buffer* out);
 /* Writes at offset (creates the file; offset 0 truncates, as on Android). <= 64 MiB. */
@@ -278,6 +285,8 @@ VE_API int32_t ve_import_file(int32_t vol_id, const char* vault_path,
 VE_API int32_t ve_export_file(int32_t vol_id, const char* vault_path,
                               const char* host_dest_path, int32_t op_id);
 
+/* VE_OK with the sizes in bytes, or VE_ERR_FAILED when the filesystem cannot say (both outputs are then 0). Callers
+ * must treat FAILED as "unknown", not as "full": before ABI 17 a disk container answered VE_OK with 0 / 0 instead. */
 VE_API int32_t ve_get_space_info(int32_t vol_id, uint64_t* total_bytes, uint64_t* free_bytes);
 /* Writes e.g. "FAT32" / "NTFS" / "ext4" into buf; returns its length, or <0. */
 VE_API int32_t ve_get_filesystem_label(int32_t vol_id, char* buf, size_t cap);

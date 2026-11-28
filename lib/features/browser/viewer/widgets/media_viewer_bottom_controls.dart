@@ -13,6 +13,7 @@ import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dar
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_volume_control.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_progress_bar.dart';
 import 'package:vaultexplorer/features/library/widgets/audio_waveform_seek_bar.dart';
 
@@ -46,6 +47,12 @@ class MediaViewerBottomControls extends StatelessWidget {
   /// where the phone-sized touch targets look oversized.
   final bool compact;
 
+  /// The volume (0-100) and how to set it. Given on desktop, where the mute
+  /// button becomes a [MediaViewerVolumeControl] with a slider; without them
+  /// it stays a plain mute button.
+  final ValueListenable<int>? volumeListenable;
+  final ValueChanged<int>? onVolumeChanged;
+
   const MediaViewerBottomControls({
     super.key,
     required this.playlistController,
@@ -70,6 +77,8 @@ class MediaViewerBottomControls extends StatelessWidget {
     this.onMenuOpened,
     this.onMenuClosed,
     this.compact = false,
+    this.volumeListenable,
+    this.onVolumeChanged,
   });
 
   double get _buttonSize => compact ? 32.0 : 40.0;
@@ -138,6 +147,20 @@ class MediaViewerBottomControls extends StatelessWidget {
           // highlight says whether a section is being set or repeating.
           onTap: () => onExecuteAction(action),
         ),
+      );
+    }
+
+    if (action == MediaViewerAction.mute &&
+        volumeListenable != null &&
+        onVolumeChanged != null) {
+      return MediaViewerVolumeControl(
+        level: volumeListenable!,
+        isMuted: isMuted,
+        onToggleMute: () => onExecuteAction(action),
+        onChanged: onVolumeChanged!,
+        onInteraction: onStartHideTimer,
+        buttonSize: _buttonSize,
+        iconSize: _glyphSize,
       );
     }
 

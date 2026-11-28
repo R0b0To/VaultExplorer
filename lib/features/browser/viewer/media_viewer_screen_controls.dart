@@ -72,6 +72,22 @@ extension _MediaViewerControls on _MediaViewerScreenState {
     _showKeyToast('${_effectiveVolume}%');
   }
 
+  /// The volume slider (or the wheel over it) set the volume to [level].
+  /// Raising it while muted unmutes, as the keyboard does.
+  void _setVolumeWithPointer(int level) {
+    final controller = _playbackManager.activeController;
+    _volumeLevel = level.clamp(0, 100);
+    if (_isMuted && level > 0) {
+      _sessionController.setIsMuted(false);
+      ref.read(appSettingsServiceProvider).loadSettings().then((s) {
+        ref
+            .read(appSettingsServiceProvider)
+            .saveSettings(s.copyWith(videoMuted: false));
+      });
+    }
+    if (controller != null) unawaited(controller.setVolume(_effectiveVolume));
+  }
+
   void _stepPlaybackSpeed(int direction) {
     const speeds = MediaViewerConstants.playbackSpeeds;
     var index = speeds.indexWhere((s) => (s - _playbackSpeed).abs() < 0.001);

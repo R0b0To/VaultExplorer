@@ -466,7 +466,13 @@ extension _MediaViewerSheets on _MediaViewerScreenState {
         _sessionController.rotateClockwise(_playlistController.currentFile);
         break;
       case MediaViewerAction.pictureInPicture:
-        if (!isImage) unawaited(_enterPictureInPictureWindow());
+        if (!isImage) {
+          unawaited(
+            PlatformFeatures.isDesktop
+                ? _floatVideoOnDesktop()
+                : _enterPictureInPictureWindow(),
+          );
+        }
         break;
       case MediaViewerAction.lockControls:
         if (!_isEditingLayout) _setControlsLocked(true);

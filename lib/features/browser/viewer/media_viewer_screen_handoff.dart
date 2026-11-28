@@ -50,7 +50,7 @@ extension _MediaViewerHandoff on _MediaViewerScreenState {
   /// app is left). A video can also be sent to the system's window right away
   /// with the picture-in-picture button, see [_enterPictureInPictureWindow].
   /// Nothing that is paused is kept.
-  void _prepareBackgroundPlaybackHandoff() {
+  void _prepareBackgroundPlaybackHandoff({bool forceFloating = false}) {
     _backgroundPlaybackHandoff = null;
     _floatingClose.value = _FloatingClose.none;
     if (widget._isPreviewOnly || _playlistController.isEmpty) return;
@@ -73,7 +73,12 @@ extension _MediaViewerHandoff on _MediaViewerScreenState {
     if (value.hasError) return;
     final finished =
         value.duration > Duration.zero && value.position >= value.duration;
-    if (finished || !(value.isPlaying || !controller.pauseRequested)) return;
+    // A paused video is let go with the viewer, except when the person asked
+    // for the floating window itself: then it floats paused, as it is.
+    if (!forceFloating &&
+        (finished || !(value.isPlaying || !controller.pauseRequested))) {
+      return;
+    }
     final config = ref
         .read(fileManagerToolbarSettingsProvider(null))
         .config
@@ -87,7 +92,9 @@ extension _MediaViewerHandoff on _MediaViewerScreenState {
         pipWindow: false,
       );
     } else {
-      if (!config.floatingPlayerEnabled) return;
+      // [forceFloating]: the person asked for it with the PiP button, so the
+      // "floating video player on close" setting does not apply.
+      if (!config.floatingPlayerEnabled && !forceFloating) return;
       _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(
         pipWindow: false,
         floatingPlayer: true,
@@ -97,7 +104,9 @@ extension _MediaViewerHandoff on _MediaViewerScreenState {
     if (handoff?.libraryPlayback == true) {
       BackgroundPlaybackHost.instance.previewMiniPlayerTransition(handoff!);
     }
-    if (_backgroundPlaybackHandoff != null && !value.isPlaying) {
+    if (_backgroundPlaybackHandoff != null &&
+        !value.isPlaying &&
+        !(forceFloating && controller.pauseRequested)) {
       // It was about to start, and the code that would have started it (this
       // viewer's) is going away: whoever takes the player over must see that
       // it plays.
@@ -110,14 +119,14 @@ extension _MediaViewerHandoff on _MediaViewerScreenState {
   /// If the player does not exist yet, because the video was only just opened,
   /// it waits for it, briefly: going back straight after opening a video
   /// should still float it, not drop it.
-  Future<void> _closeFromBackPress() async {
+  Future<void> _closeFromBackPress({bool forceFloating = false}) async {
     if (_closingFromBackPress) return;
     _closingFromBackPress = true;
     _closing = true;
     try {
       await _waitForPlayerToExist();
       if (!mounted) return;
-      _prepareBackgroundPlaybackHandoff();
+      _prepareBackgroundPlaybackHandoff(forceFloating: forceFloating);
       _beginFloatingFlight();
       Navigator.of(context).pop();
     } finally {
@@ -380,6 +389,31 @@ extension _MediaViewerHandoff on _MediaViewerScreenState {
     pipWindow: pipWindow,
     floatingPlayer: floatingPlayer,
   );
+
+  /// The viewer's picture-in-picture button on desktop, where there is no
+  /// system PiP window: the viewer closes and the video carries on in the
+  /// app's own small floating window, which can be dragged to any corner and
+  /// opened back up into the viewer. Same as closing the viewer with the
+  /// floating video player on, but asked for explicitly, so it does not depend
+  /// on that setting.
+  Future<void> _floatVideoOnDesktop() async {
+    if (widget._isPreviewOnly || _closing || _playlistController.isEmpty) {
+      return;
+    }
+    final file = _playbackManager.currentFileName;
+    final controller = _playbackManager.activeController;
+    if (file == null ||
+        file != _playlistController.currentFile ||
+        !MediaViewerConstants.isVideo(file) ||
+        controller == null ||
+        controller.isDisposed) {
+      return;
+    }
+    final value = controller.value;
+    if (!value.isInitialized || value.hasError) return;
+    if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
+    await _closeFromBackPress(forceFloating: true);
+  }
 
   /// The viewer's picture-in-picture button: the app itself becomes Android's
   /// PiP window around the video that is playing, with the viewer left open

@@ -326,7 +326,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   // Keyboard-adjusted volume (0-100). Mute still wins over it; see
   // [_effectiveVolume]. Kept for the lifetime of the viewer so it carries
   // across playlist items like the mute state does.
-  int _volumeLevel = 100;
+  // A notifier, so the desktop volume slider follows the keyboard too.
+  final ValueNotifier<int> _volumeNotifier = ValueNotifier<int>(100);
+  int get _volumeLevel => _volumeNotifier.value;
+  set _volumeLevel(int value) => _volumeNotifier.value = value;
   int get _effectiveVolume => _isMuted ? 0 : _volumeLevel;
 
   /// Bumped to reveal the lock button without a touch (a back press while
@@ -508,7 +511,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   ) {
     final hideCarouselAction = !_enableCarousel;
     // No picture-in-picture button on a device without the feature.
-    final hidePictureInPicture = !PictureInPictureBridge.isSupported.value;
+    // Desktop has no system window for it, but the floating player stands in.
+    final hidePictureInPicture =
+        !PictureInPictureBridge.isSupported.value && !PlatformFeatures.isDesktop;
     if (!widget._isPreviewOnly &&
         !hideCarouselAction &&
         !hidePictureInPicture) {
@@ -2018,6 +2023,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   @override
   void dispose() {
+    _volumeNotifier.dispose();
     FocusManager.instance.removeEarlyKeyEventHandler(_handleViewerKey);
     _handledViewerKeysDown.clear();
     unawaited(_saveActivePlaybackPosition());
@@ -3199,6 +3205,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                                           ),
                                           MediaViewerBottomControls(
                                             compact: PlatformFeatures.isDesktop,
+                                            volumeListenable:
+                                                PlatformFeatures.isDesktop
+                                                ? _volumeNotifier
+                                                : null,
+                                            onVolumeChanged:
+                                                PlatformFeatures.isDesktop
+                                                ? _setVolumeWithPointer
+                                                : null,
                                             playlistController:
                                                 _playlistController,
                                             playbackManager: _playbackManager,
